@@ -1,0 +1,45 @@
+// Esquema de Prisma para SQL Server.
+// Documentación: https://www.prisma.io/docs/orm/overview/databases/sql-server
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model PurchaseRecord {
+  id                 String    @id @default(uuid())
+
+  // Mes/informe de origen (ej. "ENERO"), útil para reportes históricos
+  informe            String?   @db.NVarChar(50)
+
+  fechaSolicitud     DateTime? @db.Date
+  fechaEntrega       DateTime? @db.Date
+
+  area               String?   @db.NVarChar(200)
+  responsable        String?   @db.NVarChar(200)
+  estado             String?   @db.NVarChar(50)
+  categoria          String?   @db.NVarChar(300)
+  descripcion        String    @db.NVarChar(Max)
+
+  medioPago          String?   @db.NVarChar(100)
+  licitacion         String?   @db.NVarChar(100)
+  estadoLegalizacion String?   @db.NVarChar(100)
+  proveedor          String?   @db.NVarChar(300)
+  fe                 String?   @db.NVarChar(200)
+
+  valorConIva        Float?
+  valorSinIva        Float?
+  valorCot           Float?
+
+  observaciones      String?   @db.NVarChar(Max)
+  radicado           Boolean   @default(false)
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@map("purchase_records")
+}
