@@ -25,7 +25,6 @@ const COLUMNS = [
   { key: "valorConIva", label: "Valor + IVA" },
   { key: "valorSinIva", label: "Valor sin IVA" },
   { key: "valorCot", label: "Valor Cot." },
-  { key: "radicado", label: "Radicado" },
   { key: "observaciones", label: "Observaciones" },
 ];
 
@@ -283,17 +282,6 @@ export default function RegistrosView({ records, setRecords, onFilteredChange })
                     <td className="num">{fmtPesos(r.valorConIva)}</td>
                     <td className="num">{fmtPesos(r.valorSinIva)}</td>
                     <td className="num">{fmtPesos(r.valorCot)}</td>
-                    <td className="check-col">
-                      <button
-                        type="button"
-                        className={`btn-check${r.radicado ? " checked" : ""}`}
-                        onClick={() => toggleRadicado(r)}
-                        aria-pressed={r.radicado}
-                        title="Radicado"
-                      >
-                        ✓
-                      </button>
-                    </td>
                     <td className="truncate wide">{r.observaciones || "—"}</td>
                     <td className="actions-cell">
                       {confirmDeleteId === r.id ? (
@@ -304,6 +292,15 @@ export default function RegistrosView({ records, setRecords, onFilteredChange })
                         </div>
                       ) : (
                         <div className="row-actions">
+                          <button
+                            type="button"
+                            className={`btn-check${r.radicado ? " checked" : ""}`}
+                            onClick={() => toggleRadicado(r)}
+                            aria-pressed={r.radicado}
+                            title="Radicado"
+                          >
+                            ✓
+                          </button>
                           <button type="button" className="btn-ghost icon-btn" onClick={() => setModalRecord(r)} title="Editar">✏️</button>
                           <button type="button" className="btn-ghost icon-btn" onClick={() => setConfirmDeleteId(r.id)} title="Eliminar">🗑️</button>
                         </div>

@@ -3,8 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import RegistrosView from "@/components/RegistrosView";
 import DashboardView from "@/components/DashboardView";
+import Sidebar from "@/components/Sidebar";
 import { monthKey, monthLabel } from "@/lib/format";
 import { saveBlob, todayISO } from "@/lib/exportHelpers";
+
+const TAB_TITLES = {
+  savings: "Dashboard de compras",
+  registros: "Registros",
+};
 
 const CSV_HEADERS = [
   "Fecha solicitud", "Fecha entrega", "Área", "Responsable", "Estado de compra",
@@ -192,74 +198,58 @@ export default function PanelCompras({ initialRecords, initialMeta }) {
   }
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="mark">Sinco · Compras</span>
-          <span className="sep">·</span>
-          <span className="sub">Compras · {records.length} registros</span>
-        </div>
-        <div className="tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "savings"}
-            className="tab"
-            onClick={() => setActiveTab("savings")}
-          >
-            Dashboard de compras
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "registros"}
-            className="tab"
-            onClick={() => setActiveTab("registros")}
-          >
-            Registros
-          </button>
-        </div>
-        <div ref={exportRef} style={{ position: "relative" }}>
-          <button type="button" className="btn-sync" onClick={() => setExportOpen((v) => !v)}>
-            <span className="ic">⬇️</span> Exportar
-          </button>
-          <div className="sync-panel" hidden={!exportOpen}>
-            <h4>Exportar registros</h4>
-            <p>Elige un mes (opcional) y el formato de exportación.</p>
-            <div className="field" style={{ marginBottom: 10 }}>
-              <label htmlFor="export-month">Mes</label>
-              <select
-                id="export-month"
-                value={exportMonth}
-                onChange={(e) => setExportMonth(e.target.value)}
-              >
-                <option value="">Todos los meses</option>
-                {monthOptions.map((k) => (
-                  <option key={k} value={k}>{monthLabel(k, multiYear)}</option>
-                ))}
-              </select>
-            </div>
-            <div className="export-options">
-              <button type="button" className="btn" onClick={exportCSV}>📊 Excel (.csv)</button>
-              <button type="button" className="btn" onClick={exportPDF}>📄 PDF</button>
-              <button type="button" className="btn" onClick={exportWord}>📝 Word (.docx)</button>
+    <div className="app-shell">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      <div className="app-main">
+        <header className="topbar">
+          <div className="brand">
+            <span className="mark">{TAB_TITLES[activeTab]}</span>
+            <span className="sep">·</span>
+            <span className="sub">{records.length} registros</span>
+          </div>
+          <div ref={exportRef} style={{ position: "relative", marginLeft: "auto" }}>
+            <button type="button" className="btn-sync" onClick={() => setExportOpen((v) => !v)}>
+              <span className="ic">⬇️</span> Exportar
+            </button>
+            <div className="sync-panel" hidden={!exportOpen}>
+              <h4>Exportar registros</h4>
+              <p>Elige un mes (opcional) y el formato de exportación.</p>
+              <div className="field" style={{ marginBottom: 10 }}>
+                <label htmlFor="export-month">Mes</label>
+                <select
+                  id="export-month"
+                  value={exportMonth}
+                  onChange={(e) => setExportMonth(e.target.value)}
+                >
+                  <option value="">Todos los meses</option>
+                  {monthOptions.map((k) => (
+                    <option key={k} value={k}>{monthLabel(k, multiYear)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="export-options">
+                <button type="button" className="btn" onClick={exportCSV}>📊 Excel (.csv)</button>
+                <button type="button" className="btn" onClick={exportPDF}>📄 PDF</button>
+                <button type="button" className="btn" onClick={exportWord}>📝 Word (.docx)</button>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main>
-        <div className="view" hidden={activeTab !== "savings"}>
-          <DashboardView records={records} />
-        </div>
-        <div className="view" hidden={activeTab !== "registros"}>
-          <RegistrosView
-            records={records}
-            setRecords={setRecords}
-            onFilteredChange={setRegistrosFiltered}
-          />
-        </div>
-      </main>
+        <main>
+          <div className="view" hidden={activeTab !== "savings"}>
+            <DashboardView records={records} />
+          </div>
+          <div className="view" hidden={activeTab !== "registros"}>
+            <RegistrosView
+              records={records}
+              setRecords={setRecords}
+              onFilteredChange={setRegistrosFiltered}
+            />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
