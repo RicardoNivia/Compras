@@ -1,8 +1,8 @@
-// Esquema de Prisma para SQL Server.
-// Documentación: https://www.prisma.io/docs/orm/overview/databases/sql-server
+// Esquema de Prisma para SQLite.
+// Documentación: https://www.prisma.io/docs/orm/overview/databases/sqlite
 
 datasource db {
-  provider = "sqlserver"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -14,28 +14,28 @@ model PurchaseRecord {
   id                 String    @id @default(uuid())
 
   // Mes/informe de origen (ej. "ENERO"), útil para reportes históricos
-  informe            String?   @db.NVarChar(50)
+  informe            String?
 
-  fechaSolicitud     DateTime? @db.Date
-  fechaEntrega       DateTime? @db.Date
+  fechaSolicitud     DateTime?
+  fechaEntrega       DateTime?
 
-  area               String?   @db.NVarChar(200)
-  responsable        String?   @db.NVarChar(200)
-  estado             String?   @db.NVarChar(50)
-  categoria          String?   @db.NVarChar(300)
-  descripcion        String    @db.NVarChar(Max)
+  area               String?
+  responsable        String?
+  estado             String?
+  categoria          String?
+  descripcion        String
 
-  medioPago          String?   @db.NVarChar(100)
-  licitacion         String?   @db.NVarChar(100)
-  estadoLegalizacion String?   @db.NVarChar(100)
-  proveedor          String?   @db.NVarChar(300)
-  fe                 String?   @db.NVarChar(200)
+  medioPago          String?
+  licitacion         String?
+  estadoLegalizacion String?
+  proveedor          String?
+  fe                 String?
 
   valorConIva        Float?
   valorSinIva        Float?
   valorCot           Float?
 
-  observaciones      String?   @db.NVarChar(Max)
+  observaciones      String?
   radicado           Boolean   @default(false)
 
   createdAt          DateTime  @default(now())

@@ -90,14 +90,14 @@
 
   /* ================= State ================= */
   // Los registros ya no vienen embebidos en un <script id="app-data">:
-  // se consultan en SQL Server (via Prisma) en el servidor y llegan aquí
+  // se consultan en SQLite (via Prisma) en el servidor y llegan aquí
   // como window.__INITIAL_STATE__ (ver app/PanelCompras.jsx). Se deja el
   // fallback al script embebido por si se reutiliza este archivo suelto.
   var dataEl = document.getElementById("app-data");
   var STATE = window.__INITIAL_STATE__ || (dataEl ? JSON.parse(dataEl.textContent) : { records: [], meta: {} });
   if (!STATE.meta) STATE.meta = {};
 
-  /* ================= Sincronización con la API / SQL Server ================= */
+  /* ================= Sincronización con la API / SQLite ================= */
   function apiCreateRecord(payload){
     return fetch("/api/records", {
       method: "POST",

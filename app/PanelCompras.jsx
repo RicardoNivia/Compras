@@ -56,7 +56,7 @@ export default function PanelCompras({ initialRecords }) {
     window.__panelComprasInitialized = true;
 
     // Estado inicial que app-logic.js lee en vez del antiguo
-    // <script id="app-data">: los registros vienen de SQL Server
+    // <script id="app-data">: los registros vienen de SQLite
     // (consultados con Prisma en el Server Component de la página).
     window.__INITIAL_STATE__ = {
       records: initialRecords || [],

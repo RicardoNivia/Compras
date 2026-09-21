@@ -1,5 +1,5 @@
 // Carga los registros originales del panel (los mismos que traía el
-// archivo HTML) en SQL Server. Se ejecuta con:
+// archivo HTML) en SQLite. Se ejecuta con:
 //   npx prisma db seed
 // (o automáticamente después de "prisma migrate dev").
 
@@ -29,7 +29,7 @@ async function main() {
   const filePath = path.join(__dirname, "seed-records.json");
   const raw = JSON.parse(fs.readFileSync(filePath, "utf-8"));
 
-  console.log(`Cargando ${raw.length} registros en SQL Server...`);
+  console.log(`Cargando ${raw.length} registros en SQLite...`);
 
   let count = 0;
   for (const r of raw) {

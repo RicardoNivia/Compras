@@ -4,7 +4,7 @@ import { toClientRecord, fromClientPayload } from "../../../lib/records";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/records — lista todos los registros de compras (SQL Server)
+// GET /api/records — lista todos los registros de compras (SQLite)
 export async function GET() {
   try {
     const records = await prisma.purchaseRecord.findMany({
