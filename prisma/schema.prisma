@@ -1,0 +1,45 @@
+// Prisma ORM con migraciones (prisma migrate) sobre SQLite.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Record {
+  id                  String   @id @default(cuid())
+  informe             String?
+  fechaSolicitud      String?
+  fechaEntrega        String?
+  area                String?
+  responsable         String?
+  estado              String?
+  categoria           String?
+  descripcion         String?
+  medioPago           String?
+  licitacion          String?
+  estadoLegalizacion  String?
+  proveedor           String?
+  fe                  String?
+  valorConIva         Float?
+  valorSinIva         Float?
+  valorCot            Float?
+  observaciones       String?
+  radicado            Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("records")
+}
+
+model Meta {
+  id            Int      @id @default(1)
+  sourceFile    String?
+  sourceSheet   String?
+  nextLocalSeq  Int      @default(1)
+  updatedAt     DateTime @updatedAt
+
+  @@map("meta")
+}

@@ -1,0 +1,33 @@
+{
+  "name": "compras-sinco",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:generate": "prisma generate",
+    "prisma:studio": "prisma studio",
+    "db:seed": "node prisma/seed.mjs",
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.20.0",
+    "next": "^14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
+    "html2canvas": "^1.4.1",
+    "docx": "^9.0.2"
+  },
+  "devDependencies": {
+    "prisma": "^5.20.0"
+  }
+}

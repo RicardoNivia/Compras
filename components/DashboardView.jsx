@@ -1,0 +1,846 @@
+"use client";
+
+import { useMemo, useRef, useState } from "react";
+import DetailModal from "@/components/DetailModal";
+import BarChartSvg from "@/components/charts/BarChartSvg";
+import StackedBarChartSvg from "@/components/charts/StackedBarChartSvg";
+import HistogramSvg from "@/components/charts/HistogramSvg";
+import GaugeSvg from "@/components/charts/GaugeSvg";
+import { fmtCOP, fmtCompact, fmtNum, fmtPesos, fmtDateDisplay, monthKey, monthLabel } from "@/lib/format";
+import { businessDaysBetween, businessDaysElapsedToToday } from "@/lib/businessDays";
+import { getDiasInfo } from "@/lib/diasInfo";
+
+const ESTADO_ORDER = ["Ejecutado", "Proceso", "Pendiente", "Anulado", "Sin estado"];
+const SERIES_COLOR_VARS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--sOther"];
+
+function sum(arr, fn) {
+  return arr.reduce((s, x) => s + (fn(x) || 0), 0);
+}
+
+function isAnulado(r) {
+  return r.estado === "Anulado";
+}
+
+function estadoLabel(estado) {
+  return estado && estado.trim() ? estado : "Sin estado";
+}
+
+export default function DashboardView({ records }) {
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [detailRecord, setDetailRecord] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const containerRef = useRef(null);
+
+  const monthOptions = useMemo(() => {
+    const set = new Set();
+    for (const r of records) {
+      const k = monthKey(r.fechaSolicitud);
+      if (k) set.add(k);
+    }
+    return Array.from(set).sort().reverse();
+  }, [records]);
+
+  const multiYear = useMemo(() => {
+    const years = new Set(monthOptions.map((k) => k.slice(0, 4)));
+    return years.size > 1;
+  }, [monthOptions]);
+
+  const allMonthsAsc = useMemo(() => [...monthOptions].sort(), [monthOptions]);
+
+  const filteredRecords = useMemo(() => {
+    if (!selectedMonth) return records;
+    return records.filter((r) => monthKey(r.fechaSolicitud) === selectedMonth);
+  }, [records, selectedMonth]);
+
+  const activeRecords = useMemo(() => filteredRecords.filter((r) => !isAnulado(r)), [filteredRecords]);
+
+  // ---------- KPI 1: valor del mes ----------
+  const kpi1 = useMemo(() => {
+    const currentMonth = allMonthsAsc[allMonthsAsc.length - 1] || null;
+    const lastClosedMonth = allMonthsAsc.length > 1 ? allMonthsAsc[allMonthsAsc.length - 2] : currentMonth;
+    const baseMonth = selectedMonth || lastClosedMonth;
+    const label = selectedMonth
+      ? `${monthLabel(selectedMonth, multiYear)} · mes seleccionado`
+      : `${monthLabel(lastClosedMonth || "", multiYear)} · último mes cerrado`;
+
+    const valueFor = (mk) => sum(
+      records.filter((r) => !isAnulado(r) && monthKey(r.fechaSolicitud) === mk),
+      (r) => r.valorConIva
+    );
+
+    const value = baseMonth ? valueFor(baseMonth) : 0;
+    const idx = allMonthsAsc.indexOf(baseMonth);
+    const prevMonth = idx > 0 ? allMonthsAsc[idx - 1] : null;
+    const prevValue = prevMonth ? valueFor(prevMonth) : null;
+    const delta = prevValue ? ((value - prevValue) / prevValue) * 100 : null;
+
+    let foot = "";
+    if (!selectedMonth && currentMonth && currentMonth !== lastClosedMonth) {
+      foot = `${monthLabel(currentMonth, multiYear)} en curso: ${fmtPesos(valueFor(currentMonth))}`;
+    }
+
+    return { label, value, delta, foot };
+  }, [records, allMonthsAsc, selectedMonth, multiYear]);
+
+  // ---------- KPI 2: cumplimiento de tiempos ----------
+  const cumplimiento = useMemo(() => {
+    const conEntrega = activeRecords.filter((r) => r.fechaEntrega);
+    const cumplieron = conEntrega.filter((r) => {
+      const d = businessDaysBetween(r.fechaSolicitud, r.fechaEntrega);
+      return d !== null && d <= 8;
+    });
+    const pct = conEntrega.length ? (cumplieron.length / conEntrega.length) * 100 : 0;
+    return { pct, total: conEntrega.length, cumplieron: cumplieron.length };
+  }, [activeRecords]);
+
+  const kpi3 = useMemo(() => {
+    const proceso = activeRecords.filter((r) => r.estado === "Proceso");
+    return { count: proceso.length, value: sum(proceso, (r) => r.valorConIva) };
+  }, [activeRecords]);
+
+  const kpi4 = useMemo(() => {
+    const conValor = activeRecords.filter((r) => r.valorConIva != null);
+    const avg = conValor.length ? sum(conValor, (r) => r.valorConIva) / conValor.length : null;
+    return { avg };
+  }, [activeRecords]);
+
+  // ---------- Solicitudes pendientes ----------
+  const pendientes = useMemo(() => {
+    const list = filteredRecords.filter((r) => {
+      if (r.fechaEntrega) return false;
+      const e = r.estado;
+      return !e || e === "Proceso" || e === "Pendiente";
+    });
+    return list
+      .map((r) => ({ record: r, dias: businessDaysElapsedToToday(r.fechaSolicitud) ?? -1 }))
+      .sort((a, b) => b.dias - a.dias);
+  }, [filteredRecords]);
+
+  // ---------- Valor de compras por mes ----------
+  const valorPorMes = useMemo(() => {
+    const currentMonth = allMonthsAsc[allMonthsAsc.length - 1];
+    return allMonthsAsc.map((mk) => {
+      const rows = filteredRecords.filter((r) => !isAnulado(r) && monthKey(r.fechaSolicitud) === mk);
+      return {
+        key: mk,
+        label: monthLabel(mk, multiYear),
+        value: sum(rows, (r) => r.valorConIva),
+        highlighted: mk === currentMonth,
+      };
+    }).filter((d) => selectedMonth ? d.key === selectedMonth : true);
+  }, [allMonthsAsc, filteredRecords, multiYear, selectedMonth]);
+
+  // ---------- Valor de compras por área y mes (top 5 áreas + otras) ----------
+  const areaMesStack = useMemo(() => {
+    const activeAll = filteredRecords.filter((r) => !isAnulado(r));
+    const totalsByArea = new Map();
+    for (const r of activeAll) {
+      const a = r.area || "Sin área";
+      totalsByArea.set(a, (totalsByArea.get(a) || 0) + (r.valorConIva || 0));
+    }
+    const top5 = Array.from(totalsByArea.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name]) => name);
+
+    const months = selectedMonth ? [selectedMonth] : allMonthsAsc;
+    const data = months.map((mk) => {
+      const rows = activeAll.filter((r) => monthKey(r.fechaSolicitud) === mk);
+      const segMap = new Map();
+      for (const name of top5) segMap.set(name, 0);
+      segMap.set("Otras", 0);
+      for (const r of rows) {
+        const a = r.area || "Sin área";
+        const key = top5.includes(a) ? a : "Otras";
+        segMap.set(key, (segMap.get(key) || 0) + (r.valorConIva || 0));
+      }
+      return {
+        key: mk,
+        label: monthLabel(mk, multiYear),
+        segments: Array.from(segMap.entries()).map(([name, value]) => ({ name, value })),
+      };
+    });
+    return { data, seriesNames: [...top5, "Otras"] };
+  }, [filteredRecords, allMonthsAsc, multiYear, selectedMonth]);
+
+  // ---------- Estado de la compra ----------
+  const estadoRows = useMemo(() => {
+    const map = new Map();
+    for (const r of filteredRecords) {
+      const e = estadoLabel(r.estado);
+      if (!map.has(e)) map.set(e, { count: 0, value: 0 });
+      const entry = map.get(e);
+      entry.count += 1;
+      entry.value += r.valorConIva || 0;
+    }
+    const keys = Array.from(map.keys());
+    keys.sort((a, b) => {
+      const ia = ESTADO_ORDER.indexOf(a);
+      const ib = ESTADO_ORDER.indexOf(b);
+      if (ia === -1 && ib === -1) return a.localeCompare(b, "es");
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+    const maxCount = Math.max(1, ...Array.from(map.values()).map((v) => v.count));
+    return keys.map((k) => ({ name: k, ...map.get(k), pct: (map.get(k).count / maxCount) * 100 }));
+  }, [filteredRecords]);
+
+  // ---------- Tiempos de solicitud a entrega ----------
+  const tiempos = useMemo(() => {
+    const pendientesRiesgo = filteredRecords.filter((r) => {
+      if (r.fechaEntrega || isAnulado(r)) return false;
+      const d = businessDaysElapsedToToday(r.fechaSolicitud);
+      return d !== null && d > 8;
+    }).length;
+
+    const buckets = [
+      { label: "0-2", min: 0, max: 2, count: 0 },
+      { label: "3-4", min: 3, max: 4, count: 0 },
+      { label: "5-6", min: 5, max: 6, count: 0 },
+      { label: "7-8", min: 7, max: 8, count: 0 },
+      { label: "9-12", min: 9, max: 12, count: 0 },
+      { label: "13+", min: 13, max: Infinity, count: 0 },
+    ];
+    let maxDias = 0;
+    const offenders = [];
+    for (const r of activeRecords) {
+      if (!r.fechaEntrega) continue;
+      const d = businessDaysBetween(r.fechaSolicitud, r.fechaEntrega);
+      if (d === null) continue;
+      maxDias = Math.max(maxDias, d);
+      const b = buckets.find((bk) => d >= bk.min && d <= bk.max);
+      if (b) b.count += 1;
+      if (d > 8) offenders.push({ record: r, over: d - 8, dias: d });
+    }
+    offenders.sort((a, b) => b.over - a.over);
+
+    return { pendientesRiesgo, buckets, maxDias, offenders: offenders.slice(0, 6) };
+  }, [filteredRecords, activeRecords]);
+
+  // ---------- Medio de pago ----------
+  const medioRows = useMemo(() => {
+    const map = new Map();
+    for (const r of activeRecords) {
+      const m = r.medioPago || "Sin definir";
+      if (!map.has(m)) map.set(m, { count: 0, value: 0 });
+      const entry = map.get(m);
+      entry.count += 1;
+      entry.value += r.valorConIva || 0;
+    }
+    const rows = Array.from(map.entries())
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.value - a.value);
+    const maxVal = Math.max(1, ...rows.map((r) => r.value));
+    return rows.map((r, i) => ({
+      ...r,
+      pct: (r.value / maxVal) * 100,
+      colorVar: SERIES_COLOR_VARS[i % SERIES_COLOR_VARS.length],
+    }));
+  }, [activeRecords]);
+
+  // ---------- Ahorro (KPI row 5) ----------
+  const ahorro = useMemo(() => {
+    const cotizados = activeRecords.filter((r) => r.valorCot != null && r.valorConIva != null);
+    const outliers = cotizados.filter((r) => r.valorCot > r.valorConIva * 20);
+    const validCot = cotizados.filter((r) => !(r.valorCot > r.valorConIva * 20));
+
+    const totalCompras = sum(activeRecords, (r) => r.valorConIva);
+    const valorCotizado = sum(validCot, (r) => r.valorCot);
+    const valorCompraCotizados = sum(validCot, (r) => r.valorConIva);
+    const ahorroTotal = valorCotizado - valorCompraCotizados;
+    const pctAhorro = valorCotizado ? (ahorroTotal / valorCotizado) * 100 : null;
+
+    return {
+      totalCompras, valorCotizado, valorCompraCotizados, ahorroTotal, pctAhorro,
+      outliersCount: outliers.length, validCot,
+    };
+  }, [activeRecords]);
+
+  // ---------- Cumplimiento de entregas (gauge) ----------
+  const gauge = useMemo(() => ({
+    pct: cumplimiento.pct,
+    total: cumplimiento.total,
+    cumplieron: cumplimiento.cumplieron,
+    noCumplieron: cumplimiento.total - cumplimiento.cumplieron,
+  }), [cumplimiento]);
+
+  // ---------- Resumen ejecutivo ----------
+  const resumen = useMemo(() => {
+    const ejecutados = filteredRecords.filter((r) => r.estado === "Ejecutado");
+    const totalEjecutado = sum(ejecutados, (r) => r.valorConIva);
+
+    let mayorAhorro = null;
+    for (const r of ahorro.validCot) {
+      const a = (r.valorCot || 0) - (r.valorConIva || 0);
+      if (!mayorAhorro || a > mayorAhorro.ahorro) mayorAhorro = { record: r, ahorro: a };
+    }
+
+    const areaTotals = new Map();
+    for (const r of activeRecords) {
+      const a = r.area || "Sin área";
+      areaTotals.set(a, (areaTotals.get(a) || 0) + (r.valorConIva || 0));
+    }
+    let mayorArea = null;
+    for (const [name, value] of areaTotals.entries()) {
+      if (!mayorArea || value > mayorArea.value) mayorArea = { name, value };
+    }
+
+    return {
+      totalEjecutado, ejecutadosCount: ejecutados.length,
+      ahorroTotal: ahorro.ahorroTotal, pctAhorro: ahorro.pctAhorro,
+      mayorAhorro, mayorArea,
+      totalCompras: filteredRecords.length,
+    };
+  }, [filteredRecords, activeRecords, ahorro]);
+
+  // ---------- Compras por área / Ahorro por área ----------
+  const porArea = useMemo(() => {
+    const map = new Map();
+    for (const r of activeRecords) {
+      const a = r.area || "Sin área";
+      if (!map.has(a)) map.set(a, { count: 0, value: 0, cot: 0, sinCot: 0 });
+      const e = map.get(a);
+      e.count += 1;
+      e.value += r.valorConIva || 0;
+      if (r.valorCot != null) e.cot += r.valorCot;
+      else e.sinCot += 1;
+    }
+    const totalValor = sum(activeRecords, (r) => r.valorConIva);
+    const rows = Array.from(map.entries()).map(([name, v]) => ({
+      name, ...v,
+      pctTotal: totalValor ? (v.value / totalValor) * 100 : 0,
+      ahorro: v.cot - v.value,
+      pctAhorro: v.cot ? ((v.cot - v.value) / v.cot) * 100 : null,
+    })).sort((a, b) => b.value - a.value);
+    const maxVal = Math.max(1, ...rows.map((r) => r.value));
+    const totalSinCot = rows.reduce((s, r) => s + r.sinCot, 0);
+    return { rows: rows.map((r) => ({ ...r, barPct: (r.value / maxVal) * 100 })), totalSinCot };
+  }, [activeRecords]);
+
+  // ---------- Top 5 proveedores ----------
+  const topProveedores = useMemo(() => {
+    const map = new Map();
+    for (const r of activeRecords) {
+      const p = r.proveedor || "Sin proveedor";
+      if (!map.has(p)) map.set(p, { count: 0, value: 0 });
+      const e = map.get(p);
+      e.count += 1;
+      e.value += r.valorConIva || 0;
+    }
+    const total = sum(activeRecords, (r) => r.valorConIva);
+    return Array.from(map.entries())
+      .map(([name, v]) => ({ name, ...v, pct: total ? (v.value / total) * 100 : 0 }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [activeRecords]);
+
+  // ---------- Compras por responsable ----------
+  const porResponsable = useMemo(() => {
+    const map = new Map();
+    for (const r of filteredRecords) {
+      const resp = r.responsable || "Sin responsable";
+      if (!map.has(resp)) map.set(resp, { ejecutado: 0, proceso: 0, anulado: 0, total: 0, value: 0 });
+      const e = map.get(resp);
+      e.total += 1;
+      e.value += r.valorConIva || 0;
+      if (r.estado === "Ejecutado") e.ejecutado += 1;
+      else if (r.estado === "Proceso") e.proceso += 1;
+      else if (r.estado === "Anulado") e.anulado += 1;
+    }
+    const rows = Array.from(map.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.value - a.value);
+    const totals = rows.reduce((acc, r) => ({
+      ejecutado: acc.ejecutado + r.ejecutado, proceso: acc.proceso + r.proceso,
+      anulado: acc.anulado + r.anulado, total: acc.total + r.total, value: acc.value + r.value,
+    }), { ejecutado: 0, proceso: 0, anulado: 0, total: 0, value: 0 });
+    return { rows, totals };
+  }, [filteredRecords]);
+
+  // ---------- Consumo por categoría y área ----------
+  const porCategoriaArea = useMemo(() => {
+    const areaMap = new Map();
+    for (const r of activeRecords) {
+      const a = r.area || "Sin área";
+      if (!areaMap.has(a)) areaMap.set(a, { count: 0, value: 0, cats: new Map() });
+      const e = areaMap.get(a);
+      e.count += 1;
+      e.value += r.valorConIva || 0;
+      const cat = r.categoria || "Sin categoría";
+      e.cats.set(cat, (e.cats.get(cat) || 0) + (r.valorConIva || 0));
+    }
+    const rows = Array.from(areaMap.entries()).map(([name, v]) => {
+      const catList = Array.from(v.cats.entries())
+        .map(([cname, cvalue]) => ({ name: cname, value: cvalue, pct: v.value ? (cvalue / v.value) * 100 : 0 }))
+        .sort((a, b) => b.value - a.value);
+      return { name, count: v.count, value: v.value, top: catList.slice(0, 4), moreCount: Math.max(0, catList.length - 4) };
+    }).sort((a, b) => b.value - a.value);
+    const totals = rows.reduce((acc, r) => ({ count: acc.count + r.count, value: acc.value + r.value }), { count: 0, value: 0 });
+    return { rows, totals };
+  }, [activeRecords]);
+
+  async function handleExportPDF() {
+    if (!containerRef.current) return;
+    setExporting(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { jsPDF } = await import("jspdf");
+
+      const bg = getComputedStyle(document.documentElement).getPropertyValue("--page").trim() || "#ffffff";
+      const scale = Math.min(2, window.devicePixelRatio || 1.5);
+      const canvas = await html2canvas(containerRef.current, { backgroundColor: bg, scale });
+
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 24;
+      const usableW = pageW - margin * 2;
+      const usableH = pageH - margin * 2 - 40;
+
+      const imgW = usableW;
+      const imgH = (canvas.height * imgW) / canvas.width;
+
+      const pxPerPage = (usableH * canvas.width) / imgW;
+      const totalPages = Math.max(1, Math.ceil(canvas.height / pxPerPage));
+
+      const title = "Sinco · Compras — Dashboard de compras";
+      const subtitle = `${selectedMonth ? monthLabel(selectedMonth, multiYear) : "Todos los meses"} · Exportado: ${new Date().toLocaleDateString("es-CO")}`;
+
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) pdf.addPage();
+        pdf.setFontSize(14);
+        pdf.text(title, margin, margin + 6);
+        pdf.setFontSize(9);
+        pdf.setTextColor(100);
+        pdf.text(subtitle, margin, margin + 20);
+
+        const sliceCanvas = document.createElement("canvas");
+        sliceCanvas.width = canvas.width;
+        const sliceHeightPx = Math.min(pxPerPage, canvas.height - page * pxPerPage);
+        sliceCanvas.height = sliceHeightPx;
+        const ctx = sliceCanvas.getContext("2d");
+        ctx.drawImage(canvas, 0, page * pxPerPage, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+        const sliceImgH = (sliceHeightPx * imgW) / canvas.width;
+        pdf.addImage(sliceCanvas.toDataURL("image/png"), "PNG", margin, margin + 30, imgW, sliceImgH);
+
+        pdf.setFontSize(8);
+        pdf.setTextColor(120);
+        pdf.text(`Página ${page + 1} de ${totalPages}`, pageW - margin - 70, pageH - 12);
+      }
+
+      pdf.save(`dashboard_compras_${new Date().toISOString().slice(0, 10)}.pdf`);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return (
+    <div ref={containerRef}>
+      <div className="card-head" style={{ marginBottom: 14 }}>
+        <div className="field" style={{ minWidth: 220 }}>
+          <label htmlFor="dash-month">Mes</label>
+          <select id="dash-month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+            <option value="">Todos los meses</option>
+            {monthOptions.map((k) => <option key={k} value={k}>{monthLabel(k, multiYear)}</option>)}
+          </select>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {selectedMonth && (
+            <button type="button" className="btn" onClick={() => setSelectedMonth("")}>Ver todo</button>
+          )}
+          <button type="button" className="btn" onClick={handleExportPDF} disabled={exporting}>
+            {exporting ? "Exportando…" : "📄 Exportar PDF"}
+          </button>
+        </div>
+      </div>
+
+      {/* KPI row */}
+      <div className="kpi-row">
+        <div className="kpi">
+          <div className="label">{kpi1.label}</div>
+          <div className="value">{fmtPesos(kpi1.value)}</div>
+          {kpi1.delta !== null && (
+            <div className="delta">
+              {kpi1.delta > 0 ? "▲" : kpi1.delta < 0 ? "▼" : "＝"} {Math.abs(kpi1.delta).toFixed(1)}%
+            </div>
+          )}
+          {kpi1.foot && <div className="foot">{kpi1.foot}</div>}
+        </div>
+        <div className="kpi">
+          <div className="label">Cumplimiento de tiempos</div>
+          <div className="value">{cumplimiento.total ? `${cumplimiento.pct.toFixed(0)}%` : "—"}</div>
+          <div className="meter-track">
+            <div
+              className="meter-fill"
+              style={{
+                width: `${cumplimiento.pct}%`,
+                background: cumplimiento.pct >= 80 ? "var(--good)" : cumplimiento.pct >= 50 ? "var(--warning)" : "var(--critical)",
+              }}
+            />
+          </div>
+          <div className="foot">{cumplimiento.cumplieron} de {cumplimiento.total} en 8 días hábiles</div>
+        </div>
+        <div className="kpi">
+          <div className="label">En proceso</div>
+          <div className="value">{fmtNum(kpi3.count)}</div>
+          <div className="foot">{fmtPesos(kpi3.value)}</div>
+        </div>
+        <div className="kpi">
+          <div className="label">Ticket promedio</div>
+          <div className="value">{fmtPesos(kpi4.avg)}</div>
+        </div>
+      </div>
+
+      {/* Solicitudes pendientes */}
+      <div className="card" id="pending-top-list" style={{ marginBottom: 14 }}>
+        <div className="card-head">
+          <div>
+            <h3>Solicitudes pendientes</h3>
+            <p className="card-sub">Sin estado, en proceso o pendiente, sin fecha de entrega registrada.</p>
+          </div>
+        </div>
+        {pendientes.length === 0 ? (
+          <div className="empty">No hay solicitudes pendientes sin estado o en proceso.</div>
+        ) : (
+          <div className="scroll-x">
+            <table className="plain-table offenders">
+              <thead>
+                <tr>
+                  <th>#</th><th>Descripción</th><th>Área</th><th>Responsable</th>
+                  <th>F. solicitud</th><th>Días</th><th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendientes.map((p, i) => {
+                  const severity = p.dias > 8 ? "critical" : p.dias > 0 ? "warning" : "muted";
+                  return (
+                    <tr key={p.record.id} className="clickable" onClick={() => setDetailRecord(p.record)}>
+                      <td className="rank">{i + 1}</td>
+                      <td>{p.record.descripcion || "—"}</td>
+                      <td>{p.record.area || "—"}</td>
+                      <td>{p.record.responsable || "—"}</td>
+                      <td>{fmtDateDisplay(p.record.fechaSolicitud)}</td>
+                      <td><span className={`pill ${severity}`}>{p.dias} d.</span></td>
+                      <td>{p.record.estado || "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Valor de compras por mes / por área y mes */}
+      <div className="grid-2">
+        <div className="card">
+          <h3>Valor de compras por mes</h3>
+          <p className="card-sub">Total con IVA por mes de solicitud (excluye anulados).</p>
+          <BarChartSvg data={valorPorMes} />
+        </div>
+        <div className="card">
+          <h3>Valor de compras por área y mes</h3>
+          <p className="card-sub">Top 5 áreas por valor, resto agrupado en &quot;Otras&quot;.</p>
+          <StackedBarChartSvg data={areaMesStack.data} seriesNames={areaMesStack.seriesNames} />
+        </div>
+      </div>
+
+      {/* Estado / tiempos */}
+      <div className="grid-2">
+        <div className="card">
+          <h3>Estado de la compra</h3>
+          {estadoRows.map((r) => (
+            <div className="estado-row" key={r.name}>
+              <div className="name">{r.name}</div>
+              <div className="track">
+                <div className="fill" style={{ width: `${r.pct}%`, background: "var(--accent)" }} />
+              </div>
+              <div className="figs">
+                <span className="n">{fmtCOP(r.value)}</span>
+                <span className="c">{r.count} solicitud(es)</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="card">
+          <h3>Tiempos de solicitud a entrega</h3>
+          <div className="kpi-row" style={{ gridTemplateColumns: "1fr 1fr", marginBottom: 14 }}>
+            <div className="kpi">
+              <div className="label">Cumplimiento</div>
+              <div className="value">{cumplimiento.total ? `${cumplimiento.pct.toFixed(0)}%` : "—"}</div>
+            </div>
+            <div className="kpi">
+              <div className="label">Pendientes en riesgo</div>
+              <div className="value">{tiempos.pendientesRiesgo}</div>
+            </div>
+          </div>
+          <HistogramSvg buckets={tiempos.buckets} maxDiasBucket={tiempos.maxDias} />
+          {tiempos.offenders.length > 0 && (
+            <div className="offenders">
+              <table>
+                <thead><tr><th>Descripción</th><th>Área</th><th>Días</th><th>Estado</th></tr></thead>
+                <tbody>
+                  {tiempos.offenders.map((o) => (
+                    <tr key={o.record.id}>
+                      <td>{o.record.descripcion || "—"}</td>
+                      <td>{o.record.area || "—"}</td>
+                      <td><span className="pill critical">{o.dias} d.</span></td>
+                      <td>{o.record.estado || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Medio de pago */}
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3>Medio de pago</h3>
+        {medioRows.map((r) => (
+          <div className="medio-row" key={r.name}>
+            <div className="name">{r.name}</div>
+            <div className="track">
+              <div className="fill" style={{ width: `${r.pct}%`, background: `var(${r.colorVar})` }} />
+            </div>
+            <div className="figs">
+              <span className="n">{fmtCOP(r.value)}</span>
+              <span className="c">{r.count} solicitud(es)</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* KPI row 5: ahorro */}
+      <div className="kpi-row kpi-row-5">
+        <div className="kpi">
+          <div className="label">Total compras</div>
+          <div className="value">{fmtPesos(ahorro.totalCompras)}</div>
+        </div>
+        <div className="kpi">
+          <div className="label">Valor cotizado</div>
+          <div className="value">{fmtPesos(ahorro.valorCotizado)}</div>
+        </div>
+        <div className="kpi">
+          <div className="label">Valor compra (cotizados)</div>
+          <div className="value">{fmtPesos(ahorro.valorCompraCotizados)}</div>
+        </div>
+        <div className="kpi">
+          <div className="label">Ahorro total</div>
+          <div className="value">{fmtPesos(ahorro.ahorroTotal)}</div>
+        </div>
+        <div className="kpi">
+          <div className="label">% ahorro global</div>
+          <div className="value">{ahorro.pctAhorro !== null ? `${ahorro.pctAhorro.toFixed(1)}%` : "—"}</div>
+        </div>
+      </div>
+      {ahorro.outliersCount > 0 && (
+        <p className="methodology-note">
+          Se excluyeron {ahorro.outliersCount} cotización(es) con valores atípicos (posibles errores de digitación,
+          cotizado &gt; 20× el valor de compra) del cálculo de ahorro.
+        </p>
+      )}
+
+      {/* Cumplimiento de entregas / Resumen ejecutivo */}
+      <div className="grid-2">
+        <div className="card">
+          <h3>Cumplimiento de entregas</h3>
+          <div className="gauge-wrap">
+            <GaugeSvg percent={gauge.pct} />
+            <div className="gauge-foot">{gauge.cumplieron} de {gauge.total} compras entregadas dentro de 8 días hábiles</div>
+            <div className="gauge-breakdown" style={{ width: "100%" }}>
+              <div className="estado-row">
+                <div className="name">Cumplió</div>
+                <div className="track"><div className="fill" style={{ width: `${gauge.total ? (gauge.cumplieron / gauge.total) * 100 : 0}%`, background: "var(--good)" }} /></div>
+                <div className="figs"><span className="n">{gauge.cumplieron}</span></div>
+              </div>
+              <div className="estado-row">
+                <div className="name">No cumplió</div>
+                <div className="track"><div className="fill" style={{ width: `${gauge.total ? (gauge.noCumplieron / gauge.total) * 100 : 0}%`, background: "var(--critical)" }} /></div>
+                <div className="figs"><span className="n">{gauge.noCumplieron}</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <h3>Resumen ejecutivo</h3>
+          <div className="summary-grid">
+            <div className="detail-item">
+              <div className="dlabel">Total ejecutado</div>
+              <div className="dvalue">{fmtCOP(resumen.totalEjecutado)}</div>
+              <div className="dcap">{resumen.ejecutadosCount} compra(s)</div>
+            </div>
+            <div className="detail-item">
+              <div className="dlabel">Ahorro generado</div>
+              <div className="dvalue">{fmtCOP(resumen.ahorroTotal)}</div>
+              <div className="dcap">{resumen.pctAhorro !== null ? `${resumen.pctAhorro.toFixed(1)}% sobre cotizado` : "—"}</div>
+            </div>
+            <div className="detail-item">
+              <div className="dlabel">Mayor ahorro individual</div>
+              <div className="dvalue">{resumen.mayorAhorro ? fmtCOP(resumen.mayorAhorro.ahorro) : "—"}</div>
+              <div className="dcap">
+                {resumen.mayorAhorro ? `${resumen.mayorAhorro.record.descripcion || "—"} · ${resumen.mayorAhorro.record.proveedor || "—"}` : "Sin datos"}
+              </div>
+            </div>
+            <div className="detail-item">
+              <div className="dlabel">Área con mayor compra</div>
+              <div className="dvalue">{resumen.mayorArea ? resumen.mayorArea.name : "—"}</div>
+              <div className="dcap">{resumen.mayorArea ? fmtCOP(resumen.mayorArea.value) : ""}</div>
+            </div>
+            <div className="detail-item full">
+              <div className="dlabel">Compras totales</div>
+              <div className="dvalue">{fmtNum(resumen.totalCompras)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Compras por área / Ahorro por área */}
+      <div className="grid-2">
+        <div className="card">
+          <h3>Compras por área</h3>
+          {porArea.rows.map((r) => (
+            <div className="estado-row" key={r.name}>
+              <div className="name">{r.name}</div>
+              <div className="track"><div className="fill" style={{ width: `${r.barPct}%`, background: "var(--accent)" }} /></div>
+              <div className="figs">
+                <span className="n">{fmtCOP(r.value)}</span>
+                <span className="c">{r.count} · {r.pctTotal.toFixed(1)}%</span>
+              </div>
+            </div>
+          ))}
+          <div className="table-wrap-plain" style={{ marginTop: 10 }}>
+            <table className="plain-table">
+              <thead><tr><th>Área</th><th className="num">Cant.</th><th className="num">Valor</th><th className="num">% total</th></tr></thead>
+              <tbody>
+                {porArea.rows.map((r) => (
+                  <tr key={r.name}>
+                    <td>{r.name}</td><td className="num">{fmtNum(r.count)}</td>
+                    <td className="num">{fmtCOP(r.value)}</td><td className="num">{r.pctTotal.toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="card">
+          <h3>Ahorro por área</h3>
+          {porArea.rows.map((r) => (
+            <div className="estado-row" key={r.name}>
+              <div className="name">{r.name}</div>
+              <div className="track">
+                <div className="fill" style={{ width: `${Math.min(100, Math.abs(r.pctAhorro || 0))}%`, background: (r.pctAhorro ?? 0) < 0 ? "var(--critical)" : "var(--good)" }} />
+              </div>
+              <div className="figs">
+                <span className="n">{fmtCOP(r.ahorro)}</span>
+                <span className="c">{r.pctAhorro !== null ? `${r.pctAhorro.toFixed(1)}%` : "sin cotización"}</span>
+              </div>
+            </div>
+          ))}
+          <div className="table-wrap-plain" style={{ marginTop: 10 }}>
+            <table className="plain-table">
+              <thead>
+                <tr><th>Área</th><th className="num">Cotizado</th><th className="num">Comprado</th><th className="num">Ahorro</th><th className="num">% ahorro</th><th className="num">Sin cot.</th></tr>
+              </thead>
+              <tbody>
+                {porArea.rows.map((r) => (
+                  <tr key={r.name}>
+                    <td>{r.name}</td><td className="num">{fmtCOP(r.cot)}</td><td className="num">{fmtCOP(r.value)}</td>
+                    <td className="num">{fmtCOP(r.ahorro)}</td>
+                    <td className="num">{r.pctAhorro !== null ? `${r.pctAhorro.toFixed(1)}%` : "—"}</td>
+                    <td className="num">{r.sinCot}/{r.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="methodology-note">
+            {porArea.totalSinCot} compra(s) no tienen cotización registrada. En esos casos el ahorro del área puede
+            aparecer negativo o subestimado, porque se resta todo lo comprado (incluidas las compras sin cotizar)
+            contra lo cotizado.
+          </p>
+        </div>
+      </div>
+
+      {/* Top proveedores / por responsable */}
+      <div className="grid-2">
+        <div className="card">
+          <h3>Top 5 proveedores por volumen de compra</h3>
+          <div className="table-wrap-plain">
+            <table className="plain-table">
+              <thead><tr><th>#</th><th>Proveedor</th><th className="num">Compras</th><th className="num">Valor</th><th className="num">% del total</th></tr></thead>
+              <tbody>
+                {topProveedores.map((p, i) => (
+                  <tr key={p.name}>
+                    <td className="rank">{i + 1}</td><td>{p.name}</td>
+                    <td className="num">{fmtNum(p.count)}</td><td className="num">{fmtCOP(p.value)}</td>
+                    <td className="num">{p.pct.toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="card">
+          <h3>Compras por responsable</h3>
+          <div className="table-wrap-plain">
+            <table className="plain-table">
+              <thead>
+                <tr><th>Responsable</th><th className="num">Ejecutado</th><th className="num">Proceso</th><th className="num">Anulado</th><th className="num">Total</th><th className="num">Valor</th></tr>
+              </thead>
+              <tbody>
+                {porResponsable.rows.map((r) => (
+                  <tr key={r.name}>
+                    <td>{r.name}</td><td className="num">{r.ejecutado}</td><td className="num">{r.proceso}</td>
+                    <td className="num">{r.anulado}</td><td className="num">{r.total}</td><td className="num">{fmtCOP(r.value)}</td>
+                  </tr>
+                ))}
+                <tr className="total-row">
+                  <td>Total</td><td className="num">{porResponsable.totals.ejecutado}</td>
+                  <td className="num">{porResponsable.totals.proceso}</td><td className="num">{porResponsable.totals.anulado}</td>
+                  <td className="num">{porResponsable.totals.total}</td><td className="num">{fmtCOP(porResponsable.totals.value)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Consumo por categoría y área */}
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3>Consumo por categoría y área</h3>
+        <div className="table-wrap-plain">
+          <table className="plain-table">
+            <thead><tr><th>Área</th><th className="num">Cant.</th><th className="num">Valor total</th><th>Categorías</th></tr></thead>
+            <tbody>
+              {porCategoriaArea.rows.map((r) => (
+                <tr key={r.name}>
+                  <td>{r.name}</td>
+                  <td className="num">{fmtNum(r.count)}</td>
+                  <td className="num">{fmtCOP(r.value)}</td>
+                  <td className="cat-cell">
+                    {r.top.map((c) => (
+                      <div className="cat-line" key={c.name}>
+                        <span className="cat-name">{c.name}</span>{" — "}
+                        <span className="cat-figs">{fmtCOP(c.value)} ({c.pct.toFixed(1)}%)</span>
+                      </div>
+                    ))}
+                    {r.moreCount > 0 && <div className="cat-more">+{r.moreCount} categoría(s) más</div>}
+                  </td>
+                </tr>
+              ))}
+              <tr className="total-row">
+                <td>Total</td>
+                <td className="num">{fmtNum(porCategoriaArea.totals.count)}</td>
+                <td className="num">{fmtCOP(porCategoriaArea.totals.value)}</td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {detailRecord && <DetailModal record={detailRecord} onClose={() => setDetailRecord(null)} />}
+    </div>
+  );
+}
