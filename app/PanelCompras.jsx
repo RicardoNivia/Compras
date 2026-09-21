@@ -43,21 +43,18 @@ function PanelSkeleton() {
 
 export default function PanelCompras({ initialRecords }) {
   const containerRef = useRef(null);
-  const initializedRef = useRef(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Evita una doble inicialización (por ejemplo en desarrollo con
-    // recargas rápidas), ya que el script de la app registra listeners
-    // globales y de lo contrario quedarían duplicados.
-    if (initializedRef.current || typeof window === "undefined") return;
-    if (window.__panelComprasInitialized) return;
-    initializedRef.current = true;
-    window.__panelComprasInitialized = true;
-
-    // Estado inicial que app-logic.js lee en vez del antiguo
-    // <script id="app-data">: los registros vienen de SQLite
-    // (consultados con Prisma en el Server Component de la página).
+    // No hay guardas de "ya inicializado" a propósito: reactStrictMode
+    // está apagado (next.config.js), así que este efecto no se
+    // duplica por eso. Si React llega a re-crear este árbol (por
+    // ejemplo, si Next.js vuelve a renderizar el Server Component
+    // padre con datos nuevos), dangerouslySetInnerHTML reemplaza el
+    // HTML del panel por una copia sin los listeners de app-logic.js;
+    // en ese caso hay que volver a cargar los scripts para dejar el
+    // panel funcional otra vez, no bloquearlo con una bandera global.
+    setReady(false);
     window.__INITIAL_STATE__ = {
       records: initialRecords || [],
       meta: {
@@ -74,7 +71,6 @@ export default function PanelCompras({ initialRecords }) {
       }
       if (!cancelled) setReady(true);
     })().catch((err) => {
-      // eslint-disable-next-line no-console
       console.error("Error inicializando Panel de Compras:", err);
       if (!cancelled) setReady(true);
     });
@@ -90,8 +86,6 @@ export default function PanelCompras({ initialRecords }) {
       <div
         ref={containerRef}
         style={{ display: ready ? undefined : "none" }}
-        // El HTML original (topbar, dashboard, modales, tooltip) se
-        // inserta tal cual; los datos ya no van embebidos aquí.
         dangerouslySetInnerHTML={{ __html: panelShellHtml }}
       />
     </>

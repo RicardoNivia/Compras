@@ -769,6 +769,28 @@
     setStoredTab(which);
   }
 
+  /* ================= Colapsar/expandir barra lateral ================= */
+  // Recuerda el estado colapsado entre sesiones, igual que la pestaña activa.
+  function getStoredSidebar(){
+    try{ return sessionStorage.getItem("sinco-compras-sidebar"); }catch(e){ return null; }
+  }
+  function setStoredSidebar(collapsed){
+    try{ sessionStorage.setItem("sinco-compras-sidebar", collapsed ? "1" : "0"); }catch(e){}
+  }
+  var sidebarEl = document.getElementById("app-sidebar");
+  var sidebarToggle = document.getElementById("sidebar-toggle");
+  function setSidebarCollapsed(collapsed){
+    sidebarEl.classList.toggle("collapsed", collapsed);
+    sidebarToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    sidebarToggle.setAttribute("aria-label", collapsed ? "Expandir menú" : "Colapsar menú");
+  }
+  setSidebarCollapsed(getStoredSidebar() === "1");
+  sidebarToggle.addEventListener("click", function(){
+    var collapsed = !sidebarEl.classList.contains("collapsed");
+    setSidebarCollapsed(collapsed);
+    setStoredSidebar(collapsed);
+  });
+
   /* ================= Sticky header offsets (Registros) ================= */
   var stickyTopbarEl = document.getElementById("app-topbar");
   var stickyToolbarEl = document.getElementById("registros-toolbar");
