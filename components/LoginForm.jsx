@@ -2,6 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { IconArrowRight, IconCheck } from "@/components/icons";
+
+const FEATURES = [
+  "Aprobaciones más rápidas",
+  "Datos de compras siempre al día",
+  "Reportes y gráficos en un clic",
+];
 
 export default function LoginForm() {
   const router = useRouter();
@@ -38,17 +45,41 @@ export default function LoginForm() {
   return (
     <div className="login-shell">
       <div className="login-side">
-        <div className="login-side-mark">S</div>
-        <h1>Sinco · Compras</h1>
-        <p>Panel de gestión y seguimiento de solicitudes de compra.</p>
+        <div className="login-side-blob login-side-blob-1" />
+        <div className="login-side-blob login-side-blob-2" />
+
+        <div className="login-side-top">
+          <div className="login-side-mark">S</div>
+          <span className="login-side-brand">Sinco · Compras</span>
+        </div>
+
+        <div className="login-side-copy">
+          <h1>Visibilidad total de tus compras.</h1>
+          <p>Un solo lugar para radicar, legalizar y hacer seguimiento a cada solicitud de compra, con reportes al instante.</p>
+        </div>
+
+        <div className="login-side-features">
+          {FEATURES.map((f) => (
+            <div key={f} className="login-side-feature">
+              <IconCheck size={12} />
+              <span>{f}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="login-side-foot">Sinco ERP © 2026</div>
       </div>
+
       <div className="login-panel">
         <form className="login-card" onSubmit={handleSubmit}>
-          <h2>Iniciar sesión</h2>
-          <p className="login-sub">Ingresa tus credenciales para continuar.</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span className="login-eyebrow">Bienvenido</span>
+            <h2>Inicia sesión</h2>
+            <p className="login-sub">Ingresa tus credenciales para continuar.</p>
+          </div>
 
           <div className="field">
-            <label htmlFor="login-email">Correo</label>
+            <label htmlFor="login-email">Correo corporativo</label>
             <input
               id="login-email" type="email" autoComplete="username" required autoFocus
               value={email} onChange={(e) => setEmail(e.target.value)}
@@ -67,9 +98,11 @@ export default function LoginForm() {
           {error && <div className="modal-error">{error}</div>}
 
           <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
-            {loading && <span className="spinner" />}
             {loading ? "Ingresando…" : "Ingresar"}
+            {loading ? <span className="spinner" /> : <IconArrowRight size={16} />}
           </button>
+
+          <p className="login-foot-note">¿Problemas para ingresar? Contacta a tu administrador.</p>
         </form>
       </div>
     </div>

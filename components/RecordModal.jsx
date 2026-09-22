@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getDiasInfo } from "@/lib/diasInfo";
 import { createRecordApi, updateRecordApi, deleteRecordApi } from "@/lib/api";
+import { IconTrash } from "@/components/icons";
 
 const ESTADOS = ["Pendiente", "Proceso", "Ejecutado", "Anulado"];
 const MEDIOS_PAGO = ["TRANSFER", "T.C", "C.M", "ANTICIPO", "ANTICIPO - TRANSFER"];
@@ -288,7 +289,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 className="btn btn-danger-outline"
                 onClick={() => setConfirmDelete(true)}
               >
-                🗑️ Eliminar
+                <IconTrash size={13} /> Eliminar
               </button>
             )}
             {isEdit && allowDelete && confirmDelete && (

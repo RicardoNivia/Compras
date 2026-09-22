@@ -9,6 +9,7 @@ import GaugeSvg from "@/components/charts/GaugeSvg";
 import { fmtCOP, fmtCompact, fmtNum, fmtPesos, fmtDateDisplay, monthKey, monthLabel } from "@/lib/format";
 import { businessDaysBetween, businessDaysElapsedToToday } from "@/lib/businessDays";
 import { getDiasInfo } from "@/lib/diasInfo";
+import { IconFile, IconMoney, IconClock, IconAlert, IconTrendUp } from "@/components/icons";
 
 const ESTADO_ORDER = ["Ejecutado", "Proceso", "Pendiente", "Anulado", "Sin estado"];
 const SERIES_COLOR_VARS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--sOther"];
@@ -26,19 +27,45 @@ function estadoLabel(estado) {
 }
 
 export default function DashboardView({ records }) {
+  const [selectedYear, setSelectedYear] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [detailRecord, setDetailRecord] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const containerRef = useRef(null);
+
+  // Años disponibles a partir de todos los registros (independiente del filtro actual).
+  const yearOptions = useMemo(() => {
+    const set = new Set();
+    for (const r of records) {
+      const k = monthKey(r.fechaSolicitud);
+      if (k) set.add(k.slice(0, 4));
+    }
+    return Array.from(set).sort().reverse();
+  }, [records]);
+
+  function handleYearChange(year) {
+    setSelectedYear(year);
+    // Si el mes elegido no pertenece al nuevo año, se limpia.
+    if (year && selectedMonth && !selectedMonth.startsWith(year)) {
+      setSelectedMonth("");
+    }
+  }
+
+  // Sin año seleccionado: se muestra todo. Con año y sin mes: se filtra por año.
+  const yearFilteredRecords = useMemo(() => {
+    if (!selectedYear) return records;
+    return records.filter((r) => (monthKey(r.fechaSolicitud) || "").startsWith(selectedYear));
+  }, [records, selectedYear]);
 
   const monthOptions = useMemo(() => {
     const set = new Set();
-    for (const r of records) {
+    for (const r of yearFilteredRecords) {
       const k = monthKey(r.fechaSolicitud);
       if (k) set.add(k);
     }
     return Array.from(set).sort().reverse();
-  }, [records]);
+  }, [yearFilteredRecords]);
 
   const multiYear = useMemo(() => {
     const years = new Set(monthOptions.map((k) => k.slice(0, 4)));
@@ -48,9 +75,9 @@ export default function DashboardView({ records }) {
   const allMonthsAsc = useMemo(() => [...monthOptions].sort(), [monthOptions]);
 
   const filteredRecords = useMemo(() => {
-    if (!selectedMonth) return records;
-    return records.filter((r) => monthKey(r.fechaSolicitud) === selectedMonth);
-  }, [records, selectedMonth]);
+    if (!selectedMonth) return yearFilteredRecords;
+    return yearFilteredRecords.filter((r) => monthKey(r.fechaSolicitud) === selectedMonth);
+  }, [yearFilteredRecords, selectedMonth]);
 
   const activeRecords = useMemo(() => filteredRecords.filter((r) => !isAnulado(r)), [filteredRecords]);
 
@@ -64,7 +91,7 @@ export default function DashboardView({ records }) {
       : `${monthLabel(lastClosedMonth || "", multiYear)} · último mes cerrado`;
 
     const valueFor = (mk) => sum(
-      records.filter((r) => !isAnulado(r) && monthKey(r.fechaSolicitud) === mk),
+      yearFilteredRecords.filter((r) => !isAnulado(r) && monthKey(r.fechaSolicitud) === mk),
       (r) => r.valorConIva
     );
 
@@ -80,7 +107,7 @@ export default function DashboardView({ records }) {
     }
 
     return { label, value, delta, foot };
-  }, [records, allMonthsAsc, selectedMonth, multiYear]);
+  }, [yearFilteredRecords, allMonthsAsc, selectedMonth, multiYear]);
 
   // ---------- KPI 2: cumplimiento de tiempos ----------
   const cumplimiento = useMemo(() => {
@@ -381,8 +408,9 @@ export default function DashboardView({ records }) {
   async function handleExportPDF() {
     if (!containerRef.current) return;
     setExporting(true);
+    setExportError("");
     try {
-      const html2canvas = (await import("html2canvas")).default;
+      const html2canvas = (await import("html2canvas-pro")).default;
       const { jsPDF } = await import("jspdf");
 
       const bg = getComputedStyle(document.documentElement).getPropertyValue("--page").trim() || "#ffffff";
@@ -403,7 +431,12 @@ export default function DashboardView({ records }) {
       const totalPages = Math.max(1, Math.ceil(canvas.height / pxPerPage));
 
       const title = "Sinco · Compras — Dashboard de compras";
-      const subtitle = `${selectedMonth ? monthLabel(selectedMonth, multiYear) : "Todos los meses"} · Exportado: ${new Date().toLocaleDateString("es-CO")}`;
+      const periodLabel = selectedMonth
+        ? monthLabel(selectedMonth, multiYear)
+        : selectedYear
+          ? `Todo ${selectedYear}`
+          : "Todos los períodos";
+      const subtitle = `${periodLabel} · Exportado: ${new Date().toLocaleDateString("es-CO")}`;
 
       for (let page = 0; page < totalPages; page++) {
         if (page > 0) pdf.addPage();
@@ -428,35 +461,52 @@ export default function DashboardView({ records }) {
       }
 
       pdf.save(`dashboard_compras_${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err) {
+      setExportError(err?.message || "No se pudo generar el PDF del dashboard.");
     } finally {
       setExporting(false);
     }
   }
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} className="dashboard-shell">
       <div className="card-head" style={{ marginBottom: 14 }}>
-        <div className="field" style={{ minWidth: 220 }}>
-          <label htmlFor="dash-month">Mes</label>
-          <select id="dash-month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
-            <option value="">Todos los meses</option>
-            {monthOptions.map((k) => <option key={k} value={k}>{monthLabel(k, multiYear)}</option>)}
-          </select>
+        <div style={{ display: "flex", gap: 10 }}>
+          <div className="field" style={{ width: 140 }}>
+            <label htmlFor="dash-year">Año</label>
+            <select id="dash-year" value={selectedYear} onChange={(e) => handleYearChange(e.target.value)}>
+              <option value="">Todos los años</option>
+              {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div className="field" style={{ width: 200 }}>
+            <label htmlFor="dash-month">Mes</label>
+            <select id="dash-month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+              <option value="">{selectedYear ? `Todo ${selectedYear}` : "Todos los meses"}</option>
+              {monthOptions.map((k) => <option key={k} value={k}>{monthLabel(k, multiYear)}</option>)}
+            </select>
+          </div>
         </div>
+        <div className="spacer" />
         <div style={{ display: "flex", gap: 8 }}>
-          {selectedMonth && (
-            <button type="button" className="btn" onClick={() => setSelectedMonth("")}>Ver todo</button>
+          {(selectedYear || selectedMonth) && (
+            <button type="button" className="btn" onClick={() => { setSelectedYear(""); setSelectedMonth(""); }}>Ver todo</button>
           )}
           <button type="button" className="btn" onClick={handleExportPDF} disabled={exporting}>
-            {exporting ? "Exportando…" : "📄 Exportar PDF"}
+            {exporting ? <span className="spinner" /> : <IconFile size={13} />} {exporting ? "Exportando…" : "Exportar PDF"}
           </button>
         </div>
       </div>
 
+      {exportError && <div className="modal-error" style={{ marginBottom: 14 }}>{exportError}</div>}
+
       {/* KPI row */}
       <div className="kpi-row">
-        <div className="kpi">
-          <div className="label">{kpi1.label}</div>
+        <div className="kpi" style={{ "--kpi-c": "var(--accent)" }}>
+          <div className="kpi-head">
+            <div className="label">{kpi1.label}</div>
+            <div className="kpi-ic"><IconMoney size={14} /></div>
+          </div>
           <div className="value">{fmtPesos(kpi1.value)}</div>
           {kpi1.delta !== null && (
             <div className="delta">
@@ -465,27 +515,30 @@ export default function DashboardView({ records }) {
           )}
           {kpi1.foot && <div className="foot">{kpi1.foot}</div>}
         </div>
-        <div className="kpi">
-          <div className="label">Cumplimiento de tiempos</div>
+        <div className="kpi" style={{ "--kpi-c": cumplimiento.pct >= 80 ? "var(--good)" : cumplimiento.pct >= 50 ? "var(--warning)" : "var(--critical)" }}>
+          <div className="kpi-head">
+            <div className="label">Cumplimiento de tiempos</div>
+            <div className="kpi-ic"><IconClock size={14} /></div>
+          </div>
           <div className="value">{cumplimiento.total ? `${cumplimiento.pct.toFixed(0)}%` : "—"}</div>
           <div className="meter-track">
-            <div
-              className="meter-fill"
-              style={{
-                width: `${cumplimiento.pct}%`,
-                background: cumplimiento.pct >= 80 ? "var(--good)" : cumplimiento.pct >= 50 ? "var(--warning)" : "var(--critical)",
-              }}
-            />
+            <div className="meter-fill" style={{ width: `${cumplimiento.pct}%` }} />
           </div>
           <div className="foot">{cumplimiento.cumplieron} de {cumplimiento.total} en 8 días hábiles</div>
         </div>
-        <div className="kpi">
-          <div className="label">En proceso</div>
+        <div className="kpi" style={{ "--kpi-c": "var(--warning)" }}>
+          <div className="kpi-head">
+            <div className="label">En proceso</div>
+            <div className="kpi-ic"><IconAlert size={14} /></div>
+          </div>
           <div className="value">{fmtNum(kpi3.count)}</div>
           <div className="foot">{fmtPesos(kpi3.value)}</div>
         </div>
-        <div className="kpi">
-          <div className="label">Ticket promedio</div>
+        <div className="kpi" style={{ "--kpi-c": "var(--secondary)" }}>
+          <div className="kpi-head">
+            <div className="label">Ticket promedio</div>
+            <div className="kpi-ic"><IconTrendUp size={14} /></div>
+          </div>
           <div className="value">{fmtPesos(kpi4.avg)}</div>
         </div>
       </div>

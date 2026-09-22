@@ -6,6 +6,7 @@ import { fmtPesos } from "@/lib/format";
 import { getDiasInfo } from "@/lib/diasInfo";
 import { patchRecordApi, deleteRecordApi } from "@/lib/api";
 import { canCreateRecord, canEditRecord, canDeleteRecord, canToggleRadicado } from "@/lib/roles";
+import { IconPlus, IconEdit, IconTrash, IconCheck } from "@/components/icons";
 
 const PAGE_SIZES = [25, 50, 100, 250];
 
@@ -248,7 +249,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
         <div className="spacer" />
         {allowCreate && (
           <button type="button" className="btn btn-primary" onClick={() => setModalRecord(null)}>
-            + Agregar registro
+            <IconPlus size={13} /> Agregar registro
           </button>
         )}
       </div>
@@ -318,19 +319,23 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                         <div className="row-actions">
                           <button
                             type="button"
-                            className={`btn-check${r.radicado ? " checked" : ""}`}
+                            className={`icon-action-btn check${r.radicado ? " checked" : ""}`}
                             onClick={() => toggleRadicado(r)}
                             aria-pressed={r.radicado}
                             title="Radicado"
                             disabled={!allowToggle || togglingId === r.id}
                           >
-                            {togglingId === r.id ? <span className="spinner" /> : "✓"}
+                            {togglingId === r.id ? <span className="spinner" /> : <IconCheck size={13} />}
                           </button>
                           {allowEdit && (
-                            <button type="button" className="btn-ghost icon-btn" onClick={() => setModalRecord(r)} title="Editar">✏️</button>
+                            <button type="button" className="icon-action-btn edit" onClick={() => setModalRecord(r)} title="Editar">
+                              <IconEdit size={13} />
+                            </button>
                           )}
                           {allowDelete && (
-                            <button type="button" className="btn-ghost icon-btn" onClick={() => setConfirmDeleteId(r.id)} title="Eliminar">🗑️</button>
+                            <button type="button" className="icon-action-btn delete" onClick={() => setConfirmDeleteId(r.id)} title="Eliminar">
+                              <IconTrash size={13} />
+                            </button>
                           )}
                         </div>
                       )}

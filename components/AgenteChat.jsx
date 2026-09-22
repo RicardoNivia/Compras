@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from "@/lib/geminiModels";
 import { renderMarkdown, splitChartBlocks } from "@/lib/markdown";
 import ChartFromSpec from "@/components/charts/ChartFromSpec";
+import { IconSpark, IconSend, IconPlus, IconTrash } from "@/components/icons";
 
 const SUGGESTIONS = [
   "¿Cuál es el valor total de compras registrado?",
@@ -44,6 +45,7 @@ export default function AgenteChat({ userName }) {
   const [deletingConvId, setDeletingConvId] = useState(null);
   const scrollRef = useRef(null);
   const selectedModel = GEMINI_MODELS.find((m) => m.id === model);
+  const userInitials = (userName || "?").trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "?";
 
   useEffect(() => {
     refreshConversations();
@@ -162,7 +164,7 @@ export default function AgenteChat({ userName }) {
     <div className="agent-layout">
       <div className="agent-history">
         <button type="button" className="agent-new-chat-btn" onClick={startNewConversation}>
-          <span>+</span> Nueva conversación
+          <IconPlus size={13} /> Nueva conversación
         </button>
         <div className="agent-history-list">
           {conversations.length === 0 && <div className="agent-history-empty">Sin conversaciones aún.</div>}
@@ -180,7 +182,7 @@ export default function AgenteChat({ userName }) {
                 disabled={deletingConvId === c.id}
                 title="Eliminar conversación"
               >
-                {deletingConvId === c.id ? <span className="spinner" /> : "✕"}
+                {deletingConvId === c.id ? <span className="spinner" /> : <IconTrash size={11} />}
               </button>
             </div>
           ))}
@@ -214,7 +216,7 @@ export default function AgenteChat({ userName }) {
             <div className="agent-empty"><span className="spinner" /></div>
           ) : isEmpty ? (
             <div className="agent-empty">
-              <div className="agent-empty-mark">✦</div>
+              <div className="agent-empty-mark"><IconSpark size={22} /></div>
               <h2>Hola{userName ? `, ${userName.split(" ")[0]}` : ""}. Soy el Agente IA de Compras.</h2>
               <p>Respondo preguntas basadas únicamente en los datos de compras registrados — no invento información y no puedo crear ni modificar registros.</p>
               <div className="agent-suggestions">
@@ -229,7 +231,9 @@ export default function AgenteChat({ userName }) {
             <div className="agent-messages">
               {messages.map((m, i) => (
                 <div key={i} className={`agent-msg ${m.role}`}>
-                  <div className="agent-msg-avatar">{m.role === "user" ? "🙂" : "✦"}</div>
+                  <div className="agent-msg-avatar">
+                    {m.role === "user" ? userInitials : <IconSpark size={14} />}
+                  </div>
                   <div className="agent-msg-bubble">
                     {m.role === "model" && m.text === "" && sending && i === messages.length - 1 ? (
                       <span className="agent-typing"><span /><span /><span /></span>
@@ -255,7 +259,7 @@ export default function AgenteChat({ userName }) {
             disabled={sending}
           />
           <button type="button" className="btn btn-primary agent-send-btn" onClick={() => send()} disabled={sending || !input.trim()}>
-            {sending ? <span className="spinner" /> : "➤"}
+            {sending ? <span className="spinner" /> : <IconSend size={15} />}
           </button>
         </div>
       </div>

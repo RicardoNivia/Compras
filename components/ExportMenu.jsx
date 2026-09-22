@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { monthKey, monthLabel } from "@/lib/format";
 import { saveBlob, todayISO } from "@/lib/exportHelpers";
+import { IconDownload, IconFile } from "@/components/icons";
 
 const CSV_HEADERS = [
   "Fecha solicitud", "Fecha entrega", "Área", "Responsable", "Estado de compra",
@@ -28,8 +29,10 @@ function recordToCsvRow(r) {
 
 export default function ExportMenu({ allRecords, filteredRecords }) {
   const [open, setOpen] = useState(false);
+  const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
   const [exporting, setExporting] = useState(null); // "csv" | "pdf" | "word" | null
+  const [error, setError] = useState("");
   const ref = useRef(null);
 
   useEffect(() => {
@@ -47,36 +50,57 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
     };
   }, [open]);
 
+  const yearOptions = useMemo(() => {
+    const set = new Set();
+    for (const r of allRecords) {
+      const k = monthKey(r.fechaSolicitud);
+      if (k) set.add(k.slice(0, 4));
+    }
+    return Array.from(set).sort().reverse();
+  }, [allRecords]);
+
   const monthOptions = useMemo(() => {
     const set = new Set();
     for (const r of allRecords) {
       const k = monthKey(r.fechaSolicitud);
-      if (k) set.add(k);
+      if (k && (!year || k.startsWith(year))) set.add(k);
     }
     return Array.from(set).sort().reverse();
-  }, [allRecords]);
+  }, [allRecords, year]);
 
   const multiYear = useMemo(() => {
     const years = new Set(monthOptions.map((k) => k.slice(0, 4)));
     return years.size > 1;
   }, [monthOptions]);
 
+  function handleYearChange(y) {
+    setYear(y);
+    if (y && month && !month.startsWith(y)) setMonth("");
+  }
+
   function getExportRows() {
-    const base = filteredRecords.length ? filteredRecords : allRecords;
-    if (!month) return base;
-    return base.filter((r) => monthKey(r.fechaSolicitud) === month);
+    let base = filteredRecords.length ? filteredRecords : allRecords;
+    if (year) base = base.filter((r) => (monthKey(r.fechaSolicitud) || "").startsWith(year));
+    if (month) base = base.filter((r) => monthKey(r.fechaSolicitud) === month);
+    return base;
   }
 
   function exportCSV() {
-    const rows = getExportRows();
-    const lines = [CSV_HEADERS.join(";"), ...rows.map(recordToCsvRow)];
-    const content = "﻿" + lines.join("\r\n");
-    saveBlob(`compras_registros_${todayISO()}.csv`, content, "text/csv;charset=utf-8");
-    setOpen(false);
+    setError("");
+    try {
+      const rows = getExportRows();
+      const lines = [CSV_HEADERS.join(";"), ...rows.map(recordToCsvRow)];
+      const content = "﻿" + lines.join("\r\n");
+      saveBlob(`compras_registros_${todayISO()}.csv`, content, "text/csv;charset=utf-8");
+      setOpen(false);
+    } catch (err) {
+      setError(err?.message || "No se pudo exportar el CSV.");
+    }
   }
 
   async function exportPDF() {
     setExporting("pdf");
+    setError("");
     try {
       const rows = getExportRows();
       const { jsPDF } = await import("jspdf");
@@ -123,6 +147,8 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
 
       doc.save(`compras_registros_${todayISO()}.pdf`);
       setOpen(false);
+    } catch (err) {
+      setError(err?.message || "No se pudo generar el PDF.");
     } finally {
       setExporting(null);
     }
@@ -130,6 +156,7 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
 
   async function exportWord() {
     setExporting("word");
+    setError("");
     try {
       const rows = getExportRows();
       const {
@@ -184,6 +211,8 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       );
       setOpen(false);
+    } catch (err) {
+      setError(err?.message || "No se pudo generar el Word.");
     } finally {
       setExporting(null);
     }
@@ -192,29 +221,39 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button type="button" className="btn-sync" onClick={() => setOpen((v) => !v)}>
-        <span className="ic">⬇️</span> Exportar
+        <IconDownload size={13} /> Exportar
       </button>
       <div className="sync-panel" hidden={!open}>
         <h4>Exportar registros</h4>
-        <p>Elige un mes (opcional) y el formato de exportación.</p>
-        <div className="field" style={{ marginBottom: 10 }}>
-          <label htmlFor="export-month">Mes</label>
-          <select id="export-month" value={month} onChange={(e) => setMonth(e.target.value)}>
-            <option value="">Todos los meses</option>
-            {monthOptions.map((k) => (
-              <option key={k} value={k}>{monthLabel(k, multiYear)}</option>
-            ))}
-          </select>
+        <p>Elige año y/o mes (opcional) y el formato de exportación.</p>
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <div className="field" style={{ flex: 1 }}>
+            <label htmlFor="export-year">Año</label>
+            <select id="export-year" value={year} onChange={(e) => handleYearChange(e.target.value)}>
+              <option value="">Todos</option>
+              {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div className="field" style={{ flex: 1 }}>
+            <label htmlFor="export-month">Mes</label>
+            <select id="export-month" value={month} onChange={(e) => setMonth(e.target.value)}>
+              <option value="">Todos</option>
+              {monthOptions.map((k) => (
+                <option key={k} value={k}>{monthLabel(k, multiYear)}</option>
+              ))}
+            </select>
+          </div>
         </div>
+        {error && <div className="modal-error" style={{ marginBottom: 10 }}>{error}</div>}
         <div className="export-options">
           <button type="button" className="btn" onClick={exportCSV} disabled={!!exporting}>
-            📊 Excel (.csv)
+            <IconFile size={13} /> Excel (.csv)
           </button>
           <button type="button" className="btn" onClick={exportPDF} disabled={!!exporting}>
-            {exporting === "pdf" ? <span className="spinner" /> : "📄"} {exporting === "pdf" ? "Generando…" : "PDF"}
+            {exporting === "pdf" ? <span className="spinner" /> : <IconFile size={13} />} {exporting === "pdf" ? "Generando…" : "PDF"}
           </button>
           <button type="button" className="btn" onClick={exportWord} disabled={!!exporting}>
-            {exporting === "word" ? <span className="spinner" /> : "📝"} {exporting === "word" ? "Generando…" : "Word (.docx)"}
+            {exporting === "word" ? <span className="spinner" /> : <IconFile size={13} />} {exporting === "word" ? "Generando…" : "Word (.docx)"}
           </button>
         </div>
       </div>
