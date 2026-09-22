@@ -5,6 +5,7 @@ import RecordModal from "@/components/RecordModal";
 import { fmtPesos } from "@/lib/format";
 import { getDiasInfo } from "@/lib/diasInfo";
 import { patchRecordApi, deleteRecordApi } from "@/lib/api";
+import { canCreateRecord, canEditRecord, canDeleteRecord, canToggleRadicado } from "@/lib/roles";
 
 const PAGE_SIZES = [25, 50, 100, 250];
 
@@ -56,7 +57,14 @@ function sortValue(r, key) {
   return v;
 }
 
-export default function RegistrosView({ records, setRecords, onFilteredChange }) {
+export default function RegistrosView({ records, setRecords, onFilteredChange, currentUser }) {
+  const role = currentUser?.role;
+  const allowCreate = canCreateRecord(role);
+  const allowEdit = canEditRecord(role);
+  const allowDelete = canDeleteRecord(role);
+  const allowToggle = canToggleRadicado(role);
+  const hasRowActions = allowToggle || allowEdit || allowDelete;
+
   const [search, setSearch] = useState("");
   const [area, setArea] = useState("");
   const [estado, setEstado] = useState("");
@@ -73,6 +81,8 @@ export default function RegistrosView({ records, setRecords, onFilteredChange })
 
   const [modalRecord, setModalRecord] = useState(undefined); // undefined = closed, null = new
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
 
   const areaOptions = useMemo(() => uniqueSorted(records, "area"), [records]);
   const estadoOptions = useMemo(() => uniqueSorted(records, "estado"), [records]);
@@ -150,20 +160,27 @@ export default function RegistrosView({ records, setRecords, onFilteredChange })
   }
 
   async function toggleRadicado(r) {
+    if (!allowToggle || togglingId) return;
     const next = !r.radicado;
+    setTogglingId(r.id);
     setRecords((prev) => prev.map((x) => (x.id === r.id ? { ...x, radicado: next } : x)));
     try {
       await patchRecordApi(r.id, { radicado: next });
     } catch {
       setRecords((prev) => prev.map((x) => (x.id === r.id ? { ...x, radicado: r.radicado } : x)));
+    } finally {
+      setTogglingId(null);
     }
   }
 
   async function handleDelete(id) {
+    if (!allowDelete) return;
+    setDeletingId(id);
     try {
       await deleteRecordApi(id);
       setRecords((prev) => prev.filter((x) => x.id !== id));
     } finally {
+      setDeletingId(null);
       setConfirmDeleteId(null);
     }
   }
@@ -229,9 +246,11 @@ export default function RegistrosView({ records, setRecords, onFilteredChange })
         </div>
         <button type="button" className="btn" onClick={clearFilters}>Limpiar filtros</button>
         <div className="spacer" />
-        <button type="button" className="btn btn-primary" onClick={() => setModalRecord(null)}>
-          + Agregar registro
-        </button>
+        {allowCreate && (
+          <button type="button" className="btn btn-primary" onClick={() => setModalRecord(null)}>
+            + Agregar registro
+          </button>
+        )}
       </div>
 
       <div className="table-card">
@@ -287,8 +306,13 @@ export default function RegistrosView({ records, setRecords, onFilteredChange })
                       {confirmDeleteId === r.id ? (
                         <div className="confirm-del">
                           <span>¿Eliminar?</span>
-                          <button type="button" className="btn btn-danger-solid small" onClick={() => handleDelete(r.id)}>Sí</button>
-                          <button type="button" className="btn small" onClick={() => setConfirmDeleteId(null)}>No</button>
+                          <button
+                            type="button" className="btn btn-danger-solid small"
+                            onClick={() => handleDelete(r.id)} disabled={deletingId === r.id}
+                          >
+                            {deletingId === r.id ? <span className="spinner" /> : "Sí"}
+                          </button>
+                          <button type="button" className="btn small" onClick={() => setConfirmDeleteId(null)} disabled={deletingId === r.id}>No</button>
                         </div>
                       ) : (
                         <div className="row-actions">
@@ -298,11 +322,16 @@ export default function RegistrosView({ records, setRecords, onFilteredChange })
                             onClick={() => toggleRadicado(r)}
                             aria-pressed={r.radicado}
                             title="Radicado"
+                            disabled={!allowToggle || togglingId === r.id}
                           >
-                            ✓
+                            {togglingId === r.id ? <span className="spinner" /> : "✓"}
                           </button>
-                          <button type="button" className="btn-ghost icon-btn" onClick={() => setModalRecord(r)} title="Editar">✏️</button>
-                          <button type="button" className="btn-ghost icon-btn" onClick={() => setConfirmDeleteId(r.id)} title="Eliminar">🗑️</button>
+                          {allowEdit && (
+                            <button type="button" className="btn-ghost icon-btn" onClick={() => setModalRecord(r)} title="Editar">✏️</button>
+                          )}
+                          {allowDelete && (
+                            <button type="button" className="btn-ghost icon-btn" onClick={() => setConfirmDeleteId(r.id)} title="Eliminar">🗑️</button>
+                          )}
                         </div>
                       )}
                     </td>
@@ -336,6 +365,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange })
           onClose={() => setModalRecord(undefined)}
           onSaved={handleSaved}
           onDeleted={handleDeletedFromModal}
+          allowDelete={allowDelete}
         />
       )}
     </div>

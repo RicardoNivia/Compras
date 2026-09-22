@@ -25,7 +25,8 @@
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
     "html2canvas": "^1.4.1",
-    "docx": "^9.0.2"
+    "docx": "^9.0.2",
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
     "prisma": "^5.20.0"

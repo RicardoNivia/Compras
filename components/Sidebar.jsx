@@ -1,33 +1,39 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { canViewDashboard, canViewUsuarios, canViewAgenteIA, ROLE_LABELS } from "@/lib/roles";
 
-const NAV_ITEMS = [
-  { key: "savings", label: "Dashboard de compras", icon: "📊" },
-  { key: "registros", label: "Registros", icon: "📋" },
+const ALL_NAV_ITEMS = [
+  { key: "dashboard", href: "/dashboard", label: "Dashboard de compras", icon: "📊", show: canViewDashboard },
+  { key: "registros", href: "/registros", label: "Registros", icon: "📋", show: () => true },
+  { key: "agente-ia", href: "/agente-ia", label: "Agente IA", icon: "✦", show: canViewAgenteIA },
+  { key: "usuarios", href: "/usuarios", label: "Usuarios", icon: "👤", show: canViewUsuarios },
 ];
 
-export default function Sidebar({ activeTab, setActiveTab }) {
-  const [collapsed, setCollapsed] = useState(false);
+export default function Sidebar({ user }) {
   const [hovering, setHovering] = useState(false);
-  const asideRef = useRef(null);
-  const expanded = !collapsed || hovering;
+  const [loggingOut, setLoggingOut] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const expanded = hovering;
 
-  // Colapsar implícitamente al hacer click fuera del menú.
-  useEffect(() => {
-    if (collapsed) return;
-    function onDocClick(e) {
-      if (asideRef.current && !asideRef.current.contains(e.target)) {
-        setCollapsed(true);
-      }
+  const items = ALL_NAV_ITEMS.filter((item) => item.show(user.role));
+
+  async function handleLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      router.push("/login");
+      router.refresh();
     }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [collapsed]);
+  }
 
   return (
     <aside
-      ref={asideRef}
       className={`sidebar${expanded ? "" : " collapsed"}`}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
@@ -38,30 +44,36 @@ export default function Sidebar({ activeTab, setActiveTab }) {
       </div>
 
       <nav className="sidebar-nav" aria-label="Navegación principal">
-        {NAV_ITEMS.map((item) => (
-          <button
+        {items.map((item) => (
+          <Link
             key={item.key}
-            type="button"
-            className={`sidebar-link${activeTab === item.key ? " active" : ""}`}
-            onClick={() => setActiveTab(item.key)}
+            href={item.href}
+            className={`sidebar-link${pathname === item.href ? " active" : ""}`}
             title={expanded ? undefined : item.label}
-            aria-current={activeTab === item.key ? "page" : undefined}
           >
             <span className="sidebar-link-ic">{item.icon}</span>
             {expanded && <span className="label">{item.label}</span>}
-          </button>
+          </Link>
         ))}
       </nav>
 
       <div className="sidebar-foot">
+        {expanded && (
+          <div className="sidebar-user">
+            <span className="sidebar-user-name">{user.nombre}</span>
+            <span className="sidebar-user-role">{ROLE_LABELS[user.role] || user.role}</span>
+          </div>
+        )}
+
         <button
           type="button"
-          className="sidebar-collapse-btn"
-          onClick={() => setCollapsed((v) => !v)}
-          title={collapsed ? "Fijar expandido" : "Colapsar menú"}
+          className="sidebar-logout-btn"
+          onClick={handleLogout}
+          disabled={loggingOut}
+          title="Cerrar sesión"
         >
-          <span className="sidebar-link-ic">{expanded ? "«" : "»"}</span>
-          {expanded && <span className="label">{collapsed ? "Fijar expandido" : "Colapsar"}</span>}
+          {loggingOut ? <span className="spinner" /> : <span className="sidebar-link-ic">⏻</span>}
+          {expanded && <span className="label">{loggingOut ? "Saliendo…" : "Cerrar sesión"}</span>}
         </button>
       </div>
     </aside>

@@ -35,7 +35,7 @@ const emptyForm = {
   observaciones: "",
 };
 
-export default function RecordModal({ record, records, onClose, onSaved, onDeleted }) {
+export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true }) {
   const isEdit = !!record;
   const [form, setForm] = useState(() => (record ? { ...emptyForm, ...record } : emptyForm));
   const [error, setError] = useState("");
@@ -276,12 +276,13 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
           </div>
 
           <div className="modal-foot">
-            <button type="submit" className="btn btn-primary" disabled={saving}>
+            <button type="submit" className="btn btn-primary" disabled={saving || deleting}>
+              {saving && <span className="spinner" />}
               {saving ? "Guardando…" : "Guardar"}
             </button>
-            <button type="button" className="btn" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn" onClick={onClose} disabled={saving || deleting}>Cancelar</button>
             <div className="spacer" />
-            {isEdit && !confirmDelete && (
+            {isEdit && allowDelete && !confirmDelete && (
               <button
                 type="button"
                 className="btn btn-danger-outline"
@@ -290,13 +291,14 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 🗑️ Eliminar
               </button>
             )}
-            {isEdit && confirmDelete && (
+            {isEdit && allowDelete && confirmDelete && (
               <div className="confirm-del">
                 <span>¿Eliminar?</span>
                 <button type="button" className="btn btn-danger-solid small" disabled={deleting} onClick={handleDelete}>
+                  {deleting && <span className="spinner" />}
                   {deleting ? "Eliminando…" : "Sí"}
                 </button>
-                <button type="button" className="btn small" onClick={() => setConfirmDelete(false)}>No</button>
+                <button type="button" className="btn small" onClick={() => setConfirmDelete(false)} disabled={deleting}>No</button>
               </div>
             )}
           </div>

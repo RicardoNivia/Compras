@@ -1,9 +1,11 @@
-import { listRecords, getMeta } from "@/lib/records";
-import PanelCompras from "@/components/PanelCompras";
+import { redirect } from "next/navigation";
+import { getSessionUser } from "@/lib/auth-server";
+import { canViewDashboard } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page() {
-  const [records, meta] = await Promise.all([listRecords(), getMeta()]);
-  return <PanelCompras initialRecords={records} initialMeta={meta} />;
+export default async function RootPage() {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  redirect(canViewDashboard(user.role) ? "/dashboard" : "/registros");
 }

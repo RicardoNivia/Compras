@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { listRecords, createRecord, getMeta } from "@/lib/records";
+import { getSessionUser } from "@/lib/auth-server";
+import { canCreateRecord } from "@/lib/roles";
 
 export async function GET() {
   const [records, meta] = await Promise.all([listRecords(), getMeta()]);
@@ -7,6 +9,10 @@ export async function GET() {
 }
 
 export async function POST(request) {
+  const user = await getSessionUser();
+  if (!user || !canCreateRecord(user.role)) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
+  }
   try {
     const body = await request.json();
     const record = await createRecord(body);

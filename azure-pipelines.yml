@@ -1,0 +1,38 @@
+# Canalización de compilación y despliegue de COMPRAS (Next.js + Prisma).
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  # Vincula el grupo de la Biblioteca. Debe estar guardado y autorizado
+  # para esta canalización en "Permisos de canalizaciones".
+  - group: iakeys
+  - name: NODE_VERSION
+    value: "20.x"
+
+steps:
+  - task: NodeTool@0
+    displayName: Instalar Node.js
+    inputs:
+      versionSpec: $(NODE_VERSION)
+
+  - script: npm ci
+    displayName: Instalar dependencias
+
+  # Los secretos del grupo NO llegan solos al proceso: hay que mapearlos
+  # uno por uno en el bloque env: de la tarea que los necesita.
+  - script: |
+      npx prisma generate
+      npm run build
+    displayName: Compilar
+    env:
+      GEMINI_API_KEY: $(apikeygemini)
+      # Agrega DATABASE_URL y SESSION_SECRET al grupo "iakeys" (o a otro grupo)
+      # y descomenta. Una variable inexistente NO falla: se pasa como el texto
+      # literal "$(DATABASE_URL)", lo que produce errores confusos en runtime.
+      # DATABASE_URL: $(DATABASE_URL)
+      # SESSION_SECRET: $(SESSION_SECRET)
