@@ -1,38 +1,35 @@
-# Canalización de compilación y despliegue de COMPRAS (Next.js + Prisma).
 trigger:
-  branches:
-    include:
-      - main
-
-pool:
-  vmImage: ubuntu-latest
+- none
 
 variables:
-  # Vincula el grupo de la Biblioteca. Debe estar guardado y autorizado
-  # para esta canalización en "Permisos de canalizaciones".
-  - group: iakeys
-  - name: NODE_VERSION
-    value: "20.x"
+  imageName: 'sincodb/comprasapp'
+  tag: '$(Build.BuildId)'
+
+pool:
+  name: Bienestar
 
 steps:
-  - task: NodeTool@0
-    displayName: Instalar Node.js
-    inputs:
-      versionSpec: $(NODE_VERSION)
 
-  - script: npm ci
-    displayName: Instalar dependencias
+- task: Docker@2
+  displayName: 'Login DockerHub'
+  inputs:
+    command: login
+    containerRegistry: 'DockerHub'
 
-  # Los secretos del grupo NO llegan solos al proceso: hay que mapearlos
-  # uno por uno en el bloque env: de la tarea que los necesita.
-  - script: |
-      npx prisma generate
-      npm run build
-    displayName: Compilar
-    env:
-      GEMINI_API_KEY: $(apikeygemini)
-      # Agrega DATABASE_URL y SESSION_SECRET al grupo "iakeys" (o a otro grupo)
-      # y descomenta. Una variable inexistente NO falla: se pasa como el texto
-      # literal "$(DATABASE_URL)", lo que produce errores confusos en runtime.
-      # DATABASE_URL: $(DATABASE_URL)
-      # SESSION_SECRET: $(SESSION_SECRET)
+- task: Docker@2
+  displayName: 'Build & Push'
+  inputs:
+    containerRegistry: 'DockerHub'
+    repository: '$(imageName)'
+    command: buildAndPush
+    Dockerfile: 'Dockerfile'
+    buildContext: '.'
+    tags: |
+      latest
+      $(tag)
+
+# VALIDACIÓN
+- script: |
+    echo "Probando pull..."
+    docker pull $(imageName):latest
+  displayName: 'Verify Image'
