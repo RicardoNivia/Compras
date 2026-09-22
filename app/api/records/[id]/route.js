@@ -10,7 +10,7 @@ export async function PUT(request, { params }) {
   }
   try {
     const body = await request.json();
-    const record = await updateRecord(params.id, body);
+    const record = await updateRecord(params.id, body, user);
     return NextResponse.json(record);
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: err.status || 500 });
@@ -25,7 +25,7 @@ export async function PATCH(request, { params }) {
   }
   try {
     const body = await request.json();
-    const record = await patchRecord(params.id, body);
+    const record = await patchRecord(params.id, body, user);
     return NextResponse.json(record);
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: err.status || 500 });
@@ -38,7 +38,7 @@ export async function DELETE(_request, { params }) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   try {
-    await deleteRecord(params.id);
+    await deleteRecord(params.id, user);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: err.status || 500 });

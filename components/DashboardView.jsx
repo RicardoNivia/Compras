@@ -132,14 +132,26 @@ export default function DashboardView({ records }) {
   }, [yearFilteredRecords, allMonthsAsc, selectedMonth, multiYear]);
 
   // ---------- KPI 2: cumplimiento de tiempos ----------
+  // Cuenta como "resuelta" toda solicitud ya entregada, y también las que
+  // siguen pendientes/en proceso pero ya superaron los 8 días hábiles (ya
+  // incumplieron aunque no se hayan entregado). Las pendientes que aún están
+  // dentro del plazo no se cuentan (su resultado todavía no está definido).
   const cumplimiento = useMemo(() => {
     const conEntrega = activeRecords.filter((r) => r.fechaEntrega);
     const cumplieron = conEntrega.filter((r) => {
       const d = businessDaysBetween(r.fechaSolicitud, r.fechaEntrega);
       return d !== null && d <= 8;
     });
-    const pct = conEntrega.length ? (cumplieron.length / conEntrega.length) * 100 : 0;
-    return { pct, total: conEntrega.length, cumplieron: cumplieron.length };
+    const pendientesVencidos = activeRecords.filter((r) => {
+      if (r.fechaEntrega) return false;
+      const e = r.estado;
+      if (e && e !== "Proceso" && e !== "Pendiente") return false;
+      const d = businessDaysElapsedToToday(r.fechaSolicitud);
+      return d !== null && d > 8;
+    });
+    const total = conEntrega.length + pendientesVencidos.length;
+    const pct = total ? (cumplieron.length / total) * 100 : 0;
+    return { pct, total, cumplieron: cumplieron.length };
   }, [activeRecords]);
 
   const kpi3 = useMemo(() => {
@@ -282,11 +294,26 @@ export default function DashboardView({ records }) {
   }, [filteredRecords, activeRecords]);
 
   // ---------- Cumplimiento / incumplimiento por mes (> 8 días hábiles), en % ----------
+  // Igual que el KPI de cumplimiento: además de las entregadas, incluye las
+  // pendientes/en proceso que ya superaron los 8 días hábiles (cuentan como
+  // no cumplió), agrupadas por el mes de su fecha de solicitud.
   const incumplimientoPorMes = useMemo(() => {
+    function diasDe(r) {
+      return r.fechaEntrega
+        ? businessDaysBetween(r.fechaSolicitud, r.fechaEntrega)
+        : businessDaysElapsedToToday(r.fechaSolicitud);
+    }
     return allMonthsAsc.map((mk) => {
-      const rows = activeRecords.filter((r) => r.fechaEntrega && monthKey(r.fechaSolicitud) === mk);
+      const rows = activeRecords.filter((r) => {
+        if (monthKey(r.fechaSolicitud) !== mk) return false;
+        if (r.fechaEntrega) return true;
+        const e = r.estado;
+        if (e && e !== "Proceso" && e !== "Pendiente") return false;
+        const d = businessDaysElapsedToToday(r.fechaSolicitud);
+        return d !== null && d > 8;
+      });
       const incumplioCount = rows.filter((r) => {
-        const d = businessDaysBetween(r.fechaSolicitud, r.fechaEntrega);
+        const d = diasDe(r);
         return d !== null && d > 8;
       }).length;
       const total = rows.length;

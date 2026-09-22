@@ -3,14 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { canViewDashboard, canViewUsuarios, canViewAgenteIA, ROLE_LABELS } from "@/lib/roles";
-import { IconDashboard, IconTable, IconSpark, IconUsers, IconLogout } from "@/components/icons";
+import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, ROLE_LABELS } from "@/lib/roles";
+import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLogout } from "@/components/icons";
 
 const ALL_NAV_ITEMS = [
   { key: "dashboard", href: "/dashboard", label: "Dashboard de compras", Icon: IconDashboard, show: canViewDashboard },
   { key: "registros", href: "/registros", label: "Registros", Icon: IconTable, show: () => true },
   { key: "agente-ia", href: "/agente-ia", label: "Agente IA", Icon: IconSpark, show: canViewAgenteIA },
   { key: "usuarios", href: "/usuarios", label: "Usuarios", Icon: IconUsers, show: canViewUsuarios },
+  { key: "auditoria", href: "/auditoria", label: "Auditoría", Icon: IconHistory, show: canViewAuditoria },
 ];
 
 function initials(name) {

@@ -15,7 +15,7 @@ export async function POST(request) {
   }
   try {
     const body = await request.json();
-    const record = await createRecord(body);
+    const record = await createRecord(body, user);
     return NextResponse.json(record, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: err.status || 500 });

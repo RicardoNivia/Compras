@@ -11,6 +11,7 @@ import { IconPlus, IconEdit, IconTrash, IconCheck, IconAlert } from "@/component
 const PAGE_SIZES = [25, 50, 100, 250];
 
 const COLUMNS = [
+  { key: "localSeq", label: "#" },
   { key: "fechaSolicitud", label: "F. solicitud" },
   { key: "fechaEntrega", label: "F. entrega" },
   { key: "dias", label: "Días" },
@@ -95,7 +96,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
     const q = search.trim().toLowerCase();
     return records.filter((r) => {
       if (q) {
-        const hay = [r.descripcion, r.proveedor, r.responsable, r.categoria, r.observaciones]
+        const hay = [r.localSeq ? `#${r.localSeq}` : "", r.descripcion, r.proveedor, r.responsable, r.categoria, r.observaciones]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -302,6 +303,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                 const diasInfo = getDiasInfo(r);
                 return (
                   <tr key={r.id}>
+                    <td className="mono">{r.localSeq ? `#${r.localSeq}` : "—"}</td>
                     <td>{r.fechaSolicitud || "—"}</td>
                     <td>{r.fechaEntrega || "—"}</td>
                     <td><span className={`pill ${diasInfo.severity}`}>{diasInfo.label}</span></td>

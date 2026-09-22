@@ -174,6 +174,16 @@ export function IconFile(props) {
   );
 }
 
+export function IconHistory(props) {
+  return (
+    <Svg {...props} viewBox="0 0 14 14">
+      <path d="M2.3 7A4.7 4.7 0 1 1 3.8 10.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M2.3 4v3h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 4.3v3l2.2 1.3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function IconAlert(props) {
   return (
     <Svg {...props} viewBox="0 0 14 14">

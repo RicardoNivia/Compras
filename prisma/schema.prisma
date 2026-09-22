@@ -10,6 +10,7 @@ datasource db {
 
 model Record {
   id                  String   @id @default(cuid())
+  localSeq            Int?     @unique // número autoincremental visible (# en la tabla), asignado desde Meta.nextLocalSeq
   informe             String?
   fechaSolicitud      String?
   fechaEntrega        String?
@@ -32,6 +33,26 @@ model Record {
   updatedAt           DateTime @updatedAt
 
   @@map("records")
+}
+
+// Auditoría de acciones sobre registros (crear / editar / eliminar / radicar).
+// userId no tiene relación FK a propósito: si el usuario se elimina, el log
+// debe seguir existiendo con el nombre/correo capturados en el momento.
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String   // "crear" | "editar" | "eliminar" | "radicar"
+  recordId   String
+  recordInfo String?
+  userId     String?
+  userNombre String?
+  userEmail  String?
+  changes    String?  // JSON: [{ field, label, before, after }]
+  createdAt  DateTime @default(now())
+
+  @@index([recordId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 model Meta {
