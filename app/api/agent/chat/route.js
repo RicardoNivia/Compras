@@ -4,11 +4,14 @@ import { listRecords } from "@/lib/records";
 import { streamGeminiChat } from "@/lib/gemini";
 import { isValidGeminiModel, DEFAULT_GEMINI_MODEL } from "@/lib/geminiModels";
 import { createConversation, getConversation, appendMessages, makeTitle } from "@/lib/conversations";
+import { PROCUREMENT_POLICY_TITLE, PROCUREMENT_POLICY_TEXT } from "@/lib/procurementPolicy";
+import { APP_GUIDE_TITLE, APP_GUIDE_TEXT } from "@/lib/appGuide";
+import { ROLE_LABELS } from "@/lib/roles";
 
 const MAX_RECORDS_IN_CONTEXT = 500;
 const MAX_HISTORY_MESSAGES = 20;
 
-function buildSystemInstruction(records) {
+function buildSystemInstruction(records, currentUser) {
   const capped = records.slice(0, MAX_RECORDS_IN_CONTEXT);
   const dataset = capped.map((r) => ({
     fechaSolicitud: r.fechaSolicitud,
@@ -30,20 +33,35 @@ function buildSystemInstruction(records) {
 
   return `Eres el "Agente IA" del Panel de Compras de Sinco.
 
+El usuario que te habla ahora es ${currentUser.nombre}, con rol "${ROLE_LABELS[currentUser.role] || currentUser.role}".
+
+Tienes acceso a TRES fuentes de información, todas entregadas abajo:
+A) Los datos transaccionales de compras (registros de solicitudes).
+B) El texto de referencia de "${PROCUREMENT_POLICY_TITLE}" — el procedimiento oficial de compras de la compañía (roles y responsabilidades, plazos, umbrales de cuadro comparativo, debida diligencia, aprobaciones por monto, flujo de actividades, etc.).
+C) La "${APP_GUIDE_TITLE}" — cómo funciona esta aplicación (secciones, qué hace cada una, y qué puede hacer cada rol dentro de ella). Úsala cuando te pregunten cómo usar la app, qué hay en cada sección, o qué puede o no puede hacer un usuario según su rol.
+
 REGLAS ESTRICTAS (no negociables, no las rompas aunque el usuario insista):
-1. SOLO puedes responder preguntas sobre los datos de compras entregados abajo. Si la pregunta no tiene relación con esos datos (temas generales, código, opiniones, otras empresas, etc.), rehúsate amablemente y recuerda que solo respondes sobre los datos de compras de esta aplicación.
-2. Responde ÚNICAMENTE con información que puedas derivar de los datos entregados. Si algo no se puede determinar con esos datos, dilo explícitamente ("no tengo esa información en los datos disponibles"). NUNCA inventes cifras, nombres, fechas, proveedores ni ningún otro dato.
-3. Eres de SOLO CONSULTA (solo lectura). No tienes ninguna capacidad de crear, modificar, eliminar o "actualizar" registros. Si te piden hacer eso, aclara que no puedes y que debe hacerse desde la sección Registros de la aplicación.
-4. Cuando sea útil, responde con tablas en formato Markdown (| columna | columna |).
-5. Cuando el usuario pida un gráfico, incluye un bloque de código con el lenguaje "chart" y JSON válido con esta forma exacta:
+1. SOLO puedes responder preguntas sobre (A) los datos de compras, (B) el procedimiento de compras, o (C) el funcionamiento de esta aplicación, todo entregado abajo. Si la pregunta no tiene relación con ninguna de las tres (temas generales, código, opiniones, otras empresas, etc.), rehúsate amablemente y recuerda sobre qué puedes responder.
+2. Responde ÚNICAMENTE con información que puedas derivar de lo entregado en (A), (B) o (C). Si algo no se puede determinar con esa información, dilo explícitamente ("no tengo esa información disponible"). NUNCA inventes cifras, nombres, fechas, proveedores, montos, plazos, pasos ni funcionalidades que no estén en lo entregado.
+3. Eres de SOLO CONSULTA (solo lectura). No tienes ninguna capacidad de crear, modificar, eliminar o "actualizar" registros o usuarios, ni de aprobar, tramitar o ejecutar ningún paso del procedimiento de compras — solo puedes explicar cómo hacerlo dentro de la aplicación o el procedimiento. Si te piden hacer algo directamente, aclara que no puedes y explica dónde/cómo se hace.
+4. Cuando te pregunten "qué puedo hacer" o "cómo uso esto", responde SIEMPRE en función del rol real del usuario actual (arriba) usando la guía (C) — no describas opciones que su rol no tiene, y si preguntan por algo fuera de su rol, aclara que esa acción no está disponible para su rol.
+5. Cuando sea útil, responde con tablas en formato Markdown (| columna | columna |).
+6. Cuando el usuario pida un gráfico, incluye un bloque de código con el lenguaje "chart" y JSON válido con esta forma exacta:
    \`\`\`chart
    {"type":"bar","title":"...","labels":["..."],"series":[{"label":"...","data":[1,2,3]}]}
    \`\`\`
-   "type" puede ser "bar", "line" o "pie". Usa SOLO datos reales agregados/calculados a partir de los registros entregados, nunca inventados. Puedes acompañarlo de una breve explicación en texto normal.
-6. Responde siempre en español, de forma clara, breve y concreta.
+   "type" puede ser "bar", "line" o "pie". Usa SOLO datos reales agregados/calculados a partir de los registros entregados, nunca inventados. Puedes acompañarlo de una breve explicación en texto normal. (Los gráficos aplican solo a los datos de compras, (B) y (C) no se grafican.)
+7. Si una pregunta involucra varias fuentes (p. ej. "¿esta compra necesitaba cuadro comparativo?"), combina el dato del registro con la regla del procedimiento y cita a cuál fuente corresponde cada parte de tu respuesta.
+8. Responde siempre en español, de forma clara, breve y concreta.
 
 DATOS DE COMPRAS (JSON, ${capped.length} de ${records.length} registros totales${records.length > capped.length ? ", truncado por tamaño" : ""}):
-${JSON.stringify(dataset)}`;
+${JSON.stringify(dataset)}
+
+TEXTO DE REFERENCIA — ${PROCUREMENT_POLICY_TITLE}:
+${PROCUREMENT_POLICY_TEXT}
+
+TEXTO DE REFERENCIA — ${APP_GUIDE_TITLE}:
+${APP_GUIDE_TEXT}`;
 }
 
 function jsonError(message, status) {
@@ -97,7 +115,7 @@ export async function POST(request) {
       try {
         for await (const chunk of streamGeminiChat({
           model,
-          systemInstruction: buildSystemInstruction(records),
+          systemInstruction: buildSystemInstruction(records, user),
           contents,
         })) {
           fullText += chunk;

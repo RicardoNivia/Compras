@@ -5,6 +5,8 @@ import DetailModal from "@/components/DetailModal";
 import BarChartSvg from "@/components/charts/BarChartSvg";
 import StackedBarChartSvg from "@/components/charts/StackedBarChartSvg";
 import HistogramSvg from "@/components/charts/HistogramSvg";
+import CompliancePercentChartSvg from "@/components/charts/CompliancePercentChartSvg";
+import PieChartSvg from "@/components/charts/PieChartSvg";
 import GaugeSvg from "@/components/charts/GaugeSvg";
 import { fmtCOP, fmtCompact, fmtNum, fmtPesos, fmtDateDisplay, monthKey, monthLabel } from "@/lib/format";
 import { businessDaysBetween, businessDaysElapsedToToday } from "@/lib/businessDays";
@@ -26,46 +28,66 @@ function estadoLabel(estado) {
   return estado && estado.trim() ? estado : "Sin estado";
 }
 
+function todayYearMonth() {
+  const d = new Date();
+  const year = String(d.getFullYear());
+  const month = `${year}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return { year, month };
+}
+
 export default function DashboardView({ records }) {
-  const [selectedYear, setSelectedYear] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("");
+  const { year: currentYear, month: currentMonthKey } = todayYearMonth();
+
+  const [viewMode, setViewMode] = useState("mensual"); // "mensual" | "anual"
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [detailRecord, setDetailRecord] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
   const containerRef = useRef(null);
 
-  // Años disponibles a partir de todos los registros (independiente del filtro actual).
+  function switchToAnual() {
+    setViewMode("anual");
+    setSelectedMonth("");
+    setSelectedYear((y) => y || currentYear);
+  }
+
+  function switchToMensual() {
+    setViewMode("mensual");
+    setSelectedYear("");
+    setSelectedMonth((m) => m || currentMonthKey);
+  }
+
+  // Años disponibles a partir de todos los registros (más el año actual, para que
+  // la pestaña Anual siempre tenga un año válido seleccionado por defecto).
   const yearOptions = useMemo(() => {
-    const set = new Set();
+    const set = new Set([currentYear]);
     for (const r of records) {
       const k = monthKey(r.fechaSolicitud);
       if (k) set.add(k.slice(0, 4));
     }
     return Array.from(set).sort().reverse();
-  }, [records]);
+  }, [records, currentYear]);
 
   function handleYearChange(year) {
     setSelectedYear(year);
-    // Si el mes elegido no pertenece al nuevo año, se limpia.
-    if (year && selectedMonth && !selectedMonth.startsWith(year)) {
-      setSelectedMonth("");
-    }
   }
 
-  // Sin año seleccionado: se muestra todo. Con año y sin mes: se filtra por año.
+  // Pestaña Anual: se restringe al año elegido. Pestaña Mensual: sin restricción de
+  // año (el mes YYYY-MM ya es específico), así el selector de mes lista todos los meses.
   const yearFilteredRecords = useMemo(() => {
     if (!selectedYear) return records;
     return records.filter((r) => (monthKey(r.fechaSolicitud) || "").startsWith(selectedYear));
   }, [records, selectedYear]);
 
   const monthOptions = useMemo(() => {
-    const set = new Set();
+    const set = new Set(viewMode === "mensual" ? [currentMonthKey] : []);
     for (const r of yearFilteredRecords) {
       const k = monthKey(r.fechaSolicitud);
       if (k) set.add(k);
     }
     return Array.from(set).sort().reverse();
-  }, [yearFilteredRecords]);
+  }, [yearFilteredRecords, viewMode, currentMonthKey]);
 
   const multiYear = useMemo(() => {
     const years = new Set(monthOptions.map((k) => k.slice(0, 4)));
@@ -190,6 +212,20 @@ export default function DashboardView({ records }) {
     return { data, seriesNames: [...top5, "Otras"] };
   }, [filteredRecords, allMonthsAsc, multiYear, selectedMonth]);
 
+  // ---------- Participación por categoría (para la vista Mensual) ----------
+  const categoriaParticipacion = useMemo(() => {
+    const map = new Map();
+    for (const r of activeRecords) {
+      const c = r.categoria || "Sin categoría";
+      map.set(c, (map.get(c) || 0) + (r.valorConIva || 0));
+    }
+    const sorted = Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+    const rows = sorted.slice(0, 5).map(([name, value]) => ({ name, value }));
+    const otrasValue = sorted.slice(5).reduce((s, [, v]) => s + v, 0);
+    if (otrasValue > 0) rows.push({ name: "Otras", value: otrasValue });
+    return rows;
+  }, [activeRecords]);
+
   // ---------- Estado de la compra ----------
   const estadoRows = useMemo(() => {
     const map = new Map();
@@ -244,6 +280,26 @@ export default function DashboardView({ records }) {
 
     return { pendientesRiesgo, buckets, maxDias, offenders: offenders.slice(0, 6) };
   }, [filteredRecords, activeRecords]);
+
+  // ---------- Cumplimiento / incumplimiento por mes (> 8 días hábiles), en % ----------
+  const incumplimientoPorMes = useMemo(() => {
+    return allMonthsAsc.map((mk) => {
+      const rows = activeRecords.filter((r) => r.fechaEntrega && monthKey(r.fechaSolicitud) === mk);
+      const incumplioCount = rows.filter((r) => {
+        const d = businessDaysBetween(r.fechaSolicitud, r.fechaEntrega);
+        return d !== null && d > 8;
+      }).length;
+      const total = rows.length;
+      const cumplioCount = total - incumplioCount;
+      const incumplioPct = total ? (incumplioCount / total) * 100 : 0;
+      const cumplioPct = total ? (cumplioCount / total) * 100 : 0;
+      return {
+        key: mk,
+        label: monthLabel(mk, multiYear),
+        total, cumplioCount, incumplioCount, cumplioPct, incumplioPct,
+      };
+    }).filter((d) => selectedMonth ? d.key === selectedMonth : true);
+  }, [allMonthsAsc, activeRecords, multiYear, selectedMonth]);
 
   // ---------- Medio de pago ----------
   const medioRows = useMemo(() => {
@@ -415,7 +471,18 @@ export default function DashboardView({ records }) {
 
       const bg = getComputedStyle(document.documentElement).getPropertyValue("--page").trim() || "#ffffff";
       const scale = Math.min(2, window.devicePixelRatio || 1.5);
-      const canvas = await html2canvas(containerRef.current, { backgroundColor: bg, scale });
+      const canvas = await html2canvas(containerRef.current, {
+        backgroundColor: bg,
+        scale,
+        onclone: (clonedDoc) => {
+          // El box-shadow con esquinas redondeadas no se pinta bien en html2canvas
+          // (deja bloques grises encima de las tarjetas): se desactiva solo en la
+          // captura, sin afectar la vista normal de la app.
+          const style = clonedDoc.createElement("style");
+          style.textContent = "*{box-shadow:none !important; backdrop-filter:none !important;}";
+          clonedDoc.head.appendChild(style);
+        },
+      });
 
       const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
       const pageW = pdf.internal.pageSize.getWidth();
@@ -471,27 +538,34 @@ export default function DashboardView({ records }) {
   return (
     <div ref={containerRef} className="dashboard-shell">
       <div className="card-head" style={{ marginBottom: 14 }}>
-        <div style={{ display: "flex", gap: 10 }}>
-          <div className="field" style={{ width: 140 }}>
-            <label htmlFor="dash-year">Año</label>
-            <select id="dash-year" value={selectedYear} onChange={(e) => handleYearChange(e.target.value)}>
-              <option value="">Todos los años</option>
-              {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+          <div className="dash-tabs" role="tablist" aria-label="Periodo del dashboard">
+            <button type="button" role="tab" aria-selected={viewMode === "mensual"} className="dash-tab" onClick={switchToMensual}>
+              Mensual
+            </button>
+            <button type="button" role="tab" aria-selected={viewMode === "anual"} className="dash-tab" onClick={switchToAnual}>
+              Anual
+            </button>
           </div>
-          <div className="field" style={{ width: 200 }}>
-            <label htmlFor="dash-month">Mes</label>
-            <select id="dash-month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
-              <option value="">{selectedYear ? `Todo ${selectedYear}` : "Todos los meses"}</option>
-              {monthOptions.map((k) => <option key={k} value={k}>{monthLabel(k, multiYear)}</option>)}
-            </select>
-          </div>
+
+          {viewMode === "anual" ? (
+            <div className="field" style={{ width: 140 }}>
+              <label htmlFor="dash-year">Año</label>
+              <select id="dash-year" value={selectedYear} onChange={(e) => handleYearChange(e.target.value)}>
+                {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+          ) : (
+            <div className="field" style={{ width: 200 }}>
+              <label htmlFor="dash-month">Mes</label>
+              <select id="dash-month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+                {monthOptions.map((k) => <option key={k} value={k}>{monthLabel(k, true)}</option>)}
+              </select>
+            </div>
+          )}
         </div>
         <div className="spacer" />
         <div style={{ display: "flex", gap: 8 }}>
-          {(selectedYear || selectedMonth) && (
-            <button type="button" className="btn" onClick={() => { setSelectedYear(""); setSelectedMonth(""); }}>Ver todo</button>
-          )}
           <button type="button" className="btn" onClick={handleExportPDF} disabled={exporting}>
             {exporting ? <span className="spinner" /> : <IconFile size={13} />} {exporting ? "Exportando…" : "Exportar PDF"}
           </button>
@@ -543,13 +617,101 @@ export default function DashboardView({ records }) {
         </div>
       </div>
 
-      {/* Solicitudes pendientes */}
-      <div className="card" id="pending-top-list" style={{ marginBottom: 14 }}>
-        <div className="card-head">
-          <div>
-            <h3>Solicitudes pendientes</h3>
-            <p className="card-sub">Sin estado, en proceso o pendiente, sin fecha de entrega registrada.</p>
+      {/* KPI row 5: ahorro */}
+      <div className="kpi-row kpi-row-5">
+        <div className="kpi">
+          <div className="label">Total compras</div>
+          <div className="value">{fmtPesos(ahorro.totalCompras)}</div>
+        </div>
+        <div className="kpi">
+          <div className="label">Valor cotizado</div>
+          <div className="value">{fmtPesos(ahorro.valorCotizado)}</div>
+        </div>
+        <div className="kpi">
+          <div className="label">Valor compra (cotizados)</div>
+          <div className="value">{fmtPesos(ahorro.valorCompraCotizados)}</div>
+        </div>
+        <div className="kpi">
+          <div className="label">Ahorro total</div>
+          <div className="value">{fmtPesos(ahorro.ahorroTotal)}</div>
+        </div>
+        <div className="kpi">
+          <div className="label">% ahorro global</div>
+          <div className="value">{ahorro.pctAhorro !== null ? `${ahorro.pctAhorro.toFixed(1)}%` : "—"}</div>
+        </div>
+      </div>
+      {ahorro.outliersCount > 0 && (
+        <p className="methodology-note">
+          Se excluyeron {ahorro.outliersCount} cotización(es) con valores atípicos (posibles errores de digitación,
+          cotizado &gt; 20× el valor de compra) del cálculo de ahorro.
+        </p>
+      )}
+
+      {/* Cumplimiento de entregas / Resumen ejecutivo */}
+      <div className="grid-2" style={{ marginBottom: 14 }}>
+        <div className="card">
+          <h3>Cumplimiento de entregas</h3>
+          <div className="gauge-wrap">
+            <GaugeSvg percent={gauge.pct} />
+            <div className="gauge-foot">{gauge.cumplieron} de {gauge.total} compras entregadas dentro de 8 días hábiles</div>
+            <div className="gauge-breakdown" style={{ width: "100%" }}>
+              <div className="estado-row">
+                <div className="name">Cumplió</div>
+                <div className="track"><div className="fill" style={{ width: `${gauge.total ? (gauge.cumplieron / gauge.total) * 100 : 0}%`, background: "var(--good)" }} /></div>
+                <div className="figs"><span className="n">{gauge.cumplieron}</span></div>
+              </div>
+              <div className="estado-row">
+                <div className="name">No cumplió</div>
+                <div className="track"><div className="fill" style={{ width: `${gauge.total ? (gauge.noCumplieron / gauge.total) * 100 : 0}%`, background: "var(--critical)" }} /></div>
+                <div className="figs"><span className="n">{gauge.noCumplieron}</span></div>
+              </div>
+            </div>
           </div>
+        </div>
+        <div className="card">
+          <h3>Resumen ejecutivo</h3>
+          <div className="summary-grid">
+            <div className="detail-item">
+              <div className="dlabel">Total ejecutado</div>
+              <div className="dvalue">{fmtCOP(resumen.totalEjecutado)}</div>
+              <div className="dcap">{resumen.ejecutadosCount} compra(s)</div>
+            </div>
+            <div className="detail-item">
+              <div className="dlabel">Ahorro generado</div>
+              <div className="dvalue">{fmtCOP(resumen.ahorroTotal)}</div>
+              <div className="dcap">{resumen.pctAhorro !== null ? `${resumen.pctAhorro.toFixed(1)}% sobre cotizado` : "—"}</div>
+            </div>
+            <div className="detail-item">
+              <div className="dlabel">Mayor ahorro individual</div>
+              <div className="dvalue">{resumen.mayorAhorro ? fmtCOP(resumen.mayorAhorro.ahorro) : "—"}</div>
+              <div className="dcap">
+                {resumen.mayorAhorro ? `${resumen.mayorAhorro.record.descripcion || "—"} · ${resumen.mayorAhorro.record.proveedor || "—"}` : "Sin datos"}
+              </div>
+            </div>
+            <div className="detail-item">
+              <div className="dlabel">Área con mayor compra</div>
+              <div className="dvalue">{resumen.mayorArea ? resumen.mayorArea.name : "—"}</div>
+              <div className="dcap">{resumen.mayorArea ? fmtCOP(resumen.mayorArea.value) : ""}</div>
+            </div>
+            <div className="detail-item full">
+              <div className="dlabel">Compras totales</div>
+              <div className="dvalue">{fmtNum(resumen.totalCompras)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Solicitudes pendientes */}
+      <div className="card card-alert" id="pending-top-list" style={{ marginBottom: 14 }}>
+        <div className="card-head">
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <div className="card-alert-ic"><IconAlert size={16} /></div>
+            <div>
+              <h3>Solicitudes pendientes</h3>
+              <p className="card-sub">Sin estado, en proceso o pendiente, sin fecha de entrega registrada.</p>
+            </div>
+          </div>
+          {pendientes.length > 0 && <span className="card-alert-count">{pendientes.length}</span>}
         </div>
         {pendientes.length === 0 ? (
           <div className="empty">No hay solicitudes pendientes sin estado o en proceso.</div>
@@ -583,17 +745,35 @@ export default function DashboardView({ records }) {
         )}
       </div>
 
-      {/* Valor de compras por mes / por área y mes */}
+      {/* Vista Anual: tendencia por mes · Vista Mensual: participación del mes seleccionado */}
       <div className="grid-2">
+        {viewMode === "anual" ? (
+          <div className="card">
+            <h3>Valor de compras por mes</h3>
+            <p className="card-sub">Total con IVA por mes de solicitud (excluye anulados).</p>
+            <BarChartSvg data={valorPorMes} />
+          </div>
+        ) : (
+          <div className="card">
+            <h3>Participación por área</h3>
+            <p className="card-sub">Total con IVA del mes, por área (excluye anulados).</p>
+            <PieChartSvg data={areaMesStack.data[0]?.segments || []} formatValue={fmtCOP} />
+          </div>
+        )}
         <div className="card">
-          <h3>Valor de compras por mes</h3>
-          <p className="card-sub">Total con IVA por mes de solicitud (excluye anulados).</p>
-          <BarChartSvg data={valorPorMes} />
-        </div>
-        <div className="card">
-          <h3>Valor de compras por área y mes</h3>
-          <p className="card-sub">Top 5 áreas por valor, resto agrupado en &quot;Otras&quot;.</p>
-          <StackedBarChartSvg data={areaMesStack.data} seriesNames={areaMesStack.seriesNames} />
+          {viewMode === "anual" ? (
+            <>
+              <h3>Valor de compras por área y mes</h3>
+              <p className="card-sub">Top 5 áreas por valor, resto agrupado en &quot;Otras&quot;.</p>
+              <StackedBarChartSvg data={areaMesStack.data} seriesNames={areaMesStack.seriesNames} />
+            </>
+          ) : (
+            <>
+              <h3>Participación por categoría</h3>
+              <p className="card-sub">Top 5 categorías por valor del mes, resto agrupado en &quot;Otras&quot;.</p>
+              <PieChartSvg data={categoriaParticipacion} formatValue={fmtCOP} />
+            </>
+          )}
         </div>
       </div>
 
@@ -647,6 +827,29 @@ export default function DashboardView({ records }) {
         </div>
       </div>
 
+      {/* Cumplimiento / incumplimiento por mes (solo vista Anual: en Mensual es un solo mes, no aporta). */}
+      {viewMode === "anual" && (
+        <div className="card card-alert" style={{ marginBottom: 14 }}>
+          <div className="card-head">
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <div className="card-alert-ic"><IconAlert size={16} /></div>
+              <div>
+                <h3>Cumplimiento por mes</h3>
+                <p className="card-sub">% de solicitudes entregadas dentro (cumplió) y fuera (no cumplió) del plazo de 8 días hábiles, por mes de solicitud.</p>
+              </div>
+            </div>
+            {incumplimientoPorMes.reduce((s, d) => s + d.incumplioCount, 0) > 0 && (
+              <span className="card-alert-count">{incumplimientoPorMes.reduce((s, d) => s + d.incumplioCount, 0)}</span>
+            )}
+          </div>
+          <div className="legend" style={{ marginBottom: 8 }}>
+            <span className="chip"><span className="swatch" style={{ background: "var(--good)" }} />Cumplió</span>
+            <span className="chip"><span className="swatch" style={{ background: "var(--critical)" }} />No cumplió</span>
+          </div>
+          <CompliancePercentChartSvg data={incumplimientoPorMes} />
+        </div>
+      )}
+
       {/* Medio de pago */}
       <div className="card" style={{ marginBottom: 14 }}>
         <h3>Medio de pago</h3>
@@ -662,90 +865,6 @@ export default function DashboardView({ records }) {
             </div>
           </div>
         ))}
-      </div>
-
-      {/* KPI row 5: ahorro */}
-      <div className="kpi-row kpi-row-5">
-        <div className="kpi">
-          <div className="label">Total compras</div>
-          <div className="value">{fmtPesos(ahorro.totalCompras)}</div>
-        </div>
-        <div className="kpi">
-          <div className="label">Valor cotizado</div>
-          <div className="value">{fmtPesos(ahorro.valorCotizado)}</div>
-        </div>
-        <div className="kpi">
-          <div className="label">Valor compra (cotizados)</div>
-          <div className="value">{fmtPesos(ahorro.valorCompraCotizados)}</div>
-        </div>
-        <div className="kpi">
-          <div className="label">Ahorro total</div>
-          <div className="value">{fmtPesos(ahorro.ahorroTotal)}</div>
-        </div>
-        <div className="kpi">
-          <div className="label">% ahorro global</div>
-          <div className="value">{ahorro.pctAhorro !== null ? `${ahorro.pctAhorro.toFixed(1)}%` : "—"}</div>
-        </div>
-      </div>
-      {ahorro.outliersCount > 0 && (
-        <p className="methodology-note">
-          Se excluyeron {ahorro.outliersCount} cotización(es) con valores atípicos (posibles errores de digitación,
-          cotizado &gt; 20× el valor de compra) del cálculo de ahorro.
-        </p>
-      )}
-
-      {/* Cumplimiento de entregas / Resumen ejecutivo */}
-      <div className="grid-2">
-        <div className="card">
-          <h3>Cumplimiento de entregas</h3>
-          <div className="gauge-wrap">
-            <GaugeSvg percent={gauge.pct} />
-            <div className="gauge-foot">{gauge.cumplieron} de {gauge.total} compras entregadas dentro de 8 días hábiles</div>
-            <div className="gauge-breakdown" style={{ width: "100%" }}>
-              <div className="estado-row">
-                <div className="name">Cumplió</div>
-                <div className="track"><div className="fill" style={{ width: `${gauge.total ? (gauge.cumplieron / gauge.total) * 100 : 0}%`, background: "var(--good)" }} /></div>
-                <div className="figs"><span className="n">{gauge.cumplieron}</span></div>
-              </div>
-              <div className="estado-row">
-                <div className="name">No cumplió</div>
-                <div className="track"><div className="fill" style={{ width: `${gauge.total ? (gauge.noCumplieron / gauge.total) * 100 : 0}%`, background: "var(--critical)" }} /></div>
-                <div className="figs"><span className="n">{gauge.noCumplieron}</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <h3>Resumen ejecutivo</h3>
-          <div className="summary-grid">
-            <div className="detail-item">
-              <div className="dlabel">Total ejecutado</div>
-              <div className="dvalue">{fmtCOP(resumen.totalEjecutado)}</div>
-              <div className="dcap">{resumen.ejecutadosCount} compra(s)</div>
-            </div>
-            <div className="detail-item">
-              <div className="dlabel">Ahorro generado</div>
-              <div className="dvalue">{fmtCOP(resumen.ahorroTotal)}</div>
-              <div className="dcap">{resumen.pctAhorro !== null ? `${resumen.pctAhorro.toFixed(1)}% sobre cotizado` : "—"}</div>
-            </div>
-            <div className="detail-item">
-              <div className="dlabel">Mayor ahorro individual</div>
-              <div className="dvalue">{resumen.mayorAhorro ? fmtCOP(resumen.mayorAhorro.ahorro) : "—"}</div>
-              <div className="dcap">
-                {resumen.mayorAhorro ? `${resumen.mayorAhorro.record.descripcion || "—"} · ${resumen.mayorAhorro.record.proveedor || "—"}` : "Sin datos"}
-              </div>
-            </div>
-            <div className="detail-item">
-              <div className="dlabel">Área con mayor compra</div>
-              <div className="dvalue">{resumen.mayorArea ? resumen.mayorArea.name : "—"}</div>
-              <div className="dcap">{resumen.mayorArea ? fmtCOP(resumen.mayorArea.value) : ""}</div>
-            </div>
-            <div className="detail-item full">
-              <div className="dlabel">Compras totales</div>
-              <div className="dvalue">{fmtNum(resumen.totalCompras)}</div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Compras por área / Ahorro por área */}

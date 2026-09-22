@@ -6,7 +6,7 @@ import { fmtPesos } from "@/lib/format";
 import { getDiasInfo } from "@/lib/diasInfo";
 import { patchRecordApi, deleteRecordApi } from "@/lib/api";
 import { canCreateRecord, canEditRecord, canDeleteRecord, canToggleRadicado } from "@/lib/roles";
-import { IconPlus, IconEdit, IconTrash, IconCheck } from "@/components/icons";
+import { IconPlus, IconEdit, IconTrash, IconCheck, IconAlert } from "@/components/icons";
 
 const PAGE_SIZES = [25, 50, 100, 250];
 
@@ -73,6 +73,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
   const [licitacion, setLicitacion] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [onlyIncumplimiento, setOnlyIncumplimiento] = useState(false);
 
   const [sortKey, setSortKey] = useState("fechaSolicitud");
   const [sortDir, setSortDir] = useState("desc");
@@ -106,9 +107,10 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
       if (licitacion && String(r.licitacion || "") !== licitacion) return false;
       if (dateFrom && (!r.fechaSolicitud || r.fechaSolicitud < dateFrom)) return false;
       if (dateTo && (!r.fechaSolicitud || r.fechaSolicitud > dateTo)) return false;
+      if (onlyIncumplimiento && !((getDiasInfo(r).dias ?? 0) > 8)) return false;
       return true;
     });
-  }, [records, search, area, estado, medioPago, licitacion, dateFrom, dateTo]);
+  }, [records, search, area, estado, medioPago, licitacion, dateFrom, dateTo, onlyIncumplimiento]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -132,7 +134,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
 
   useEffect(() => {
     setPage(1);
-  }, [search, area, estado, medioPago, licitacion, dateFrom, dateTo, pageSize]);
+  }, [search, area, estado, medioPago, licitacion, dateFrom, dateTo, onlyIncumplimiento, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -158,6 +160,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
     setLicitacion("");
     setDateFrom("");
     setDateTo("");
+    setOnlyIncumplimiento(false);
   }
 
   async function toggleRadicado(r) {
@@ -201,57 +204,70 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
 
   return (
     <div>
-      <div className="toolbar" id="registros-toolbar">
-        <div className="field search-field">
-          <label htmlFor="reg-search">Buscar</label>
-          <input
-            id="reg-search" type="search" placeholder="Descripción, proveedor, responsable…"
-            value={search} onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="toolbar" id="registros-toolbar" style={{ flexDirection: "column", alignItems: "stretch" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          <div className="field search-field">
+            <label htmlFor="reg-search">Buscar</label>
+            <input
+              id="reg-search" type="search" placeholder="Descripción, proveedor, responsable…"
+              value={search} onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="reg-area">Área</label>
+            <select id="reg-area" value={area} onChange={(e) => setArea(e.target.value)}>
+              <option value="">Todas</option>
+              {areaOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="reg-estado">Estado de compra</label>
+            <select id="reg-estado" value={estado} onChange={(e) => setEstado(e.target.value)}>
+              <option value="">Todos</option>
+              {estadoOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="reg-medio">Medio de pago</label>
+            <select id="reg-medio" value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
+              <option value="">Todos</option>
+              {medioOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="reg-licitacion">Licitación</label>
+            <select id="reg-licitacion" value={licitacion} onChange={(e) => setLicitacion(e.target.value)}>
+              <option value="">Todas</option>
+              {licitacionOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="reg-from">Desde</label>
+            <input id="reg-from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="reg-to">Hasta</label>
+            <input id="reg-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
         </div>
-        <div className="field">
-          <label htmlFor="reg-area">Área</label>
-          <select id="reg-area" value={area} onChange={(e) => setArea(e.target.value)}>
-            <option value="">Todas</option>
-            {areaOptions.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="reg-estado">Estado de compra</label>
-          <select id="reg-estado" value={estado} onChange={(e) => setEstado(e.target.value)}>
-            <option value="">Todos</option>
-            {estadoOptions.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="reg-medio">Medio de pago</label>
-          <select id="reg-medio" value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
-            <option value="">Todos</option>
-            {medioOptions.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="reg-licitacion">Licitación</label>
-          <select id="reg-licitacion" value={licitacion} onChange={(e) => setLicitacion(e.target.value)}>
-            <option value="">Todas</option>
-            {licitacionOptions.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="reg-from">Desde</label>
-          <input id="reg-from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </div>
-        <div className="field">
-          <label htmlFor="reg-to">Hasta</label>
-          <input id="reg-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-        </div>
-        <button type="button" className="btn" onClick={clearFilters}>Limpiar filtros</button>
-        <div className="spacer" />
-        {allowCreate && (
-          <button type="button" className="btn btn-primary" onClick={() => setModalRecord(null)}>
-            <IconPlus size={13} /> Agregar registro
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+          <button
+            type="button"
+            className={`btn${onlyIncumplimiento ? " btn-danger-solid" : ""}`}
+            onClick={() => setOnlyIncumplimiento((v) => !v)}
+            aria-pressed={onlyIncumplimiento}
+            title="Solicitudes en proceso o entregadas con más de 8 días hábiles"
+          >
+            <IconAlert size={13} /> Incumplimiento (&gt;8 días)
           </button>
-        )}
+          <button type="button" className="btn" onClick={clearFilters}>Limpiar filtros</button>
+          <div className="spacer" />
+          {allowCreate && (
+            <button type="button" className="btn btn-primary" onClick={() => setModalRecord(null)}>
+              <IconPlus size={13} /> Agregar registro
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="table-card">

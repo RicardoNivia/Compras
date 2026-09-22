@@ -10,7 +10,8 @@ const SUGGESTIONS = [
   "¿Cuál es el valor total de compras registrado?",
   "¿Cuáles son las 3 categorías con más gasto?",
   "Muéstrame un gráfico de compras por área",
-  "¿Qué solicitudes llevan más días hábiles sin resolverse?",
+  "¿A partir de qué monto se requiere cuadro comparativo?",
+  "¿Qué puedo hacer en esta aplicación según mi rol?",
 ];
 
 function AssistantContent({ text }) {
@@ -218,7 +219,7 @@ export default function AgenteChat({ userName }) {
             <div className="agent-empty">
               <div className="agent-empty-mark"><IconSpark size={22} /></div>
               <h2>Hola{userName ? `, ${userName.split(" ")[0]}` : ""}. Soy el Agente IA de Compras.</h2>
-              <p>Respondo preguntas basadas únicamente en los datos de compras registrados — no invento información y no puedo crear ni modificar registros.</p>
+              <p>Respondo preguntas sobre los datos de compras, el procedimiento oficial de compras (ADM-P-01) y cómo usar esta aplicación según tu rol — no invento información y no puedo crear, modificar ni aprobar nada.</p>
               <div className="agent-suggestions">
                 {SUGGESTIONS.map((s) => (
                   <button key={s} type="button" className="agent-suggestion-chip" onClick={() => send(s)}>

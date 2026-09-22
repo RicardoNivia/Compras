@@ -31,7 +31,7 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
   const [open, setOpen] = useState(false);
   const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
-  const [exporting, setExporting] = useState(null); // "csv" | "pdf" | "word" | null
+  const [exporting, setExporting] = useState(null); // "pdf" | null
   const [error, setError] = useState("");
   const ref = useRef(null);
 
@@ -79,7 +79,9 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
   }
 
   function getExportRows() {
-    let base = filteredRecords.length ? filteredRecords : allRecords;
+    // Refleja exactamente lo que la tabla de Registros está mostrando
+    // (búsqueda/área/estado/etc.), más el año/mes elegidos aquí.
+    let base = filteredRecords;
     if (year) base = base.filter((r) => (monthKey(r.fechaSolicitud) || "").startsWith(year));
     if (month) base = base.filter((r) => monthKey(r.fechaSolicitud) === month);
     return base;
@@ -94,7 +96,7 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
       saveBlob(`compras_registros_${todayISO()}.csv`, content, "text/csv;charset=utf-8");
       setOpen(false);
     } catch (err) {
-      setError(err?.message || "No se pudo exportar el CSV.");
+      setError(err?.message || "No se pudo exportar el Excel.");
     }
   }
 
@@ -154,70 +156,6 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
     }
   }
 
-  async function exportWord() {
-    setExporting("word");
-    setError("");
-    try {
-      const rows = getExportRows();
-      const {
-        Document, Packer, Table, TableRow, TableCell, Paragraph, TextRun,
-        WidthType, PageOrientation, HeadingLevel,
-      } = await import("docx");
-
-      const headerCells = [
-        "F. solicitud", "F. entrega", "Área", "Responsable", "Estado", "Categoría",
-        "Descripción", "Medio de pago", "Estado legaliz.", "Radicado", "Proveedor",
-        "Valor + IVA", "Observaciones",
-      ].map((h) => new TableCell({
-        children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })],
-      }));
-
-      const bodyRows = rows.map((r) => new TableRow({
-        children: [
-          r.fechaSolicitud || "", r.fechaEntrega || "", r.area || "", r.responsable || "",
-          r.estado || "", r.categoria || "", r.descripcion || "", r.medioPago || "",
-          r.estadoLegalizacion || "", r.radicado ? "Sí" : "No", r.proveedor || "",
-          r.valorConIva != null ? new Intl.NumberFormat("es-CO").format(r.valorConIva) : "",
-          r.observaciones || "",
-        ].map((v) => new TableCell({ children: [new Paragraph(String(v))] })),
-      }));
-
-      const table = new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: [new TableRow({ children: headerCells, tableHeader: true }), ...bodyRows],
-      });
-
-      const doc = new Document({
-        sections: [{
-          properties: { page: { size: { orientation: PageOrientation.LANDSCAPE } } },
-          children: [
-            new Paragraph({ text: "Sinco · Compras — Registros", heading: HeadingLevel.HEADING_1 }),
-            new Paragraph({
-              children: [new TextRun({
-                text: `Exportado: ${new Date().toLocaleDateString("es-CO")} · ${rows.length} registro(s)`,
-                color: "666666",
-              })],
-            }),
-            new Paragraph({ text: "" }),
-            table,
-          ],
-        }],
-      });
-
-      const blob = await Packer.toBlob(doc);
-      saveBlob(
-        `compras_registros_${todayISO()}.docx`,
-        blob,
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      );
-      setOpen(false);
-    } catch (err) {
-      setError(err?.message || "No se pudo generar el Word.");
-    } finally {
-      setExporting(null);
-    }
-  }
-
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button type="button" className="btn-sync" onClick={() => setOpen((v) => !v)}>
@@ -251,9 +189,6 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
           </button>
           <button type="button" className="btn" onClick={exportPDF} disabled={!!exporting}>
             {exporting === "pdf" ? <span className="spinner" /> : <IconFile size={13} />} {exporting === "pdf" ? "Generando…" : "PDF"}
-          </button>
-          <button type="button" className="btn" onClick={exportWord} disabled={!!exporting}>
-            {exporting === "word" ? <span className="spinner" /> : <IconFile size={13} />} {exporting === "word" ? "Generando…" : "Word (.docx)"}
           </button>
         </div>
       </div>
