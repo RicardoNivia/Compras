@@ -100,6 +100,48 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
     }
   }
 
+  async function exportExcel() {
+    setExporting("xlsx");
+    setError("");
+    try {
+      const rows = getExportRows();
+      const XLSX = await import("xlsx");
+      const data = rows.map((r) => ({
+        "Fecha solicitud": r.fechaSolicitud || "",
+        "Fecha entrega": r.fechaEntrega || "",
+        "Área": r.area || "",
+        "Responsable": r.responsable || "",
+        "Estado de compra": r.estado || "",
+        "Categoría": r.categoria || "",
+        "Descripción": r.descripcion || "",
+        "Medio de pago": r.medioPago || "",
+        "Licitación": r.licitacion || "",
+        "Estado legalización": r.estadoLegalizacion || "",
+        "Radicado": r.radicado ? "Sí" : "No",
+        "Proveedor": r.proveedor || "",
+        "FE": r.fe || "",
+        "Valor + IVA": r.valorConIva ?? "",
+        "Valor sin IVA": r.valorSinIva ?? "",
+        "Valor cotizado": r.valorCot ?? "",
+        "Observaciones": r.observaciones || "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws["!cols"] = [
+        { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 16 }, { wch: 16 },
+        { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 9 }, { wch: 20 },
+        { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 32 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Registros");
+      XLSX.writeFile(wb, `compras_registros_${todayISO()}.xlsx`);
+      setOpen(false);
+    } catch (err) {
+      setError(err?.message || "No se pudo generar el Excel.");
+    } finally {
+      setExporting(null);
+    }
+  }
+
   async function exportPDF() {
     setExporting("pdf");
     setError("");
@@ -184,8 +226,11 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
         </div>
         {error && <div className="modal-error" style={{ marginBottom: 10 }}>{error}</div>}
         <div className="export-options">
+          <button type="button" className="btn" onClick={exportExcel} disabled={!!exporting}>
+            {exporting === "xlsx" ? <span className="spinner" /> : <IconFile size={13} />} {exporting === "xlsx" ? "Generando…" : "Excel (.xlsx)"}
+          </button>
           <button type="button" className="btn" onClick={exportCSV} disabled={!!exporting}>
-            <IconFile size={13} /> Excel (.csv)
+            <IconFile size={13} /> CSV
           </button>
           <button type="button" className="btn" onClick={exportPDF} disabled={!!exporting}>
             {exporting === "pdf" ? <span className="spinner" /> : <IconFile size={13} />} {exporting === "pdf" ? "Generando…" : "PDF"}
