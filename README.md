@@ -1,6 +1,6 @@
-# Panel de Compras — Next.js + Prisma (SQLite)
+# Panel de Compras — Next.js + Prisma (PostgreSQL)
 
-Migración de la app original (una sola página HTML) a **Next.js (App Router)** + **React** + **Prisma ORM** sobre **SQLite**, usando **migraciones** (`prisma migrate`) en vez de datos "quemados".
+Migración de la app original (una sola página HTML) a **Next.js (App Router)** + **React** + **Prisma ORM** sobre **PostgreSQL**, usando **migraciones** (`prisma migrate`) en vez de datos "quemados".
 
 > Los datos en `backend/prisma/seed-data.json` son solo un **ejemplo** para demostrar que la app funciona igual que el original — no son los datos reales del negocio.
 
@@ -8,7 +8,7 @@ Migración de la app original (una sola página HTML) a **Next.js (App Router)**
 
 El proyecto está dividido en dos apps Next.js independientes, hermanas dentro del mismo repo:
 
-- **`backend/`** — solo rutas API (`app/api/*`), Prisma/SQLite, autenticación. Corre en el puerto **3001**.
+- **`backend/`** — solo rutas API (`app/api/*`), Prisma/PostgreSQL, autenticación. Corre en el puerto **3001**.
 - **`frontend/`** — todas las páginas (dashboard, registros, usuarios, auditoría, agente IA, login). Corre en el puerto **3000** y obtiene todos sus datos por HTTP contra el backend (nunca accede a Prisma directamente).
 
 En desarrollo, las llamadas `fetch("/api/...")` hechas desde el navegador se reenvían automáticamente del frontend al backend vía `rewrites()` (`frontend/next.config.js`), así que desde la UI todo se ve same-origin. Las cargas iniciales de datos en Server Components usan `frontend/lib/backendFetch.js`, que llama directo al backend reenviando la cookie de sesión.
@@ -25,7 +25,9 @@ Ambas apps comparten la misma `SESSION_SECRET` (debe ser idéntica en `backend/.
 cd backend
 npm install
 npx prisma generate
-npx prisma migrate dev --name init   # crea prisma/migrations/ y la base prisma/dev.db
+docker run -d --name compras-pg -p 5432:5432 -e POSTGRES_DB=compras -e POSTGRES_USER=compras -e POSTGRES_PASSWORD=compras postgres:16-alpine
+cp .env.example .env                 # DATABASE_URL apunta a ese Postgres
+npx prisma migrate dev               # aplica prisma/migrations/
 npm run db:seed                       # carga los registros de ejemplo
 npm run dev                           # http://localhost:3001
 

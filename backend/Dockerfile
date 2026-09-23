@@ -1,4 +1,4 @@
-# Imagen de producción del backend de Panel de Compras (Next.js API-only + Prisma/SQLite).
+# Imagen de producción del backend de Panel de Compras (Next.js API-only + Prisma/PostgreSQL).
 # Build context: backend/ (docker build -f backend/Dockerfile backend)
 FROM node:20-alpine AS base
 # Prisma necesita OpenSSL en Alpine para elegir el query engine correcto.
@@ -30,6 +30,6 @@ COPY --from=builder /app/next.config.js ./next.config.js
 
 EXPOSE 3001
 
-# Aplica migraciones pendientes contra el archivo SQLite del volumen persistente
+# Aplica migraciones pendientes contra PostgreSQL (servicio "db" del stack)
 # antes de arrancar — mismo patrón que el "prisma db push" del API de bienestar.
 CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
