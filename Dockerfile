@@ -1,9 +1,13 @@
 # Imagen de producción de Panel de Compras (Next.js + Prisma/SQLite).
 FROM node:20-alpine AS base
+# Prisma necesita OpenSSL en Alpine para elegir el query engine correcto.
+RUN apk add --no-cache openssl libc6-compat
 
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+# El "postinstall" ejecuta "prisma generate", que necesita el schema.
+COPY prisma ./prisma
 RUN npm ci
 
 FROM base AS builder
