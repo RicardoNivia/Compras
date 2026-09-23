@@ -104,3 +104,18 @@ model Message {
 
   @@map("agent_messages")
 }
+
+// Opciones administrables para los desplegables del formulario de registros.
+// tipo: "area" | "responsable" | "estado" | "medioPago" | "estadoLegalizacion"
+// (coincide 1:1 con el nombre del campo correspondiente en Record).
+model Maestro {
+  id        String   @id @default(cuid())
+  tipo      String
+  valor     String
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tipo, valor])
+  @@map("maestros")
+}

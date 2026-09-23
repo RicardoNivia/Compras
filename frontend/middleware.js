@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
-const PUBLIC_PATHS = new Set(["/login", "/api/auth/login"]);
+const PUBLIC_PATHS = new Set(["/login"]);
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
@@ -14,9 +14,6 @@ export async function middleware(request) {
   const payload = token ? await verifySessionToken(token) : null;
 
   if (!payload) {
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "No autenticado." }, { status: 401 });
-    }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
@@ -24,11 +21,8 @@ export async function middleware(request) {
   }
 
   const isAdmin = payload.role === "admin";
-  const adminOnly = ["/usuarios", "/api/users", "/agente-ia", "/api/agent", "/auditoria", "/api/audit"];
+  const adminOnly = ["/usuarios", "/agente-ia", "/auditoria", "/maestros"];
   if (adminOnly.some((p) => pathname.startsWith(p)) && !isAdmin) {
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-    }
     const url = request.nextUrl.clone();
     url.pathname = "/registros";
     return NextResponse.redirect(url);
@@ -38,5 +32,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/).*)"],
 };

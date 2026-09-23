@@ -5,7 +5,7 @@ import RecordModal from "@/components/RecordModal";
 import { fmtPesos } from "@/lib/format";
 import { getDiasInfo } from "@/lib/diasInfo";
 import { patchRecordApi, deleteRecordApi } from "@/lib/api";
-import { canCreateRecord, canEditRecord, canDeleteRecord, canToggleRadicado } from "@/lib/roles";
+import { canCreateRecord, canEditRecord, canDeleteRecord, canToggleRadicado, getEditableFields } from "@/lib/roles";
 import { IconPlus, IconEdit, IconTrash, IconCheck, IconAlert } from "@/components/icons";
 
 const PAGE_SIZES = [25, 50, 100, 250];
@@ -59,12 +59,13 @@ function sortValue(r, key) {
   return v;
 }
 
-export default function RegistrosView({ records, setRecords, onFilteredChange, currentUser }) {
+export default function RegistrosView({ records, setRecords, onFilteredChange, currentUser, maestros }) {
   const role = currentUser?.role;
   const allowCreate = canCreateRecord(role);
   const allowEdit = canEditRecord(role);
   const allowDelete = canDeleteRecord(role);
   const allowToggle = canToggleRadicado(role);
+  const editableFields = getEditableFields(role);
   const hasRowActions = allowToggle || allowEdit || allowDelete;
 
   const [search, setSearch] = useState("");
@@ -86,6 +87,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
+  const [confirmRadicado, setConfirmRadicado] = useState(null); // registro pendiente de confirmar
 
   const areaOptions = useMemo(() => uniqueSorted(records, "area"), [records]);
   const estadoOptions = useMemo(() => uniqueSorted(records, "estado"), [records]);
@@ -164,15 +166,23 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
     setOnlyIncumplimiento(false);
   }
 
-  async function toggleRadicado(r) {
-    if (!allowToggle || togglingId) return;
-    const next = !r.radicado;
+  // El radicado es de un solo sentido: una vez marcado no se puede desmarcar
+  // (ni en la UI ni en el backend), así que solo se pide confirmar al marcar.
+  function requestRadicado(r) {
+    if (!allowToggle || togglingId || r.radicado) return;
+    setConfirmRadicado(r);
+  }
+
+  async function confirmMarkRadicado() {
+    const r = confirmRadicado;
+    if (!r) return;
+    setConfirmRadicado(null);
     setTogglingId(r.id);
-    setRecords((prev) => prev.map((x) => (x.id === r.id ? { ...x, radicado: next } : x)));
+    setRecords((prev) => prev.map((x) => (x.id === r.id ? { ...x, radicado: true } : x)));
     try {
-      await patchRecordApi(r.id, { radicado: next });
+      await patchRecordApi(r.id, { radicado: true });
     } catch {
-      setRecords((prev) => prev.map((x) => (x.id === r.id ? { ...x, radicado: r.radicado } : x)));
+      setRecords((prev) => prev.map((x) => (x.id === r.id ? { ...x, radicado: false } : x)));
     } finally {
       setTogglingId(null);
     }
@@ -338,10 +348,10 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                           <button
                             type="button"
                             className={`icon-action-btn check${r.radicado ? " checked" : ""}`}
-                            onClick={() => toggleRadicado(r)}
+                            onClick={() => requestRadicado(r)}
                             aria-pressed={r.radicado}
-                            title="Radicado"
-                            disabled={!allowToggle || togglingId === r.id}
+                            title={r.radicado ? "Radicado (no se puede deshacer)" : "Marcar como radicado"}
+                            disabled={!allowToggle || togglingId === r.id || r.radicado}
                           >
                             {togglingId === r.id ? <span className="spinner" /> : <IconCheck size={13} />}
                           </button>
@@ -389,7 +399,35 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
           onSaved={handleSaved}
           onDeleted={handleDeletedFromModal}
           allowDelete={allowDelete}
+          editableFields={editableFields}
+          maestros={maestros}
         />
+      )}
+
+      {confirmRadicado && (
+        <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmRadicado(null); }}>
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <div className="modal-head">
+              <h3>Marcar como radicado</h3>
+              <button type="button" className="btn-ghost icon-btn" onClick={() => setConfirmRadicado(null)} aria-label="Cerrar">✕</button>
+            </div>
+            <div className="modal-body" style={{ gridTemplateColumns: "1fr" }}>
+              <p style={{ margin: 0 }}>
+                ¿Confirmas que el registro {confirmRadicado.localSeq ? `#${confirmRadicado.localSeq}` : ""}
+                {confirmRadicado.descripcion ? ` — ${confirmRadicado.descripcion}` : ""} ya fue radicado?
+              </p>
+              <p className="count-note" style={{ margin: 0 }}>
+                Esta acción no se puede deshacer: una vez marcado, nadie podrá desmarcarlo.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn btn-primary" onClick={confirmMarkRadicado}>
+                Sí, marcar como radicado
+              </button>
+              <button type="button" className="btn" onClick={() => setConfirmRadicado(null)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -192,3 +192,33 @@ export function IconAlert(props) {
     </Svg>
   );
 }
+
+export function IconLayers(props) {
+  return (
+    <Svg {...props}>
+      <path d="M8.5 1.8 15 5.3l-6.5 3.5L2 5.3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M2 9 8.5 12.5 15 9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2 12.5 8.5 16l6.5-3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconBuilding(props) {
+  return (
+    <Svg {...props}>
+      <rect x="2.5" y="1.8" width="7.5" height="13.4" rx="1" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M10 6.5h4.5v8.7H10" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M4.7 4.5h1.6M4.7 7.2h1.6M4.7 9.9h1.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M6.7 15.2v-2.3H5.3v2.3" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconFlag(props) {
+  return (
+    <Svg {...props}>
+      <path d="M3 1.5v13.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M3 2.2c2-1 4 1 6 0s4-1 4 0v6c-2-1-4 1-6 0s-4-1-4 0Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </Svg>
+  );
+}

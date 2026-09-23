@@ -50,3 +50,35 @@ export async function deleteRecordApi(id) {
   const res = await fetch(`/api/records/${id}`, { method: "DELETE" });
   return handle(res);
 }
+
+export async function fetchMaestros(tipo, onlyActive) {
+  const qs = new URLSearchParams();
+  if (tipo) qs.set("tipo", tipo);
+  if (onlyActive) qs.set("onlyActive", "1");
+  const suffix = qs.toString();
+  const res = await fetch(`/api/maestros${suffix ? `?${suffix}` : ""}`, { cache: "no-store" });
+  return handle(res);
+}
+
+export async function createMaestroApi(data) {
+  const res = await fetch("/api/maestros", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handle(res);
+}
+
+export async function updateMaestroApi(id, data) {
+  const res = await fetch(`/api/maestros/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handle(res);
+}
+
+export async function deleteMaestroApi(id) {
+  const res = await fetch(`/api/maestros/${id}`, { method: "DELETE" });
+  return handle(res);
+}

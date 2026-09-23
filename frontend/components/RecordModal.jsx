@@ -5,10 +5,6 @@ import { getDiasInfo } from "@/lib/diasInfo";
 import { createRecordApi, updateRecordApi, deleteRecordApi } from "@/lib/api";
 import { IconTrash } from "@/components/icons";
 
-const ESTADOS = ["Pendiente", "Proceso", "Ejecutado", "Anulado"];
-const MEDIOS_PAGO = ["TRANSFER", "T.C", "C.M", "ANTICIPO", "ANTICIPO - TRANSFER"];
-const ESTADOS_LEGALIZACION = ["", "ACTA", "OC", "N/A"];
-
 function uniqueSorted(records, field) {
   const set = new Set();
   for (const r of records) {
@@ -36,9 +32,30 @@ const emptyForm = {
   observaciones: "",
 };
 
-export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true }) {
+export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true, editableFields = null, maestros = [] }) {
   const isEdit = !!record;
+  // editableFields null = todos los campos editables (admin, registro).
+  // Con lista (p.ej. legalizar), los demás campos quedan solo-lectura.
+  const isEditable = (field) => !editableFields || editableFields.includes(field);
   const [form, setForm] = useState(() => (record ? { ...emptyForm, ...record } : emptyForm));
+
+  // Opciones del maestro para `tipo`, más el valor actual del registro si
+  // quedó inactivo/no está en el maestro (para no perderlo/cambiarlo sin que
+  // el usuario lo decida explícitamente al editar un registro viejo).
+  function optionsFor(tipo) {
+    const activeValues = new Set();
+    const opts = [];
+    for (const m of maestros) {
+      if (m.tipo !== tipo) continue;
+      activeValues.add(m.valor);
+      opts.push({ value: m.valor, label: m.valor });
+    }
+    const current = form[tipo];
+    if (current && !activeValues.has(current)) {
+      opts.push({ value: current, label: `${current} (inactivo)` });
+    }
+    return opts.sort((a, b) => a.label.localeCompare(b.label, "es"));
+  }
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -52,8 +69,6 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  const areaOptions = useMemo(() => uniqueSorted(records, "area"), [records]);
-  const responsableOptions = useMemo(() => uniqueSorted(records, "responsable"), [records]);
   const categoriaOptions = useMemo(() => uniqueSorted(records, "categoria"), [records]);
   const proveedorOptions = useMemo(() => uniqueSorted(records, "proveedor"), [records]);
 
@@ -127,6 +142,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 id="f-fechaSolicitud" type="date" required
                 value={form.fechaSolicitud || ""}
                 onChange={(e) => update("fechaSolicitud", e.target.value)}
+                disabled={!isEditable("fechaSolicitud")}
               />
             </div>
             <div className="field">
@@ -135,6 +151,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 id="f-fechaEntrega" type="date"
                 value={form.fechaEntrega || ""}
                 onChange={(e) => update("fechaEntrega", e.target.value)}
+                disabled={!isEditable("fechaEntrega")}
               />
             </div>
 
@@ -146,31 +163,33 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
 
             <div className="field">
               <label htmlFor="f-area">Área *</label>
-              <input
-                id="f-area" list="areas-list" required
+              <select
+                id="f-area" required
                 value={form.area || ""}
                 onChange={(e) => update("area", e.target.value)}
-              />
-              <datalist id="areas-list">
-                {areaOptions.map((v) => <option key={v} value={v} />)}
-              </datalist>
+                disabled={!isEditable("area")}
+              >
+                <option value="">Selecciona un área…</option>
+                {optionsFor("area").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
             </div>
             <div className="field">
               <label htmlFor="f-responsable">Responsable *</label>
-              <input
-                id="f-responsable" list="responsables-list" required
+              <select
+                id="f-responsable" required
                 value={form.responsable || ""}
                 onChange={(e) => update("responsable", e.target.value)}
-              />
-              <datalist id="responsables-list">
-                {responsableOptions.map((v) => <option key={v} value={v} />)}
-              </datalist>
+                disabled={!isEditable("responsable")}
+              >
+                <option value="">Selecciona un responsable…</option>
+                {optionsFor("responsable").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
             </div>
 
             <div className="field">
               <label htmlFor="f-estado">Estado de compra</label>
-              <select id="f-estado" value={form.estado || ""} onChange={(e) => update("estado", e.target.value)}>
-                {ESTADOS.map((v) => <option key={v} value={v}>{v}</option>)}
+              <select id="f-estado" value={form.estado || ""} onChange={(e) => update("estado", e.target.value)} disabled={!isEditable("estado")}>
+                {optionsFor("estado").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="field">
@@ -179,6 +198,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 id="f-categoria" list="categorias-list"
                 value={form.categoria || ""}
                 onChange={(e) => update("categoria", e.target.value)}
+                disabled={!isEditable("categoria")}
               />
               <datalist id="categorias-list">
                 {categoriaOptions.map((v) => <option key={v} value={v} />)}
@@ -191,14 +211,15 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 id="f-descripcion" required
                 value={form.descripcion || ""}
                 onChange={(e) => update("descripcion", e.target.value)}
+                disabled={!isEditable("descripcion")}
               />
             </div>
 
             <div className="field">
               <label htmlFor="f-medioPago">Medio de pago</label>
-              <select id="f-medioPago" value={form.medioPago || ""} onChange={(e) => update("medioPago", e.target.value)}>
+              <select id="f-medioPago" value={form.medioPago || ""} onChange={(e) => update("medioPago", e.target.value)} disabled={!isEditable("medioPago")}>
                 <option value="">—</option>
-                {MEDIOS_PAGO.map((v) => <option key={v} value={v}>{v}</option>)}
+                {optionsFor("medioPago").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="field">
@@ -207,6 +228,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 id="f-proveedor" list="proveedores-list"
                 value={form.proveedor || ""}
                 onChange={(e) => update("proveedor", e.target.value)}
+                disabled={!isEditable("proveedor")}
               />
               <datalist id="proveedores-list">
                 {proveedorOptions.map((v) => <option key={v} value={v} />)}
@@ -219,6 +241,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 id="f-licitacion"
                 value={form.licitacion || ""}
                 onChange={(e) => update("licitacion", e.target.value)}
+                disabled={!isEditable("licitacion")}
               />
             </div>
             <div className="field">
@@ -227,16 +250,16 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 id="f-estadoLegalizacion"
                 value={form.estadoLegalizacion || ""}
                 onChange={(e) => update("estadoLegalizacion", e.target.value)}
+                disabled={!isEditable("estadoLegalizacion")}
               >
-                {ESTADOS_LEGALIZACION.map((v) => (
-                  <option key={v} value={v}>{v === "" ? "—" : v}</option>
-                ))}
+                <option value="">—</option>
+                {optionsFor("estadoLegalizacion").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
 
             <div className="field">
               <label htmlFor="f-fe">FE / referencia</label>
-              <input id="f-fe" value={form.fe || ""} onChange={(e) => update("fe", e.target.value)} />
+              <input id="f-fe" value={form.fe || ""} onChange={(e) => update("fe", e.target.value)} disabled={!isEditable("fe")} />
             </div>
             <div className="field">
               <label htmlFor="f-valorConIva">Valor + IVA</label>
@@ -244,6 +267,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 id="f-valorConIva" type="number" min="0"
                 value={form.valorConIva ?? ""}
                 onChange={(e) => update("valorConIva", e.target.value)}
+                disabled={!isEditable("valorConIva")}
               />
             </div>
 
@@ -253,6 +277,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 id="f-valorSinIva" type="number" min="0"
                 value={form.valorSinIva ?? ""}
                 onChange={(e) => update("valorSinIva", e.target.value)}
+                disabled={!isEditable("valorSinIva")}
               />
             </div>
             <div className="field">
@@ -261,6 +286,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 id="f-valorCot" type="number" min="0"
                 value={form.valorCot ?? ""}
                 onChange={(e) => update("valorCot", e.target.value)}
+                disabled={!isEditable("valorCot")}
               />
             </div>
 
@@ -270,6 +296,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 id="f-observaciones" rows={3}
                 value={form.observaciones || ""}
                 onChange={(e) => update("observaciones", e.target.value)}
+                disabled={!isEditable("observaciones")}
               />
             </div>
 

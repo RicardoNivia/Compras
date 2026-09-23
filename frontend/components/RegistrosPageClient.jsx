@@ -4,7 +4,7 @@ import { useState } from "react";
 import RegistrosView from "@/components/RegistrosView";
 import ExportMenu from "@/components/ExportMenu";
 
-export default function RegistrosPageClient({ initialRecords, currentUser }) {
+export default function RegistrosPageClient({ initialRecords, currentUser, maestros }) {
   const [records, setRecords] = useState(initialRecords || []);
   const [filtered, setFiltered] = useState(initialRecords || []);
 
@@ -19,6 +19,7 @@ export default function RegistrosPageClient({ initialRecords, currentUser }) {
         setRecords={setRecords}
         onFilteredChange={setFiltered}
         currentUser={currentUser}
+        maestros={maestros}
       />
     </div>
   );
