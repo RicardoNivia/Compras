@@ -2,8 +2,12 @@ trigger:
 - none
 
 variables:
-  imageName: 'sincodb/comprasapp'
+  backendImage: 'sincodb/comprasapp-backend'
+  frontendImage: 'sincodb/comprasapp-frontend'
   tag: '$(Build.BuildId)'
+  # Nombre del servicio backend dentro de la red del stack (compras-deploy).
+  # Se embebe en el build del frontend (rewrites de next.config.js).
+  backendUrl: 'http://backend:3001'
 
 pool:
   name: Bienestar
@@ -16,14 +20,39 @@ steps:
     command: login
     containerRegistry: 'DockerHub'
 
+# BACKEND
 - task: Docker@2
-  displayName: 'Build & Push'
+  displayName: 'Build & Push backend'
   inputs:
     containerRegistry: 'DockerHub'
-    repository: '$(imageName)'
+    repository: '$(backendImage)'
     command: buildAndPush
-    Dockerfile: 'Dockerfile'
-    buildContext: '.'
+    Dockerfile: 'backend/Dockerfile'
+    buildContext: 'backend'
+    tags: |
+      latest
+      $(tag)
+
+# FRONTEND (build y push separados: buildAndPush ignora --build-arg)
+- task: Docker@2
+  displayName: 'Build frontend'
+  inputs:
+    containerRegistry: 'DockerHub'
+    repository: '$(frontendImage)'
+    command: build
+    Dockerfile: 'frontend/Dockerfile'
+    buildContext: 'frontend'
+    arguments: '--build-arg BACKEND_URL=$(backendUrl)'
+    tags: |
+      latest
+      $(tag)
+
+- task: Docker@2
+  displayName: 'Push frontend'
+  inputs:
+    containerRegistry: 'DockerHub'
+    repository: '$(frontendImage)'
+    command: push
     tags: |
       latest
       $(tag)
@@ -31,5 +60,6 @@ steps:
 # VALIDACIÓN
 - script: |
     echo "Probando pull..."
-    docker pull $(imageName):latest
-  displayName: 'Verify Image'
+    docker pull $(backendImage):latest
+    docker pull $(frontendImage):latest
+  displayName: 'Verify Images'
