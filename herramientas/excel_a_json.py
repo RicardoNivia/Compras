@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Convierte la hoja COMPRAS del Excel del panel a un JSON que consume
-prisma/importar-registros.mjs.
+backend/prisma/importar-registros.mjs.
 
 Uso:
     python herramientas/excel_a_json.py "<ruta del .xlsx>" [salida.json]
@@ -17,7 +17,7 @@ HOJA = "COMPRAS"
 
 # Posición de cada columna del Excel dentro de la fila (base 0).
 # La columna 3 ("Días") es un cálculo del Excel: no se guarda, la app la
-# recalcula con lib/businessDays.js. La 18 ("Columna1") es residual.
+# recalcula con frontend/lib/businessDays.js. La 18 ("Columna1") es residual.
 COLUMNAS = {
     "informe": 0,
     "fechaSolicitud": 1,
