@@ -30,13 +30,15 @@ export const ROLE_ICONS = {
   [ROLES.RADICAR]: "✓",
 };
 
-// admin: acceso total.
-// registro: dashboard + registros (CRUD completo), sin administración de usuarios.
-// legalizar: solo tabla de registros; puede editar, no crear ni eliminar.
+// admin: acceso total, incluye marcar/desmarcar radicado.
+// registro: dashboard + registros (crear/editar/eliminar), sin administración de
+//   usuarios ni el check de radicado (eso es solo de admin/radicar).
+// legalizar: solo tabla de registros; puede editar (campos limitados, ver
+//   LEGALIZAR_EDITABLE_FIELDS), no crear ni eliminar.
 // radicar: solo tabla de registros; solo puede marcar/desmarcar el check de radicado.
 
 export function canViewDashboard(role) {
-  return role === ROLES.ADMIN || role === ROLES.REGISTRO;
+  return ROLE_LIST.includes(role);
 }
 
 export function canViewUsuarios(role) {
@@ -48,6 +50,10 @@ export function canViewAgenteIA(role) {
 }
 
 export function canViewAuditoria(role) {
+  return role === ROLES.ADMIN;
+}
+
+export function canViewMaestros(role) {
   return role === ROLES.ADMIN;
 }
 
@@ -64,5 +70,21 @@ export function canDeleteRecord(role) {
 }
 
 export function canToggleRadicado(role) {
-  return role === ROLES.ADMIN || role === ROLES.REGISTRO || role === ROLES.RADICAR;
+  return role === ROLES.ADMIN || role === ROLES.RADICAR;
+}
+
+// legalizar solo puede tocar estos 5 campos al editar un registro; el resto
+// queda intacto sin importar qué envíe el cliente (ver lib/records.js#updateRecord).
+export const LEGALIZAR_EDITABLE_FIELDS = [
+  "estadoLegalizacion",
+  "fe",
+  "valorConIva",
+  "valorSinIva",
+  "observaciones",
+];
+
+// null = todos los campos editables (admin, registro).
+export function getEditableFields(role) {
+  if (role === ROLES.LEGALIZAR) return LEGALIZAR_EDITABLE_FIELDS;
+  return null;
 }

@@ -48,27 +48,43 @@ function numOrNull(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+const FIELD_SANITIZERS = {
+  informe: (v) => v || null,
+  fechaSolicitud: (v) => v || null,
+  fechaEntrega: (v) => v || null,
+  area: (v) => v || null,
+  responsable: (v) => v || null,
+  estado: (v) => v || null,
+  categoria: (v) => v || null,
+  descripcion: (v) => v || null,
+  medioPago: (v) => v || null,
+  licitacion: (v) => (v != null && v !== "" ? String(v) : null),
+  estadoLegalizacion: (v) => v || null,
+  proveedor: (v) => v || null,
+  fe: (v) => (v != null && v !== "" ? String(v) : null),
+  valorConIva: numOrNull,
+  valorSinIva: numOrNull,
+  valorCot: numOrNull,
+  observaciones: (v) => v || null,
+  radicado: (v) => !!v,
+};
+
 export function sanitizeInput(body) {
-  return {
-    informe: body.informe || null,
-    fechaSolicitud: body.fechaSolicitud || null,
-    fechaEntrega: body.fechaEntrega || null,
-    area: body.area || null,
-    responsable: body.responsable || null,
-    estado: body.estado || null,
-    categoria: body.categoria || null,
-    descripcion: body.descripcion || null,
-    medioPago: body.medioPago || null,
-    licitacion: body.licitacion != null && body.licitacion !== "" ? String(body.licitacion) : null,
-    estadoLegalizacion: body.estadoLegalizacion || null,
-    proveedor: body.proveedor || null,
-    fe: body.fe != null && body.fe !== "" ? String(body.fe) : null,
-    valorConIva: numOrNull(body.valorConIva),
-    valorSinIva: numOrNull(body.valorSinIva),
-    valorCot: numOrNull(body.valorCot),
-    observaciones: body.observaciones || null,
-    radicado: !!body.radicado,
-  };
+  const out = {};
+  for (const key of Object.keys(FIELD_SANITIZERS)) {
+    out[key] = FIELD_SANITIZERS[key](body[key]);
+  }
+  return out;
+}
+
+// Igual que sanitizeInput, pero solo para el subconjunto de campos dado —
+// usado cuando el rol (p.ej. legalizar) solo puede tocar ciertos campos.
+export function sanitizeFields(body, fields) {
+  const out = {};
+  for (const key of fields) {
+    if (key in FIELD_SANITIZERS) out[key] = FIELD_SANITIZERS[key](body[key]);
+  }
+  return out;
 }
 
 export async function createRecord(body, actor) {
@@ -95,9 +111,11 @@ export async function createRecord(body, actor) {
   return record;
 }
 
-export async function updateRecord(id, body, actor) {
+// options.fields restringe qué campos puede tocar esta edición (p.ej. legalizar);
+// omitirlo sanea el registro completo (admin, registro).
+export async function updateRecord(id, body, actor, options = {}) {
   const before = await prisma.record.findUnique({ where: { id } });
-  const data = sanitizeInput(body);
+  const data = options.fields ? sanitizeFields(body, options.fields) : sanitizeInput(body);
   const row = await prisma.record.update({ where: { id }, data });
   const after = toClientRecord(row);
   await logUpdate(actor, before ? toClientRecord(before) : null, after, "editar").catch(() => {});
@@ -106,6 +124,13 @@ export async function updateRecord(id, body, actor) {
 
 export async function patchRecord(id, partial, actor) {
   const before = await prisma.record.findUnique({ where: { id } });
+  // El radicado es una acción de un solo sentido: una vez marcado, nadie
+  // (ni admin) puede desmarcarlo — se refuerza aquí, no solo en la UI.
+  if (before?.radicado && partial.radicado === false) {
+    const err = new Error("No se puede desmarcar el radicado: una vez marcado no se puede deshacer.");
+    err.status = 409;
+    throw err;
+  }
   const row = await prisma.record.update({ where: { id }, data: partial });
   const after = toClientRecord(row);
   const action = Object.keys(partial).every((k) => k === "radicado") ? "radicar" : "editar";
