@@ -106,8 +106,11 @@ a{ color: inherit; }
 button{ font-family: inherit; }
 ::selection{ background: var(--accent-wash); }
 
-.app-shell{ min-height:100vh; display:flex; align-items:stretch; }
-.app-main{ flex:1; min-width:0; display:flex; flex-direction:column; }
+/* height fijo (no min-height): el shell no crece con el contenido, así que
+   el sidebar nunca se desplaza con el scroll de la página — solo .app-main
+   hace scroll internamente. */
+.app-shell{ height:100vh; display:flex; align-items:stretch; overflow:hidden; }
+.app-main{ flex:1; min-width:0; height:100vh; display:flex; flex-direction:column; overflow-y:auto; }
 
 /* ---------- Sidebar (dark, fija respecto al tema claro/oscuro de la app) ---------- */
 .sidebar{
@@ -119,9 +122,9 @@ button{ font-family: inherit; }
   --sb-ink-active: #ffffff;
   --sb-border: rgba(255,255,255,0.08);
   --sb-accent: #2063a0;
-  flex: none; width: 240px; display:flex; flex-direction:column;
+  flex: none; width: 240px; height:100vh; display:flex; flex-direction:column;
   background: var(--sb-bg); border-right:1px solid var(--sb-border);
-  padding: 16px 12px; gap:4px;
+  padding: 16px 12px; gap:4px; overflow-y:auto;
 }
 
 .sidebar-head{ display:flex; align-items:center; gap:10px; padding:4px 6px 20px; }
