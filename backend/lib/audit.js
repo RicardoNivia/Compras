@@ -1,7 +1,18 @@
 import { prisma } from "@/lib/prisma";
-import { FIELD_LABELS } from "@/lib/auditLabels";
+import { FIELD_LABELS, MAESTRO_FIELD_LABELS, USER_FIELD_LABELS } from "@/lib/auditLabels";
 
-export { FIELD_LABELS, ACTION_LABELS } from "@/lib/auditLabels";
+export { FIELD_LABELS, MAESTRO_FIELD_LABELS, USER_FIELD_LABELS, ACTION_LABELS } from "@/lib/auditLabels";
+
+// Nombre corto del tipo de maestro para el resumen del log — copia local
+// (sin importar lib/maestros.js) para no crear una dependencia circular
+// entre lib/maestros.js y lib/audit.js.
+const TIPO_LABELS_RESUMEN = {
+  area: "Área",
+  responsable: "Responsable",
+  estado: "Estado de compra",
+  medioPago: "Medio de pago",
+  estadoLegalizacion: "Estado legalización",
+};
 
 function recordSummary(r) {
   if (!r) return null;
@@ -10,28 +21,39 @@ function recordSummary(r) {
   return [numTag, desc].filter(Boolean).join(" · ") || r.id;
 }
 
+function maestroSummary(m) {
+  if (!m) return null;
+  return `${TIPO_LABELS_RESUMEN[m.tipo] || m.tipo}: ${m.valor}`;
+}
+
+function userSummary(u) {
+  if (!u) return null;
+  return u.email ? `${u.nombre} (${u.email})` : u.nombre;
+}
+
 function normalize(v) {
   if (v === null || v === undefined) return "";
   if (typeof v === "boolean") return v ? "true" : "false";
   return String(v);
 }
 
-function diffFields(before, after) {
+function diffFields(before, after, fieldLabels) {
   const changes = [];
-  for (const key of Object.keys(FIELD_LABELS)) {
+  for (const key of Object.keys(fieldLabels)) {
     const b = before ? before[key] : undefined;
     const a = after ? after[key] : undefined;
     if (normalize(b) !== normalize(a)) {
-      changes.push({ field: key, label: FIELD_LABELS[key], before: b ?? null, after: a ?? null });
+      changes.push({ field: key, label: fieldLabels[key], before: b ?? null, after: a ?? null });
     }
   }
   return changes;
 }
 
-async function writeLog({ action, recordId, recordInfo, actor, changes }) {
+async function writeLog({ action, entityType, recordId, recordInfo, actor, changes }) {
   await prisma.auditLog.create({
     data: {
       action,
+      entityType,
       recordId,
       recordInfo: recordInfo || null,
       userId: actor?.id || null,
@@ -45,20 +67,58 @@ async function writeLog({ action, recordId, recordInfo, actor, changes }) {
 // Para crear/eliminar se guarda el snapshot completo de los campos (no solo un
 // diff), así queda registrado exactamente qué contenía el registro creado o eliminado.
 export async function logCreate(actor, record) {
-  const changes = diffFields(null, record);
-  await writeLog({ action: "crear", recordId: record.id, recordInfo: recordSummary(record), actor, changes });
+  const changes = diffFields(null, record, FIELD_LABELS);
+  await writeLog({ action: "crear", entityType: "record", recordId: record.id, recordInfo: recordSummary(record), actor, changes });
 }
 
 // action: "editar" (edición completa) o "radicar" (toggle del check de radicado).
 export async function logUpdate(actor, before, after, action = "editar") {
-  const changes = diffFields(before, after);
+  const changes = diffFields(before, after, FIELD_LABELS);
   if (!changes.length) return;
-  await writeLog({ action, recordId: after.id, recordInfo: recordSummary(after), actor, changes });
+  await writeLog({ action, entityType: "record", recordId: after.id, recordInfo: recordSummary(after), actor, changes });
 }
 
 export async function logDelete(actor, record) {
-  const changes = diffFields(record, null);
-  await writeLog({ action: "eliminar", recordId: record.id, recordInfo: recordSummary(record), actor, changes });
+  const changes = diffFields(record, null, FIELD_LABELS);
+  await writeLog({ action: "eliminar", entityType: "record", recordId: record.id, recordInfo: recordSummary(record), actor, changes });
+}
+
+// ---------- Maestros ----------
+
+export async function logMaestroCreate(actor, maestro) {
+  const changes = diffFields(null, maestro, MAESTRO_FIELD_LABELS);
+  await writeLog({ action: "crear", entityType: "maestro", recordId: maestro.id, recordInfo: maestroSummary(maestro), actor, changes });
+}
+
+export async function logMaestroUpdate(actor, before, after) {
+  const changes = diffFields(before, after, MAESTRO_FIELD_LABELS);
+  if (!changes.length) return;
+  await writeLog({ action: "editar", entityType: "maestro", recordId: after.id, recordInfo: maestroSummary(after), actor, changes });
+}
+
+export async function logMaestroDelete(actor, maestro) {
+  const changes = diffFields(maestro, null, MAESTRO_FIELD_LABELS);
+  await writeLog({ action: "eliminar", entityType: "maestro", recordId: maestro.id, recordInfo: maestroSummary(maestro), actor, changes });
+}
+
+// ---------- Usuarios ----------
+// Los objetos antes/después deben venir ya en forma "cliente" (toClientUser),
+// es decir, sin el hash de la contraseña — nunca se audita la contraseña.
+
+export async function logUserCreate(actor, user) {
+  const changes = diffFields(null, user, USER_FIELD_LABELS);
+  await writeLog({ action: "crear", entityType: "user", recordId: user.id, recordInfo: userSummary(user), actor, changes });
+}
+
+export async function logUserUpdate(actor, before, after) {
+  const changes = diffFields(before, after, USER_FIELD_LABELS);
+  if (!changes.length) return;
+  await writeLog({ action: "editar", entityType: "user", recordId: after.id, recordInfo: userSummary(after), actor, changes });
+}
+
+export async function logUserDelete(actor, user) {
+  const changes = diffFields(user, null, USER_FIELD_LABELS);
+  await writeLog({ action: "eliminar", entityType: "user", recordId: user.id, recordInfo: userSummary(user), actor, changes });
 }
 
 export async function listAuditLogs({ from, to, userId, recordId, page = 1, pageSize = 50 } = {}) {

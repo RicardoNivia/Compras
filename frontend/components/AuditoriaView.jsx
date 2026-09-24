@@ -15,7 +15,7 @@ const MONEY_FIELDS = new Set(["valorConIva", "valorSinIva", "valorCot"]);
 
 function fmtValue(field, v) {
   if (v === null || v === undefined || v === "") return "—";
-  if (field === "radicado") return v === true || v === "true" ? "Sí" : "No";
+  if (typeof v === "boolean" || v === "true" || v === "false") return v === true || v === "true" ? "Sí" : "No";
   if (MONEY_FIELDS.has(field)) return fmtPesos(Number(v));
   return String(v);
 }
@@ -174,7 +174,7 @@ export default function AuditoriaView({ initial, actors }) {
                   <th>Fecha</th>
                   <th>Usuario</th>
                   <th>Acción</th>
-                  <th>Registro</th>
+                  <th>Entidad</th>
                   <th>Detalle</th>
                 </tr>
               </thead>

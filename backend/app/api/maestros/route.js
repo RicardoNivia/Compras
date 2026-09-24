@@ -25,7 +25,7 @@ export async function POST(request) {
   }
   try {
     const body = await request.json();
-    const maestro = await createMaestro(body);
+    const maestro = await createMaestro(body, user);
     return NextResponse.json(maestro, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: err.status || 500 });

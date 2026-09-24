@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { logMaestroCreate, logMaestroUpdate, logMaestroDelete } from "@/lib/audit";
 
 // tipo -> nombre del campo correspondiente en Record (coinciden 1:1).
 // Duplicado (sin Prisma) en frontend/lib/maestrosTipos.js — mantener ambos en sync.
@@ -63,7 +64,7 @@ export async function listMaestros({ tipo, onlyActive } = {}) {
   return out;
 }
 
-export async function createMaestro(body) {
+export async function createMaestro(body, actor) {
   const tipo = body.tipo;
   const valor = (body.valor || "").trim();
   if (!TIPOS_MAESTRO.includes(tipo)) throw badRequest("Tipo de maestro inválido.");
@@ -73,14 +74,16 @@ export async function createMaestro(body) {
     const row = await prisma.maestro.create({
       data: { tipo, valor, activo: body.activo ?? true },
     });
-    return toClientMaestro(row, false);
+    const maestro = toClientMaestro(row, false);
+    await logMaestroCreate(actor, maestro).catch(() => {});
+    return maestro;
   } catch (err) {
     if (err.code === "P2002") throw badRequest("Ya existe ese valor para este maestro.");
     throw err;
   }
 }
 
-export async function updateMaestro(id, body) {
+export async function updateMaestro(id, body, actor) {
   const current = await prisma.maestro.findUnique({ where: { id } });
   if (!current) {
     const err = new Error("Maestro no encontrado.");
@@ -106,14 +109,16 @@ export async function updateMaestro(id, body) {
 
   try {
     const row = await prisma.maestro.update({ where: { id }, data });
-    return toClientMaestro(row, await isValueInUse(row.tipo, row.valor));
+    const after = toClientMaestro(row, await isValueInUse(row.tipo, row.valor));
+    await logMaestroUpdate(actor, toClientMaestro(current, false), after).catch(() => {});
+    return after;
   } catch (err) {
     if (err.code === "P2002") throw badRequest("Ya existe ese valor para este maestro.");
     throw err;
   }
 }
 
-export async function deleteMaestro(id) {
+export async function deleteMaestro(id, actor) {
   const current = await prisma.maestro.findUnique({ where: { id } });
   if (!current) {
     const err = new Error("Maestro no encontrado.");
@@ -126,4 +131,5 @@ export async function deleteMaestro(id) {
     throw err;
   }
   await prisma.maestro.delete({ where: { id } });
+  await logMaestroDelete(actor, toClientMaestro(current, false)).catch(() => {});
 }

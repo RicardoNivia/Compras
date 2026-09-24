@@ -41,7 +41,8 @@ model Record {
 model AuditLog {
   id         String   @id @default(cuid())
   action     String   // "crear" | "editar" | "eliminar" | "radicar"
-  recordId   String
+  entityType String   @default("record") // "record" | "maestro" | "user"
+  recordId   String   // id de la entidad afectada (registro, maestro o usuario)
   recordInfo String?
   userId     String?
   userNombre String?
@@ -52,6 +53,7 @@ model AuditLog {
   @@index([recordId])
   @@index([userId])
   @@index([createdAt])
+  @@index([entityType])
   @@map("audit_logs")
 }
 

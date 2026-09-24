@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { ROLE_LIST } from "@/lib/roles";
+import { logUserCreate, logUserUpdate, logUserDelete } from "@/lib/audit";
 
 export function toClientUser(u) {
   return {
@@ -33,7 +34,7 @@ function validateShared(body) {
   }
 }
 
-export async function createUser(body) {
+export async function createUser(body, actor) {
   validateShared(body);
   if (!body.password || body.password.length < 6) {
     throw badRequest("La contraseña debe tener al menos 6 caracteres.");
@@ -51,10 +52,12 @@ export async function createUser(body) {
       activo: body.activo ?? true,
     },
   });
-  return toClientUser(user);
+  const client = toClientUser(user);
+  await logUserCreate(actor, client).catch(() => {});
+  return client;
 }
 
-export async function updateUser(id, body) {
+export async function updateUser(id, body, actor) {
   validateShared(body);
   if (body.password && body.password.length < 6) {
     throw badRequest("La contraseña debe tener al menos 6 caracteres.");
@@ -62,6 +65,8 @@ export async function updateUser(id, body) {
   const email = body.email.toLowerCase().trim();
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing && existing.id !== id) throw badRequest("Ya existe un usuario con ese correo.");
+
+  const before = await prisma.user.findUnique({ where: { id } });
 
   const data = {
     nombre: body.nombre.trim(),
@@ -73,9 +78,13 @@ export async function updateUser(id, body) {
     data.password = await bcrypt.hash(body.password, 10);
   }
   const user = await prisma.user.update({ where: { id }, data });
-  return toClientUser(user);
+  const after = toClientUser(user);
+  await logUserUpdate(actor, before ? toClientUser(before) : null, after).catch(() => {});
+  return after;
 }
 
-export async function deleteUser(id) {
+export async function deleteUser(id, actor) {
+  const before = await prisma.user.findUnique({ where: { id } });
   await prisma.user.delete({ where: { id } });
+  if (before) await logUserDelete(actor, toClientUser(before)).catch(() => {});
 }

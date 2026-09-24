@@ -20,7 +20,7 @@ export default async function AuditoriaPage() {
   const { actors } = await actorsRes.json();
 
   return (
-    <AppShell user={user} title="Auditoría" subtitle="Quién hizo qué sobre cada registro">
+    <AppShell user={user} title="Auditoría" subtitle="Quién hizo qué sobre registros, maestros y usuarios">
       <AuditoriaView initial={initial} actors={actors} />
     </AppShell>
   );

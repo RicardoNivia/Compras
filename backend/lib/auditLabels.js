@@ -23,6 +23,19 @@ export const FIELD_LABELS = {
   radicado: "Radicado",
 };
 
+export const MAESTRO_FIELD_LABELS = {
+  tipo: "Tipo",
+  valor: "Valor",
+  activo: "Activo",
+};
+
+export const USER_FIELD_LABELS = {
+  nombre: "Nombre",
+  email: "Correo",
+  role: "Rol",
+  activo: "Activo",
+};
+
 export const ACTION_LABELS = {
   crear: "Creó",
   editar: "Editó",
