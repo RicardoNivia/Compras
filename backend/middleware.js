@@ -18,7 +18,7 @@ export async function middleware(request) {
   }
 
   const isAdmin = payload.role === "admin";
-  const adminOnly = ["/api/users", "/api/agent", "/api/audit"];
+  const adminOnly = ["/api/users", "/api/audit"];
   if (adminOnly.some((p) => pathname.startsWith(p)) && !isAdmin) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }

@@ -36,6 +36,7 @@ export const ROLE_ICONS = {
 // legalizar: solo tabla de registros; puede editar (campos limitados, ver
 //   LEGALIZAR_EDITABLE_FIELDS), no crear ni eliminar.
 // radicar: solo tabla de registros; solo puede marcar/desmarcar el check de radicado.
+// Dashboard y Agente IA son visibles para cualquier rol autenticado.
 
 export function canViewDashboard(role) {
   return ROLE_LIST.includes(role);
@@ -46,7 +47,7 @@ export function canViewUsuarios(role) {
 }
 
 export function canViewAgenteIA(role) {
-  return role === ROLES.ADMIN;
+  return ROLE_LIST.includes(role);
 }
 
 export function canViewAuditoria(role) {
