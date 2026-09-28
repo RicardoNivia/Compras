@@ -39,8 +39,9 @@ function estadoPillClass(estado) {
 }
 
 function legalizacionPillClass(v) {
-  if (v === "ACTA") return "good";
-  if (v === "OC") return "warning";
+  if (v === "Legalizado") return "good";
+  if (v === "Pendiente") return "warning";
+  if (v === "Rechazado") return "critical";
   return "muted";
 }
 
@@ -73,6 +74,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
   const [estado, setEstado] = useState("");
   const [medioPago, setMedioPago] = useState("");
   const [licitacion, setLicitacion] = useState("");
+  const [estadoLegalizacion, setEstadoLegalizacion] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [onlyIncumplimiento, setOnlyIncumplimiento] = useState(false);
@@ -93,13 +95,32 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
   const estadoOptions = useMemo(() => uniqueSorted(records, "estado"), [records]);
   const medioOptions = useMemo(() => uniqueSorted(records, "medioPago"), [records]);
   const licitacionOptions = useMemo(() => uniqueSorted(records, "licitacion"), [records]);
+  const estadoLegalizacionOptions = useMemo(() => uniqueSorted(records, "estadoLegalizacion"), [records]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return records.filter((r) => {
       if (q) {
-        const hay = [r.localSeq ? `#${r.localSeq}` : "", r.descripcion, r.proveedor, r.responsable, r.categoria, r.observaciones]
-          .filter(Boolean)
+        const hay = [
+          r.localSeq ? `#${r.localSeq}` : "",
+          r.fechaSolicitud,
+          r.fechaEntrega,
+          r.area,
+          r.responsable,
+          r.estado,
+          r.categoria,
+          r.descripcion,
+          r.medioPago,
+          r.licitacion,
+          r.estadoLegalizacion,
+          r.proveedor,
+          r.fe,
+          r.valorConIva,
+          r.valorSinIva,
+          r.valorCot,
+          r.observaciones,
+        ]
+          .filter((v) => v !== null && v !== undefined && v !== "")
           .join(" ")
           .toLowerCase();
         if (!hay.includes(q)) return false;
@@ -108,12 +129,13 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
       if (estado && r.estado !== estado) return false;
       if (medioPago && r.medioPago !== medioPago) return false;
       if (licitacion && String(r.licitacion || "") !== licitacion) return false;
+      if (estadoLegalizacion && r.estadoLegalizacion !== estadoLegalizacion) return false;
       if (dateFrom && (!r.fechaSolicitud || r.fechaSolicitud < dateFrom)) return false;
       if (dateTo && (!r.fechaSolicitud || r.fechaSolicitud > dateTo)) return false;
       if (onlyIncumplimiento && !((getDiasInfo(r).dias ?? 0) > 8)) return false;
       return true;
     });
-  }, [records, search, area, estado, medioPago, licitacion, dateFrom, dateTo, onlyIncumplimiento]);
+  }, [records, search, area, estado, medioPago, licitacion, estadoLegalizacion, dateFrom, dateTo, onlyIncumplimiento]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -161,6 +183,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
     setEstado("");
     setMedioPago("");
     setLicitacion("");
+    setEstadoLegalizacion("");
     setDateFrom("");
     setDateTo("");
     setOnlyIncumplimiento(false);
@@ -220,7 +243,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
           <div className="field search-field">
             <label htmlFor="reg-search">Buscar</label>
             <input
-              id="reg-search" type="search" placeholder="Descripción, proveedor, responsable…"
+              id="reg-search" type="search" placeholder="Buscar en cualquier campo del registro…"
               value={search} onChange={(e) => setSearch(e.target.value)}
             />
           </div>
@@ -250,6 +273,13 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
             <select id="reg-licitacion" value={licitacion} onChange={(e) => setLicitacion(e.target.value)}>
               <option value="">Todas</option>
               {licitacionOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="reg-estado-legal">Estado legalización</label>
+            <select id="reg-estado-legal" value={estadoLegalizacion} onChange={(e) => setEstadoLegalizacion(e.target.value)}>
+              <option value="">Todos</option>
+              {estadoLegalizacionOptions.map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
           </div>
           <div className="field">
@@ -350,8 +380,14 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                             className={`icon-action-btn check${r.radicado ? " checked" : ""}`}
                             onClick={() => requestRadicado(r)}
                             aria-pressed={r.radicado}
-                            title={r.radicado ? "Radicado (no se puede deshacer)" : "Marcar como radicado"}
-                            disabled={!allowToggle || togglingId === r.id || r.radicado}
+                            title={
+                              r.radicado
+                                ? "Radicado (no se puede deshacer)"
+                                : r.estadoLegalizacion !== "Legalizado"
+                                  ? "Solo se puede radicar un registro con estado de legalización \"Legalizado\""
+                                  : "Marcar como radicado"
+                            }
+                            disabled={!allowToggle || togglingId === r.id || r.radicado || r.estadoLegalizacion !== "Legalizado"}
                           >
                             {togglingId === r.id ? <span className="spinner" /> : <IconCheck size={13} />}
                           </button>
@@ -399,7 +435,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
           onSaved={handleSaved}
           onDeleted={handleDeletedFromModal}
           allowDelete={allowDelete}
-          editableFields={editableFields}
+          editableFields={modalRecord ? editableFields : null}
           maestros={maestros}
         />
       )}
