@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconArrowRight, IconCheck } from "@/components/icons";
+import ContactAdminModal from "@/components/ContactAdminModal";
 
 const FEATURES = [
   "Aprobaciones más rápidas",
@@ -16,6 +17,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -95,6 +97,15 @@ export default function LoginForm() {
             />
           </div>
 
+          <button
+            type="button"
+            className="btn-ghost"
+            style={{ alignSelf: "flex-end", fontSize: 13 }}
+            onClick={() => setShowForgotPassword(true)}
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
+
           {error && <div className="modal-error">{error}</div>}
 
           <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
@@ -105,6 +116,10 @@ export default function LoginForm() {
           <p className="login-foot-note">¿Problemas para ingresar? Contacta a tu administrador.</p>
         </form>
       </div>
+
+      {showForgotPassword && (
+        <ContactAdminModal onClose={() => setShowForgotPassword(false)} />
+      )}
     </div>
   );
 }

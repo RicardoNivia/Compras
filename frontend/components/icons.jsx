@@ -58,6 +58,15 @@ export function IconLogout(props) {
   );
 }
 
+export function IconKey(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="5.3" cy="11.3" r="3" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M7.4 9.2L13.5 3.1M11.3 5.3l1.7 1.7M13.3 3.3l1.7 1.7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function IconSearch(props) {
   return (
     <Svg {...props} viewBox="0 0 15 15">

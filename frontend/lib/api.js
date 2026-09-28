@@ -51,6 +51,15 @@ export async function deleteRecordApi(id) {
   return handle(res);
 }
 
+export async function changePasswordApi(currentPassword, newPassword) {
+  const res = await fetch("/api/auth/change-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  return handle(res);
+}
+
 export async function fetchMaestros(tipo, onlyActive) {
   const qs = new URLSearchParams();
   if (tipo) qs.set("tipo", tipo);

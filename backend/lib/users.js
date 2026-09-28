@@ -83,6 +83,30 @@ export async function updateUser(id, body, actor) {
   return after;
 }
 
+export async function changeOwnPassword(userId, currentPassword, newPassword) {
+  if (!currentPassword || !newPassword) {
+    throw badRequest("La contraseña actual y la nueva son obligatorias.");
+  }
+  if (newPassword.length < 6) {
+    throw badRequest("La nueva contraseña debe tener al menos 6 caracteres.");
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw badRequest("Usuario no encontrado.");
+
+  const valid = await bcrypt.compare(currentPassword, user.password);
+  if (!valid) {
+    const err = new Error("La contraseña actual no es correcta.");
+    err.status = 401;
+    throw err;
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password: await bcrypt.hash(newPassword, 10) },
+  });
+}
+
 export async function deleteUser(id, actor) {
   const before = await prisma.user.findUnique({ where: { id } });
   await prisma.user.delete({ where: { id } });

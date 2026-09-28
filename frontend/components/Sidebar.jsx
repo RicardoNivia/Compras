@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, ROLE_LABELS } from "@/lib/roles";
-import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout } from "@/components/icons";
+import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey } from "@/components/icons";
+import ChangePasswordModal from "@/components/ChangePasswordModal";
 
 const ALL_NAV_ITEMS = [
   { key: "dashboard", href: "/dashboard", label: "Dashboard de compras", Icon: IconDashboard, show: canViewDashboard },
@@ -23,6 +24,7 @@ function initials(name) {
 
 export default function Sidebar({ user }) {
   const [loggingOut, setLoggingOut] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -71,6 +73,16 @@ export default function Sidebar({ user }) {
         <button
           type="button"
           className="sidebar-logout-btn"
+          onClick={() => setShowChangePassword(true)}
+          title="Cambiar contraseña"
+        >
+          <span className="sidebar-link-ic"><IconKey size={17} /></span>
+          <span className="label">Cambiar contraseña</span>
+        </button>
+
+        <button
+          type="button"
+          className="sidebar-logout-btn"
           onClick={handleLogout}
           disabled={loggingOut}
           title="Cerrar sesión"
@@ -79,6 +91,10 @@ export default function Sidebar({ user }) {
           <span className="label">{loggingOut ? "Saliendo…" : "Cerrar sesión"}</span>
         </button>
       </div>
+
+      {showChangePassword && (
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+      )}
     </aside>
   );
 }
