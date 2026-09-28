@@ -30,12 +30,15 @@ export const ROLE_ICONS = {
   [ROLES.RADICAR]: "✓",
 };
 
-// admin: acceso total, incluye marcar/desmarcar radicado.
-// registro: dashboard + registros (crear/editar/eliminar), sin administración de
-//   usuarios ni el check de radicado (eso es solo de admin/radicar).
+// admin: acceso total — el único que puede eliminar registros y el único que
+//   puede editar/mover la fecha de solicitud de un registro ya creado.
+// registro: dashboard + registros (crear/editar, sin eliminar), sin
+//   administración de usuarios ni el check de radicado (eso es solo de
+//   admin/radicar); al editar no puede tocar la fecha de solicitud.
 // legalizar: solo tabla de registros; puede editar (campos limitados, ver
 //   LEGALIZAR_EDITABLE_FIELDS), no crear ni eliminar.
-// radicar: solo tabla de registros; solo puede marcar/desmarcar el check de radicado.
+// radicar: solo tabla de registros; solo puede marcar el check de radicado
+//   (nunca desmarcarlo), y solo si el registro ya está "Legalizado".
 // Dashboard y Agente IA son visibles para cualquier rol autenticado.
 
 export function canViewDashboard(role) {
@@ -67,11 +70,17 @@ export function canEditRecord(role) {
 }
 
 export function canDeleteRecord(role) {
-  return role === ROLES.ADMIN || role === ROLES.REGISTRO;
+  return role === ROLES.ADMIN;
 }
 
 export function canToggleRadicado(role) {
   return role === ROLES.ADMIN || role === ROLES.RADICAR;
+}
+
+// Agente IA: visible para todos, pero solo admin puede usar modelos "paid"
+// (ver lib/geminiModels.js) — el resto queda limitado a los modelos "free".
+export function canUsePaidModels(role) {
+  return role === ROLES.ADMIN;
 }
 
 // legalizar solo puede tocar estos 5 campos al editar un registro; el resto
@@ -84,8 +93,41 @@ export const LEGALIZAR_EDITABLE_FIELDS = [
   "observaciones",
 ];
 
-// null = todos los campos editables (admin, registro).
+// Todos los campos de un registro que se pueden editar (todo salvo
+// fechaSolicitud) — usado para restringir a roles no-admin, que no pueden
+// modificar ni mover la fecha de solicitud una vez creado el registro.
+export const NON_ADMIN_EDITABLE_FIELDS = [
+  "informe",
+  "fechaEntrega",
+  "area",
+  "responsable",
+  "estado",
+  "categoria",
+  "descripcion",
+  "medioPago",
+  "licitacion",
+  "estadoLegalizacion",
+  "proveedor",
+  "fe",
+  "valorConIva",
+  "valorSinIva",
+  "valorCot",
+  "observaciones",
+  "radicado",
+];
+
+// Campos editables al EDITAR un registro ya existente (no aplica a la creación).
+// null = todos los campos (solo admin, incluye fechaSolicitud).
 export function getEditableFields(role) {
+  if (role === ROLES.ADMIN) return null;
   if (role === ROLES.LEGALIZAR) return LEGALIZAR_EDITABLE_FIELDS;
+  return NON_ADMIN_EDITABLE_FIELDS;
+}
+
+// Campos que puede tocar cada rol vía PATCH (usado solo para el toggle de
+// radicado). radicar solo puede tocar "radicado"; el resto de roles con
+// permiso de PATCH (admin) no tiene restricción de campos.
+export function getPatchableFields(role) {
+  if (role === ROLES.RADICAR) return ["radicado"];
   return null;
 }

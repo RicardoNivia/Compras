@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { updateRecord, patchRecord, deleteRecord } from "@/lib/records";
 import { getSessionUser } from "@/lib/auth-server";
-import { canEditRecord, canDeleteRecord, canToggleRadicado, getEditableFields } from "@/lib/roles";
+import { canEditRecord, canDeleteRecord, canToggleRadicado, getEditableFields, getPatchableFields } from "@/lib/roles";
 
 export async function PUT(request, { params }) {
   const user = await getSessionUser();
@@ -25,7 +25,7 @@ export async function PATCH(request, { params }) {
   }
   try {
     const body = await request.json();
-    const record = await patchRecord(params.id, body, user);
+    const record = await patchRecord(params.id, body, user, { fields: getPatchableFields(user.role) });
     return NextResponse.json(record);
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: err.status || 500 });

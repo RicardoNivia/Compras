@@ -87,6 +87,14 @@ export function sanitizeFields(body, fields) {
   return out;
 }
 
+// El número de factura/referencia (fe) puede repetirse (p.ej. una misma
+// factura cubre varias compras): esto NUNCA bloquea el guardado, solo se usa
+// para devolver un aviso informativo al cliente (ver "feWarning" abajo).
+async function countOtrosConFe(fe, excludeId) {
+  if (!fe) return 0;
+  return prisma.record.count({ where: { fe, id: excludeId ? { not: excludeId } : undefined } });
+}
+
 export async function createRecord(body, actor) {
   const data = sanitizeInput(body);
   if (!data.fechaSolicitud || !data.area || !data.responsable || !data.descripcion) {
@@ -94,6 +102,7 @@ export async function createRecord(body, actor) {
     err.status = 400;
     throw err;
   }
+  const feDuplicados = await countOtrosConFe(data.fe, null);
   // Asigna el siguiente número autoincremental visible (localSeq) desde Meta,
   // en la misma transacción para evitar que dos creaciones simultáneas choquen.
   const row = await prisma.$transaction(async (tx) => {
@@ -108,6 +117,9 @@ export async function createRecord(body, actor) {
   });
   const record = toClientRecord(row);
   await logCreate(actor, record).catch(() => {});
+  if (feDuplicados > 0) {
+    record.feWarning = `Ya existen ${feDuplicados} compra(s) registradas con el número de factura/referencia "${data.fe}".`;
+  }
   return record;
 }
 
@@ -116,20 +128,36 @@ export async function createRecord(body, actor) {
 export async function updateRecord(id, body, actor, options = {}) {
   const before = await prisma.record.findUnique({ where: { id } });
   const data = options.fields ? sanitizeFields(body, options.fields) : sanitizeInput(body);
+  const feDuplicados = "fe" in data ? await countOtrosConFe(data.fe, id) : 0;
   const row = await prisma.record.update({ where: { id }, data });
   const after = toClientRecord(row);
   await logUpdate(actor, before ? toClientRecord(before) : null, after, "editar").catch(() => {});
+  if (feDuplicados > 0) {
+    after.feWarning = `Ya existen ${feDuplicados} compra(s) registradas con el número de factura/referencia "${data.fe}".`;
+  }
   return after;
 }
 
-export async function patchRecord(id, partial, actor) {
+export async function patchRecord(id, rawPartial, actor, options = {}) {
   const before = await prisma.record.findUnique({ where: { id } });
+  const partial = options.fields
+    ? Object.fromEntries(Object.entries(rawPartial).filter(([k]) => options.fields.includes(k)))
+    : rawPartial;
   // El radicado es una acción de un solo sentido: una vez marcado, nadie
   // (ni admin) puede desmarcarlo — se refuerza aquí, no solo en la UI.
   if (before?.radicado && partial.radicado === false) {
     const err = new Error("No se puede desmarcar el radicado: una vez marcado no se puede deshacer.");
     err.status = 409;
     throw err;
+  }
+  // Solo se puede radicar un registro cuya legalización ya esté en estado "Legalizado".
+  if (partial.radicado === true) {
+    const estadoLegalizacion = partial.estadoLegalizacion !== undefined ? partial.estadoLegalizacion : before?.estadoLegalizacion;
+    if (estadoLegalizacion !== "Legalizado") {
+      const err = new Error("Solo se puede radicar un registro con estado de legalización \"Legalizado\".");
+      err.status = 409;
+      throw err;
+    }
   }
   const row = await prisma.record.update({ where: { id }, data: partial });
   const after = toClientRecord(row);
