@@ -2,8 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getDiasInfo } from "@/lib/diasInfo";
+import { fmtCOP } from "@/lib/format";
 import { createRecordApi, updateRecordApi, deleteRecordApi } from "@/lib/api";
 import { IconTrash } from "@/components/icons";
+
+const PRESUPUESTO_ALERTA_PCT = 80;
+const PRESUPUESTO_CRITICO_PCT = 90;
 
 function uniqueSorted(records, field) {
   const set = new Set();
@@ -71,6 +75,55 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
 
   const categoriaOptions = useMemo(() => uniqueSorted(records, "categoria"), [records]);
   const proveedorOptions = useMemo(() => uniqueSorted(records, "proveedor"), [records]);
+
+  // Aviso informativo (nunca bloquea guardar): cuántas otras compras ya tienen
+  // el mismo FE — un mismo número de factura puede cubrir varias compras.
+  const feDuplicados = useMemo(() => {
+    const fe = (form.fe || "").trim();
+    if (!fe) return 0;
+    return records.filter((r) => r.id !== record?.id && (r.fe || "").trim() === fe).length;
+  }, [form.fe, records, record?.id]);
+
+  // Panel informativo: gastado vs. presupuesto configurado en el maestro de área
+  // (no bloquea el guardado, solo orienta al usuario al elegir el área).
+  const presupuestoInfo = useMemo(() => {
+    const area = form.area;
+    if (!area) return null;
+    const maestro = maestros.find((m) => m.tipo === "area" && m.valor === area);
+    const presupuestoAnual = maestro?.presupuestoAnual;
+    if (presupuestoAnual == null) return null;
+
+    const now = new Date();
+    const year = String(now.getFullYear());
+    const mk = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+    let gastadoAnual = 0;
+    let gastadoMes = 0;
+    for (const r of records) {
+      if (r.area !== area || r.estado === "Anulado") continue;
+      if (!r.fechaSolicitud || !r.fechaSolicitud.startsWith(year)) continue;
+      gastadoAnual += r.valorConIva || 0;
+      if (r.fechaSolicitud.slice(0, 7) === mk) gastadoMes += r.valorConIva || 0;
+    }
+
+    const presupuestoMensual = presupuestoAnual / 12;
+    const pctAnual = presupuestoAnual ? (gastadoAnual / presupuestoAnual) * 100 : 0;
+    const pctMensual = presupuestoMensual ? (gastadoMes / presupuestoMensual) * 100 : 0;
+
+    return {
+      presupuestoAnual, presupuestoMensual,
+      gastadoAnual, gastadoMes,
+      disponibleAnual: presupuestoAnual - gastadoAnual,
+      disponibleMensual: presupuestoMensual - gastadoMes,
+      pctAnual, pctMensual,
+    };
+  }, [form.area, maestros, records]);
+
+  function presupuestoSeverity(pct) {
+    if (pct >= PRESUPUESTO_CRITICO_PCT) return "critical";
+    if (pct >= PRESUPUESTO_ALERTA_PCT) return "warning";
+    return "good";
+  }
 
   const diasInfo = useMemo(() => {
     if (!form.fechaSolicitud) return null;
@@ -173,6 +226,22 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 {optionsFor("area").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
+
+            {presupuestoInfo && (
+              <div className="dias-preview">
+                Presupuesto del área — mes:{" "}
+                <span className={`pill ${presupuestoSeverity(presupuestoInfo.pctMensual)}`}>
+                  {fmtCOP(presupuestoInfo.gastadoMes)} de {fmtCOP(presupuestoInfo.presupuestoMensual)} ({presupuestoInfo.pctMensual.toFixed(0)}%)
+                </span>{" "}
+                · disponible {fmtCOP(presupuestoInfo.disponibleMensual)}
+                <br />
+                Año: <span className={`pill ${presupuestoSeverity(presupuestoInfo.pctAnual)}`}>
+                  {fmtCOP(presupuestoInfo.gastadoAnual)} de {fmtCOP(presupuestoInfo.presupuestoAnual)} ({presupuestoInfo.pctAnual.toFixed(0)}%)
+                </span>{" "}
+                · disponible {fmtCOP(presupuestoInfo.disponibleAnual)}
+              </div>
+            )}
+
             <div className="field">
               <label htmlFor="f-responsable">Responsable *</label>
               <select
@@ -199,6 +268,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 value={form.categoria || ""}
                 onChange={(e) => update("categoria", e.target.value)}
                 disabled={!isEditable("categoria")}
+                spellCheck lang="es"
               />
               <datalist id="categorias-list">
                 {categoriaOptions.map((v) => <option key={v} value={v} />)}
@@ -212,6 +282,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 value={form.descripcion || ""}
                 onChange={(e) => update("descripcion", e.target.value)}
                 disabled={!isEditable("descripcion")}
+                spellCheck lang="es"
               />
             </div>
 
@@ -229,6 +300,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 value={form.proveedor || ""}
                 onChange={(e) => update("proveedor", e.target.value)}
                 disabled={!isEditable("proveedor")}
+                spellCheck lang="es"
               />
               <datalist id="proveedores-list">
                 {proveedorOptions.map((v) => <option key={v} value={v} />)}
@@ -260,6 +332,11 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
             <div className="field">
               <label htmlFor="f-fe">FE / referencia</label>
               <input id="f-fe" value={form.fe || ""} onChange={(e) => update("fe", e.target.value)} disabled={!isEditable("fe")} />
+              {feDuplicados > 0 && (
+                <span className="pill warning" style={{ marginTop: 4, alignSelf: "flex-start" }}>
+                  Ya existe{feDuplicados > 1 ? `n ${feDuplicados} compras` : " 1 compra"} con este FE
+                </span>
+              )}
             </div>
             <div className="field">
               <label htmlFor="f-valorConIva">Valor + IVA</label>
@@ -297,6 +374,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 value={form.observaciones || ""}
                 onChange={(e) => update("observaciones", e.target.value)}
                 disabled={!isEditable("observaciones")}
+                spellCheck lang="es"
               />
             </div>
 

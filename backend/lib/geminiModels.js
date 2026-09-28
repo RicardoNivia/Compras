@@ -42,3 +42,12 @@ export const DEFAULT_GEMINI_MODEL = "gemini-flash-latest";
 export function isValidGeminiModel(id) {
   return GEMINI_MODELS.some((m) => m.id === id);
 }
+
+// Un modelo "paid" solo se puede usar si el rol tiene permiso (ver
+// lib/roles.js#canUsePaidModels) — se pasa como booleano en vez de importar
+// roles.js aquí para mantener este catálogo sin dependencias.
+export function isModelAllowedFor(id, canUsePaid) {
+  const model = GEMINI_MODELS.find((m) => m.id === id);
+  if (!model) return false;
+  return model.tier === "free" || canUsePaid;
+}

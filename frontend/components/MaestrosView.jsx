@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import MaestroModal from "@/components/MaestroModal";
 import { TIPOS_MAESTRO, TIPO_LABELS } from "@/lib/maestrosTipos";
 import { updateMaestroApi, deleteMaestroApi } from "@/lib/api";
+import { fmtCOP } from "@/lib/format";
 import { IconPlus, IconEdit, IconTrash, IconSearch, IconBuilding, IconUsers, IconFlag, IconMoney, IconFile } from "@/components/icons";
 
 const EN_USO_TITLE = "No se puede editar ni eliminar: este valor ya está en uso en uno o más registros. Puedes inactivarlo para que deje de ofrecerse en el formulario.";
@@ -158,6 +159,7 @@ export default function MaestrosView({ initialMaestros }) {
           <thead>
             <tr>
               <th>{COLUMN_LABELS[tab]}</th>
+              {tab === "area" && <th className="num">Presupuesto anual</th>}
               <th className="col-activo">Activo</th>
               <th className="col-acciones"></th>
             </tr>
@@ -165,7 +167,7 @@ export default function MaestrosView({ initialMaestros }) {
           <tbody>
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={3}>
+                <td colSpan={tab === "area" ? 4 : 3}>
                   <div className="empty">No hay opciones de {TIPO_LABELS[tab].toLowerCase()} que coincidan.</div>
                 </td>
               </tr>
@@ -176,6 +178,7 @@ export default function MaestrosView({ initialMaestros }) {
               return (
                 <tr key={m.id}>
                   <td>{m.valor}</td>
+                  {tab === "area" && <td className="num">{m.presupuestoAnual != null ? fmtCOP(m.presupuestoAnual) : "—"}</td>}
                   <td>
                     <ToggleSwitch
                       checked={m.activo}
@@ -202,8 +205,14 @@ export default function MaestrosView({ initialMaestros }) {
                           type="button"
                           className="icon-action-btn edit"
                           onClick={() => openEdit(m)}
-                          title={locked ? EN_USO_TITLE : "Editar"}
-                          disabled={locked}
+                          title={
+                            locked && tab !== "area"
+                              ? EN_USO_TITLE
+                              : locked
+                                ? "En uso: no puedes cambiar el nombre, pero sí el presupuesto."
+                                : "Editar"
+                          }
+                          disabled={locked && tab !== "area"}
                         >
                           <IconEdit size={13} />
                         </button>

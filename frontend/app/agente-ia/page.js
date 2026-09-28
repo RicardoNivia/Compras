@@ -13,7 +13,7 @@ export default async function AgenteIAPage() {
 
   return (
     <AppShell user={user} title="Agente IA" subtitle="Consultas sobre compras">
-      <AgenteChat userName={user.nombre} />
+      <AgenteChat userName={user.nombre} role={user.role} />
     </AppShell>
   );
 }

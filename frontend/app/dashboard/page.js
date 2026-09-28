@@ -12,12 +12,16 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
   if (!canViewDashboard(user.role)) redirect("/registros");
 
-  const res = await backendFetch("/api/records");
-  const { records } = await res.json();
+  const [recordsRes, maestrosRes] = await Promise.all([
+    backendFetch("/api/records"),
+    backendFetch("/api/maestros?tipo=area"),
+  ]);
+  const { records } = await recordsRes.json();
+  const { maestros } = await maestrosRes.json();
 
   return (
     <AppShell user={user} title="Dashboard de compras" subtitle={`${records.length} registros`}>
-      <DashboardView records={records} />
+      <DashboardView records={records} areaMaestros={maestros} />
     </AppShell>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from "@/lib/geminiModels";
+import { canUsePaidModels } from "@/lib/roles";
 import { renderMarkdown, splitChartBlocks } from "@/lib/markdown";
 import ChartFromSpec from "@/components/charts/ChartFromSpec";
 import { IconSpark, IconSend, IconPlus, IconTrash } from "@/components/icons";
@@ -35,7 +36,8 @@ function formatConvDate(iso) {
   }
 }
 
-export default function AgenteChat({ userName }) {
+export default function AgenteChat({ userName, role }) {
+  const canPaid = canUsePaidModels(role);
   const [model, setModel] = useState(DEFAULT_GEMINI_MODEL);
   const [messages, setMessages] = useState([]); // { role: "user" | "model", text }
   const [input, setInput] = useState("");
@@ -196,8 +198,8 @@ export default function AgenteChat({ userName }) {
             <label htmlFor="agent-model">Modelo</label>
             <select id="agent-model" value={model} onChange={(e) => setModel(e.target.value)} disabled={sending}>
               {GEMINI_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label} · {m.tier === "free" ? "Gratis" : "De pago"}
+                <option key={m.id} value={m.id} disabled={m.tier === "paid" && !canPaid}>
+                  {m.label} · {m.tier === "free" ? "Gratis" : canPaid ? "De pago" : "De pago (solo admin)"}
                 </option>
               ))}
             </select>
@@ -209,6 +211,11 @@ export default function AgenteChat({ userName }) {
               </span>
               <span className="agent-model-desc">{selectedModel.description} · {selectedModel.limits}</span>
             </div>
+          )}
+          {!canPaid && (
+            <p className="card-sub" style={{ margin: 0 }}>
+              Los modelos de pago solo pueden seleccionarlos los administradores.
+            </p>
           )}
         </div>
 

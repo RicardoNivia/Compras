@@ -35,7 +35,10 @@ function todayYearMonth() {
   return { year, month };
 }
 
-export default function DashboardView({ records }) {
+const PRESUPUESTO_ALERTA_PCT = 80; // % de consumo del presupuesto a partir del cual se resalta en amarillo
+const PRESUPUESTO_CRITICO_PCT = 90; // % de consumo a partir del cual se resalta en rojo (cerca del límite o excedido)
+
+export default function DashboardView({ records, areaMaestros = [] }) {
   const { year: currentYear, month: currentMonthKey } = todayYearMonth();
 
   const [viewMode, setViewMode] = useState("mensual"); // "mensual" | "anual"
@@ -466,7 +469,18 @@ export default function DashboardView({ records }) {
     return { rows, totals };
   }, [filteredRecords]);
 
+  // ---------- Presupuesto anual por área (maestro "area") ----------
+  const presupuestoPorArea = useMemo(() => {
+    const map = new Map();
+    for (const m of areaMaestros) {
+      if (m.presupuestoAnual != null) map.set(m.valor, m.presupuestoAnual);
+    }
+    return map;
+  }, [areaMaestros]);
+
   // ---------- Consumo por categoría y área ----------
+  // Presupuesto de referencia: en la vista Mensual se compara contra el presupuesto
+  // anual dividido en 12 (presupuesto del mes); en la vista Anual, contra el anual completo.
   const porCategoriaArea = useMemo(() => {
     const areaMap = new Map();
     for (const r of activeRecords) {
@@ -482,11 +496,35 @@ export default function DashboardView({ records }) {
       const catList = Array.from(v.cats.entries())
         .map(([cname, cvalue]) => ({ name: cname, value: cvalue, pct: v.value ? (cvalue / v.value) * 100 : 0 }))
         .sort((a, b) => b.value - a.value);
-      return { name, count: v.count, value: v.value, top: catList.slice(0, 4), moreCount: Math.max(0, catList.length - 4) };
+
+      const presupuestoAnual = presupuestoPorArea.get(name) ?? null;
+      const presupuesto = presupuestoAnual != null
+        ? (viewMode === "mensual" ? presupuestoAnual / 12 : presupuestoAnual)
+        : null;
+      const pctPresupuesto = presupuesto ? (v.value / presupuesto) * 100 : null;
+      const presupuestoEstado = pctPresupuesto === null
+        ? "sin-datos"
+        : pctPresupuesto >= PRESUPUESTO_CRITICO_PCT
+          ? "excedido"
+          : pctPresupuesto >= PRESUPUESTO_ALERTA_PCT
+            ? "alerta"
+            : "ok";
+      const disponible = presupuesto != null ? presupuesto - v.value : null;
+
+      return {
+        name, count: v.count, value: v.value, top: catList.slice(0, 4), moreCount: Math.max(0, catList.length - 4),
+        presupuestoAnual, presupuesto, pctPresupuesto, presupuestoEstado, disponible,
+      };
     }).sort((a, b) => b.value - a.value);
-    const totals = rows.reduce((acc, r) => ({ count: acc.count + r.count, value: acc.value + r.value }), { count: 0, value: 0 });
+    const totals = rows.reduce((acc, r) => ({
+      count: acc.count + r.count,
+      value: acc.value + r.value,
+      presupuesto: acc.presupuesto + (r.presupuesto || 0),
+      disponible: acc.disponible + (r.disponible || 0),
+      conPresupuesto: acc.conPresupuesto || r.presupuesto != null,
+    }), { count: 0, value: 0, presupuesto: 0, disponible: 0, conPresupuesto: false });
     return { rows, totals };
-  }, [activeRecords]);
+  }, [activeRecords, presupuestoPorArea, viewMode]);
 
   async function handleExportPDF() {
     if (!containerRef.current) return;
@@ -519,10 +557,38 @@ export default function DashboardView({ records }) {
       const usableH = pageH - margin * 2 - 40;
 
       const imgW = usableW;
-      const imgH = (canvas.height * imgW) / canvas.width;
-
       const pxPerPage = (usableH * canvas.width) / imgW;
-      const totalPages = Math.max(1, Math.ceil(canvas.height / pxPerPage));
+
+      // Puntos de corte seguros: los límites (top/bottom, en px del canvas) de
+      // cada bloque de primer nivel del dashboard (KPIs, tarjetas, gráficos).
+      // Al paginar, se evita cortar un bloque a la mitad — se corta entre
+      // bloques, aunque eso deje una página un poco más corta de lo posible.
+      // Se usa getBoundingClientRect (no offsetTop, que es relativo al ancestro
+      // posicionado más cercano, no necesariamente el contenedor del dashboard).
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const scaleY = canvas.height / containerRect.height;
+      const blockBounds = Array.from(containerRef.current.children)
+        .map((el) => {
+          const rect = el.getBoundingClientRect();
+          return {
+            top: (rect.top - containerRect.top) * scaleY,
+            bottom: (rect.bottom - containerRect.top) * scaleY,
+          };
+        })
+        .filter((b) => b.bottom > b.top);
+
+      const pageBreaks = [0];
+      let cursor = 0;
+      while (cursor < canvas.height - 1) {
+        const naturalEnd = Math.min(cursor + pxPerPage, canvas.height);
+        const safeEnds = blockBounds
+          .map((b) => b.bottom)
+          .filter((y) => y > cursor + 1 && y <= naturalEnd);
+        const end = Math.round(safeEnds.length ? Math.max(...safeEnds) : naturalEnd);
+        pageBreaks.push(end);
+        cursor = end;
+      }
+      const totalPages = pageBreaks.length - 1;
 
       const title = "Sinco · Compras — Dashboard de compras";
       const periodLabel = selectedMonth
@@ -540,12 +606,13 @@ export default function DashboardView({ records }) {
         pdf.setTextColor(100);
         pdf.text(subtitle, margin, margin + 20);
 
+        const sliceTop = pageBreaks[page];
+        const sliceHeightPx = pageBreaks[page + 1] - sliceTop;
         const sliceCanvas = document.createElement("canvas");
         sliceCanvas.width = canvas.width;
-        const sliceHeightPx = Math.min(pxPerPage, canvas.height - page * pxPerPage);
         sliceCanvas.height = sliceHeightPx;
         const ctx = sliceCanvas.getContext("2d");
-        ctx.drawImage(canvas, 0, page * pxPerPage, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+        ctx.drawImage(canvas, 0, sliceTop, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
         const sliceImgH = (sliceHeightPx * imgW) / canvas.width;
         pdf.addImage(sliceCanvas.toDataURL("image/png"), "PNG", margin, margin + 30, imgW, sliceImgH);
 
@@ -1008,15 +1075,38 @@ export default function DashboardView({ records }) {
       {/* Consumo por categoría y área */}
       <div className="card" style={{ marginBottom: 14 }}>
         <h3>Consumo por categoría y área</h3>
+        <p className="card-sub">
+          Presupuesto: {viewMode === "mensual" ? "presupuesto anual del área dividido en 12 (mes)" : "presupuesto anual del área"}.
+          Se resalta en amarillo desde el {PRESUPUESTO_ALERTA_PCT}% de consumo, y en rojo desde el {PRESUPUESTO_CRITICO_PCT}% (cerca del límite o ya excedido).
+        </p>
         <div className="table-wrap-plain">
           <table className="plain-table">
-            <thead><tr><th>Área</th><th className="num">Cant.</th><th className="num">Valor total</th><th>Categorías</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Área</th><th className="num">Cant.</th><th className="num">Valor total</th>
+                <th className="num">Presupuesto {viewMode === "mensual" ? "(mes)" : "(año)"}</th>
+                <th className="num">Disponible</th>
+                <th className="num">% consumido</th>
+                <th>Categorías</th>
+              </tr>
+            </thead>
             <tbody>
               {porCategoriaArea.rows.map((r) => (
-                <tr key={r.name}>
+                <tr key={r.name} className={r.presupuestoEstado === "excedido" ? "row-critical" : r.presupuestoEstado === "alerta" ? "row-warning" : ""}>
                   <td>{r.name}</td>
                   <td className="num">{fmtNum(r.count)}</td>
                   <td className="num">{fmtCOP(r.value)}</td>
+                  <td className="num">{r.presupuesto != null ? fmtCOP(r.presupuesto) : "—"}</td>
+                  <td className={`num${r.disponible !== null && r.disponible < 0 ? " text-critical" : ""}`}>
+                    {r.disponible !== null ? fmtCOP(r.disponible) : "—"}
+                  </td>
+                  <td className="num">
+                    {r.pctPresupuesto !== null ? (
+                      <span className={`pill ${r.presupuestoEstado === "excedido" ? "critical" : r.presupuestoEstado === "alerta" ? "warning" : "good"}`}>
+                        {r.presupuestoEstado === "excedido" && <IconAlert size={11} />} {r.pctPresupuesto.toFixed(1)}%
+                      </span>
+                    ) : "—"}
+                  </td>
                   <td className="cat-cell">
                     {r.top.map((c) => (
                       <div className="cat-line" key={c.name}>
@@ -1032,6 +1122,11 @@ export default function DashboardView({ records }) {
                 <td>Total</td>
                 <td className="num">{fmtNum(porCategoriaArea.totals.count)}</td>
                 <td className="num">{fmtCOP(porCategoriaArea.totals.value)}</td>
+                <td className="num">{porCategoriaArea.totals.conPresupuesto ? fmtCOP(porCategoriaArea.totals.presupuesto) : "—"}</td>
+                <td className={`num${porCategoriaArea.totals.conPresupuesto && porCategoriaArea.totals.disponible < 0 ? " text-critical" : ""}`}>
+                  {porCategoriaArea.totals.conPresupuesto ? fmtCOP(porCategoriaArea.totals.disponible) : "—"}
+                </td>
+                <td className="num"></td>
                 <td></td>
               </tr>
             </tbody>

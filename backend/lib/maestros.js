@@ -25,9 +25,18 @@ export function toClientMaestro(m, enUso = false) {
     tipo: m.tipo,
     valor: m.valor,
     activo: m.activo,
+    presupuestoAnual: m.presupuestoAnual ?? null,
     enUso,
     createdAt: m.createdAt,
   };
+}
+
+function parsePresupuesto(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) throw badRequest("El presupuesto anual debe ser un número válido mayor o igual a 0.");
+  return n;
 }
 
 export async function isValueInUse(tipo, valor) {
@@ -70,9 +79,11 @@ export async function createMaestro(body, actor) {
   if (!TIPOS_MAESTRO.includes(tipo)) throw badRequest("Tipo de maestro inválido.");
   if (!valor) throw badRequest("El valor es obligatorio.");
 
+  const presupuestoAnual = tipo === "area" ? (parsePresupuesto(body.presupuestoAnual) ?? null) : null;
+
   try {
     const row = await prisma.maestro.create({
-      data: { tipo, valor, activo: body.activo ?? true },
+      data: { tipo, valor, activo: body.activo ?? true, presupuestoAnual },
     });
     const maestro = toClientMaestro(row, false);
     await logMaestroCreate(actor, maestro).catch(() => {});
@@ -93,6 +104,10 @@ export async function updateMaestro(id, body, actor) {
 
   const data = {};
   if (body.activo !== undefined) data.activo = !!body.activo;
+
+  if (current.tipo === "area" && body.presupuestoAnual !== undefined) {
+    data.presupuestoAnual = parsePresupuesto(body.presupuestoAnual);
+  }
 
   if (body.valor !== undefined) {
     const valor = String(body.valor).trim();

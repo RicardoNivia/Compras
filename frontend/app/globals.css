@@ -323,6 +323,10 @@ rect.mark:hover{ opacity:0.82; cursor:pointer; }
 .pill.secondary{ background: color-mix(in srgb, var(--secondary) 18%, transparent); color: var(--secondary); }
 .pill::before{ content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
 
+.plain-table tbody tr.row-warning{ background: color-mix(in srgb, var(--warning) 12%, transparent); }
+.plain-table tbody tr.row-critical{ background: color-mix(in srgb, var(--critical) 12%, transparent); }
+.text-critical{ color: var(--critical); font-weight:700; }
+
 .offenders{ margin-top:8px; }
 .offenders table{ width:100%; border-collapse:collapse; font-size:12.5px; }
 .offenders th{ text-align:left; font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; padding:4px 6px; border-bottom:1px solid var(--border); }
@@ -357,6 +361,7 @@ rect.mark:hover{ opacity:0.82; cursor:pointer; }
 
 .field{ display:flex; flex-direction:column; gap:4px; }
 .field label{ font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+.field .dvalue{ font-size:13.5px; color:var(--ink); padding:8px 1px; line-height:1.4; }
 input, select, textarea{
   font-family: inherit; font-size:13.5px; color:var(--ink);
   background: var(--surface-2); border:1px solid var(--border); border-radius:10px;
