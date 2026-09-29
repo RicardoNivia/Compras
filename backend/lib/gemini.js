@@ -1,20 +1,36 @@
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
-const MAX_CONNECT_RETRIES = 2;
+// El proxy de rewrites del frontend (next.config.js) corta la conexión a los
+// ~30s si no ha recibido ningún byte de respuesta todavía — así que el peor
+// caso (MAX_CONNECT_RETRIES+1 intentos × CONNECT_TIMEOUT_MS) debe quedar por
+// debajo de eso, o el usuario ve un "Internal Server Error" 500 genérico del
+// proxy en vez del mensaje de error real del agente. Un solo intento con un
+// timeout generoso (en vez de varios cortos) deja más margen para prompts
+// grandes (todo el dataset de compras + presupuestos + políticas) en redes
+// lentas, sin dejar de fallar con tiempo de sobra antes del corte del proxy.
+const MAX_CONNECT_RETRIES = 0;
+const CONNECT_TIMEOUT_MS = 25000;
 
 async function fetchWithRetry(url, options) {
   let lastErr;
   for (let attempt = 0; attempt <= MAX_CONNECT_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CONNECT_TIMEOUT_MS);
     try {
-      return await fetch(url, options);
+      return await fetch(url, { ...options, signal: controller.signal });
     } catch (err) {
-      lastErr = err;
-      // Falla de conexión (timeout/DNS de red, común en redes corporativas
-      // intermitentes) — no es un error de la API, se reintenta.
+      // Timeout (sin respuesta del todo, común en redes corporativas que
+      // descartan el tráfico en silencio) o falla de conexión — no es un
+      // error de la API, se reintenta hasta MAX_CONNECT_RETRIES veces.
+      lastErr = err.name === "AbortError"
+        ? new Error(`sin respuesta tras ${CONNECT_TIMEOUT_MS / 1000}s`)
+        : err;
       if (attempt < MAX_CONNECT_RETRIES) continue;
+    } finally {
+      clearTimeout(timer);
     }
   }
   throw new Error(
-    `No se pudo conectar con Gemini (falla de red al intentar ${MAX_CONNECT_RETRIES + 1} veces). ` +
+    `No se pudo conectar con Gemini (falla de red). ` +
     `Verifica la conexión a internet o el proxy/firewall corporativo. Detalle: ${lastErr?.cause?.code || lastErr?.message || lastErr}`
   );
 }
