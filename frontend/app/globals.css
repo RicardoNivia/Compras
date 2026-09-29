@@ -906,7 +906,7 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 }
 .agent-suggestion-chip:hover{ transform: translateY(-2px); border-color: var(--accent); background: var(--accent-wash); color: var(--accent); }
 
-.agent-messages{ display:flex; flex-direction:column; gap:18px; max-width:760px; margin:0 auto; }
+.agent-messages{ display:flex; flex-direction:column; gap:18px; max-width:1200px; margin:0 auto; }
 .agent-msg{ display:flex; gap:12px; align-items:flex-start; animation: agentFadeUp .28s ease both; }
 .agent-msg.user{ flex-direction:row-reverse; }
 .agent-msg-avatar{
@@ -915,9 +915,10 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 }
 .agent-msg.model .agent-msg-avatar{ background: linear-gradient(135deg, var(--accent), var(--secondary)); color:#fff; border:none; }
 .agent-msg-bubble{
-  max-width:min(560px, 78%); padding:12px 16px; border-radius:16px; font-size:14px; line-height:1.6;
+  max-width:min(920px, 88%); padding:12px 16px; border-radius:16px; font-size:14px; line-height:1.6;
   background: var(--surface-2); color: var(--ink);
 }
+.agent-msg.user .agent-msg-bubble{ max-width:min(700px, 88%); }
 .agent-msg.user .agent-msg-bubble{ background: var(--accent); color: var(--accent-ink); border-radius:16px 16px 4px 16px; }
 .agent-msg.model .agent-msg-bubble{ background: var(--surface-2); border-radius:16px 16px 16px 4px; }
 .chat-markdown p{ margin:0 0 8px; }
