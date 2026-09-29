@@ -41,7 +41,7 @@ model Record {
 model AuditLog {
   id         String   @id @default(cuid())
   action     String   // "crear" | "editar" | "eliminar" | "radicar"
-  entityType String   @default("record") // "record" | "maestro" | "user"
+  entityType String   @default("record") // "record" | "maestro" | "user" | "presupuesto"
   recordId   String   // id de la entidad afectada (registro, maestro o usuario)
   recordInfo String?
   userId     String?
@@ -108,17 +108,56 @@ model Message {
 }
 
 // Opciones administrables para los desplegables del formulario de registros.
-// tipo: "area" | "responsable" | "estado" | "medioPago" | "estadoLegalizacion"
+// tipo: "area" | "responsable" | "estado" | "categoria" | "medioPago" | "estadoLegalizacion"
 // (coincide 1:1 con el nombre del campo correspondiente en Record).
 model Maestro {
-  id               String   @id @default(cuid())
-  tipo             String
-  valor            String
-  activo           Boolean  @default(true)
-  presupuestoAnual Float?   // solo aplica a tipo "area": presupuesto anual asignado a esa área
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id        String   @id @default(cuid())
+  tipo      String
+  valor     String
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([tipo, valor])
   @@map("maestros")
+}
+
+// El modo (por área o por categoría) es una configuración GENERAL por año,
+// no por área individual: aplica a todas las áreas de ese año por igual.
+// Cambiarlo cuando ya hay presupuestos configurados en el modo anterior borra
+// esos datos (ver lib/presupuestos.js#setModoAnio).
+model PresupuestoAnio {
+  anio      Int      @id
+  modo      String   // "area" | "categoria"
+  updatedAt DateTime @updatedAt
+
+  @@map("presupuesto_anios")
+}
+
+// Presupuesto configurado por área y año, en el modo vigente de ese año
+// (PresupuestoAnio): si es "area", un solo valor total (valorArea); si es
+// "categoria", se reparte por categoría (ver PresupuestoCategoria) y el
+// total del área es la suma de esas categorías.
+model Presupuesto {
+  id         String                 @id @default(cuid())
+  area       String
+  anio       Int
+  valorArea  Float?                 // usado solo si el modo del año es "area"
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  categorias PresupuestoCategoria[]
+
+  @@unique([area, anio])
+  @@map("presupuestos")
+}
+
+model PresupuestoCategoria {
+  id            String      @id @default(cuid())
+  presupuestoId String
+  categoria     String
+  valor         Float
+  presupuesto   Presupuesto @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
+
+  @@unique([presupuestoId, categoria])
+  @@map("presupuesto_categorias")
 }

@@ -27,7 +27,6 @@ export const MAESTRO_FIELD_LABELS = {
   tipo: "Tipo",
   valor: "Valor",
   activo: "Activo",
-  presupuestoAnual: "Presupuesto anual",
 };
 
 export const USER_FIELD_LABELS = {

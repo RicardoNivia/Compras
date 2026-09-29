@@ -6,16 +6,11 @@ import { createMaestroApi, updateMaestroApi } from "@/lib/api";
 
 export default function MaestroModal({ tipo, maestro, onClose, onSaved }) {
   const isEdit = !!maestro;
-  const isArea = tipo === "area";
   // Si el valor ya está en uso en registros, no se puede renombrar (rompería
-  // la referencia por texto), pero sí se pueden editar el resto de sus datos
-  // (presupuesto, estado activo/inactivo).
+  // la referencia por texto).
   const valorLocked = isEdit && maestro.enUso;
   const [valor, setValor] = useState(maestro?.valor || "");
   const [activo, setActivo] = useState(maestro ? maestro.activo : true);
-  const [presupuestoAnual, setPresupuestoAnual] = useState(
-    maestro?.presupuestoAnual != null ? String(maestro.presupuestoAnual) : ""
-  );
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -26,16 +21,10 @@ export default function MaestroModal({ tipo, maestro, onClose, onSaved }) {
       setError("El valor es obligatorio.");
       return;
     }
-    if (isArea && presupuestoAnual !== "" && (Number.isNaN(Number(presupuestoAnual)) || Number(presupuestoAnual) < 0)) {
-      setError("El presupuesto anual debe ser un número válido mayor o igual a 0.");
-      return;
-    }
 
     setSaving(true);
     try {
       const payload = { valor, activo };
-      if (isArea) payload.presupuestoAnual = presupuestoAnual === "" ? null : Number(presupuestoAnual);
-
       let saved;
       if (isEdit) {
         saved = await updateMaestroApi(maestro.id, payload);
@@ -80,17 +69,6 @@ export default function MaestroModal({ tipo, maestro, onClose, onSaved }) {
                 />
               )}
             </div>
-            {isArea && (
-              <div className="field">
-                <label htmlFor="m-presupuesto">Presupuesto anual</label>
-                <input
-                  id="m-presupuesto" type="number" min="0" step="1000"
-                  value={presupuestoAnual}
-                  onChange={(e) => setPresupuestoAnual(e.target.value)}
-                  placeholder="Ej. 50000000"
-                />
-              </div>
-            )}
             <div className="field">
               <label htmlFor="m-activo">Estado</label>
               <select id="m-activo" value={activo ? "1" : "0"} onChange={(e) => setActivo(e.target.value === "1")}>

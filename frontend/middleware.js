@@ -21,7 +21,7 @@ export async function middleware(request) {
   }
 
   const isAdmin = payload.role === "admin";
-  const adminOnly = ["/usuarios", "/auditoria", "/maestros"];
+  const adminOnly = ["/usuarios", "/auditoria", "/maestros", "/presupuesto"];
   if (adminOnly.some((p) => pathname.startsWith(p)) && !isAdmin) {
     const url = request.nextUrl.clone();
     url.pathname = "/registros";

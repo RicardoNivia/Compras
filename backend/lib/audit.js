@@ -121,6 +121,64 @@ export async function logUserDelete(actor, user) {
   await writeLog({ action: "eliminar", entityType: "user", recordId: user.id, recordInfo: userSummary(user), actor, changes });
 }
 
+// ---------- Presupuestos ----------
+// El presupuesto no tiene campos escalares simples que diffear con
+// diffFields (modo "categoria" es una lista) — se guarda como un solo campo
+// "presupuesto" con el snapshot antes/después en JSON.
+
+function presupuestoSummary(p) {
+  if (!p) return null;
+  return `Presupuesto ${p.area} · ${p.anio}`;
+}
+
+function presupuestoValueSnapshot(p) {
+  if (!p) return null;
+  return p.modo === "area"
+    ? { modo: "area", valorArea: p.valorArea }
+    : { modo: "categoria", categorias: p.categorias };
+}
+
+export async function logPresupuestoUpsert(actor, before, after) {
+  const beforeVal = presupuestoValueSnapshot(before);
+  const afterVal = presupuestoValueSnapshot(after);
+  if (JSON.stringify(beforeVal) === JSON.stringify(afterVal)) return;
+  const changes = [{
+    field: "presupuesto",
+    label: "Presupuesto",
+    before: beforeVal ? JSON.stringify(beforeVal) : null,
+    after: afterVal ? JSON.stringify(afterVal) : null,
+  }];
+  await writeLog({
+    action: before ? "editar" : "crear",
+    entityType: "presupuesto",
+    recordId: after.id,
+    recordInfo: presupuestoSummary(after),
+    actor,
+    changes,
+  });
+}
+
+export async function logPresupuestoDelete(actor, p) {
+  const changes = [{ field: "presupuesto", label: "Presupuesto", before: JSON.stringify(presupuestoValueSnapshot(p)), after: null }];
+  await writeLog({ action: "eliminar", entityType: "presupuesto", recordId: p.id, recordInfo: presupuestoSummary(p), actor, changes });
+}
+
+// El modo (por área/por categoría) es general por año — este cambio puede
+// implicar borrar todos los presupuestos de áreas configurados en el modo
+// anterior (ver lib/presupuestos.js#setModoAnio), por eso queda auditado aparte.
+export async function logPresupuestoModoChange(actor, anio, modoAnterior, modoNuevo, presupuestosBorrados) {
+  const changes = [{
+    field: "modo",
+    label: "Modo de presupuesto del año",
+    before: modoAnterior,
+    after: modoNuevo,
+  }];
+  const info = presupuestosBorrados > 0
+    ? `Presupuesto ${anio} — cambió de modo (se borraron ${presupuestosBorrados} área(s) configuradas por "${modoAnterior === "area" ? "área" : "categoría"}")`
+    : `Presupuesto ${anio} — modo definido`;
+  await writeLog({ action: "editar", entityType: "presupuesto", recordId: `anio-${anio}`, recordInfo: info, actor, changes });
+}
+
 export async function listAuditLogs({ from, to, userId, recordId, page = 1, pageSize = 50 } = {}) {
   const where = {};
   if (from || to) {

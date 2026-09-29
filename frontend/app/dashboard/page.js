@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { backendFetch } from "@/lib/backendFetch";
 import { getSessionUser } from "@/lib/auth";
-import { canViewDashboard } from "@/lib/roles";
+import { canViewDashboard, canViewPresupuesto } from "@/lib/roles";
 import AppShell from "@/components/AppShell";
 import DashboardView from "@/components/DashboardView";
 
@@ -12,16 +12,16 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
   if (!canViewDashboard(user.role)) redirect("/registros");
 
-  const [recordsRes, maestrosRes] = await Promise.all([
+  const [recordsRes, presupuestosRes] = await Promise.all([
     backendFetch("/api/records"),
-    backendFetch("/api/maestros?tipo=area"),
+    canViewPresupuesto(user.role) ? backendFetch("/api/presupuestos") : Promise.resolve(null),
   ]);
   const { records } = await recordsRes.json();
-  const { maestros } = await maestrosRes.json();
+  const presupuestos = presupuestosRes ? (await presupuestosRes.json()).presupuestos : [];
 
   return (
     <AppShell user={user} title="Dashboard de compras" subtitle={`${records.length} registros`}>
-      <DashboardView records={records} areaMaestros={maestros} />
+      <DashboardView records={records} presupuestos={presupuestos} />
     </AppShell>
   );
 }

@@ -3,13 +3,17 @@
 async function handle(res) {
   if (!res.ok) {
     let message = `Error ${res.status}`;
+    let extra = null;
     try {
       const data = await res.json();
       if (data?.error) message = data.error;
+      extra = data;
     } catch {
       // ignore
     }
-    throw new Error(message);
+    const err = new Error(message);
+    if (extra) Object.assign(err, extra);
+    throw err;
   }
   return res.json();
 }
@@ -89,5 +93,36 @@ export async function updateMaestroApi(id, data) {
 
 export async function deleteMaestroApi(id) {
   const res = await fetch(`/api/maestros/${id}`, { method: "DELETE" });
+  return handle(res);
+}
+
+export async function fetchPresupuestos(anio) {
+  const qs = anio ? `?anio=${anio}` : "";
+  const res = await fetch(`/api/presupuestos${qs}`, { cache: "no-store" });
+  return handle(res);
+}
+
+export async function savePresupuestoApi(data) {
+  const res = await fetch("/api/presupuestos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handle(res);
+}
+
+export async function deletePresupuestoApi(id) {
+  const res = await fetch(`/api/presupuestos/${id}`, { method: "DELETE" });
+  return handle(res);
+}
+
+// requiresConfirm/afectados llegan en el error (ver handle) si el cambio de
+// modo borraría presupuestos ya configurados y no se envió confirm:true.
+export async function setModoAnioApi(anio, modo, confirm = false) {
+  const res = await fetch("/api/presupuestos/modo", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ anio, modo, confirm }),
+  });
   return handle(res);
 }

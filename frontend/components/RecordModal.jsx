@@ -36,7 +36,7 @@ const emptyForm = {
   observaciones: "",
 };
 
-export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true, editableFields = null, maestros = [] }) {
+export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true, editableFields = null, maestros = [], presupuestos = [] }) {
   const isEdit = !!record;
   // editableFields null = todos los campos editables (admin, registro).
   // Con lista (p.ej. legalizar), los demás campos quedan solo-lectura.
@@ -73,7 +73,6 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  const categoriaOptions = useMemo(() => uniqueSorted(records, "categoria"), [records]);
   const proveedorOptions = useMemo(() => uniqueSorted(records, "proveedor"), [records]);
 
   // Aviso informativo (nunca bloquea guardar): cuántas otras compras ya tienen
@@ -84,24 +83,36 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
     return records.filter((r) => r.id !== record?.id && (r.fe || "").trim() === fe).length;
   }, [form.fe, records, record?.id]);
 
-  // Panel informativo: gastado vs. presupuesto configurado en el maestro de área
-  // (no bloquea el guardado, solo orienta al usuario al elegir el área).
+  // Panel informativo: gastado vs. presupuesto del año actual (configurado en
+  // la sección "Presupuesto"), no bloquea el guardado, solo orienta al elegir
+  // área/categoría. Si el área maneja presupuesto por categoría y ya hay una
+  // categoría elegida con presupuesto propio, se compara contra esa categoría;
+  // si no, contra el total del área.
   const presupuestoInfo = useMemo(() => {
     const area = form.area;
     if (!area) return null;
-    const maestro = maestros.find((m) => m.tipo === "area" && m.valor === area);
-    const presupuestoAnual = maestro?.presupuestoAnual;
-    if (presupuestoAnual == null) return null;
+    const year = new Date().getFullYear();
+    const p = presupuestos.find((x) => x.area === area && x.anio === year);
+    if (!p) return null;
 
-    const now = new Date();
-    const year = String(now.getFullYear());
-    const mk = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    let label = area;
+    let presupuestoAnual = p.total;
+    const catBudget = p.modo === "categoria" && form.categoria
+      ? p.categorias.find((c) => c.categoria === form.categoria)
+      : null;
+    if (catBudget) {
+      label = `${area} — ${form.categoria}`;
+      presupuestoAnual = catBudget.valor;
+    }
+    if (!presupuestoAnual) return null;
 
+    const mk = `${year}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
     let gastadoAnual = 0;
     let gastadoMes = 0;
     for (const r of records) {
       if (r.area !== area || r.estado === "Anulado") continue;
-      if (!r.fechaSolicitud || !r.fechaSolicitud.startsWith(year)) continue;
+      if (catBudget && r.categoria !== form.categoria) continue;
+      if (!r.fechaSolicitud || !r.fechaSolicitud.startsWith(String(year))) continue;
       gastadoAnual += r.valorConIva || 0;
       if (r.fechaSolicitud.slice(0, 7) === mk) gastadoMes += r.valorConIva || 0;
     }
@@ -111,13 +122,13 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
     const pctMensual = presupuestoMensual ? (gastadoMes / presupuestoMensual) * 100 : 0;
 
     return {
-      presupuestoAnual, presupuestoMensual,
+      label, presupuestoAnual, presupuestoMensual,
       gastadoAnual, gastadoMes,
       disponibleAnual: presupuestoAnual - gastadoAnual,
       disponibleMensual: presupuestoMensual - gastadoMes,
       pctAnual, pctMensual,
     };
-  }, [form.area, maestros, records]);
+  }, [form.area, form.categoria, presupuestos, records]);
 
   function presupuestoSeverity(pct) {
     if (pct >= PRESUPUESTO_CRITICO_PCT) return "critical";
@@ -227,21 +238,6 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
               </select>
             </div>
 
-            {presupuestoInfo && (
-              <div className="dias-preview">
-                Presupuesto del área — mes:{" "}
-                <span className={`pill ${presupuestoSeverity(presupuestoInfo.pctMensual)}`}>
-                  {fmtCOP(presupuestoInfo.gastadoMes)} de {fmtCOP(presupuestoInfo.presupuestoMensual)} ({presupuestoInfo.pctMensual.toFixed(0)}%)
-                </span>{" "}
-                · disponible {fmtCOP(presupuestoInfo.disponibleMensual)}
-                <br />
-                Año: <span className={`pill ${presupuestoSeverity(presupuestoInfo.pctAnual)}`}>
-                  {fmtCOP(presupuestoInfo.gastadoAnual)} de {fmtCOP(presupuestoInfo.presupuestoAnual)} ({presupuestoInfo.pctAnual.toFixed(0)}%)
-                </span>{" "}
-                · disponible {fmtCOP(presupuestoInfo.disponibleAnual)}
-              </div>
-            )}
-
             <div className="field">
               <label htmlFor="f-responsable">Responsable *</label>
               <select
@@ -268,12 +264,28 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 value={form.categoria || ""}
                 onChange={(e) => update("categoria", e.target.value)}
                 disabled={!isEditable("categoria")}
+                placeholder="Escribe para buscar…"
                 spellCheck lang="es"
               />
               <datalist id="categorias-list">
-                {categoriaOptions.map((v) => <option key={v} value={v} />)}
+                {optionsFor("categoria").map((o) => <option key={o.value} value={o.value} />)}
               </datalist>
             </div>
+
+            {presupuestoInfo && (
+              <div className="dias-preview">
+                Presupuesto {presupuestoInfo.label} — mes:{" "}
+                <span className={`pill ${presupuestoSeverity(presupuestoInfo.pctMensual)}`}>
+                  {fmtCOP(presupuestoInfo.gastadoMes)} de {fmtCOP(presupuestoInfo.presupuestoMensual)} ({presupuestoInfo.pctMensual.toFixed(0)}%)
+                </span>{" "}
+                · disponible {fmtCOP(presupuestoInfo.disponibleMensual)}
+                <br />
+                Año: <span className={`pill ${presupuestoSeverity(presupuestoInfo.pctAnual)}`}>
+                  {fmtCOP(presupuestoInfo.gastadoAnual)} de {fmtCOP(presupuestoInfo.presupuestoAnual)} ({presupuestoInfo.pctAnual.toFixed(0)}%)
+                </span>{" "}
+                · disponible {fmtCOP(presupuestoInfo.disponibleAnual)}
+              </div>
+            )}
 
             <div className="field full">
               <label htmlFor="f-descripcion">Descripción *</label>

@@ -61,6 +61,10 @@ export function canViewMaestros(role) {
   return role === ROLES.ADMIN;
 }
 
+export function canViewPresupuesto(role) {
+  return role === ROLES.ADMIN;
+}
+
 export function canCreateRecord(role) {
   return role === ROLES.ADMIN || role === ROLES.REGISTRO;
 }

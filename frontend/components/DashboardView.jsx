@@ -38,7 +38,7 @@ function todayYearMonth() {
 const PRESUPUESTO_ALERTA_PCT = 80; // % de consumo del presupuesto a partir del cual se resalta en amarillo
 const PRESUPUESTO_CRITICO_PCT = 90; // % de consumo a partir del cual se resalta en rojo (cerca del límite o excedido)
 
-export default function DashboardView({ records, areaMaestros = [] }) {
+export default function DashboardView({ records, presupuestos = [] }) {
   const { year: currentYear, month: currentMonthKey } = todayYearMonth();
 
   const [viewMode, setViewMode] = useState("mensual"); // "mensual" | "anual"
@@ -469,14 +469,29 @@ export default function DashboardView({ records, areaMaestros = [] }) {
     return { rows, totals };
   }, [filteredRecords]);
 
-  // ---------- Presupuesto anual por área (maestro "area") ----------
+  // ---------- Presupuesto por área (configurado en la sección "Presupuesto",
+  // por año — en modo "categoría" el total del área es la suma de categorías) ----------
+  const refYear = Number(viewMode === "anual" ? selectedYear : (selectedMonth || currentMonthKey).slice(0, 4));
   const presupuestoPorArea = useMemo(() => {
     const map = new Map();
-    for (const m of areaMaestros) {
-      if (m.presupuestoAnual != null) map.set(m.valor, m.presupuestoAnual);
+    for (const p of presupuestos) {
+      if (p.anio === refYear) map.set(p.area, p.total);
     }
     return map;
-  }, [areaMaestros]);
+  }, [presupuestos, refYear]);
+
+  // Presupuesto por categoría dentro de cada área — solo existe cuando el año
+  // se maneja en modo "categoria" (ver sección "Presupuesto").
+  const presupuestoCategoriasPorArea = useMemo(() => {
+    const map = new Map();
+    for (const p of presupuestos) {
+      if (p.anio !== refYear || p.modo !== "categoria") continue;
+      const inner = new Map();
+      for (const c of p.categorias || []) inner.set(c.categoria, c.valor);
+      map.set(p.area, inner);
+    }
+    return map;
+  }, [presupuestos, refYear]);
 
   // ---------- Consumo por categoría y área ----------
   // Presupuesto de referencia: en la vista Mensual se compara contra el presupuesto
@@ -493,8 +508,23 @@ export default function DashboardView({ records, areaMaestros = [] }) {
       e.cats.set(cat, (e.cats.get(cat) || 0) + (r.valorConIva || 0));
     }
     const rows = Array.from(areaMap.entries()).map(([name, v]) => {
-      const catList = Array.from(v.cats.entries())
-        .map(([cname, cvalue]) => ({ name: cname, value: cvalue, pct: v.value ? (cvalue / v.value) * 100 : 0 }))
+      const catPresupuestos = presupuestoCategoriasPorArea.get(name) || new Map();
+      // Unión de categorías con gasto y categorías con presupuesto asignado —
+      // así una categoría presupuestada sin compras todavía también se muestra.
+      const catNames = new Set([...v.cats.keys(), ...catPresupuestos.keys()]);
+      const catList = Array.from(catNames)
+        .map((cname) => {
+          const cvalue = v.cats.get(cname) || 0;
+          const catPresupuestoAnual = catPresupuestos.get(cname) ?? null;
+          const catPresupuesto = catPresupuestoAnual != null
+            ? (viewMode === "mensual" ? catPresupuestoAnual / 12 : catPresupuestoAnual)
+            : null;
+          const catPctPresupuesto = catPresupuesto ? (cvalue / catPresupuesto) * 100 : null;
+          return {
+            name: cname, value: cvalue, pct: v.value ? (cvalue / v.value) * 100 : 0,
+            presupuesto: catPresupuesto, pctPresupuesto: catPctPresupuesto,
+          };
+        })
         .sort((a, b) => b.value - a.value);
 
       const presupuestoAnual = presupuestoPorArea.get(name) ?? null;
@@ -511,8 +541,16 @@ export default function DashboardView({ records, areaMaestros = [] }) {
             : "ok";
       const disponible = presupuesto != null ? presupuesto - v.value : null;
 
+      // Las categorías con presupuesto asignado siempre se muestran (aunque no
+      // estén entre las de mayor gasto) — el resto de los 4 puestos se llena
+      // con las de mayor valor.
+      const conPresupuesto = catList.filter((c) => c.presupuesto != null);
+      const sinPresupuesto = catList.filter((c) => c.presupuesto == null);
+      const top = [...conPresupuesto, ...sinPresupuesto.slice(0, Math.max(0, 4 - conPresupuesto.length))]
+        .sort((a, b) => b.value - a.value);
+
       return {
-        name, count: v.count, value: v.value, top: catList.slice(0, 4), moreCount: Math.max(0, catList.length - 4),
+        name, count: v.count, value: v.value, top, moreCount: Math.max(0, catList.length - top.length),
         presupuestoAnual, presupuesto, pctPresupuesto, presupuestoEstado, disponible,
       };
     }).sort((a, b) => b.value - a.value);
@@ -521,10 +559,11 @@ export default function DashboardView({ records, areaMaestros = [] }) {
       value: acc.value + r.value,
       presupuesto: acc.presupuesto + (r.presupuesto || 0),
       disponible: acc.disponible + (r.disponible || 0),
+      gastadoConPresupuesto: acc.gastadoConPresupuesto + (r.presupuesto != null ? r.value : 0),
       conPresupuesto: acc.conPresupuesto || r.presupuesto != null,
-    }), { count: 0, value: 0, presupuesto: 0, disponible: 0, conPresupuesto: false });
+    }), { count: 0, value: 0, presupuesto: 0, disponible: 0, gastadoConPresupuesto: 0, conPresupuesto: false });
     return { rows, totals };
-  }, [activeRecords, presupuestoPorArea, viewMode]);
+  }, [activeRecords, presupuestoPorArea, presupuestoCategoriasPorArea, viewMode]);
 
   async function handleExportPDF() {
     if (!containerRef.current) return;
@@ -741,6 +780,41 @@ export default function DashboardView({ records, areaMaestros = [] }) {
         </p>
       )}
 
+      {/* Presupuesto vs. gastado a nivel general */}
+      {porCategoriaArea.totals.conPresupuesto && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <h3>Presupuesto vs. gastado — nivel general</h3>
+          <p className="card-sub">
+            Suma de las áreas con presupuesto configurado para {viewMode === "mensual" ? `${refYear} (prorrateado por mes)` : refYear}.
+          </p>
+          <div className="kpi-row" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+            <div className="kpi" style={{ "--kpi-c": "var(--accent)" }}>
+              <div className="kpi-head"><div className="label">Presupuestado</div><div className="kpi-ic"><IconMoney size={14} /></div></div>
+              <div className="value">{fmtCOP(porCategoriaArea.totals.presupuesto)}</div>
+            </div>
+            <div className="kpi">
+              <div className="label">Gastado</div>
+              <div className="value">{fmtCOP(porCategoriaArea.totals.gastadoConPresupuesto)}</div>
+            </div>
+            <div className="kpi" style={{ "--kpi-c": (() => {
+              const pct = porCategoriaArea.totals.presupuesto ? (porCategoriaArea.totals.gastadoConPresupuesto / porCategoriaArea.totals.presupuesto) * 100 : null;
+              return pct === null ? "var(--muted)" : pct >= PRESUPUESTO_CRITICO_PCT ? "var(--critical)" : pct >= PRESUPUESTO_ALERTA_PCT ? "var(--warning)" : "var(--good)";
+            })() }}>
+              <div className="label">% consumido</div>
+              <div className="value">
+                {porCategoriaArea.totals.presupuesto
+                  ? `${((porCategoriaArea.totals.gastadoConPresupuesto / porCategoriaArea.totals.presupuesto) * 100).toFixed(1)}%`
+                  : "—"}
+              </div>
+            </div>
+            <div className="kpi">
+              <div className="label">Disponible</div>
+              <div className={`value${porCategoriaArea.totals.disponible < 0 ? " text-critical" : ""}`}>{fmtCOP(porCategoriaArea.totals.disponible)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cumplimiento de entregas / Resumen ejecutivo */}
       <div className="grid-2" style={{ marginBottom: 14 }}>
         <div className="card">
@@ -787,6 +861,27 @@ export default function DashboardView({ records, areaMaestros = [] }) {
               <div className="dvalue">{resumen.mayorArea ? resumen.mayorArea.name : "—"}</div>
               <div className="dcap">{resumen.mayorArea ? fmtCOP(resumen.mayorArea.value) : ""}</div>
             </div>
+            {porCategoriaArea.totals.conPresupuesto && (
+              <>
+                <div className="detail-item">
+                  <div className="dlabel">Presupuestado vs. gastado</div>
+                  <div className="dvalue">
+                    {fmtCOP(porCategoriaArea.totals.gastadoConPresupuesto)} / {fmtCOP(porCategoriaArea.totals.presupuesto)}
+                  </div>
+                  <div className="dcap">
+                    {porCategoriaArea.totals.presupuesto
+                      ? `${((porCategoriaArea.totals.gastadoConPresupuesto / porCategoriaArea.totals.presupuesto) * 100).toFixed(1)}% consumido`
+                      : "—"}
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <div className="dlabel">Disponible de presupuesto</div>
+                  <div className={`dvalue${porCategoriaArea.totals.disponible < 0 ? " text-critical" : ""}`}>
+                    {fmtCOP(porCategoriaArea.totals.disponible)}
+                  </div>
+                </div>
+              </>
+            )}
             <div className="detail-item full">
               <div className="dlabel">Compras totales</div>
               <div className="dvalue">{fmtNum(resumen.totalCompras)}</div>
@@ -1076,7 +1171,7 @@ export default function DashboardView({ records, areaMaestros = [] }) {
       <div className="card" style={{ marginBottom: 14 }}>
         <h3>Consumo por categoría y área</h3>
         <p className="card-sub">
-          Presupuesto: {viewMode === "mensual" ? "presupuesto anual del área dividido en 12 (mes)" : "presupuesto anual del área"}.
+          Presupuesto {refYear}: {viewMode === "mensual" ? "presupuesto del año dividido en 12 (mes)" : "presupuesto configurado para el año"} (configúralo en la sección "Presupuesto").
           Se resalta en amarillo desde el {PRESUPUESTO_ALERTA_PCT}% de consumo, y en rojo desde el {PRESUPUESTO_CRITICO_PCT}% (cerca del límite o ya excedido).
         </p>
         <div className="table-wrap-plain">
@@ -1084,7 +1179,7 @@ export default function DashboardView({ records, areaMaestros = [] }) {
             <thead>
               <tr>
                 <th>Área</th><th className="num">Cant.</th><th className="num">Valor total</th>
-                <th className="num">Presupuesto {viewMode === "mensual" ? "(mes)" : "(año)"}</th>
+                <th className="num">Presupuesto {viewMode === "mensual" ? "(mes)" : `(${refYear})`}</th>
                 <th className="num">Disponible</th>
                 <th className="num">% consumido</th>
                 <th>Categorías</th>
@@ -1112,6 +1207,11 @@ export default function DashboardView({ records, areaMaestros = [] }) {
                       <div className="cat-line" key={c.name}>
                         <span className="cat-name">{c.name}</span>{" — "}
                         <span className="cat-figs">{fmtCOP(c.value)} ({c.pct.toFixed(1)}%)</span>
+                        {c.presupuesto != null && (
+                          <span className={`cat-presupuesto${c.pctPresupuesto >= PRESUPUESTO_CRITICO_PCT ? " text-critical" : c.pctPresupuesto >= PRESUPUESTO_ALERTA_PCT ? " text-warning" : ""}`}>
+                            {" "}/ presup. {fmtCOP(c.presupuesto)}{c.pctPresupuesto !== null ? ` (${c.pctPresupuesto.toFixed(0)}%)` : ""}
+                          </span>
+                        )}
                       </div>
                     ))}
                     {r.moreCount > 0 && <div className="cat-more">+{r.moreCount} categoría(s) más</div>}
