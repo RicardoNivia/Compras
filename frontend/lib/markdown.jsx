@@ -52,11 +52,22 @@ function parseBlock(block) {
   const lines = block.split("\n").filter((l) => l.length > 0);
   if (lines.length === 0) return null;
 
-  const headingMatch = lines[0].match(/^(#{1,4})\s+(.*)$/);
-  if (headingMatch && lines.length === 1) {
+  // Un encabezado puede llegar seguido de más líneas en el mismo bloque (el
+  // modelo no siempre deja una línea en blanco después) — se reconoce igual
+  // aunque no sea la única línea del bloque, y el resto se procesa aparte.
+  const headingMatch = lines[0].match(/^(#{1,6})\s+(.*)$/);
+  if (headingMatch) {
     const level = headingMatch[1].length;
     const Tag = `h${Math.min(level + 3, 6)}`;
-    return <Tag key={nextKey("h")}>{parseInline(headingMatch[2])}</Tag>;
+    const heading = <Tag key={nextKey("h")}>{parseInline(headingMatch[2])}</Tag>;
+    const rest = lines.slice(1).join("\n");
+    if (!rest) return heading;
+    return (
+      <div key={nextKey("hwrap")} className="chat-heading-block">
+        {heading}
+        {parseBlock(rest)}
+      </div>
+    );
   }
 
   if (lines.length >= 2 && lines[0].includes("|") && isTableSeparator(lines[1])) {
