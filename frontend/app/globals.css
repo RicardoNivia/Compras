@@ -253,6 +253,22 @@ main{ flex:1; min-width:0; padding: 26px 32px 60px; width:100%; box-sizing:borde
 .kpi .meter-track{ height:6px; border-radius:999px; background:var(--surface-2); overflow:hidden; margin-top:2px; }
 .kpi .meter-fill{ height:100%; border-radius:999px; background: var(--kpi-c, var(--good)); }
 
+.kpi-explain{ margin-top:8px; }
+.kpi-explain-btn{
+  appearance:none; border:none; background:none; cursor:pointer; padding:0;
+  display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700;
+  color: var(--kpi-c, var(--accent));
+}
+.kpi-explain-btn:hover{ text-decoration:underline; }
+
+.kpi-explain-modal{ max-width:520px; }
+.kpi-explain-modal-title{ display:flex; align-items:flex-start; gap:10px; }
+.kpi-explain-modal-ic{
+  flex:none; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+  background: linear-gradient(135deg, var(--accent), var(--secondary)); color:#fff;
+}
+.kpi-explain-loading{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2); padding:6px 0; }
+
 /* ---------- Cards / charts ---------- */
 .grid-2{ display:grid; grid-template-columns: 1.4fr 1fr; gap:14px; margin-bottom:14px; align-items:stretch; }
 .card{
@@ -341,6 +357,13 @@ rect.mark:hover{ opacity:0.82; cursor:pointer; }
 .pill.accent{ background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .pill.secondary{ background: color-mix(in srgb, var(--secondary) 18%, transparent); color: var(--secondary); }
 .pill::before{ content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+.ai-applied-chips{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.ai-applied-chips .chip{
+  display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px;
+  font-size:11.5px; font-weight:600; background: var(--accent-wash); color: var(--accent);
+  white-space:nowrap;
+}
 
 .plain-table tbody tr.row-warning{ background: color-mix(in srgb, var(--warning) 12%, transparent); }
 .plain-table tbody tr.row-critical{ background: color-mix(in srgb, var(--critical) 12%, transparent); }

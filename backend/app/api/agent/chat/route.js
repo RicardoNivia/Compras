@@ -2,6 +2,7 @@ import { getSessionUser } from "@/lib/auth-server";
 import { isRoleAllowed } from "@/lib/permissions";
 import { listRecords } from "@/lib/records";
 import { listPresupuestos } from "@/lib/presupuestos";
+import { listAuditLogs } from "@/lib/audit";
 import { streamGeminiChat } from "@/lib/gemini";
 import { streamAnthropicChat } from "@/lib/anthropic";
 import { isValidAiModel, isAiModelAllowedFor, DEFAULT_AI_MODEL, getAiModel } from "@/lib/aiModels";
@@ -11,6 +12,7 @@ import { APP_GUIDE_TITLE, APP_GUIDE_TEXT } from "@/lib/appGuide";
 import { ROLE_LABELS } from "@/lib/roles";
 
 const MAX_RECORDS_IN_CONTEXT = 500;
+const MAX_AUDIT_IN_CONTEXT = 300;
 const MAX_HISTORY_MESSAGES = 20;
 
 // Presupuesto por área y año (ver lib/presupuestos.js — modo "area": un total;
@@ -63,7 +65,21 @@ function buildPresupuestoResumen(records, presupuestos) {
   };
 }
 
-function buildSystemInstruction(records, currentUser, presupuestos, canSeePresupuesto) {
+// Resumen compacto de auditoría para el agente: quién hizo qué, cuándo, sobre
+// qué entidad y qué cambió — restringido por "viewAuditoria" de la Matriz de
+// permisos (por defecto, solo admin), igual que el presupuesto.
+function buildAuditoriaResumen(logs) {
+  return logs.map((l) => ({
+    fecha: l.createdAt,
+    accion: l.action,
+    entidad: l.entityType,
+    detalle: l.recordInfo,
+    usuario: l.userNombre || l.userEmail || "(usuario eliminado)",
+    cambios: l.changes,
+  }));
+}
+
+function buildSystemInstruction(records, currentUser, presupuestos, canSeePresupuesto, auditLogs, canSeeAuditoria) {
   const capped = records.slice(0, MAX_RECORDS_IN_CONTEXT);
   const dataset = capped.map((r) => ({
     fechaSolicitud: r.fechaSolicitud,
@@ -83,23 +99,33 @@ function buildSystemInstruction(records, currentUser, presupuestos, canSeePresup
     radicado: r.radicado,
   }));
 
-  // El tema de presupuesto queda restringido por la funcionalidad
-  // "viewPresupuesto" de la Matriz de permisos (por defecto, solo admin): a
-  // quien no la tenga no se le entrega esta fuente ni se le menciona como
-  // disponible.
+  // El tema de presupuesto y el de auditoría quedan restringidos por sus
+  // funcionalidades correspondientes en la Matriz de permisos (por defecto,
+  // solo admin): a quien no las tenga no se le entregan esas fuentes ni se
+  // le mencionan como disponibles.
   const presupuesto = canSeePresupuesto ? buildPresupuestoResumen(records, presupuestos) : null;
+  const auditoriaCapped = canSeeAuditoria ? auditLogs.slice(0, MAX_AUDIT_IN_CONTEXT) : [];
+  const auditoria = canSeeAuditoria ? buildAuditoriaResumen(auditoriaCapped) : null;
 
-  const fuentes = canSeePresupuesto
-    ? `Tienes acceso a CUATRO fuentes de información, todas entregadas abajo:
-A) Los datos transaccionales de compras (registros de solicitudes).
-B) El texto de referencia de "${PROCUREMENT_POLICY_TITLE}" — el procedimiento oficial de compras de la compañía (roles y responsabilidades, plazos, umbrales de cuadro comparativo, debida diligencia, aprobaciones por monto, flujo de actividades, etc.).
-C) La "${APP_GUIDE_TITLE}" — cómo funciona esta aplicación (secciones, qué hace cada una, y qué puede hacer cada rol dentro de ella). Úsala cuando te pregunten cómo usar la app, qué hay en cada sección, o qué puede o no puede hacer un usuario según su rol.
-D) El presupuesto configurado por área y año (por área o desglosado por categoría, según cómo se haya configurado) y cuánto lleva gastado cada una — solo disponible para admin. Úsala para responder preguntas como "¿qué presupuesto tiene asignado el área X en [año]?", "¿cuánto lleva gastado?", "¿cuánto presupuesto queda disponible?". Si un área/año no aparece en (D), es porque no tiene presupuesto configurado — dilo así, no asumas que es cero.`
-    : `Tienes acceso a TRES fuentes de información, todas entregadas abajo:
-A) Los datos transaccionales de compras (registros de solicitudes).
-B) El texto de referencia de "${PROCUREMENT_POLICY_TITLE}" — el procedimiento oficial de compras de la compañía (roles y responsabilidades, plazos, umbrales de cuadro comparativo, debida diligencia, aprobaciones por monto, flujo de actividades, etc.).
-C) La "${APP_GUIDE_TITLE}" — cómo funciona esta aplicación (secciones, qué hace cada una, y qué puede hacer cada rol dentro de ella). Úsala cuando te pregunten cómo usar la app, qué hay en cada sección, o qué puede o no puede hacer un usuario según su rol.
-El tema de presupuesto por área es exclusivo del rol admin: si te preguntan por presupuestos, aclara que esa información no está disponible para su rol.`;
+  const sourceList = [
+    "Los datos transaccionales de compras (registros de solicitudes).",
+    `El texto de referencia de "${PROCUREMENT_POLICY_TITLE}" — el procedimiento oficial de compras de la compañía (roles y responsabilidades, plazos, umbrales de cuadro comparativo, debida diligencia, aprobaciones por monto, flujo de actividades, etc.).`,
+    `La "${APP_GUIDE_TITLE}" — cómo funciona esta aplicación (secciones, qué hace cada una, y qué puede hacer cada rol dentro de ella). Úsala cuando te pregunten cómo usar la app, qué hay en cada sección, o qué puede o no puede hacer un usuario según su rol.`,
+  ];
+  if (canSeePresupuesto) {
+    sourceList.push(`El presupuesto configurado por área y año (por área o desglosado por categoría, según cómo se haya configurado) y cuánto lleva gastado cada una — solo disponible para quien tenga este permiso. Úsala para responder preguntas como "¿qué presupuesto tiene asignado el área X en [año]?", "¿cuánto lleva gastado?", "¿cuánto presupuesto queda disponible?". Si un área/año no aparece aquí, es porque no tiene presupuesto configurado — dilo así, no asumas que es cero.`);
+  }
+  if (canSeeAuditoria) {
+    sourceList.push(`El registro de auditoría (quién hizo qué, cuándo, sobre qué — registros de compra, maestros, usuarios, presupuestos o permisos — y qué campos cambiaron) — solo disponible para quien tenga este permiso. Úsala para responder preguntas como "¿quién eliminó tal registro?", "¿qué cambió Fulano esta semana?", "¿cuándo se le dio este permiso a tal rol?". Son los últimos ${auditoriaCapped.length} movimientos${auditLogs.length > auditoriaCapped.length ? " (truncado por tamaño)" : ""}; si preguntan por algo más antiguo, dilo explícitamente en vez de asumir que no pasó.`);
+  }
+  const restricciones = [];
+  if (!canSeePresupuesto) restricciones.push("presupuesto");
+  if (!canSeeAuditoria) restricciones.push("auditoría");
+
+  const letras = "ABCDEFGH";
+  const fuentesTexto = sourceList.map((s, i) => `${letras[i]}) ${s}`).join("\n");
+  const fuentes = `Tienes acceso a ${sourceList.length === 3 ? "TRES" : sourceList.length === 4 ? "CUATRO" : "CINCO"} fuentes de información, todas entregadas abajo:
+${fuentesTexto}${restricciones.length ? `\nEl tema de ${restricciones.join(" y de ")} es exclusivo de quien tenga ese permiso: si te preguntan por eso, aclara que esa información no está disponible para su rol.` : ""}`;
 
   return `Eres el "Agente IA" del Panel de Compras de Sinco.
 
@@ -126,6 +152,9 @@ ${JSON.stringify(dataset)}
 ${presupuesto ? `
 PRESUPUESTO POR ÁREA Y AÑO (JSON):
 ${JSON.stringify(presupuesto)}
+` : ""}${auditoria ? `
+REGISTRO DE AUDITORÍA (JSON):
+${JSON.stringify(auditoria)}
 ` : ""}
 TEXTO DE REFERENCIA — ${PROCUREMENT_POLICY_TITLE}:
 ${PROCUREMENT_POLICY_TEXT}
@@ -149,6 +178,7 @@ export async function POST(request) {
 
   const canUsePaid = await isRoleAllowed(user.role, "useAiPaidModels");
   const canSeePresupuesto = await isRoleAllowed(user.role, "viewPresupuesto");
+  const canSeeAuditoria = await isRoleAllowed(user.role, "viewAuditoria");
 
   const body = await request.json().catch(() => ({}));
   const requestedModel = isValidAiModel(body.model) ? body.model : DEFAULT_AI_MODEL;
@@ -173,13 +203,17 @@ export async function POST(request) {
 
   let records;
   let presupuestos = [];
+  let auditLogs = [];
   try {
     let presupuestosResult;
-    [records, presupuestosResult] = await Promise.all([
+    let auditResult;
+    [records, presupuestosResult, auditResult] = await Promise.all([
       listRecords(),
       canSeePresupuesto ? listPresupuestos() : Promise.resolve({ presupuestos: [] }),
+      canSeeAuditoria ? listAuditLogs({ pageSize: MAX_AUDIT_IN_CONTEXT }) : Promise.resolve({ logs: [] }),
     ]);
     presupuestos = presupuestosResult.presupuestos;
+    auditLogs = auditResult.logs;
   } catch {
     return jsonError("No se pudieron leer los datos de compras.", 500);
   }
@@ -197,7 +231,7 @@ export async function POST(request) {
       try {
         for await (const chunk of streamChat({
           model,
-          systemInstruction: buildSystemInstruction(records, user, presupuestos, canSeePresupuesto),
+          systemInstruction: buildSystemInstruction(records, user, presupuestos, canSeePresupuesto, auditLogs, canSeeAuditoria),
           contents,
         })) {
           fullText += chunk;

@@ -10,7 +10,9 @@ import GaugeSvg from "@/components/charts/GaugeSvg";
 import { fmtCOP, fmtCompact, fmtNum, fmtPesos, fmtDateDisplay, monthKey, monthLabel } from "@/lib/format";
 import { businessDaysBetween, businessDaysElapsedToToday } from "@/lib/businessDays";
 import { getDiasInfo } from "@/lib/diasInfo";
-import { IconFile, IconMoney, IconClock, IconAlert, IconTrendUp } from "@/components/icons";
+import { explainKpiApi } from "@/lib/api";
+import { renderMarkdown } from "@/lib/markdown";
+import { IconFile, IconMoney, IconClock, IconAlert, IconTrendUp, IconSpark } from "@/components/icons";
 
 const ESTADO_ORDER = ["Ejecutado", "Proceso", "Pendiente", "Anulado", "Sin estado"];
 const SERIES_COLOR_VARS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--sOther"];
@@ -27,8 +29,82 @@ function sum(arr, fn) {
   return arr.reduce((s, x) => s + (fn(x) || 0), 0);
 }
 
+// Versión compacta de un registro, para mandarle solo lo necesario al backend
+// cuando se pide "Explícame este número" (ver KpiExplain más abajo).
+function compactRecord(r, extra) {
+  return {
+    fecha: r.fechaSolicitud, entrega: r.fechaEntrega || null, area: r.area || "Sin área",
+    categoria: r.categoria || null, proveedor: r.proveedor || null, descripcion: r.descripcion || null,
+    estado: r.estado || null, valor: r.valorConIva ?? null, ...extra,
+  };
+}
+
 function isAnulado(r) {
   return r.estado === "Anulado";
+}
+
+// Botón "Explícame este número": pide al Agente IA (modelo gratis de Gemini,
+// sin streaming) una explicación puntual del KPI a partir de los registros
+// que lo componen, y la muestra en un modal con el mismo renderizado
+// Markdown del chat — se calcula una sola vez y se cachea mientras el
+// componente esté montado con las mismas props.
+function KpiExplain({ label, value, comparisonLabel, comparisonValue, records }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [text, setText] = useState("");
+  const [error, setError] = useState("");
+
+  async function handleClick() {
+    setOpen(true);
+    if (text || loading) return;
+    setLoading(true);
+    setError("");
+    try {
+      const { explanation } = await explainKpiApi({ label, value, comparisonLabel, comparisonValue, records });
+      setText(explanation);
+    } catch (err) {
+      setError(err.message || "No se pudo generar la explicación.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="kpi-explain">
+      <button type="button" className="kpi-explain-btn" onClick={handleClick}>
+        <IconSpark size={11} /> Explicar
+      </button>
+      {open && (
+        <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
+          <div className="modal kpi-explain-modal">
+            <div className="modal-head">
+              <div className="kpi-explain-modal-title">
+                <span className="kpi-explain-modal-ic"><IconSpark size={16} /></span>
+                <div>
+                  <h3>{label}</h3>
+                  <p className="card-sub" style={{ margin: 0 }}>
+                    {value}
+                    {comparisonLabel && comparisonValue != null ? ` · ${comparisonLabel}: ${comparisonValue}` : ""}
+                  </p>
+                </div>
+              </div>
+              <button type="button" className="btn-ghost icon-btn" onClick={() => setOpen(false)} aria-label="Cerrar">✕</button>
+            </div>
+            <div className="modal-body">
+              {loading && (
+                <div className="kpi-explain-loading"><span className="spinner" /> Analizando los registros…</div>
+              )}
+              {!loading && error && <div className="modal-error"><IconAlert size={13} /> {error}</div>}
+              {!loading && !error && <div className="chat-markdown">{renderMarkdown(text)}</div>}
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn" onClick={() => setOpen(false)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function estadoLabel(estado) {
@@ -138,7 +214,15 @@ export default function DashboardView({ records, presupuestos = [] }) {
       foot = `${monthLabel(currentMonth, multiYear)} en curso: ${fmtPesos(valueFor(currentMonth))}`;
     }
 
-    return { label, value, delta, foot };
+    const recordsFor = (mk, periodo) => yearFilteredRecords
+      .filter((r) => !isAnulado(r) && monthKey(r.fechaSolicitud) === mk)
+      .map((r) => compactRecord(r, { periodo }));
+    const explainRecords = [
+      ...(baseMonth ? recordsFor(baseMonth, "actual") : []),
+      ...(prevMonth ? recordsFor(prevMonth, "anterior") : []),
+    ];
+
+    return { label, value, delta, foot, prevValue, prevLabel: prevMonth ? monthLabel(prevMonth, multiYear) : null, explainRecords };
   }, [yearFilteredRecords, allMonthsAsc, selectedMonth, multiYear]);
 
   // ---------- KPI 2: cumplimiento de tiempos ----------
@@ -161,18 +245,25 @@ export default function DashboardView({ records, presupuestos = [] }) {
     });
     const total = conEntrega.length + pendientesVencidos.length;
     const pct = total ? (cumplieron.length / total) * 100 : 0;
-    return { pct, total, cumplieron: cumplieron.length };
+    const explainRecords = [
+      ...conEntrega.map((r) => {
+        const d = businessDaysBetween(r.fechaSolicitud, r.fechaEntrega);
+        return compactRecord(r, { diasHabiles: d, cumplio: d !== null && d <= 8 });
+      }),
+      ...pendientesVencidos.map((r) => compactRecord(r, { diasHabiles: businessDaysElapsedToToday(r.fechaSolicitud), cumplio: false, sinEntregar: true })),
+    ];
+    return { pct, total, cumplieron: cumplieron.length, explainRecords };
   }, [activeRecords]);
 
   const kpi3 = useMemo(() => {
     const proceso = activeRecords.filter((r) => r.estado === "Proceso");
-    return { count: proceso.length, value: sum(proceso, (r) => r.valorConIva) };
+    return { count: proceso.length, value: sum(proceso, (r) => r.valorConIva), explainRecords: proceso.map((r) => compactRecord(r)) };
   }, [activeRecords]);
 
   const kpi4 = useMemo(() => {
     const conValor = activeRecords.filter((r) => r.valorConIva != null);
     const avg = conValor.length ? sum(conValor, (r) => r.valorConIva) / conValor.length : null;
-    return { avg };
+    return { avg, explainRecords: conValor.map((r) => compactRecord(r)) };
   }, [activeRecords]);
 
   // ---------- Solicitudes pendientes ----------
@@ -750,6 +841,11 @@ export default function DashboardView({ records, presupuestos = [] }) {
             </div>
           )}
           {kpi1.foot && <div className="foot">{kpi1.foot}</div>}
+          <KpiExplain
+            label={kpi1.label} value={fmtPesos(kpi1.value)}
+            comparisonLabel={kpi1.prevLabel} comparisonValue={kpi1.prevValue != null ? fmtPesos(kpi1.prevValue) : null}
+            records={kpi1.explainRecords}
+          />
         </div>
         <div className="kpi" style={{ "--kpi-c": cumplimiento.pct >= 80 ? "var(--good)" : cumplimiento.pct >= 50 ? "var(--warning)" : "var(--critical)" }}>
           <div className="kpi-head">
@@ -761,6 +857,10 @@ export default function DashboardView({ records, presupuestos = [] }) {
             <div className="meter-fill" style={{ width: `${cumplimiento.pct}%` }} />
           </div>
           <div className="foot">{cumplimiento.cumplieron} de {cumplimiento.total} en 8 días hábiles</div>
+          <KpiExplain
+            label="Cumplimiento de tiempos" value={cumplimiento.total ? `${cumplimiento.pct.toFixed(0)}%` : "—"}
+            records={cumplimiento.explainRecords}
+          />
         </div>
         <div className="kpi" style={{ "--kpi-c": "var(--warning)" }}>
           <div className="kpi-head">
@@ -769,6 +869,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
           </div>
           <div className="value">{fmtNum(kpi3.count)}</div>
           <div className="foot">{fmtPesos(kpi3.value)}</div>
+          <KpiExplain label="En proceso" value={`${fmtNum(kpi3.count)} (${fmtPesos(kpi3.value)})`} records={kpi3.explainRecords} />
         </div>
         <div className="kpi" style={{ "--kpi-c": "var(--secondary)" }}>
           <div className="kpi-head">
@@ -776,6 +877,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
             <div className="kpi-ic"><IconTrendUp size={14} /></div>
           </div>
           <div className="value">{fmtPesos(kpi4.avg)}</div>
+          <KpiExplain label="Ticket promedio" value={fmtPesos(kpi4.avg)} records={kpi4.explainRecords} />
         </div>
       </div>
 

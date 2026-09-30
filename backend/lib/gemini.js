@@ -93,3 +93,47 @@ export async function* streamGeminiChat({ model, systemInstruction, contents }) 
     }
   }
 }
+
+// Llamada NO streaming, para tareas de "traducir a datos estructurados" (no
+// conversación) — usa responseMimeType/responseSchema para forzar que Gemini
+// devuelva JSON válido según el esquema, en vez de tener que parsear texto
+// libre a la fuerza.
+export async function generateGeminiJson({ model, systemInstruction, prompt, schema }) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY no está configurada en el servidor.");
+  }
+
+  const url = `${GEMINI_API_BASE}/models/${encodeURIComponent(model)}:generateContent`;
+  const res = await fetchWithRetry(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: "application/json",
+        ...(schema ? { responseSchema: schema } : {}),
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    let detail = "";
+    try {
+      detail = (await res.text()).slice(0, 400);
+    } catch {
+      // ignore
+    }
+    throw new Error(`Gemini API respondió ${res.status}. ${detail}`);
+  }
+
+  const data = await res.json();
+  const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error("Gemini no devolvió un JSON válido.");
+  }
+}

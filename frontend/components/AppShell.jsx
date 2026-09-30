@@ -2,7 +2,7 @@
 
 import Sidebar from "@/components/Sidebar";
 
-export default function AppShell({ user, title, subtitle, children }) {
+export default function AppShell({ user, title, subtitle, actions, children }) {
   return (
     <div className="app-shell">
       <Sidebar user={user} />
@@ -17,6 +17,12 @@ export default function AppShell({ user, title, subtitle, children }) {
               </>
             )}
           </div>
+          {actions && (
+            <>
+              <div className="spacer" />
+              {actions}
+            </>
+          )}
         </header>
         <main>{children}</main>
       </div>
