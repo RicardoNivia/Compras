@@ -9,11 +9,11 @@ export const dynamic = "force-dynamic";
 export default async function AgenteIAPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  if (!canViewAgenteIA(user.role)) redirect("/registros");
+  if (!(user.permissions?.viewAgenteIA ?? canViewAgenteIA(user.role))) redirect("/registros");
 
   return (
     <AppShell user={user} title="Agente IA" subtitle="Consultas sobre compras">
-      <AgenteChat userName={user.nombre} role={user.role} />
+      <AgenteChat userName={user.nombre} role={user.role} permissions={user.permissions} />
     </AppShell>
   );
 }

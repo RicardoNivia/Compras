@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { updateRecord, patchRecord, deleteRecord } from "@/lib/records";
 import { getSessionUser } from "@/lib/auth-server";
-import { canEditRecord, canDeleteRecord, canToggleRadicado, getEditableFields, getPatchableFields } from "@/lib/roles";
+import { getEditableFields, getPatchableFields } from "@/lib/roles";
+import { isRoleAllowed } from "@/lib/permissions";
 
 export async function PUT(request, { params }) {
   const user = await getSessionUser();
-  if (!user || !canEditRecord(user.role)) {
+  if (!user || !(await isRoleAllowed(user.role, "editRecord"))) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   try {
@@ -20,7 +21,7 @@ export async function PUT(request, { params }) {
 // Actualización parcial (usada para el toggle de "radicado").
 export async function PATCH(request, { params }) {
   const user = await getSessionUser();
-  if (!user || !canToggleRadicado(user.role)) {
+  if (!user || !(await isRoleAllowed(user.role, "toggleRadicado"))) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   try {
@@ -34,7 +35,7 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(_request, { params }) {
   const user = await getSessionUser();
-  if (!user || !canDeleteRecord(user.role)) {
+  if (!user || !(await isRoleAllowed(user.role, "deleteRecord"))) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   try {

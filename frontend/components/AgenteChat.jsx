@@ -38,8 +38,8 @@ function formatConvDate(iso) {
   }
 }
 
-export default function AgenteChat({ userName, role }) {
-  const canPaid = canUsePaidModels(role);
+export default function AgenteChat({ userName, role, permissions }) {
+  const canPaid = permissions?.useAiPaidModels ?? canUsePaidModels(role);
   const [model, setModel] = useState(DEFAULT_AI_MODEL);
   const [messages, setMessages] = useState([]); // { role: "user" | "model", text }
   const [input, setInput] = useState("");

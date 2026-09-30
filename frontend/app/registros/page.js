@@ -11,10 +11,11 @@ export default async function RegistrosPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
+  const seePresupuesto = user.permissions?.viewPresupuesto ?? canViewPresupuesto(user.role);
   const [recordsRes, maestrosRes, presupuestosRes] = await Promise.all([
     backendFetch("/api/records"),
     backendFetch("/api/maestros?onlyActive=1"),
-    canViewPresupuesto(user.role) ? backendFetch("/api/presupuestos") : Promise.resolve(null),
+    seePresupuesto ? backendFetch("/api/presupuestos") : Promise.resolve(null),
   ]);
   const { records } = await recordsRes.json();
   const { maestros } = await maestrosRes.json();

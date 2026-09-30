@@ -41,7 +41,7 @@ model Record {
 model AuditLog {
   id         String   @id @default(cuid())
   action     String   // "crear" | "editar" | "eliminar" | "radicar"
-  entityType String   @default("record") // "record" | "maestro" | "user" | "presupuesto"
+  entityType String   @default("record") // "record" | "maestro" | "user" | "presupuesto" | "permiso"
   recordId   String   // id de la entidad afectada (registro, maestro o usuario)
   recordInfo String?
   userId     String?
@@ -160,4 +160,21 @@ model PresupuestoCategoria {
 
   @@unique([presupuestoId, categoria])
   @@map("presupuesto_categorias")
+}
+
+// Excepciones configurables por el admin a los permisos por defecto de
+// lib/roles.js (ver lib/permissions.js#FEATURES para el catálogo de
+// funcionalidades y sus roles por defecto). La AUSENCIA de una fila para
+// (role, feature) significa "usar el valor por defecto de esa funcionalidad"
+// — así un error de datos o una fila faltante nunca deja a un rol sin acceso
+// de forma inesperada, solo hace que se use el comportamiento original.
+model RolePermission {
+  id        String   @id @default(cuid())
+  role      String
+  feature   String
+  allowed   Boolean
+  updatedAt DateTime @updatedAt
+
+  @@unique([role, feature])
+  @@map("role_permissions")
 }

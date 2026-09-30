@@ -1,5 +1,5 @@
 import { getSessionUser } from "@/lib/auth-server";
-import { canViewAgenteIA, canUsePaidModels, canViewPresupuesto } from "@/lib/roles";
+import { isRoleAllowed } from "@/lib/permissions";
 import { listRecords } from "@/lib/records";
 import { listPresupuestos } from "@/lib/presupuestos";
 import { streamGeminiChat } from "@/lib/gemini";
@@ -17,8 +17,8 @@ const MAX_HISTORY_MESSAGES = 20;
 // modo "categoria": desglosado por categoría, el total del área es la suma) +
 // lo gastado hasta ahora en cada uno, para que el agente pueda responder
 // preguntas de presupuesto. Solo se cuentan registros no anulados, igual que
-// en el dashboard. Es información exclusiva del rol admin (ver
-// canViewPresupuesto) — si el usuario actual no es admin, no se le entrega.
+// en el dashboard. Restringido por la funcionalidad "viewPresupuesto" de la
+// Matriz de permisos (por defecto, solo admin) — ver lib/permissions.js.
 function buildPresupuestoResumen(records, presupuestos) {
   // Un solo recorrido de todos los registros — no un ciclo por cada área ni
   // por cada categoría — acumulando en mapas por "area||anio" y
@@ -63,7 +63,7 @@ function buildPresupuestoResumen(records, presupuestos) {
   };
 }
 
-function buildSystemInstruction(records, currentUser, presupuestos) {
+function buildSystemInstruction(records, currentUser, presupuestos, canSeePresupuesto) {
   const capped = records.slice(0, MAX_RECORDS_IN_CONTEXT);
   const dataset = capped.map((r) => ({
     fechaSolicitud: r.fechaSolicitud,
@@ -83,12 +83,13 @@ function buildSystemInstruction(records, currentUser, presupuestos) {
     radicado: r.radicado,
   }));
 
-  // El tema de presupuesto es exclusivo de admin: a cualquier otro rol no se
-  // le entrega esta fuente ni se le menciona como disponible.
-  const isAdmin = currentUser.role === "admin";
-  const presupuesto = isAdmin ? buildPresupuestoResumen(records, presupuestos) : null;
+  // El tema de presupuesto queda restringido por la funcionalidad
+  // "viewPresupuesto" de la Matriz de permisos (por defecto, solo admin): a
+  // quien no la tenga no se le entrega esta fuente ni se le menciona como
+  // disponible.
+  const presupuesto = canSeePresupuesto ? buildPresupuestoResumen(records, presupuestos) : null;
 
-  const fuentes = isAdmin
+  const fuentes = canSeePresupuesto
     ? `Tienes acceso a CUATRO fuentes de información, todas entregadas abajo:
 A) Los datos transaccionales de compras (registros de solicitudes).
 B) El texto de referencia de "${PROCUREMENT_POLICY_TITLE}" — el procedimiento oficial de compras de la compañía (roles y responsabilidades, plazos, umbrales de cuadro comparativo, debida diligencia, aprobaciones por monto, flujo de actividades, etc.).
@@ -142,13 +143,16 @@ function jsonError(message, status) {
 
 export async function POST(request) {
   const user = await getSessionUser();
-  if (!user || !canViewAgenteIA(user.role)) {
+  if (!user || !(await isRoleAllowed(user.role, "viewAgenteIA"))) {
     return jsonError("No autorizado.", 403);
   }
 
+  const canUsePaid = await isRoleAllowed(user.role, "useAiPaidModels");
+  const canSeePresupuesto = await isRoleAllowed(user.role, "viewPresupuesto");
+
   const body = await request.json().catch(() => ({}));
   const requestedModel = isValidAiModel(body.model) ? body.model : DEFAULT_AI_MODEL;
-  const model = isAiModelAllowedFor(requestedModel, canUsePaidModels(user.role)) ? requestedModel : DEFAULT_AI_MODEL;
+  const model = isAiModelAllowedFor(requestedModel, canUsePaid) ? requestedModel : DEFAULT_AI_MODEL;
   const provider = getAiModel(model)?.provider || "gemini";
   const message = (body.message || "").toString().trim();
   if (!message) return jsonError("El mensaje no puede estar vacío.", 400);
@@ -173,7 +177,7 @@ export async function POST(request) {
     let presupuestosResult;
     [records, presupuestosResult] = await Promise.all([
       listRecords(),
-      canViewPresupuesto(user.role) ? listPresupuestos() : Promise.resolve({ presupuestos: [] }),
+      canSeePresupuesto ? listPresupuestos() : Promise.resolve({ presupuestos: [] }),
     ]);
     presupuestos = presupuestosResult.presupuestos;
   } catch {
@@ -193,7 +197,7 @@ export async function POST(request) {
       try {
         for await (const chunk of streamChat({
           model,
-          systemInstruction: buildSystemInstruction(records, user, presupuestos),
+          systemInstruction: buildSystemInstruction(records, user, presupuestos, canSeePresupuesto),
           contents,
         })) {
           fullText += chunk;

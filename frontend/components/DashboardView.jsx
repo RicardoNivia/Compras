@@ -4,7 +4,6 @@ import { useMemo, useRef, useState } from "react";
 import DetailModal from "@/components/DetailModal";
 import BarChartSvg from "@/components/charts/BarChartSvg";
 import StackedBarChartSvg from "@/components/charts/StackedBarChartSvg";
-import HistogramSvg from "@/components/charts/HistogramSvg";
 import CompliancePercentChartSvg from "@/components/charts/CompliancePercentChartSvg";
 import PieChartSvg from "@/components/charts/PieChartSvg";
 import GaugeSvg from "@/components/charts/GaugeSvg";
@@ -15,6 +14,14 @@ import { IconFile, IconMoney, IconClock, IconAlert, IconTrendUp } from "@/compon
 
 const ESTADO_ORDER = ["Ejecutado", "Proceso", "Pendiente", "Anulado", "Sin estado"];
 const SERIES_COLOR_VARS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--sOther"];
+const ESTADO_COLOR_VARS = {
+  Ejecutado: "--good",
+  Proceso: "--warning",
+  Pendiente: "--secondary",
+  Anulado: "--critical",
+  "Sin estado": "--muted",
+};
+const OFFENDERS_PAGE_SIZE = 8;
 
 function sum(arr, fn) {
   return arr.reduce((s, x) => s + (fn(x) || 0), 0);
@@ -261,7 +268,12 @@ export default function DashboardView({ records, presupuestos = [] }) {
       return ia - ib;
     });
     const maxCount = Math.max(1, ...Array.from(map.values()).map((v) => v.count));
-    return keys.map((k) => ({ name: k, ...map.get(k), pct: (map.get(k).count / maxCount) * 100 }));
+    const totalCount = filteredRecords.length || 1;
+    return keys.map((k) => ({
+      name: k, ...map.get(k),
+      pct: (map.get(k).count / maxCount) * 100,
+      pctTotal: (map.get(k).count / totalCount) * 100,
+    }));
   }, [filteredRecords]);
 
   // ---------- Tiempos de solicitud a entrega ----------
@@ -293,8 +305,25 @@ export default function DashboardView({ records, presupuestos = [] }) {
     }
     offenders.sort((a, b) => b.over - a.over);
 
-    return { pendientesRiesgo, buckets, maxDias, offenders: offenders.slice(0, 6) };
+    const totalConDias = buckets.reduce((s, b) => s + b.count, 0) || 1;
+    const maxCount = Math.max(1, ...buckets.map((b) => b.count));
+    const enrichedBuckets = buckets.map((b, i) => ({
+      ...b,
+      pct: (b.count / maxCount) * 100,
+      pctTotal: (b.count / totalConDias) * 100,
+      withinSla: b.max <= 8,
+    }));
+
+    return { pendientesRiesgo, buckets: enrichedBuckets, maxDias, offenders };
   }, [filteredRecords, activeRecords]);
+
+  const [offendersPage, setOffendersPage] = useState(1);
+  const offendersTotalPages = Math.max(1, Math.ceil(tiempos.offenders.length / OFFENDERS_PAGE_SIZE));
+  const offendersCurrentPage = Math.min(offendersPage, offendersTotalPages);
+  const pagedOffenders = useMemo(() => {
+    const start = (offendersCurrentPage - 1) * OFFENDERS_PAGE_SIZE;
+    return tiempos.offenders.slice(start, start + OFFENDERS_PAGE_SIZE);
+  }, [tiempos.offenders, offendersCurrentPage]);
 
   // ---------- Cumplimiento / incumplimiento por mes (> 8 días hábiles), en % ----------
   // Igual que el KPI de cumplimiento: además de las entregadas, incluye las
@@ -966,54 +995,82 @@ export default function DashboardView({ records, presupuestos = [] }) {
         </div>
       </div>
 
-      {/* Estado / tiempos */}
-      <div className="grid-2">
-        <div className="card">
-          <h3>Estado de la compra</h3>
+      {/* Estado de la compra */}
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3>Estado de la compra</h3>
+        <div className="estado-cards-grid">
           {estadoRows.map((r) => (
-            <div className="estado-row" key={r.name}>
-              <div className="name">{r.name}</div>
+            <div className="estado-card" key={r.name}>
+              <div className="estado-card-head">
+                <span className="estado-dot" style={{ background: `var(${ESTADO_COLOR_VARS[r.name] || "--accent"})` }} />
+                <span className="estado-card-name">{r.name}</span>
+              </div>
+              <div className="estado-card-value">{fmtCOP(r.value)}</div>
               <div className="track">
-                <div className="fill" style={{ width: `${r.pct}%`, background: "var(--accent)" }} />
+                <div className="fill" style={{ width: `${r.pct}%`, background: `var(${ESTADO_COLOR_VARS[r.name] || "--accent"})` }} />
+              </div>
+              <div className="estado-card-foot">{r.count} solicitud(es) · {r.pctTotal.toFixed(1)}% del total</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tiempos de solicitud a entrega */}
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3>Tiempos de solicitud a entrega</h3>
+        <div className="kpi-row" style={{ gridTemplateColumns: "1fr 1fr", marginBottom: 14 }}>
+          <div className="kpi">
+            <div className="label">Cumplimiento</div>
+            <div className="value">{cumplimiento.total ? `${cumplimiento.pct.toFixed(0)}%` : "—"}</div>
+          </div>
+          <div className="kpi">
+            <div className="label">Pendientes en riesgo</div>
+            <div className="value">{tiempos.pendientesRiesgo}</div>
+          </div>
+        </div>
+        <div className="dist-bars">
+          {tiempos.buckets.map((b) => (
+            <div className="estado-row" key={b.label}>
+              <div className="name">{b.label} días</div>
+              <div className="track">
+                <div className="fill" style={{ width: `${b.pct}%`, background: b.withinSla ? "var(--good)" : "var(--critical)" }} />
               </div>
               <div className="figs">
-                <span className="n">{fmtCOP(r.value)}</span>
-                <span className="c">{r.count} solicitud(es)</span>
+                <span className="n">{b.count}</span>
+                <span className="c">{b.pctTotal.toFixed(1)}%</span>
               </div>
             </div>
           ))}
         </div>
-        <div className="card">
-          <h3>Tiempos de solicitud a entrega</h3>
-          <div className="kpi-row" style={{ gridTemplateColumns: "1fr 1fr", marginBottom: 14 }}>
-            <div className="kpi">
-              <div className="label">Cumplimiento</div>
-              <div className="value">{cumplimiento.total ? `${cumplimiento.pct.toFixed(0)}%` : "—"}</div>
-            </div>
-            <div className="kpi">
-              <div className="label">Pendientes en riesgo</div>
-              <div className="value">{tiempos.pendientesRiesgo}</div>
-            </div>
-          </div>
-          <HistogramSvg buckets={tiempos.buckets} maxDiasBucket={tiempos.maxDias} />
-          {tiempos.offenders.length > 0 && (
-            <div className="offenders">
+        {tiempos.offenders.length > 0 && (
+          <div className="offenders" style={{ marginTop: 14 }}>
+            <div style={{ overflowX: "auto" }}>
               <table>
-                <thead><tr><th>Descripción</th><th>Área</th><th>Días</th><th>Estado</th></tr></thead>
+                <thead><tr><th>Descripción</th><th>Área</th><th>Días</th><th>Estado</th><th>Observación</th></tr></thead>
                 <tbody>
-                  {tiempos.offenders.map((o) => (
+                  {pagedOffenders.map((o) => (
                     <tr key={o.record.id}>
                       <td>{o.record.descripcion || "—"}</td>
                       <td>{o.record.area || "—"}</td>
                       <td><span className="pill critical">{o.dias} d.</span></td>
                       <td>{o.record.estado || "—"}</td>
+                      <td>{o.record.observaciones || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
+              <div className="page-btns">
+                <button type="button" className="btn small" disabled={offendersCurrentPage <= 1} onClick={() => setOffendersPage((p) => p - 1)}>Anterior</button>
+                <button type="button" className="btn small" disabled={offendersCurrentPage >= offendersTotalPages} onClick={() => setOffendersPage((p) => p + 1)}>Siguiente</button>
+              </div>
+              <span className="count-note">Página {offendersCurrentPage} de {offendersTotalPages}</span>
+              <div className="spacer" />
+              <span className="count-note">{tiempos.offenders.length} solicitud(es) con más de 8 días hábiles</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Cumplimiento / incumplimiento por mes (solo vista Anual: en Mensual es un solo mes, no aporta). */}

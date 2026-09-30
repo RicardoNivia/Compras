@@ -180,6 +180,15 @@ button{ font-family: inherit; }
 @keyframes spin{ to{ transform:rotate(360deg); } }
 .btn:disabled, .btn-check:disabled, .btn-ghost:disabled{ opacity:.55; cursor:not-allowed; }
 
+.toast{
+  position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:200;
+  display:flex; align-items:center; gap:8px; padding:10px 16px; border-radius:12px;
+  font-size:13px; font-weight:600; box-shadow:0 12px 28px -10px rgba(0,0,0,0.35);
+  animation: toastIn .2s ease;
+}
+.toast-good{ background: var(--good); color:#fff; }
+@keyframes toastIn{ from{ opacity:0; transform:translate(-50%, 8px); } to{ opacity:1; transform:translate(-50%, 0); } }
+
 .view-head{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
 
 /* ---------- Topbar ---------- */
@@ -313,6 +322,16 @@ rect.mark:hover{ opacity:0.82; cursor:pointer; }
 .estado-row .figs, .medio-row .figs{ width:172px; flex:none; text-align:right; font-size:12px; line-height:1.4; }
 .estado-row .figs .n{ font-weight:700; display:block; }
 .estado-row .figs .c, .medio-row .figs .c{ color:var(--muted); display:block; font-size:11.5px; }
+
+.estado-cards-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-top:12px; }
+.estado-card{ background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:14px 16px; }
+.estado-card-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.estado-dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+.estado-card-name{ font-size:13px; font-weight:700; color:var(--ink-2); }
+.estado-card-value{ font-family:"Nunito",sans-serif; font-size:20px; font-weight:800; margin-bottom:8px; }
+.estado-card .track{ height:8px; border-radius:999px; background:var(--surface); overflow:hidden; margin-bottom:8px; }
+.estado-card .fill{ height:100%; border-radius:999px; }
+.estado-card-foot{ font-size:12px; color:var(--muted); }
 
 .pill{ display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:600; white-space:nowrap; }
 .pill.good{ background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
@@ -635,6 +654,32 @@ table.plain-table td.num, table.plain-table th.num{ text-align:right; font-famil
 table.plain-table tbody tr.total-row td{ font-weight:700; border-top:2px solid var(--border); border-bottom:none; }
 table.plain-table td.rank{ color:var(--muted); font-weight:700; font-family:"IBM Plex Mono",monospace; }
 td.cat-cell{ white-space:normal; min-width:280px; }
+
+table.perm-matrix{ min-width:640px; }
+table.perm-matrix .perm-role-col{ text-align:center; padding:10px 8px 12px; }
+.perm-role-badge{
+  display:flex; align-items:center; justify-content:center; margin:0 auto 4px;
+  width:26px; height:26px; border-radius:50%; font-size:12px; font-weight:800;
+  background: color-mix(in srgb, var(--rc) 18%, transparent); color: var(--rc);
+}
+table.perm-matrix .perm-section-row td{
+  background: var(--surface-2); color:var(--muted); font-size:11px; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.05em; padding:6px 10px; border-bottom:1px solid var(--border);
+}
+.perm-cell{ text-align:center; position:relative; }
+.perm-toggle{
+  appearance:none; border:1px solid var(--border); background:var(--surface-2); color:var(--muted);
+  width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; margin:0 auto;
+}
+.perm-toggle:hover{ border-color:var(--accent); }
+.perm-toggle:disabled{ cursor:wait; }
+.perm-toggle.on{ background: color-mix(in srgb, var(--good) 18%, transparent); border-color:var(--good); color:var(--good); }
+.perm-dash{ font-size:13px; }
+.perm-cell-error{
+  position:absolute; top:100%; left:50%; transform:translateX(-50%); z-index:5;
+  background:var(--critical); color:#fff; font-size:11px; padding:3px 8px; border-radius:6px; white-space:nowrap;
+}
 .cat-line{ font-size:12.5px; line-height:1.7; }
 .cat-line .cat-name{ color:var(--ink); }
 .cat-line .cat-figs{ color:var(--ink-2); font-family:"IBM Plex Mono",monospace; }
@@ -815,9 +860,8 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 .maestros-page-btn:hover{ background:var(--surface-2); }
 .maestros-page-btn:disabled{ opacity:.35; cursor:not-allowed; }
 .maestros-page-num{
-  width:28px; height:28px; border-radius:50%; background:var(--accent); color:var(--accent-ink);
-  display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;
-  font-family:"Nunito",sans-serif;
+  padding:0 12px; color:var(--ink); font-size:13px; font-weight:700;
+  font-family:"Nunito",sans-serif; white-space:nowrap;
 }
 
 @media (max-width: 900px){

@@ -126,3 +126,17 @@ export async function setModoAnioApi(anio, modo, confirm = false) {
   });
   return handle(res);
 }
+
+export async function fetchPermissionsMatrix() {
+  const res = await fetch("/api/permissions", { cache: "no-store" });
+  return handle(res);
+}
+
+export async function setPermissionApi(role, feature, allowed) {
+  const res = await fetch("/api/permissions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role, feature, allowed }),
+  });
+  return handle(res);
+}

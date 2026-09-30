@@ -10,14 +10,18 @@ export const dynamic = "force-dynamic";
 export default async function UsuariosPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  if (!canViewUsuarios(user.role)) redirect("/registros");
+  if (!(user.permissions?.viewUsuarios ?? canViewUsuarios(user.role))) redirect("/registros");
 
-  const res = await backendFetch("/api/users");
-  const { users } = await res.json();
+  const [usersRes, permissionsRes] = await Promise.all([
+    backendFetch("/api/users"),
+    backendFetch("/api/permissions"),
+  ]);
+  const { users } = await usersRes.json();
+  const { matrix } = await permissionsRes.json();
 
   return (
     <AppShell user={user} title="Usuarios" subtitle={`${users.length} usuarios`}>
-      <UsuariosView initialUsers={users} />
+      <UsuariosView initialUsers={users} initialPermissionsMatrix={matrix} />
     </AppShell>
   );
 }

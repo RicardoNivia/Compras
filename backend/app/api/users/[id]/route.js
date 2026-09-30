@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { updateUser, deleteUser } from "@/lib/users";
 import { getSessionUser } from "@/lib/auth-server";
+import { isRoleAllowed } from "@/lib/permissions";
 
-// Protegido por middleware.js (solo rol "admin" llega hasta aquí).
+// Restringido por la funcionalidad "viewUsuarios" de la Matriz de permisos
+// (por defecto, solo admin) — ver app/api/users/route.js.
 
 export async function PUT(request, { params }) {
+  const actor = await getSessionUser();
+  if (!actor || !(await isRoleAllowed(actor.role, "viewUsuarios"))) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
+  }
   try {
-    const actor = await getSessionUser();
     const body = await request.json();
     const user = await updateUser(params.id, body, actor);
     return NextResponse.json(user);
@@ -16,8 +21,11 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(_request, { params }) {
+  const actor = await getSessionUser();
+  if (!actor || !(await isRoleAllowed(actor.role, "viewUsuarios"))) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
+  }
   try {
-    const actor = await getSessionUser();
     await deleteUser(params.id, actor);
     return NextResponse.json({ ok: true });
   } catch (err) {

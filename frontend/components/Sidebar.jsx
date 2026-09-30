@@ -7,14 +7,17 @@ import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, c
 import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney } from "@/components/icons";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 
+// "feature" referencia la Matriz de permisos (lib/permissions.js en el
+// backend) — si el usuario trae user.permissions (siempre debería, viene de
+// /api/auth/me), se usa eso; "show" queda como valor por defecto de respaldo.
 const ALL_NAV_ITEMS = [
-  { key: "dashboard", href: "/dashboard", label: "Dashboard de compras", Icon: IconDashboard, show: canViewDashboard },
-  { key: "registros", href: "/registros", label: "Registros", Icon: IconTable, show: () => true },
-  { key: "agente-ia", href: "/agente-ia", label: "Agente IA", Icon: IconSpark, show: canViewAgenteIA },
-  { key: "maestros", href: "/maestros", label: "Maestros", Icon: IconLayers, show: canViewMaestros },
-  { key: "presupuesto", href: "/presupuesto", label: "Presupuesto", Icon: IconMoney, show: canViewPresupuesto },
-  { key: "usuarios", href: "/usuarios", label: "Usuarios", Icon: IconUsers, show: canViewUsuarios },
-  { key: "auditoria", href: "/auditoria", label: "Auditoría", Icon: IconHistory, show: canViewAuditoria },
+  { key: "dashboard", href: "/dashboard", label: "Dashboard de compras", Icon: IconDashboard, feature: "viewDashboard", show: canViewDashboard },
+  { key: "registros", href: "/registros", label: "Registros", Icon: IconTable, feature: null, show: () => true },
+  { key: "agente-ia", href: "/agente-ia", label: "Agente IA", Icon: IconSpark, feature: "viewAgenteIA", show: canViewAgenteIA },
+  { key: "maestros", href: "/maestros", label: "Maestros", Icon: IconLayers, feature: "viewMaestros", show: canViewMaestros },
+  { key: "presupuesto", href: "/presupuesto", label: "Presupuesto", Icon: IconMoney, feature: "viewPresupuesto", show: canViewPresupuesto },
+  { key: "usuarios", href: "/usuarios", label: "Usuarios", Icon: IconUsers, feature: "viewUsuarios", show: canViewUsuarios },
+  { key: "auditoria", href: "/auditoria", label: "Auditoría", Icon: IconHistory, feature: "viewAuditoria", show: canViewAuditoria },
 ];
 
 function initials(name) {
@@ -29,7 +32,7 @@ export default function Sidebar({ user }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const items = ALL_NAV_ITEMS.filter((item) => item.show(user.role));
+  const items = ALL_NAV_ITEMS.filter((item) => (item.feature ? (user.permissions?.[item.feature] ?? item.show(user.role)) : item.show(user.role)));
 
   async function handleLogout() {
     if (loggingOut) return;

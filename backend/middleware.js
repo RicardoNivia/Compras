@@ -17,12 +17,9 @@ export async function middleware(request) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }
 
-  const isAdmin = payload.role === "admin";
-  const adminOnly = ["/api/users", "/api/audit"];
-  if (adminOnly.some((p) => pathname.startsWith(p)) && !isAdmin) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
-
+  // La autorización fina (admin vs. otros roles, y las excepciones de la
+  // Matriz de permisos) se resuelve en cada route handler — el middleware
+  // corre en Edge runtime y no tiene acceso a Prisma/la base de datos.
   return NextResponse.next();
 }
 

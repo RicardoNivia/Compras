@@ -20,14 +20,10 @@ export async function middleware(request) {
     return NextResponse.redirect(url);
   }
 
-  const isAdmin = payload.role === "admin";
-  const adminOnly = ["/usuarios", "/auditoria", "/maestros", "/presupuesto"];
-  if (adminOnly.some((p) => pathname.startsWith(p)) && !isAdmin) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/registros";
-    return NextResponse.redirect(url);
-  }
-
+  // La autorización fina (admin vs. otros roles, y las excepciones de la
+  // Matriz de permisos) se resuelve en cada page.js (server component, con
+  // acceso a la BD vía el backend) — el middleware corre en Edge runtime y
+  // no puede consultarla, así que aquí solo se exige estar autenticado.
   return NextResponse.next();
 }
 

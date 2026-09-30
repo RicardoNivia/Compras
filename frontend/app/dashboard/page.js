@@ -10,11 +10,12 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  if (!canViewDashboard(user.role)) redirect("/registros");
+  if (!(user.permissions?.viewDashboard ?? canViewDashboard(user.role))) redirect("/registros");
+  const seePresupuesto = user.permissions?.viewPresupuesto ?? canViewPresupuesto(user.role);
 
   const [recordsRes, presupuestosRes] = await Promise.all([
     backendFetch("/api/records"),
-    canViewPresupuesto(user.role) ? backendFetch("/api/presupuestos") : Promise.resolve(null),
+    seePresupuesto ? backendFetch("/api/presupuestos") : Promise.resolve(null),
   ]);
   const { records } = await recordsRes.json();
   const presupuestos = presupuestosRes ? (await presupuestosRes.json()).presupuestos : [];
