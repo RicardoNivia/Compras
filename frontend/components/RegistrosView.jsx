@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import RecordModal from "@/components/RecordModal";
-import { fmtPesos } from "@/lib/format";
+import { fmtPesos, fmtCOP } from "@/lib/format";
 import { getDiasInfo } from "@/lib/diasInfo";
-import { patchRecordApi, deleteRecordApi } from "@/lib/api";
+import { patchRecordApi, deleteRecordApi, searchFiltersWithAiApi } from "@/lib/api";
 import { canCreateRecord, canEditRecord, canDeleteRecord, canToggleRadicado, getEditableFields } from "@/lib/roles";
-import { IconPlus, IconEdit, IconTrash, IconCheck, IconAlert } from "@/components/icons";
+import { IconPlus, IconEdit, IconTrash, IconCheck, IconAlert, IconSpark, IconSearch } from "@/components/icons";
 
 const PAGE_SIZES = [25, 50, 100, 250];
 
@@ -78,7 +78,17 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
   const [estadoLegalizacion, setEstadoLegalizacion] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [valorMin, setValorMin] = useState("");
+  const [valorMax, setValorMax] = useState("");
   const [onlyIncumplimiento, setOnlyIncumplimiento] = useState(false);
+
+  // Modo de búsqueda: "manual" (filtros de siempre) o "ia" (lenguaje natural,
+  // traducido a esos mismos filtros — un solo motor de filtrado para ambos).
+  const [searchMode, setSearchMode] = useState("manual");
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiApplied, setAiApplied] = useState(null); // resumen de lo último que aplicó la IA
 
   const [sortKey, setSortKey] = useState("fechaSolicitud");
   const [sortDir, setSortDir] = useState("desc");
@@ -133,10 +143,12 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
       if (estadoLegalizacion && r.estadoLegalizacion !== estadoLegalizacion) return false;
       if (dateFrom && (!r.fechaSolicitud || r.fechaSolicitud < dateFrom)) return false;
       if (dateTo && (!r.fechaSolicitud || r.fechaSolicitud > dateTo)) return false;
+      if (valorMin !== "" && !(r.valorConIva >= Number(valorMin))) return false;
+      if (valorMax !== "" && !(r.valorConIva <= Number(valorMax))) return false;
       if (onlyIncumplimiento && !((getDiasInfo(r).dias ?? 0) > 8)) return false;
       return true;
     });
-  }, [records, search, area, estado, medioPago, licitacion, estadoLegalizacion, dateFrom, dateTo, onlyIncumplimiento]);
+  }, [records, search, area, estado, medioPago, licitacion, estadoLegalizacion, dateFrom, dateTo, valorMin, valorMax, onlyIncumplimiento]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -160,7 +172,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
 
   useEffect(() => {
     setPage(1);
-  }, [search, area, estado, medioPago, licitacion, dateFrom, dateTo, onlyIncumplimiento, pageSize]);
+  }, [search, area, estado, medioPago, licitacion, dateFrom, dateTo, valorMin, valorMax, onlyIncumplimiento, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -187,7 +199,47 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
     setEstadoLegalizacion("");
     setDateFrom("");
     setDateTo("");
+    setValorMin("");
+    setValorMax("");
     setOnlyIncumplimiento(false);
+    setAiApplied(null);
+    setAiError("");
+  }
+
+  // Traduce aiQuery a los mismos filtros de arriba (vía el modelo gratis de
+  // Gemini, del lado del servidor) y los aplica — el filtrado en sí sigue
+  // siendo el mismo useMemo de siempre, no hay un motor de filtrado aparte.
+  async function handleAiSearch() {
+    const q = aiQuery.trim();
+    if (!q || aiLoading) return;
+    setAiLoading(true);
+    setAiError("");
+    try {
+      const { filters } = await searchFiltersWithAiApi(q, {
+        areas: areaOptions,
+        estados: estadoOptions,
+        medios: medioOptions,
+        licitaciones: licitacionOptions,
+        estadosLegalizacion: estadoLegalizacionOptions,
+      });
+      setSearch(filters.search || "");
+      setArea(filters.area || "");
+      setEstado(filters.estado || "");
+      setMedioPago(filters.medioPago || "");
+      setLicitacion(filters.licitacion || "");
+      setEstadoLegalizacion(filters.estadoLegalizacion || "");
+      setDateFrom(filters.dateFrom || "");
+      setDateTo(filters.dateTo || "");
+      setValorMin(filters.valorMin != null ? String(filters.valorMin) : "");
+      setValorMax(filters.valorMax != null ? String(filters.valorMax) : "");
+      setOnlyIncumplimiento(!!filters.onlyIncumplimiento);
+      setAiApplied(filters);
+    } catch (err) {
+      setAiError(err.message || "No se pudo interpretar la búsqueda.");
+      setAiApplied(null);
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   // El radicado es de un solo sentido: una vez marcado no se puede desmarcar
@@ -240,6 +292,53 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
   return (
     <div>
       <div className="toolbar" id="registros-toolbar" style={{ flexDirection: "column", alignItems: "stretch" }}>
+        <div className="dash-tabs" role="tablist" aria-label="Modo de búsqueda" style={{ alignSelf: "flex-start" }}>
+          <button type="button" role="tab" aria-selected={searchMode === "manual"} className="dash-tab" onClick={() => setSearchMode("manual")}>
+            Filtros manuales
+          </button>
+          <button type="button" role="tab" aria-selected={searchMode === "ia"} className="dash-tab" onClick={() => setSearchMode("ia")}>
+            <IconSpark size={13} /> Buscar con IA
+          </button>
+        </div>
+
+        {searchMode === "ia" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div className="field search-field" style={{ flex: 1 }}>
+                <label htmlFor="reg-ai-query">Describe qué buscas</label>
+                <input
+                  id="reg-ai-query" type="text"
+                  placeholder="Ej. compras de infraestructura de más de 5 millones en julio…"
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAiSearch()}
+                  disabled={aiLoading}
+                />
+              </div>
+              <button type="button" className="btn btn-primary" onClick={handleAiSearch} disabled={aiLoading || !aiQuery.trim()} style={{ alignSelf: "flex-end" }}>
+                {aiLoading ? <span className="spinner" /> : <IconSearch size={13} />} {aiLoading ? "Buscando…" : "Buscar"}
+              </button>
+            </div>
+            {aiError && <div className="modal-error"><IconAlert size={13} /> {aiError}</div>}
+            {aiApplied && !aiError && (
+              <div className="ai-applied-chips">
+                <span className="chip">Entendí:</span>
+                {aiApplied.area && <span className="chip">Área: {aiApplied.area}</span>}
+                {aiApplied.estado && <span className="chip">Estado: {aiApplied.estado}</span>}
+                {aiApplied.medioPago && <span className="chip">Medio de pago: {aiApplied.medioPago}</span>}
+                {aiApplied.licitacion && <span className="chip">Licitación: {aiApplied.licitacion}</span>}
+                {aiApplied.estadoLegalizacion && <span className="chip">Legalización: {aiApplied.estadoLegalizacion}</span>}
+                {aiApplied.dateFrom && <span className="chip">Desde: {aiApplied.dateFrom}</span>}
+                {aiApplied.dateTo && <span className="chip">Hasta: {aiApplied.dateTo}</span>}
+                {aiApplied.valorMin != null && <span className="chip">Valor mín: {fmtCOP(aiApplied.valorMin)}</span>}
+                {aiApplied.valorMax != null && <span className="chip">Valor máx: {fmtCOP(aiApplied.valorMax)}</span>}
+                {aiApplied.search && <span className="chip">Texto: {aiApplied.search}</span>}
+                {aiApplied.onlyIncumplimiento && <span className="chip">Solo incumplidas</span>}
+                <span className="count-note">{sorted.length} resultado(s)</span>
+              </div>
+            )}
+          </div>
+        ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           <div className="field search-field">
             <label htmlFor="reg-search">Buscar</label>
@@ -291,7 +390,16 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
             <label htmlFor="reg-to">Hasta</label>
             <input id="reg-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </div>
+          <div className="field">
+            <label htmlFor="reg-valor-min">Valor desde</label>
+            <input id="reg-valor-min" type="number" min="0" placeholder="Ej. 5000000" value={valorMin} onChange={(e) => setValorMin(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="reg-valor-max">Valor hasta</label>
+            <input id="reg-valor-max" type="number" min="0" placeholder="Ej. 20000000" value={valorMax} onChange={(e) => setValorMax(e.target.value)} />
+          </div>
         </div>
+        )}
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
           <button
             type="button"

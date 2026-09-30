@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { backendFetch } from "@/lib/backendFetch";
 import { getSessionUser } from "@/lib/auth";
 import { canViewPresupuesto } from "@/lib/roles";
-import AppShell from "@/components/AppShell";
 import RegistrosPageClient from "@/components/RegistrosPageClient";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +21,12 @@ export default async function RegistrosPage() {
   const presupuestos = presupuestosRes ? (await presupuestosRes.json()).presupuestos : [];
 
   return (
-    <AppShell user={user} title="Registros" subtitle={`${records.length} registros`}>
-      <RegistrosPageClient initialRecords={records} currentUser={user} maestros={maestros} presupuestos={presupuestos} />
-    </AppShell>
+    <RegistrosPageClient
+      user={user}
+      initialRecords={records}
+      currentUser={user}
+      maestros={maestros}
+      presupuestos={presupuestos}
+    />
   );
 }

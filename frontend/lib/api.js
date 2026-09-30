@@ -140,3 +140,26 @@ export async function setPermissionApi(role, feature, allowed) {
   });
   return handle(res);
 }
+
+// Traduce una búsqueda en lenguaje natural a los mismos filtros que usa el
+// modo manual de Registros (ver RegistrosView.jsx) — siempre con el modelo
+// gratis de Gemini por defecto, del lado del servidor.
+export async function searchFiltersWithAiApi(query, options) {
+  const res = await fetch("/api/agent/search-filters", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, options }),
+  });
+  return handle(res);
+}
+
+// "Explícame este número" — explicación puntual en lenguaje natural de un KPI
+// del Dashboard, a partir de los registros que lo componen (ver DashboardView.jsx).
+export async function explainKpiApi({ label, value, comparisonLabel, comparisonValue, records }) {
+  const res = await fetch("/api/agent/explain", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label, value, comparisonLabel, comparisonValue, records }),
+  });
+  return handle(res);
+}

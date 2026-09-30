@@ -1,19 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import AppShell from "@/components/AppShell";
 import RegistrosView from "@/components/RegistrosView";
 import ExportMenu from "@/components/ExportMenu";
 
-export default function RegistrosPageClient({ initialRecords, currentUser, maestros, presupuestos = [] }) {
+export default function RegistrosPageClient({ user, initialRecords, currentUser, maestros, presupuestos = [] }) {
   const [records, setRecords] = useState(initialRecords || []);
   const [filtered, setFiltered] = useState(initialRecords || []);
 
   return (
-    <div>
-      <div className="view-head">
-        <div className="spacer" />
-        <ExportMenu allRecords={records} filteredRecords={filtered} />
-      </div>
+    <AppShell
+      user={user}
+      title="Registros"
+      subtitle={`${records.length} registros`}
+      actions={<ExportMenu allRecords={records} filteredRecords={filtered} />}
+    >
       <RegistrosView
         records={records}
         setRecords={setRecords}
@@ -22,6 +24,6 @@ export default function RegistrosPageClient({ initialRecords, currentUser, maest
         maestros={maestros}
         presupuestos={presupuestos}
       />
-    </div>
+    </AppShell>
   );
 }
