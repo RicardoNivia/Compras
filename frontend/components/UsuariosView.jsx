@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import UserModal from "@/components/UserModal";
+import PermissionsMatrix from "@/components/PermissionsMatrix";
 import { ROLE_LABELS, ROLE_LIST, ROLE_COLOR_VARS, ROLE_ICONS } from "@/lib/roles";
 
 function initials(name) {
@@ -26,7 +27,8 @@ function TrashIcon() {
   );
 }
 
-export default function UsuariosView({ initialUsers }) {
+export default function UsuariosView({ initialUsers, initialPermissionsMatrix }) {
+  const [tab, setTab] = useState("usuarios"); // "usuarios" | "permisos"
   const [users, setUsers] = useState(initialUsers || []);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -67,6 +69,19 @@ export default function UsuariosView({ initialUsers }) {
 
   return (
     <div>
+      <div className="dash-tabs" role="tablist" aria-label="Vista de usuarios" style={{ marginBottom: 16 }}>
+        <button type="button" role="tab" aria-selected={tab === "usuarios"} className="dash-tab" onClick={() => setTab("usuarios")}>
+          Usuarios
+        </button>
+        <button type="button" role="tab" aria-selected={tab === "permisos"} className="dash-tab" onClick={() => setTab("permisos")}>
+          Matriz de permisos
+        </button>
+      </div>
+
+      {tab === "permisos" ? (
+        <PermissionsMatrix initialMatrix={initialPermissionsMatrix} />
+      ) : (
+        <>
       <div className="role-summary-row">
         {ROLE_LIST.map((r) => {
           const active = roleFilter === r;
@@ -151,6 +166,8 @@ export default function UsuariosView({ initialUsers }) {
 
       {modalUser !== undefined && (
         <UserModal user={modalUser} onClose={() => setModalUser(undefined)} onSaved={handleSaved} />
+      )}
+        </>
       )}
     </div>
   );

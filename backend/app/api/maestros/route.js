@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { listMaestros, createMaestro } from "@/lib/maestros";
 import { getSessionUser } from "@/lib/auth-server";
-import { canViewMaestros } from "@/lib/roles";
+import { isRoleAllowed } from "@/lib/permissions";
 
 // Sin chequeo de rol más allá de estar autenticado (lo garantiza el
 // middleware): cualquier rol que pueda editar registros necesita leer estas
@@ -20,7 +20,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   const user = await getSessionUser();
-  if (!user || !canViewMaestros(user.role)) {
+  if (!user || !(await isRoleAllowed(user.role, "viewMaestros"))) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   try {

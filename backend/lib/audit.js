@@ -179,6 +179,22 @@ export async function logPresupuestoModoChange(actor, anio, modoAnterior, modoNu
   await writeLog({ action: "editar", entityType: "presupuesto", recordId: `anio-${anio}`, recordInfo: info, actor, changes });
 }
 
+// ---------- Matriz de permisos ----------
+// role_feature (ver lib/permissions.js) como recordId, así cada celda de la
+// matriz tiene su propio historial identificable.
+export async function logPermissionChange(actor, role, roleLabel, featureLabel, before, after) {
+  if (before === after) return;
+  const changes = [{ field: "allowed", label: featureLabel, before: normalize(before), after: normalize(after) }];
+  await writeLog({
+    action: "editar",
+    entityType: "permiso",
+    recordId: `${role}-${featureLabel}`,
+    recordInfo: `Permiso de "${roleLabel}" sobre "${featureLabel}"`,
+    actor,
+    changes,
+  });
+}
+
 export async function listAuditLogs({ from, to, userId, recordId, page = 1, pageSize = 50 } = {}) {
   const where = {};
   if (from || to) {

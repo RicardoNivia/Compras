@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function MaestrosPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  if (!canViewMaestros(user.role)) redirect("/registros");
+  if (!(user.permissions?.viewMaestros ?? canViewMaestros(user.role))) redirect("/registros");
 
   const res = await backendFetch("/api/maestros");
   const { maestros } = await res.json();

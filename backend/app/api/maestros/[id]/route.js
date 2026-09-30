@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { updateMaestro, deleteMaestro } from "@/lib/maestros";
 import { getSessionUser } from "@/lib/auth-server";
-import { canViewMaestros } from "@/lib/roles";
+import { isRoleAllowed } from "@/lib/permissions";
 
 export async function PATCH(request, { params }) {
   const user = await getSessionUser();
-  if (!user || !canViewMaestros(user.role)) {
+  if (!user || !(await isRoleAllowed(user.role, "viewMaestros"))) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   try {
@@ -19,7 +19,7 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(_request, { params }) {
   const user = await getSessionUser();
-  if (!user || !canViewMaestros(user.role)) {
+  if (!user || !(await isRoleAllowed(user.role, "viewMaestros"))) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   try {

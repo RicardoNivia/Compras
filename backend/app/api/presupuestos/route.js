@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { listPresupuestos, upsertPresupuesto } from "@/lib/presupuestos";
 import { getSessionUser } from "@/lib/auth-server";
-import { canViewPresupuesto } from "@/lib/roles";
+import { isRoleAllowed } from "@/lib/permissions";
 
-// El tema de presupuesto es exclusivo del rol admin: también la lectura,
-// no solo crear/editar/eliminar.
+// El tema de presupuesto queda restringido por la funcionalidad
+// "viewPresupuesto" de la Matriz de permisos (por defecto, solo admin):
+// también la lectura, no solo crear/editar/eliminar.
 export async function GET(request) {
   const user = await getSessionUser();
-  if (!user || !canViewPresupuesto(user.role)) {
+  if (!user || !(await isRoleAllowed(user.role, "viewPresupuesto"))) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   const { searchParams } = new URL(request.url);
@@ -22,7 +23,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   const user = await getSessionUser();
-  if (!user || !canViewPresupuesto(user.role)) {
+  if (!user || !(await isRoleAllowed(user.role, "viewPresupuesto"))) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   try {

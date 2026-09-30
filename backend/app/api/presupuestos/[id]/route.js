@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { deletePresupuesto } from "@/lib/presupuestos";
 import { getSessionUser } from "@/lib/auth-server";
-import { canViewPresupuesto } from "@/lib/roles";
+import { isRoleAllowed } from "@/lib/permissions";
 
 export async function DELETE(_request, { params }) {
   const user = await getSessionUser();
-  if (!user || !canViewPresupuesto(user.role)) {
+  if (!user || !(await isRoleAllowed(user.role, "viewPresupuesto"))) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   try {

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth-server";
-import { canViewAgenteIA } from "@/lib/roles";
+import { isRoleAllowed } from "@/lib/permissions";
 import { getConversation, deleteConversation } from "@/lib/conversations";
 
 export async function GET(_request, { params }) {
   const user = await getSessionUser();
-  if (!user || !canViewAgenteIA(user.role)) {
+  if (!user || !(await isRoleAllowed(user.role, "viewAgenteIA"))) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   const conversation = await getConversation(user.id, params.id);
@@ -17,7 +17,7 @@ export async function GET(_request, { params }) {
 
 export async function DELETE(_request, { params }) {
   const user = await getSessionUser();
-  if (!user || !canViewAgenteIA(user.role)) {
+  if (!user || !(await isRoleAllowed(user.role, "viewAgenteIA"))) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   try {

@@ -62,10 +62,11 @@ function sortValue(r, key) {
 
 export default function RegistrosView({ records, setRecords, onFilteredChange, currentUser, maestros, presupuestos = [] }) {
   const role = currentUser?.role;
-  const allowCreate = canCreateRecord(role);
-  const allowEdit = canEditRecord(role);
-  const allowDelete = canDeleteRecord(role);
-  const allowToggle = canToggleRadicado(role);
+  const permissions = currentUser?.permissions;
+  const allowCreate = permissions?.createRecord ?? canCreateRecord(role);
+  const allowEdit = permissions?.editRecord ?? canEditRecord(role);
+  const allowDelete = permissions?.deleteRecord ?? canDeleteRecord(role);
+  const allowToggle = permissions?.toggleRadicado ?? canToggleRadicado(role);
   const editableFields = getEditableFields(role);
   const hasRowActions = allowToggle || allowEdit || allowDelete;
 

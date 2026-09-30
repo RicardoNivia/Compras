@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function AuditoriaPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  if (!canViewAuditoria(user.role)) redirect("/registros");
+  if (!(user.permissions?.viewAuditoria ?? canViewAuditoria(user.role))) redirect("/registros");
 
   const [initialRes, actorsRes] = await Promise.all([
     backendFetch("/api/audit?page=1&pageSize=50"),
