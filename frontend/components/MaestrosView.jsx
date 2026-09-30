@@ -227,25 +227,28 @@ export default function MaestrosView({ initialMaestros }) {
           </tbody>
         </table>
 
-        {totalPages > 1 && (
-          <div className="maestros-pagination">
-            <button
-              type="button" className="maestros-page-btn"
-              disabled={currentPage <= 1} onClick={() => setPage((p) => p - 1)}
-              aria-label="Página anterior"
-            >
-              ‹
-            </button>
-            <span className="maestros-page-num">{currentPage}</span>
-            <button
-              type="button" className="maestros-page-btn"
-              disabled={currentPage >= totalPages} onClick={() => setPage((p) => p + 1)}
-              aria-label="Página siguiente"
-            >
-              ›
-            </button>
-          </div>
-        )}
+        <div className="maestros-pagination">
+          {totalPages > 1 && (
+            <>
+              <button
+                type="button" className="maestros-page-btn"
+                disabled={currentPage <= 1} onClick={() => setPage((p) => p - 1)}
+                aria-label="Página anterior"
+              >
+                ‹
+              </button>
+              <span className="maestros-page-num">Página {currentPage} de {totalPages}</span>
+              <button
+                type="button" className="maestros-page-btn"
+                disabled={currentPage >= totalPages} onClick={() => setPage((p) => p + 1)}
+                aria-label="Página siguiente"
+              >
+                ›
+              </button>
+            </>
+          )}
+          <span className="count-note">{rows.length} registro(s)</span>
+        </div>
       </section>
 
       {modalOpen && (
