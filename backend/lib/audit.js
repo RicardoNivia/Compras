@@ -223,6 +223,7 @@ export async function listAuditLogs({ from, to, userId, recordId, page = 1, page
     logs: rows.map((r) => ({
       id: r.id,
       action: r.action,
+      entityType: r.entityType,
       recordId: r.recordId,
       recordInfo: r.recordInfo,
       userId: r.userId,
