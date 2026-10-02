@@ -102,6 +102,9 @@ export const LEGALIZAR_EDITABLE_FIELDS = [
   "fe",
   "valorConIva",
   "valorSinIva",
+  "moneda",
+  "valorUsd",
+  "trm",
   "observaciones",
 ];
 
@@ -124,6 +127,9 @@ export const NON_ADMIN_EDITABLE_FIELDS = [
   "valorConIva",
   "valorSinIva",
   "valorCot",
+  "moneda",
+  "valorUsd",
+  "trm",
   "observaciones",
   "radicado",
 ];

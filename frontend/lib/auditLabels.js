@@ -19,6 +19,9 @@ export const FIELD_LABELS = {
   valorConIva: "Valor con IVA",
   valorSinIva: "Valor sin IVA",
   valorCot: "Valor cotizado",
+  moneda: "Moneda",
+  valorUsd: "Valor en USD",
+  trm: "TRM utilizada",
   observaciones: "Observaciones",
   radicado: "Radicado",
 };

@@ -27,6 +27,9 @@ model Record {
   valorConIva         Float?
   valorSinIva         Float?
   valorCot            Float?
+  moneda              String   @default("COP") // "COP" | "USD" — en qué moneda se cotizó/compró originalmente; los campos de valor (arriba) SIEMPRE quedan en pesos colombianos, sin importar la moneda original
+  valorUsd            Float?   // monto original en dólares — solo si moneda = "USD", únicamente de referencia/auditoría
+  trm                 Float?   // TRM usada para convertir valorUsd a pesos — solo si moneda = "USD"
   observaciones       String?
   radicado            Boolean  @default(false)
   createdAt           DateTime @default(now())
