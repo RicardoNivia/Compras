@@ -27,6 +27,7 @@ export const FEATURES = [
   { key: "viewPresupuesto", label: "Ver y configurar Presupuesto", section: "Presupuesto", defaultRoles: [ROLES.ADMIN] },
   { key: "viewUsuarios", label: "Administrar Usuarios", section: "Usuarios", defaultRoles: [ROLES.ADMIN] },
   { key: "viewAuditoria", label: "Ver Auditoría", section: "Auditoría", defaultRoles: [ROLES.ADMIN] },
+  { key: "viewReportes", label: "Ver y configurar Informes automáticos", section: "Informes", defaultRoles: [ROLES.ADMIN] },
 ];
 
 const FEATURE_MAP = new Map(FEATURES.map((f) => [f.key, f]));

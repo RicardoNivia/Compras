@@ -10,11 +10,11 @@ const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 const MAX_CONNECT_RETRIES = 0;
 const CONNECT_TIMEOUT_MS = 25000;
 
-async function fetchWithRetry(url, options) {
+async function fetchWithRetry(url, options, timeoutMs = CONNECT_TIMEOUT_MS) {
   let lastErr;
   for (let attempt = 0; attempt <= MAX_CONNECT_RETRIES; attempt++) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), CONNECT_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await fetch(url, { ...options, signal: controller.signal });
     } catch (err) {
@@ -22,7 +22,7 @@ async function fetchWithRetry(url, options) {
       // descartan el tráfico en silencio) o falla de conexión — no es un
       // error de la API, se reintenta hasta MAX_CONNECT_RETRIES veces.
       lastErr = err.name === "AbortError"
-        ? new Error(`sin respuesta tras ${CONNECT_TIMEOUT_MS / 1000}s`)
+        ? new Error(`sin respuesta tras ${timeoutMs / 1000}s`)
         : err;
       if (attempt < MAX_CONNECT_RETRIES) continue;
     } finally {
@@ -98,7 +98,7 @@ export async function* streamGeminiChat({ model, systemInstruction, contents }) 
 // conversación) — usa responseMimeType/responseSchema para forzar que Gemini
 // devuelva JSON válido según el esquema, en vez de tener que parsear texto
 // libre a la fuerza.
-export async function generateGeminiJson({ model, systemInstruction, prompt, schema }) {
+export async function generateGeminiJson({ model, systemInstruction, prompt, schema, timeoutMs }) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY no está configurada en el servidor.");
@@ -117,7 +117,7 @@ export async function generateGeminiJson({ model, systemInstruction, prompt, sch
         ...(schema ? { responseSchema: schema } : {}),
       },
     }),
-  });
+  }, timeoutMs);
 
   if (!res.ok) {
     let detail = "";

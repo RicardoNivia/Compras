@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewPresupuesto, ROLE_LABELS } from "@/lib/roles";
-import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney } from "@/components/icons";
+import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewPresupuesto, canViewReportes, ROLE_LABELS } from "@/lib/roles";
+import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail } from "@/components/icons";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 
 // "feature" referencia la Matriz de permisos (lib/permissions.js en el
@@ -16,6 +16,7 @@ const ALL_NAV_ITEMS = [
   { key: "agente-ia", href: "/agente-ia", label: "Agente IA", Icon: IconSpark, feature: "viewAgenteIA", show: canViewAgenteIA },
   { key: "maestros", href: "/maestros", label: "Maestros", Icon: IconLayers, feature: "viewMaestros", show: canViewMaestros },
   { key: "presupuesto", href: "/presupuesto", label: "Presupuesto", Icon: IconMoney, feature: "viewPresupuesto", show: canViewPresupuesto },
+  { key: "informes", href: "/informes", label: "Informes", Icon: IconMail, feature: "viewReportes", show: canViewReportes },
   { key: "usuarios", href: "/usuarios", label: "Usuarios", Icon: IconUsers, feature: "viewUsuarios", show: canViewUsuarios },
   { key: "auditoria", href: "/auditoria", label: "Auditoría", Icon: IconHistory, feature: "viewAuditoria", show: canViewAuditoria },
 ];

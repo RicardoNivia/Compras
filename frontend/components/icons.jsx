@@ -223,6 +223,15 @@ export function IconBuilding(props) {
   );
 }
 
+export function IconMail(props) {
+  return (
+    <Svg {...props} viewBox="0 0 16 16">
+      <rect x="1.5" y="3" width="13" height="10" rx="1.6" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M2 4l6 5 6-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function IconFlag(props) {
   return (
     <Svg {...props}>

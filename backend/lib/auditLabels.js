@@ -36,9 +36,27 @@ export const USER_FIELD_LABELS = {
   activo: "Activo",
 };
 
+export const REPORT_FIELD_LABELS = {
+  nombre: "Nombre",
+  prompt: "Instrucción (prompt)",
+  destinatarios: "Destinatarios (Para)",
+  cc: "Copia (CC)",
+  frecuencia: "Frecuencia",
+  diaSemana: "Día de la semana",
+  diaMes: "Día del mes",
+  hora: "Hora de envío",
+  prioridad: "Prioridad",
+  sabadoHabil: "Sábado hábil",
+  domingoHabil: "Domingo hábil",
+  cuerpoModo: "Modo del cuerpo del correo",
+  cuerpoPrompt: "Instrucción de estilo del cuerpo",
+  activo: "Activo",
+};
+
 export const ACTION_LABELS = {
   crear: "Creó",
   editar: "Editó",
   eliminar: "Eliminó",
   radicar: "Radicó",
+  enviar: "Envió",
 };

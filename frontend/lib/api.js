@@ -163,3 +163,79 @@ export async function explainKpiApi({ label, value, comparisonLabel, comparisonV
   });
   return handle(res);
 }
+
+// ---------- Informes automáticos (ver InformesView.jsx) ----------
+
+export async function fetchReportsApi() {
+  const res = await fetch("/api/reports", { cache: "no-store" });
+  return handle(res);
+}
+
+// La generación puede tardar hasta ~100s (fallback Gemini→Anthropic sobre
+// cientos de registros, ver backend/lib/aiStructured.js) — más de lo que el
+// proxy de rewrites deja esperar en una sola llamada. El backend arranca un
+// trabajo en segundo plano y devuelve su id de inmediato; esta función hace
+// el polling acá (varios GETs cortos y rápidos) para que quien la llama siga
+// viéndola como una promesa normal que resuelve con el resultado final.
+async function pollReportJob(jobId, { maxWaitMs = 115000, intervalMs = 2000 } = {}) {
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    const res = await fetch(`/api/reports/jobs/${jobId}`, { cache: "no-store" });
+    const data = await handle(res);
+    if (data.status === "done") return data.result;
+    if (data.status === "error") throw new Error(data.error || "No se pudo completar la operación.");
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error("La operación está tardando más de lo esperado. Intenta de nuevo en un momento.");
+}
+
+// Vuelve a dibujar el PDF a partir de un contenido ya generado (sin IA, sin
+// polling — responde al instante) — se usa al abrir "Editar informe" para
+// mostrar de nuevo el mismo PDF guardado la última vez.
+export async function renderReportPdfApi({ content, nombre }) {
+  const res = await fetch("/api/reports/render-pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content, nombre }),
+  });
+  return handle(res);
+}
+
+export async function previewReportApi({ prompt, nombre, prioridad, cuerpoModo, cuerpoPrompt }) {
+  const res = await fetch("/api/reports/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, nombre, prioridad, cuerpoModo, cuerpoPrompt }),
+  });
+  const { jobId } = await handle(res);
+  return pollReportJob(jobId);
+}
+
+export async function createReportApi(data) {
+  const res = await fetch("/api/reports", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handle(res);
+}
+
+export async function updateReportApi(id, data) {
+  const res = await fetch(`/api/reports/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handle(res);
+}
+
+export async function deleteReportApi(id) {
+  const res = await fetch(`/api/reports/${id}`, { method: "DELETE" });
+  return handle(res);
+}
+
+export async function sendReportNowApi(id) {
+  const res = await fetch(`/api/reports/${id}/send-now`, { method: "POST" });
+  const { jobId } = await handle(res);
+  return pollReportJob(jobId);
+}
