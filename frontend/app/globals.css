@@ -112,7 +112,14 @@ button{ font-family: inherit; }
 .app-shell{ height:100vh; display:flex; align-items:stretch; overflow:hidden; }
 .app-main{ flex:1; min-width:0; height:100vh; display:flex; flex-direction:column; overflow-y:auto; }
 
-/* ---------- Sidebar (dark, fija respecto al tema claro/oscuro de la app) ---------- */
+/* ---------- Sidebar: riel de íconos que se expande al pasar el mouse ----------
+   .sidebar-track reserva un ancho FIJO (68px) como hijo real de .app-shell,
+   así el contenido (.app-main) nunca se reacomoda ni el menú "se alarga" con
+   el alto de la página (ver .app-shell/.app-main arriba: siguen fijos a
+   100vh). .sidebar es un panel absoluto DENTRO de ese riel que solo crece en
+   ancho al hacer hover, superponiéndose al contenido — igual que Linear/
+   Vercel/VS Code. */
+.sidebar-track{ flex:none; width:68px; height:100vh; position:relative; }
 .sidebar{
   /* Azul marino original, aclarado solo un 10%; sigue fijo (no reacciona
      al tema claro/oscuro). */
@@ -122,25 +129,29 @@ button{ font-family: inherit; }
   --sb-ink-active: #ffffff;
   --sb-border: rgba(255,255,255,0.08);
   --sb-accent: #2063a0;
-  flex: none; width: 240px; height:100vh; display:flex; flex-direction:column;
+  position:absolute; inset:0; width:68px; display:flex; flex-direction:column;
   background: var(--sb-bg); border-right:1px solid var(--sb-border);
-  padding: 16px 12px; gap:4px; overflow-y:auto;
+  padding: 16px 10px; gap:4px; overflow:hidden; box-sizing:border-box;
+  transition: width .16s ease; z-index:50;
 }
+.sidebar-track:hover .sidebar{ width:232px; overflow-y:auto; box-shadow:16px 0 36px -14px rgba(0,0,0,0.45); }
 
-.sidebar-head{ display:flex; align-items:center; gap:10px; padding:4px 6px 20px; }
+.sidebar-head{ display:flex; align-items:center; gap:10px; padding:4px 6px 20px; flex:none; }
 .sidebar-brand-mark{
   flex:none; width:34px; height:34px; border-radius:9px;
   background: var(--sb-accent); color:#ffffff;
   font-family:"Nunito",sans-serif; font-weight:800; font-size:15px;
   display:flex; align-items:center; justify-content:center;
 }
-.sidebar-brand-label{ font-family:"Nunito",sans-serif; font-weight:700; font-size:14px; color:var(--sb-ink-active); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sidebar-brand-label{ font-family:"Nunito",sans-serif; font-weight:700; font-size:14px; color:var(--sb-ink-active); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:0; transition:opacity .1s; }
+.sidebar-track:hover .sidebar-brand-label{ opacity:1; }
 
 .sidebar-nav{ display:flex; flex-direction:column; gap:3px; flex:1; }
 .sidebar-link{
   appearance:none; border:none; background:transparent; color: var(--sb-ink);
   display:flex; align-items:center; gap:10px; padding:6px; border-radius:9px;
   font-size:13.5px; font-weight:600; cursor:pointer; text-align:left; white-space:nowrap;
+  flex:none; width:100%; box-sizing:border-box;
 }
 .sidebar-link:hover{ background: var(--sb-bg-2); color: var(--sb-ink-active); }
 .sidebar-link.active{ background: var(--sb-bg-2); color: var(--sb-ink-active); }
@@ -151,21 +162,27 @@ button{ font-family: inherit; }
   font-size:14px; line-height:1; background: rgba(255,255,255,0.06); color: var(--sb-ink);
 }
 .sidebar-link.active .sidebar-link-ic{ background: var(--sb-accent); color:#fff; }
-.sidebar-link .label{ overflow:hidden; text-overflow:ellipsis; }
+.sidebar-link .label, .sidebar-logout-btn .label, .sidebar-collapse-btn .label{ overflow:hidden; text-overflow:ellipsis; opacity:0; transition:opacity .1s; }
+.sidebar-track:hover .sidebar-link .label, .sidebar-track:hover .sidebar-logout-btn .label, .sidebar-track:hover .sidebar-collapse-btn .label{ opacity:1; }
 
-.sidebar-foot{ display:flex; flex-direction:column; gap:8px; margin-top:auto; padding-top:12px; border-top:1px solid var(--sb-border); }
+.sidebar-search-btn{ margin-bottom:6px; border:1px solid var(--sb-border); }
+.sidebar-kbd{ margin-left:auto; font-size:10px; font-weight:700; color: var(--sb-ink); opacity:0; transition:opacity .1s; flex:none; }
+.sidebar-track:hover .sidebar-kbd{ opacity:1; }
+
+.sidebar-foot{ display:flex; flex-direction:column; gap:8px; margin-top:auto; padding-top:12px; border-top:1px solid var(--sb-border); flex:none; }
 .sidebar-user{ display:flex; align-items:center; gap:10px; padding:8px 8px; border-radius:10px; background: rgba(255,255,255,0.06); margin-bottom: 4px; }
 .sidebar-user-avatar{
   flex:none; width:30px; height:30px; border-radius:50%; background: var(--sb-accent); color:#fff;
   font-family:"Nunito",sans-serif; font-weight:800; font-size:12px;
   display:flex; align-items:center; justify-content:center;
 }
-.sidebar-user-name{ font-size:12px; font-weight:700; color:var(--sb-ink-active); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.sidebar-user-role{ font-size:10.5px; color:var(--sb-ink); }
+.sidebar-user-name{ font-size:12px; font-weight:700; color:var(--sb-ink-active); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:0; transition:opacity .1s; }
+.sidebar-user-role{ font-size:10.5px; color:var(--sb-ink); opacity:0; transition:opacity .1s; }
+.sidebar-track:hover .sidebar-user-name, .sidebar-track:hover .sidebar-user-role{ opacity:1; }
 .sidebar-logout-btn, .sidebar-collapse-btn{
   appearance:none; border:1px solid var(--sb-border); background: var(--sb-bg-2); color:var(--sb-ink);
   display:flex; align-items:center; gap:8px; padding:6px; border-radius:9px;
-  font-size:12.5px; font-weight:600; cursor:pointer;
+  font-size:12.5px; font-weight:600; cursor:pointer; flex:none; width:100%; box-sizing:border-box;
 }
 .sidebar-logout-btn:hover, .sidebar-collapse-btn:hover{ color: var(--sb-ink-active); }
 .sidebar-logout-btn:disabled{ opacity:.6; cursor:not-allowed; }
@@ -527,6 +544,11 @@ input:focus, select:focus, textarea:focus{ border-color:var(--accent); box-shado
 .btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 .btn-primary{ background: var(--accent); border-color:var(--accent); color:var(--accent-ink); }
 .btn-primary:hover{ filter:brightness(1.06); }
+/* El :disabled genérico (opacity:.55) deja el fondo azul pálido pero el
+   texto blanco intacto — casi ilegible. Acá se usa un estilo propio (fondo
+   claro + texto azul) en vez de solo atenuar, para que siga leyéndose sin
+   importar qué haya detrás. */
+.btn-primary:disabled{ background: var(--surface-2); border-color: var(--border); color: var(--accent); opacity: 1; }
 .btn-ghost{ background:transparent; border-color:transparent; padding:6px 8px; }
 .btn-danger-text{ color:var(--critical); }
 .icon-btn{ padding:6px 8px; font-size:14px; line-height:1; }

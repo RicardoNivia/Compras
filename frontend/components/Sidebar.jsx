@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewPresupuesto, canViewReportes, canViewAlertas, ROLE_LABELS } from "@/lib/roles";
-import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail, IconBell } from "@/components/icons";
+import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail, IconBell, IconSearch } from "@/components/icons";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
+import CommandPalette from "@/components/CommandPalette";
 
 // "feature" referencia la Matriz de permisos (lib/permissions.js en el
 // backend) — si el usuario trae user.permissions (siempre debería, viene de
@@ -31,10 +32,25 @@ function initials(name) {
 export default function Sidebar({ user }) {
   const [loggingOut, setLoggingOut] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
   const items = ALL_NAV_ITEMS.filter((item) => (item.feature ? (user.permissions?.[item.feature] ?? item.show(user.role)) : item.show(user.role)));
+
+  // Abrir la paleta de comandos con Ctrl/Cmd+K desde cualquier página — el
+  // Sidebar vive en el layout persistente (app/(app)/layout.js), así que este
+  // listener queda activo todo el tiempo sin tener que registrarlo por página.
+  useEffect(() => {
+    function onKeyDown(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   async function handleLogout() {
     if (loggingOut) return;
@@ -48,59 +64,71 @@ export default function Sidebar({ user }) {
   }
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-head">
-        <span className="sidebar-brand-mark">S</span>
-        <span className="sidebar-brand-label">Sinco · Compras</span>
-      </div>
-
-      <nav className="sidebar-nav" aria-label="Navegación principal">
-        {items.map(({ key, href, label, Icon }) => (
-          <Link
-            key={key}
-            href={href}
-            className={`sidebar-link${pathname === href ? " active" : ""}`}
-          >
-            <span className="sidebar-link-ic"><Icon size={17} /></span>
-            <span className="label">{label}</span>
-          </Link>
-        ))}
-      </nav>
-
-      <div className="sidebar-foot">
-        <div className="sidebar-user">
-          <div className="sidebar-user-avatar">{initials(user.nombre)}</div>
-          <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-            <span className="sidebar-user-name">{user.nombre}</span>
-            <span className="sidebar-user-role">{ROLE_LABELS[user.role] || user.role}</span>
-          </div>
+    <div className="sidebar-track">
+      <aside className="sidebar">
+        <div className="sidebar-head">
+          <span className="sidebar-brand-mark">S</span>
+          <span className="sidebar-brand-label">Sinco · Compras</span>
         </div>
 
-        <button
-          type="button"
-          className="sidebar-logout-btn"
-          onClick={() => setShowChangePassword(true)}
-          title="Cambiar contraseña"
-        >
-          <span className="sidebar-link-ic"><IconKey size={17} /></span>
-          <span className="label">Cambiar contraseña</span>
+        <button type="button" className="sidebar-link sidebar-search-btn" onClick={() => setPaletteOpen(true)}>
+          <span className="sidebar-link-ic"><IconSearch size={15} /></span>
+          <span className="label">Buscar o ir a…</span>
+          <span className="sidebar-kbd">⌘K</span>
         </button>
 
-        <button
-          type="button"
-          className="sidebar-logout-btn"
-          onClick={handleLogout}
-          disabled={loggingOut}
-          title="Cerrar sesión"
-        >
-          {loggingOut ? <span className="spinner" /> : <span className="sidebar-link-ic"><IconLogout size={17} /></span>}
-          <span className="label">{loggingOut ? "Saliendo…" : "Cerrar sesión"}</span>
-        </button>
-      </div>
+        <nav className="sidebar-nav" aria-label="Navegación principal">
+          {items.map(({ key, href, label, Icon }) => (
+            <Link
+              key={key}
+              href={href}
+              className={`sidebar-link${pathname === href ? " active" : ""}`}
+            >
+              <span className="sidebar-link-ic">
+                <Icon size={17} />
+              </span>
+              <span className="label">{label}</span>
+            </Link>
+          ))}
+        </nav>
 
-      {showChangePassword && (
-        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
-      )}
-    </aside>
+        <div className="sidebar-foot">
+          <div className="sidebar-user">
+            <div className="sidebar-user-avatar">{initials(user.nombre)}</div>
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <span className="sidebar-user-name">{user.nombre}</span>
+              <span className="sidebar-user-role">{ROLE_LABELS[user.role] || user.role}</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="sidebar-logout-btn"
+            onClick={() => setShowChangePassword(true)}
+            title="Cambiar contraseña"
+          >
+            <span className="sidebar-link-ic"><IconKey size={17} /></span>
+            <span className="label">Cambiar contraseña</span>
+          </button>
+
+          <button
+            type="button"
+            className="sidebar-logout-btn"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            title="Cerrar sesión"
+          >
+            {loggingOut ? <span className="spinner" /> : <span className="sidebar-link-ic"><IconLogout size={17} /></span>}
+            <span className="label">{loggingOut ? "Saliendo…" : "Cerrar sesión"}</span>
+          </button>
+        </div>
+
+        {showChangePassword && (
+          <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+        )}
+      </aside>
+
+      {paletteOpen && <CommandPalette items={items} onClose={() => setPaletteOpen(false)} />}
+    </div>
   );
 }
