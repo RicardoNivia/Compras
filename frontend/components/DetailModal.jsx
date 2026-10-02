@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { fmtDateDisplay, fmtPesos } from "@/lib/format";
+import { fmtDateDisplay, fmtDateTime, fmtPesos } from "@/lib/format";
 import { getDiasInfo } from "@/lib/diasInfo";
 
 function estadoPillClass(estado) {
@@ -89,6 +89,8 @@ export default function DetailModal({ record, onClose }) {
           <Item label="Radicado">{record.radicado ? "Sí" : "No"}</Item>
 
           <Item label="Observaciones" full><EmptyOr value={record.observaciones} /></Item>
+
+          <Item label="Fecha de registro en el sistema">{fmtDateTime(record.fechaRegistro)}</Item>
         </div>
       </div>
     </div>

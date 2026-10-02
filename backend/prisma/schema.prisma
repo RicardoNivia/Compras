@@ -41,7 +41,7 @@ model Record {
 model AuditLog {
   id         String   @id @default(cuid())
   action     String   // "crear" | "editar" | "eliminar" | "radicar"
-  entityType String   @default("record") // "record" | "maestro" | "user" | "presupuesto" | "permiso"
+  entityType String   @default("record") // "record" | "maestro" | "user" | "presupuesto" | "permiso" | "informe"
   recordId   String   // id de la entidad afectada (registro, maestro o usuario)
   recordInfo String?
   userId     String?
@@ -177,4 +177,43 @@ model RolePermission {
 
   @@unique([role, feature])
   @@map("role_permissions")
+}
+
+// Informe ejecutivo configurable por prompt (ver lib/reportContent.js): el
+// admin describe en lenguaje natural qué debe contener, el sistema genera una
+// vista previa con IA antes de guardar, y una vez guardado se envía por
+// correo a "destinatarios" según "frecuencia"/"diaSemana"/"diaMes"/"hora"
+// (ver lib/reportScheduler.js — revisa cada minuto qué informes están
+// vencidos, sin depender de un cron externo al proceso de Next.js).
+// prioridad es solo informativa (se muestra en la UI y en el asunto del
+// correo); no afecta el orden ni la frecuencia de envío.
+// El informe (secciones + gráficas) se envía como PDF adjunto (ver
+// lib/reportPdf.js); "cuerpoModo"/"cuerpoPrompt" controlan el TEXTO PLANO del
+// cuerpo del correo (ver lib/reportEmailBody.js), independiente del contenido
+// del PDF.
+model ReportConfig {
+  id              String    @id @default(cuid())
+  nombre          String
+  prompt          String
+  destinatarios   String    // JSON: string[] de correos (Para / To)
+  cc              String?   // JSON: string[] de correos en copia (CC), opcional
+  frecuencia      String    // "diaria" | "semanal" | "mensual"
+  diaSemana       Int?      // 0 (domingo) .. 6 (sábado) — solo si frecuencia = "semanal"
+  diaMes          Int?      // 1..31 — solo si frecuencia = "mensual" (31 = fin de mes, ver reportScheduler.js)
+  hora            String    // "HH:mm" (24h, hora local del servidor)
+  sabadoHabil     Boolean   @default(false) // si es false, un envío programado en sábado se corre al siguiente día hábil (ver lib/reportScheduler.js)
+  domingoHabil    Boolean   @default(false) // ídem para domingo — sábado y domingo se controlan por separado (uno puede ser hábil y el otro no)
+  prioridad       String    @default("media") // "alta" | "media" | "baja"
+  cuerpoModo      String    @default("resumen") // "plano" | "resumen" — ver lib/reportEmailBody.js
+  cuerpoPrompt    String?   // instrucción opcional de estilo/tono para el cuerpo del correo
+  activo          Boolean   @default(true)
+  ultimoContenido String?   // JSON: snapshot de la última vista previa/envío generado (ver REPORT_SCHEMA)
+  ultimoCuerpoCorreo String? // texto plano del cuerpo de correo de esa misma vista previa/envío — sin esto, al editar un informe ya guardado no había forma de volver a mostrar el cuerpo exacto que se generó (solo el contenido del PDF)
+  ultimoEnvio     DateTime?
+  createdBy       String?
+  createdByNombre String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("report_configs")
 }

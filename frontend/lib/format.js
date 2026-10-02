@@ -54,6 +54,16 @@ export function fmtDateDisplay(iso) {
   return `${d}/${m}/${y}`;
 }
 
+// Para timestamps reales (p.ej. Record.createdAt — "fecha de registro" en el
+// servidor), a diferencia de fmtDateDisplay que solo formatea una fecha de
+// negocio "YYYY-MM-DD" sin hora.
+export function fmtDateTime(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("es-CO", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 export function monthKey(iso) {
   if (!iso) return null;
   return String(iso).slice(0, 7);

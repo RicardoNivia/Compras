@@ -1,22 +1,29 @@
 const ANTHROPIC_API_BASE = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
-const MAX_TOKENS = 4096;
+// 4096 (y luego 8192) se quedaban cortos para informes con muchas secciones +
+// tablas grandes: Anthropic cortaba la respuesta a mitad del JSON (stop_reason
+// "max_tokens"), lo que fallaba al hacer JSON.parse con un mensaje confuso
+// ("no devolvió un JSON válido") en vez de explicar la causa real. Subir este
+// límite no tiene costo extra si no se usa — Anthropic solo cobra los tokens
+// que realmente genera, "max_tokens" es solo un techo — así que se deja bien
+// holgado (el modelo acepta hasta 64000 para claude-haiku-4-5).
+const MAX_TOKENS = 32000;
 // Mismo criterio que lib/gemini.js: un solo intento con timeout generoso
 // (en vez de varios cortos) — debe fallar con margen antes de que el proxy
 // de rewrites del frontend corte la conexión a los ~30s.
 const MAX_CONNECT_RETRIES = 0;
 const CONNECT_TIMEOUT_MS = 25000;
 
-async function fetchWithRetry(url, options) {
+async function fetchWithRetry(url, options, timeoutMs = CONNECT_TIMEOUT_MS) {
   let lastErr;
   for (let attempt = 0; attempt <= MAX_CONNECT_RETRIES; attempt++) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), CONNECT_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await fetch(url, { ...options, signal: controller.signal });
     } catch (err) {
       lastErr = err.name === "AbortError"
-        ? new Error(`sin respuesta tras ${CONNECT_TIMEOUT_MS / 1000}s`)
+        ? new Error(`sin respuesta tras ${timeoutMs / 1000}s`)
         : err;
       if (attempt < MAX_CONNECT_RETRIES) continue;
     } finally {
@@ -105,5 +112,70 @@ export async function* streamAnthropicChat({ model, systemInstruction, contents 
         throw new Error(evt.error?.message || "Error de la API de Anthropic.");
       }
     }
+  }
+}
+
+// Anthropic no tiene un modo "responseSchema" nativo como Gemini. El patrón
+// de forzar una tool con tool_choice:{type:"tool"} NO es compatible con
+// todos los modelos (p.ej. Haiku 4.5 responde 400 "tool_choice: type \"tool\"
+// ... are not supported for this model") — así que en su lugar se le pide el
+// JSON por instrucción directa en el system prompt y se parsea el texto de
+// respuesta, igual de confiable en la práctica con modelos Claude recientes
+// y sin esa restricción de compatibilidad. "schema" llega en el formato de
+// lib/gemini.js (type: "OBJECT"/"STRING"/..., nullable) — se incluye tal
+// cual en la instrucción, no hace falta traducirlo a JSON Schema.
+function stripCodeFence(text) {
+  return text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+}
+
+export async function generateAnthropicJson({ model, systemInstruction, prompt, schema, timeoutMs }) {
+  const apiKey = process.env.ANTROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error("ANTROPIC_API_KEY no está configurada en el servidor.");
+  }
+
+  const jsonInstruction = schema
+    ? `\n\nResponde ÚNICAMENTE con un objeto JSON válido que cumpla exactamente este esquema — sin texto adicional, sin explicaciones, sin bloques de código ni backticks (tipos: OBJECT/STRING/NUMBER/BOOLEAN/ARRAY; "nullable": true significa que el campo puede ir en null): ${JSON.stringify(schema)}`
+    : "";
+
+  const res = await fetchWithRetry(`${ANTHROPIC_API_BASE}/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": ANTHROPIC_VERSION,
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: MAX_TOKENS,
+      // temperature 0: esta función solo la usa lib/aiStructured.js (Informes
+      // automáticos) — mismo prompt siempre debe devolver el mismo informe,
+      // igual que generateGeminiJson (ver lib/gemini.js). No afecta el chat
+      // del Agente IA ni "Explícame este número", que usan streamAnthropicChat.
+      temperature: 0,
+      system: `${systemInstruction}${jsonInstruction}`,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  }, timeoutMs);
+
+  if (!res.ok) {
+    let detail = "";
+    try {
+      detail = (await res.text()).slice(0, 400);
+    } catch {
+      // ignore
+    }
+    throw new Error(`Anthropic API respondió ${res.status}. ${detail}`);
+  }
+
+  const data = await res.json();
+  const text = (data?.content || []).filter((c) => c.type === "text").map((c) => c.text || "").join("");
+  if (data?.stop_reason === "max_tokens") {
+    throw new Error(`Anthropic cortó la respuesta por ser demasiado larga (límite de ${MAX_TOKENS} tokens) — intenta con un prompt más acotado (menos secciones/tablas a la vez).`);
+  }
+  try {
+    return JSON.parse(stripCodeFence(text));
+  } catch {
+    throw new Error("Anthropic no devolvió un JSON válido.");
   }
 }

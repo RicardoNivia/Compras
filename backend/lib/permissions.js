@@ -17,6 +17,7 @@ function badRequest(message) {
 // route handlers que la usan) para que la matriz tenga efecto real.
 export const FEATURES = [
   { key: "viewDashboard", label: "Ver Dashboard de compras", section: "Dashboard", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR] },
+  { key: "viewAlertas", label: "Ver Alertas y notificaciones", section: "Alertas", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR] },
   { key: "viewAgenteIA", label: "Ver Agente IA", section: "Agente IA", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR] },
   { key: "useAiPaidModels", label: "Usar modelos de pago del Agente IA", section: "Agente IA", defaultRoles: [ROLES.ADMIN] },
   { key: "createRecord", label: "Crear registro de compra", section: "Registros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
@@ -27,6 +28,7 @@ export const FEATURES = [
   { key: "viewPresupuesto", label: "Ver y configurar Presupuesto", section: "Presupuesto", defaultRoles: [ROLES.ADMIN] },
   { key: "viewUsuarios", label: "Administrar Usuarios", section: "Usuarios", defaultRoles: [ROLES.ADMIN] },
   { key: "viewAuditoria", label: "Ver Auditoría", section: "Auditoría", defaultRoles: [ROLES.ADMIN] },
+  { key: "viewReportes", label: "Ver y configurar Informes automáticos", section: "Informes", defaultRoles: [ROLES.ADMIN] },
 ];
 
 const FEATURE_MAP = new Map(FEATURES.map((f) => [f.key, f]));

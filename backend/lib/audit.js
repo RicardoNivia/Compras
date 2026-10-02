@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { FIELD_LABELS, MAESTRO_FIELD_LABELS, USER_FIELD_LABELS } from "@/lib/auditLabels";
+import { FIELD_LABELS, MAESTRO_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS } from "@/lib/auditLabels";
 
-export { FIELD_LABELS, MAESTRO_FIELD_LABELS, USER_FIELD_LABELS, ACTION_LABELS } from "@/lib/auditLabels";
+export { FIELD_LABELS, MAESTRO_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, ACTION_LABELS } from "@/lib/auditLabels";
 
 // Nombre corto del tipo de maestro para el resumen del log — copia local
 // (sin importar lib/maestros.js) para no crear una dependencia circular
@@ -192,6 +192,40 @@ export async function logPermissionChange(actor, role, roleLabel, featureLabel, 
     recordInfo: `Permiso de "${roleLabel}" sobre "${featureLabel}"`,
     actor,
     changes,
+  });
+}
+
+// ---------- Informes automáticos ----------
+
+function reportSummary(r) {
+  if (!r) return null;
+  return `Informe "${r.nombre}"`;
+}
+
+export async function logReportCreate(actor, report) {
+  const changes = diffFields(null, report, REPORT_FIELD_LABELS);
+  await writeLog({ action: "crear", entityType: "informe", recordId: report.id, recordInfo: reportSummary(report), actor, changes });
+}
+
+export async function logReportUpdate(actor, before, after) {
+  const changes = diffFields(before, after, REPORT_FIELD_LABELS);
+  if (!changes.length) return;
+  await writeLog({ action: "editar", entityType: "informe", recordId: after.id, recordInfo: reportSummary(after), actor, changes });
+}
+
+export async function logReportDelete(actor, report) {
+  const changes = diffFields(report, null, REPORT_FIELD_LABELS);
+  await writeLog({ action: "eliminar", entityType: "informe", recordId: report.id, recordInfo: reportSummary(report), actor, changes });
+}
+
+export async function logReportSent(actor, report, ok, detail) {
+  await writeLog({
+    action: "enviar",
+    entityType: "informe",
+    recordId: report.id,
+    recordInfo: `Informe "${report.nombre}" ${ok ? "enviado" : "con error de envío"}${detail ? ` — ${detail}` : ""}`,
+    actor,
+    changes: null,
   });
 }
 

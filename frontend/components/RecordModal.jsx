@@ -5,6 +5,7 @@ import { getDiasInfo } from "@/lib/diasInfo";
 import { fmtCOP } from "@/lib/format";
 import { createRecordApi, updateRecordApi, deleteRecordApi } from "@/lib/api";
 import { IconTrash } from "@/components/icons";
+import ObservacionesReview from "@/components/ObservacionesReview";
 
 const PRESUPUESTO_ALERTA_PCT = 80;
 const PRESUPUESTO_CRITICO_PCT = 90;
@@ -64,6 +65,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [aiReviewLoading, setAiReviewLoading] = useState(false);
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -388,13 +390,25 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 disabled={!isEditable("observaciones")}
                 spellCheck lang="es"
               />
+              {isEditable("observaciones") && (
+                <ObservacionesReview
+                  observaciones={form.observaciones}
+                  estadoLegalizacion={form.estadoLegalizacion}
+                  descripcion={form.descripcion}
+                  area={form.area}
+                  categoria={form.categoria}
+                  proveedor={form.proveedor}
+                  valorConIva={form.valorConIva}
+                  onLoadingChange={setAiReviewLoading}
+                />
+              )}
             </div>
 
             {error && <div className="modal-error full" style={{ gridColumn: "1 / -1" }}>{error}</div>}
           </div>
 
           <div className="modal-foot">
-            <button type="submit" className="btn btn-primary" disabled={saving || deleting}>
+            <button type="submit" className="btn btn-primary" disabled={saving || deleting || aiReviewLoading} title={aiReviewLoading ? "Espera a que termine la revisión con IA" : undefined}>
               {saving && <span className="spinner" />}
               {saving ? "Guardando…" : "Guardar"}
             </button>

@@ -202,6 +202,24 @@ export function IconAlert(props) {
   );
 }
 
+export function IconCopy(props) {
+  return (
+    <Svg {...props} viewBox="0 0 14 14">
+      <rect x="5" y="5" width="7.5" height="7.5" rx="1.3" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M3.5 9.5h-1A1 1 0 0 1 1.5 8.5v-6A1 1 0 0 1 2.5 1.5h6a1 1 0 0 1 1 1v1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconInfo(props) {
+  return (
+    <Svg {...props} viewBox="0 0 14 14">
+      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M7 6.3v3.4M7 4.3h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function IconLayers(props) {
   return (
     <Svg {...props}>
@@ -219,6 +237,15 @@ export function IconBuilding(props) {
       <path d="M10 6.5h4.5v8.7H10" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
       <path d="M4.7 4.5h1.6M4.7 7.2h1.6M4.7 9.9h1.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
       <path d="M6.7 15.2v-2.3H5.3v2.3" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconMail(props) {
+  return (
+    <Svg {...props} viewBox="0 0 16 16">
+      <rect x="1.5" y="3" width="13" height="10" rx="1.6" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M2 4l6 5 6-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
