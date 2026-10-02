@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { reviewObservacionesApi } from "@/lib/api";
-import { IconSpark, IconAlert, IconCheck, IconInfo } from "@/components/icons";
+import { IconSpark, IconAlert, IconCheck, IconInfo, IconCopy } from "@/components/icons";
 
 const INFO_TEXT = "La IA revisa si el texto de Observaciones justifica bien el estado de legalización actual (qué falta, si es muy vago, etc.) y, si no alcanza, te propone un texto mejorado para que lo copies tú mismo — no cambia nada en el registro automáticamente.";
 
@@ -23,6 +23,18 @@ export default function ObservacionesReview({ observaciones, estadoLegalizacion,
   const [showInfo, setShowInfo] = useState(false);
   const [infoPos, setInfoPos] = useState(null);
   const infoBtnRef = useRef(null);
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(result.sugerencia);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // portapapeles no disponible (permiso denegado, navegador viejo, etc.)
+      // — no es crítico, el texto sigue visible para copiarlo a mano.
+    }
+  }
 
   function openInfo() {
     const rect = infoBtnRef.current?.getBoundingClientRect();
@@ -36,6 +48,7 @@ export default function ObservacionesReview({ observaciones, estadoLegalizacion,
     onLoadingChange?.(true);
     setError("");
     setResult(null);
+    setCopied(false);
     try {
       const res = await reviewObservacionesApi({ observaciones, estadoLegalizacion, descripcion, area, categoria, proveedor, valorConIva });
       setResult(res);
@@ -109,7 +122,12 @@ export default function ObservacionesReview({ observaciones, estadoLegalizacion,
                   <p style={{ margin: "0 0 10px", fontSize: 13.5, lineHeight: 1.5 }}>{result.comentario}</p>
                   {result.sugerencia && (
                     <div className="field full" style={{ marginTop: 4 }}>
-                      <label>Sugerencia (solo informativa — cópiala a mano si quieres usarla)</label>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <label style={{ margin: 0 }}>Sugerencia (solo informativa — no se aplica sola)</label>
+                        <button type="button" className="btn small" onClick={handleCopy}>
+                          {copied ? <IconCheck size={12} /> : <IconCopy size={12} />} {copied ? "Copiado" : "Copiar"}
+                        </button>
+                      </div>
                       <div className="dvalue" style={{ background: "var(--surface-2)", borderRadius: 10, padding: "8px 10px", whiteSpace: "pre-wrap" }}>
                         {result.sugerencia}
                       </div>

@@ -202,6 +202,15 @@ export function IconAlert(props) {
   );
 }
 
+export function IconCopy(props) {
+  return (
+    <Svg {...props} viewBox="0 0 14 14">
+      <rect x="5" y="5" width="7.5" height="7.5" rx="1.3" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M3.5 9.5h-1A1 1 0 0 1 1.5 8.5v-6A1 1 0 0 1 2.5 1.5h6a1 1 0 0 1 1 1v1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function IconInfo(props) {
   return (
     <Svg {...props} viewBox="0 0 14 14">
