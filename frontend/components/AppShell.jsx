@@ -1,31 +1,30 @@
-"use client";
-
-import Sidebar from "@/components/Sidebar";
-
-export default function AppShell({ user, title, subtitle, actions, children }) {
+// El menú lateral ya no vive acá — lo monta app/(app)/layout.js una sola vez
+// para toda la sesión de navegación, así nunca se vuelve a montar ni parpadea
+// con un skeleton al cambiar de página (el menú no depende de ningún fetch).
+// Este componente solo pone el encabezado (título/subtítulo/acciones) y el
+// contenido de la página — "user" se mantiene como prop aceptada por
+// compatibilidad con los llamadores existentes, pero ya no se usa acá.
+export default function AppShell({ title, subtitle, actions, children }) {
   return (
-    <div className="app-shell">
-      <Sidebar user={user} />
-      <div className="app-main">
-        <header className="topbar">
-          <div className="brand">
-            <span className="mark">{title}</span>
-            {subtitle && (
-              <>
-                <span className="sep">·</span>
-                <span className="sub">{subtitle}</span>
-              </>
-            )}
-          </div>
-          {actions && (
+    <>
+      <header className="topbar">
+        <div className="brand">
+          <span className="mark">{title}</span>
+          {subtitle && (
             <>
-              <div className="spacer" />
-              {actions}
+              <span className="sep">·</span>
+              <span className="sub">{subtitle}</span>
             </>
           )}
-        </header>
-        <main>{children}</main>
-      </div>
-    </div>
+        </div>
+        {actions && (
+          <>
+            <div className="spacer" />
+            {actions}
+          </>
+        )}
+      </header>
+      <main>{children}</main>
+    </>
   );
 }
