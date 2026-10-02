@@ -24,6 +24,11 @@ export function toClientRecord(r) {
     valorCot: r.valorCot,
     observaciones: r.observaciones,
     radicado: r.radicado,
+    // Capturada por el servidor al crear el registro (Prisma @default(now()),
+    // nunca editable desde el cliente — ver FIELD_SANITIZERS, que no la
+    // incluye) — distinta de "fechaSolicitud", que el usuario puede editar o
+    // dejar con una fecha pasada.
+    fechaRegistro: r.createdAt,
   };
 }
 

@@ -260,6 +260,8 @@ main{ flex:1; min-width:0; padding: 26px 32px 60px; width:100%; box-sizing:borde
   color: var(--kpi-c, var(--accent));
 }
 .kpi-explain-btn:hover{ text-decoration:underline; }
+.kpi-explain-btn:disabled{ color: var(--muted); cursor:not-allowed; opacity:0.7; }
+.kpi-explain-btn:disabled:hover{ text-decoration:none; }
 
 .kpi-explain-modal{ max-width:520px; }
 .kpi-explain-modal-title{ display:flex; align-items:flex-start; gap:10px; }

@@ -202,6 +202,15 @@ export function IconAlert(props) {
   );
 }
 
+export function IconInfo(props) {
+  return (
+    <Svg {...props} viewBox="0 0 14 14">
+      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M7 6.3v3.4M7 4.3h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function IconLayers(props) {
   return (
     <Svg {...props}>

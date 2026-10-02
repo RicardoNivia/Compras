@@ -69,6 +69,10 @@ export function canViewReportes(role) {
   return role === ROLES.ADMIN;
 }
 
+export function canViewAlertas(role) {
+  return ROLE_LIST.includes(role);
+}
+
 export function canCreateRecord(role) {
   return role === ROLES.ADMIN || role === ROLES.REGISTRO;
 }

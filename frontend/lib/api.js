@@ -164,6 +164,33 @@ export async function explainKpiApi({ label, value, comparisonLabel, comparisonV
   return handle(res);
 }
 
+// "Revisar con IA" — evalúa si el texto de Observaciones justifica bien el
+// estado de legalización actual, y sugiere una mejora si no (ver RecordModal.jsx).
+export async function reviewObservacionesApi({ observaciones, estadoLegalizacion, descripcion, area, categoria, proveedor, valorConIva }) {
+  const res = await fetch("/api/agent/review-observaciones", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ observaciones, estadoLegalizacion, descripcion, area, categoria, proveedor, valorConIva }),
+  });
+  return handle(res);
+}
+
+// ---------- Alertas y notificaciones (ver AlertasView.jsx) ----------
+
+export async function fetchAlertsApi() {
+  const res = await fetch("/api/alerts");
+  return handle(res);
+}
+
+// "Revisar con IA" de la página de Alertas — análisis completo (resumen,
+// riesgos, proyección, sugerencias) a partir de las listas ya calculadas por
+// el servidor; no manda datos desde el cliente, el backend recalcula las
+// listas por su cuenta para no confiar en lo que haya en pantalla.
+export async function reviewAlertasApi() {
+  const res = await fetch("/api/agent/review-alertas", { method: "POST" });
+  return handle(res);
+}
+
 // ---------- Informes automáticos (ver InformesView.jsx) ----------
 
 export async function fetchReportsApi() {

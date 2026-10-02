@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth-server";
-import { generateGeminiJson } from "@/lib/gemini";
-import { DEFAULT_GEMINI_MODEL } from "@/lib/geminiModels";
+import { generateStructuredJson } from "@/lib/aiStructured";
 
 function jsonError(message, status) {
   return NextResponse.json({ error: message }, { status });
@@ -28,9 +27,10 @@ const FILTER_SCHEMA = {
   required: ["onlyIncumplimiento"],
 };
 
-// Siempre usa el modelo gratis de Gemini por defecto — esta es una utilidad
+// Usa Gemini (modelo gratis) por defecto, con fallback automático a
+// Anthropic si Gemini falla (ver lib/aiStructured.js) — esta es una utilidad
 // puntual (traducir texto a filtros), no el chat completo del Agente IA, así
-// que no expone selector de modelo ni permite modelos de pago.
+// que no expone selector de modelo ni permite elegir modelos de pago.
 export async function POST(request) {
   const user = await getSessionUser();
   if (!user) return jsonError("No autorizado.", 401);

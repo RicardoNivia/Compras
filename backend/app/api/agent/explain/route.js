@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth-server";
-import { generateGeminiJson } from "@/lib/gemini";
-import { DEFAULT_GEMINI_MODEL } from "@/lib/geminiModels";
+import { generateStructuredJson } from "@/lib/aiStructured";
 
 function jsonError(message, status) {
   return NextResponse.json({ error: message }, { status });
@@ -18,8 +17,10 @@ const MAX_RECORDS = 300;
 // "Explícame este número": una explicación puntual en lenguaje natural de un
 // KPI del Dashboard, a partir de los registros que lo componen (los manda el
 // cliente, ya filtrados al periodo relevante — este endpoint no vuelve a
-// consultar la base). Siempre con el modelo gratis de Gemini, sin streaming
-// (respuesta corta, no hace falta el efecto "escribiendo…").
+// consultar la base). Gemini primero, con fallback a Anthropic si falla (ver
+// lib/aiStructured.js) — budget acotado porque esto corre síncrono dentro de
+// una sola llamada HTTP (sujeta al límite de ~30s del proxy del frontend),
+// no como trabajo en segundo plano.
 export async function POST(request) {
   const user = await getSessionUser();
   if (!user) return jsonError("No autorizado.", 401);
@@ -41,12 +42,7 @@ Registros relevantes (JSON, ${capped.length} de ${list.length}${list.length > ca
 ${JSON.stringify(capped)}`;
 
   try {
-    const result = await generateGeminiJson({
-      model: DEFAULT_GEMINI_MODEL,
-      systemInstruction,
-      prompt,
-      schema: EXPLAIN_SCHEMA,
-    });
+    const result = await generateStructuredJson({ systemInstruction, prompt, schema: EXPLAIN_SCHEMA, budgetMs: 25000 });
     return NextResponse.json({ explanation: result.explanation });
   } catch (err) {
     return jsonError(err.message || "No se pudo generar la explicación.", 500);
