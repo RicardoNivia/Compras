@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { generateReportContent } from "@/lib/reportContent";
 import { generateReportPdfBuffer } from "@/lib/reportPdf";
 import { generateEmailBody } from "@/lib/reportEmailBody";
-import { sendReportEmail, isMailerConfigured } from "@/lib/mailer";
+import { sendReportEmail, isMailerConfigured, MAIL_MAINTENANCE } from "@/lib/mailer";
 import { markSent } from "@/lib/reports";
 import { logReportSent } from "@/lib/audit";
 
@@ -81,7 +81,7 @@ function isDue(report, now) {
 }
 
 async function runDueReports() {
-  if (!isMailerConfigured()) return;
+  if (MAIL_MAINTENANCE || !isMailerConfigured()) return;
   let due;
   try {
     due = await prisma.reportConfig.findMany({ where: { activo: true } });

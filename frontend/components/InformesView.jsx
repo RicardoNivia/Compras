@@ -7,6 +7,15 @@ import { IconMail, IconEdit, IconTrash, IconSend, IconClock, IconCheck, IconAler
 
 const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
+// Mientras el envío de correos esté bloqueado (ver MAIL_MAINTENANCE en
+// backend/lib/mailer.js — SMTP-AUTH deshabilitado por el proveedor), se
+// avisa aquí y se deshabilita "Enviar ahora"; generar y guardar informes
+// sigue funcionando normal. Cambiar a `false` junto con el flag del backend
+// apenas se resuelva el envío.
+const MAIL_MAINTENANCE = true;
+const MAIL_MAINTENANCE_MESSAGE =
+  "El envío de correos está temporalmente en mantenimiento (SMTP-AUTH bloqueado por el proveedor de correo). Puedes seguir generando y guardando informes con normalidad; el botón \"Enviar ahora\" y el envío programado se reactivarán apenas se resuelva.";
+
 function scheduleLabel(r) {
   if (r.frecuencia === "diaria") return `Diario · ${r.hora}`;
   if (r.frecuencia === "semanal") return `Cada ${DIAS_SEMANA[r.diaSemana] ?? "—"} · ${r.hora}`;
@@ -56,7 +65,7 @@ export default function InformesView({ initialReports }) {
   function handleSaved(saved, isEdit) {
     setReports((prev) => (isEdit ? prev.map((r) => (r.id === saved.id ? saved : r)) : [saved, ...prev]));
     setTab("lista");
-    showToast(isEdit ? "Informe actualizado." : "Informe guardado — se enviará según su programación.");
+    showToast(isEdit ? "Informe actualizado." : MAIL_MAINTENANCE ? "Informe guardado — el envío está en mantenimiento por ahora." : "Informe guardado — se enviará según su programación.");
   }
 
   async function handleToggleActivo(report) {
@@ -114,6 +123,10 @@ export default function InformesView({ initialReports }) {
         </button>
       </div>
 
+      {MAIL_MAINTENANCE && (
+        <div className="modal-error" style={{ marginBottom: 14 }}><IconAlert size={13} /> {MAIL_MAINTENANCE_MESSAGE}</div>
+      )}
+
       {errorMsg && (
         <div className="modal-error" style={{ marginBottom: 14 }}><IconAlert size={13} /> {errorMsg}</div>
       )}
@@ -170,7 +183,10 @@ export default function InformesView({ initialReports }) {
                       </div>
                     ) : (
                       <div className="report-card-actions">
-                        <button type="button" className="btn btn-sync" disabled={busy} onClick={() => handleSendNow(r)}>
+                        <button
+                          type="button" className="btn btn-sync" disabled={busy || MAIL_MAINTENANCE} onClick={() => handleSendNow(r)}
+                          title={MAIL_MAINTENANCE ? MAIL_MAINTENANCE_MESSAGE : undefined}
+                        >
                           {busy ? <span className="spinner" /> : <IconSend size={13} />} Enviar ahora
                         </button>
                         <button type="button" className="user-action-btn edit" title="Editar" onClick={() => openEdit(r)}>

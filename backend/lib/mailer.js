@@ -1,5 +1,17 @@
 import nodemailer from "nodemailer";
 
+// Modo mantenimiento: el tenant de Microsoft 365 tiene SMTP-AUTH bloqueado
+// por política (ver el hint en sendReportEmail más abajo) y no hay una fecha
+// en que TI lo vaya a habilitar — en vez de dejar que cada envío (manual o
+// programado) falle igual con el mismo error 535, se bloquea desde el
+// origen con un mensaje claro. Generar y guardar informes sigue funcionando
+// normal; solo el envío queda pausado. Cambiar a `false` apenas TI habilite
+// SMTP-AUTH (o se migre a otro proveedor) — también hay que quitar el aviso
+// y volver a habilitar el botón "Enviar ahora" en frontend/components/InformesView.jsx.
+export const MAIL_MAINTENANCE = true;
+export const MAIL_MAINTENANCE_MESSAGE =
+  "El envío de correos está temporalmente en mantenimiento (SMTP-AUTH bloqueado por el proveedor de correo). Puedes seguir generando y guardando informes con normalidad; el envío se reactivará apenas se resuelva.";
+
 let cachedTransporter = null;
 
 // Transporte SMTP genérico (host/puerto/usuario configurables por .env) — por

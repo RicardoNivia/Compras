@@ -5,7 +5,7 @@ import { getReport, markSent } from "@/lib/reports";
 import { generateReportContent } from "@/lib/reportContent";
 import { generateReportPdfBuffer } from "@/lib/reportPdf";
 import { generateEmailBody } from "@/lib/reportEmailBody";
-import { sendReportEmail } from "@/lib/mailer";
+import { sendReportEmail, MAIL_MAINTENANCE, MAIL_MAINTENANCE_MESSAGE } from "@/lib/mailer";
 import { logReportSent } from "@/lib/audit";
 import { createJob } from "@/lib/reportJobs";
 
@@ -18,6 +18,9 @@ export async function POST(request, { params }) {
   const user = await getSessionUser();
   if (!user || !(await isRoleAllowed(user.role, "viewReportes"))) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
+  }
+  if (MAIL_MAINTENANCE) {
+    return NextResponse.json({ error: MAIL_MAINTENANCE_MESSAGE }, { status: 503 });
   }
 
   const jobId = createJob(async () => {

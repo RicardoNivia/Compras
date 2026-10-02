@@ -1,6 +1,13 @@
 const ANTHROPIC_API_BASE = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
-const MAX_TOKENS = 4096;
+// 4096 (y luego 8192) se quedaban cortos para informes con muchas secciones +
+// tablas grandes: Anthropic cortaba la respuesta a mitad del JSON (stop_reason
+// "max_tokens"), lo que fallaba al hacer JSON.parse con un mensaje confuso
+// ("no devolvió un JSON válido") en vez de explicar la causa real. Subir este
+// límite no tiene costo extra si no se usa — Anthropic solo cobra los tokens
+// que realmente genera, "max_tokens" es solo un techo — así que se deja bien
+// holgado (el modelo acepta hasta 64000 para claude-haiku-4-5).
+const MAX_TOKENS = 32000;
 // Mismo criterio que lib/gemini.js: un solo intento con timeout generoso
 // (en vez de varios cortos) — debe fallar con margen antes de que el proxy
 // de rewrites del frontend corte la conexión a los ~30s.
@@ -163,6 +170,9 @@ export async function generateAnthropicJson({ model, systemInstruction, prompt, 
 
   const data = await res.json();
   const text = (data?.content || []).filter((c) => c.type === "text").map((c) => c.text || "").join("");
+  if (data?.stop_reason === "max_tokens") {
+    throw new Error(`Anthropic cortó la respuesta por ser demasiado larga (límite de ${MAX_TOKENS} tokens) — intenta con un prompt más acotado (menos secciones/tablas a la vez).`);
+  }
   try {
     return JSON.parse(stripCodeFence(text));
   } catch {
