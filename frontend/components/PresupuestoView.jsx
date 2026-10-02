@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fmtCOP } from "@/lib/format";
 import { savePresupuestoApi, deletePresupuestoApi, setModoAnioApi, fetchPresupuestos } from "@/lib/api";
 import { IconMoney, IconPlus, IconAlert, IconChevronDown, IconBuilding, IconLayers, IconCheck, IconSearch } from "@/components/icons";
+import MoneyInput from "@/components/MoneyInput";
 
 const ALERTA_PCT = 80;
 const CRITICO_PCT = 90;
@@ -32,35 +33,6 @@ function sumRecordsFor(records, year, area, categoria) {
     total += r.valorConIva || 0;
   }
   return total;
-}
-
-// Input de valor en pesos colombianos: guarda el número plano (sin separadores)
-// en el estado del padre, pero muestra el valor formateado con separador de
-// miles a medida que se digita (los presupuestos suelen ser cifras de millones).
-function MoneyInput({ id, value, onChange, placeholder, ariaLabel }) {
-  const display = value === "" || value === null || value === undefined
-    ? ""
-    : new Intl.NumberFormat("es-CO").format(Number(value) || 0);
-
-  function handleChange(e) {
-    const digits = e.target.value.replace(/\D/g, "");
-    onChange(digits === "" ? "" : String(Number(digits)));
-  }
-
-  return (
-    <div className="money-field">
-      <span className="money-field-prefix">$</span>
-      <input
-        id={id}
-        type="text"
-        inputMode="numeric"
-        value={display}
-        onChange={handleChange}
-        placeholder={placeholder}
-        aria-label={ariaLabel}
-      />
-    </div>
-  );
 }
 
 // Donut de progreso — a diferencia de un gauge de "cumplimiento" (más alto es

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import RecordModal from "@/components/RecordModal";
-import { fmtPesos, fmtCOP } from "@/lib/format";
+import { fmtCOP } from "@/lib/format";
 import { getDiasInfo } from "@/lib/diasInfo";
 import { patchRecordApi, deleteRecordApi, searchFiltersWithAiApi } from "@/lib/api";
 import { canCreateRecord, canEditRecord, canDeleteRecord, canToggleRadicado, getEditableFields } from "@/lib/roles";
@@ -460,15 +460,15 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                     <td>{r.responsable || "—"}</td>
                     <td><span className={`pill ${estadoPillClass(r.estado)}`}>{r.estado || "—"}</span></td>
                     <td className="truncate">{r.categoria || "—"}</td>
-                    <td className="desc-cell">{r.descripcion || "—"}</td>
+                    <td className="truncate wide">{r.descripcion || "—"}</td>
                     <td>{r.medioPago || "—"}</td>
                     <td className="truncate">{r.licitacion || "—"}</td>
                     <td><span className={`pill ${legalizacionPillClass(r.estadoLegalizacion)}`}>{r.estadoLegalizacion || "—"}</span></td>
                     <td className="truncate wide">{r.proveedor || "—"}</td>
-                    <td className="mono">{r.fe || "—"}</td>
-                    <td className="num">{fmtPesos(r.valorConIva)}</td>
-                    <td className="num">{fmtPesos(r.valorSinIva)}</td>
-                    <td className="num">{fmtPesos(r.valorCot)}</td>
+                    <td className="mono cell-fe">{r.fe || "—"}</td>
+                    <td className="num">{fmtCOP(r.valorConIva)}</td>
+                    <td className="num">{fmtCOP(r.valorSinIva)}</td>
+                    <td className="num">{fmtCOP(r.valorCot)}</td>
                     <td className="truncate wide">{r.observaciones || "—"}</td>
                     <td className="actions-cell">
                       {confirmDeleteId === r.id ? (

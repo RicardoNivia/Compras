@@ -88,6 +88,16 @@ export default function DetailModal({ record, onClose }) {
           <Item label="Valor cotizado">{fmtPesos(record.valorCot)}</Item>
           <Item label="Radicado">{record.radicado ? "Sí" : "No"}</Item>
 
+          {record.moneda === "USD" && (
+            <>
+              <Item label="Moneda original">Dólares (USD)</Item>
+              <Item label="Valor en USD / TRM">
+                {record.valorUsd != null ? `US$${record.valorUsd.toLocaleString("es-CO")}` : "—"}
+                {record.trm != null ? ` · TRM ${record.trm.toLocaleString("es-CO")}` : ""}
+              </Item>
+            </>
+          )}
+
           <Item label="Observaciones" full><EmptyOr value={record.observaciones} /></Item>
 
           <Item label="Fecha de registro en el sistema">{fmtDateTime(record.fechaRegistro)}</Item>

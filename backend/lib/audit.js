@@ -269,6 +269,23 @@ export async function listAuditLogs({ from, to, userId, recordId, page = 1, page
   };
 }
 
+// ---------- Agente IA (chat) ----------
+// Segunda capa de validación del chat (ver lib/agentModeration.js): cuando el
+// moderador detecta que una respuesta ya generada violó las reglas (habló
+// fuera de tema, reveló infraestructura o dio información de credenciales),
+// queda registrado acá para que un admin pueda auditarlo — independiente de
+// que la respuesta mostrada al usuario ya se haya sustituido por el rechazo.
+export async function logAgentViolation(actor, { conversationId, userMessage, categoria, razon }) {
+  await writeLog({
+    action: "bloqueoIa",
+    entityType: "agente-ia",
+    recordId: conversationId || null,
+    recordInfo: `Respuesta bloqueada (${categoria || "sin categoría"})${razon ? ` — ${razon}` : ""} · Pregunta: "${(userMessage || "").slice(0, 200)}"`,
+    actor,
+    changes: null,
+  });
+}
+
 // Autores distintos que aparecen en el log (incluye usuarios ya eliminados),
 // para poblar el filtro por usuario sin depender de la tabla users.
 export async function listAuditActors() {

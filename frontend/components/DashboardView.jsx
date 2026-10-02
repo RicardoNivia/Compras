@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DetailModal from "@/components/DetailModal";
 import BarChartSvg from "@/components/charts/BarChartSvg";
 import StackedBarChartSvg from "@/components/charts/StackedBarChartSvg";
@@ -140,12 +140,12 @@ export default function DashboardView({ records, presupuestos = [] }) {
 
   function switchToMensual() {
     setViewMode("mensual");
-    setSelectedYear("");
+    setSelectedYear((y) => y || currentYear);
     setSelectedMonth((m) => m || currentMonthKey);
   }
 
   // Años disponibles a partir de todos los registros (más el año actual, para que
-  // la pestaña Anual siempre tenga un año válido seleccionado por defecto).
+  // ambas pestañas siempre tengan un año válido seleccionado por defecto).
   const yearOptions = useMemo(() => {
     const set = new Set([currentYear]);
     for (const r of records) {
@@ -155,25 +155,33 @@ export default function DashboardView({ records, presupuestos = [] }) {
     return Array.from(set).sort().reverse();
   }, [records, currentYear]);
 
+  // El año se comparte entre las dos pestañas: eligiendo el mismo año en Mensual
+  // y en Anual, ambas deben quedar restringidas exactamente al mismo conjunto de
+  // registros (ver yearFilteredRecords/yearRecordsForCategoriaArea más abajo).
   function handleYearChange(year) {
     setSelectedYear(year);
   }
 
-  // Pestaña Anual: se restringe al año elegido. Pestaña Mensual: sin restricción de
-  // año (el mes YYYY-MM ya es específico), así el selector de mes lista todos los meses.
   const yearFilteredRecords = useMemo(() => {
     if (!selectedYear) return records;
     return records.filter((r) => (monthKey(r.fechaSolicitud) || "").startsWith(selectedYear));
   }, [records, selectedYear]);
 
   const monthOptions = useMemo(() => {
-    const set = new Set(viewMode === "mensual" ? [currentMonthKey] : []);
+    const set = new Set(viewMode === "mensual" && selectedYear === currentYear ? [currentMonthKey] : []);
     for (const r of yearFilteredRecords) {
       const k = monthKey(r.fechaSolicitud);
       if (k) set.add(k);
     }
     return Array.from(set).sort().reverse();
-  }, [yearFilteredRecords, viewMode, currentMonthKey]);
+  }, [yearFilteredRecords, viewMode, currentMonthKey, selectedYear, currentYear]);
+
+  // Si al cambiar de año en Mensual el mes elegido no existe en el nuevo año
+  // (sin registros ese mes), se ajusta al mes disponible más reciente de ese año.
+  useEffect(() => {
+    if (viewMode !== "mensual" || monthOptions.length === 0) return;
+    if (!monthOptions.includes(selectedMonth)) setSelectedMonth(monthOptions[0]);
+  }, [viewMode, monthOptions, selectedMonth]);
 
   const multiYear = useMemo(() => {
     const years = new Set(monthOptions.map((k) => k.slice(0, 4)));
@@ -591,7 +599,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
 
   // ---------- Presupuesto por área (configurado en la sección "Presupuesto",
   // por año — en modo "categoría" el total del área es la suma de categorías) ----------
-  const refYear = Number(viewMode === "anual" ? selectedYear : (selectedMonth || currentMonthKey).slice(0, 4));
+  const refYear = Number(selectedYear || currentYear);
   const presupuestoPorArea = useMemo(() => {
     const map = new Map();
     for (const p of presupuestos) {
@@ -614,11 +622,18 @@ export default function DashboardView({ records, presupuestos = [] }) {
   }, [presupuestos, refYear]);
 
   // ---------- Consumo por categoría y área ----------
-  // Presupuesto de referencia: en la vista Mensual se compara contra el presupuesto
-  // anual dividido en 12 (presupuesto del mes); en la vista Anual, contra el anual completo.
+  // El consumo mostrado aquí es siempre el acumulado de todo el año de
+  // referencia (refYear) — igual en la vista Mensual que en la Anual, sin
+  // importar qué mes esté seleccionado. Solo el presupuesto de comparación
+  // cambia: en Mensual se compara contra el presupuesto anual dividido en 12
+  // (presupuesto del mes); en Anual, contra el anual completo.
+  const yearRecordsForCategoriaArea = useMemo(() => {
+    return records.filter((r) => !isAnulado(r) && (monthKey(r.fechaSolicitud) || "").startsWith(String(refYear)));
+  }, [records, refYear]);
+
   const porCategoriaArea = useMemo(() => {
     const areaMap = new Map();
-    for (const r of activeRecords) {
+    for (const r of yearRecordsForCategoriaArea) {
       const a = r.area || "Sin área";
       if (!areaMap.has(a)) areaMap.set(a, { count: 0, value: 0, cats: new Map() });
       const e = areaMap.get(a);
@@ -636,21 +651,16 @@ export default function DashboardView({ records, presupuestos = [] }) {
         .map((cname) => {
           const cvalue = v.cats.get(cname) || 0;
           const catPresupuestoAnual = catPresupuestos.get(cname) ?? null;
-          const catPresupuesto = catPresupuestoAnual != null
-            ? (viewMode === "mensual" ? catPresupuestoAnual / 12 : catPresupuestoAnual)
-            : null;
-          const catPctPresupuesto = catPresupuesto ? (cvalue / catPresupuesto) * 100 : null;
+          const catPctPresupuesto = catPresupuestoAnual ? (cvalue / catPresupuestoAnual) * 100 : null;
           return {
             name: cname, value: cvalue, pct: v.value ? (cvalue / v.value) * 100 : 0,
-            presupuesto: catPresupuesto, pctPresupuesto: catPctPresupuesto,
+            presupuesto: catPresupuestoAnual, pctPresupuesto: catPctPresupuesto,
           };
         })
         .sort((a, b) => b.value - a.value);
 
       const presupuestoAnual = presupuestoPorArea.get(name) ?? null;
-      const presupuesto = presupuestoAnual != null
-        ? (viewMode === "mensual" ? presupuestoAnual / 12 : presupuestoAnual)
-        : null;
+      const presupuesto = presupuestoAnual;
       const pctPresupuesto = presupuesto ? (v.value / presupuesto) * 100 : null;
       const presupuestoEstado = pctPresupuesto === null
         ? "sin-datos"
@@ -683,7 +693,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
       conPresupuesto: acc.conPresupuesto || r.presupuesto != null,
     }), { count: 0, value: 0, presupuesto: 0, disponible: 0, gastadoConPresupuesto: 0, conPresupuesto: false });
     return { rows, totals };
-  }, [activeRecords, presupuestoPorArea, presupuestoCategoriasPorArea, viewMode]);
+  }, [yearRecordsForCategoriaArea, presupuestoPorArea, presupuestoCategoriasPorArea]);
 
   async function handleExportPDF() {
     if (!containerRef.current) return;
@@ -809,12 +819,20 @@ export default function DashboardView({ records, presupuestos = [] }) {
               </select>
             </div>
           ) : (
-            <div className="field" style={{ width: 200 }}>
-              <label htmlFor="dash-month">Mes</label>
-              <select id="dash-month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
-                {monthOptions.map((k) => <option key={k} value={k}>{monthLabel(k, true)}</option>)}
-              </select>
-            </div>
+            <>
+              <div className="field" style={{ width: 110 }}>
+                <label htmlFor="dash-year-mensual">Año</label>
+                <select id="dash-year-mensual" value={selectedYear} onChange={(e) => handleYearChange(e.target.value)}>
+                  {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ width: 170 }}>
+                <label htmlFor="dash-month">Mes</label>
+                <select id="dash-month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+                  {monthOptions.map((k) => <option key={k} value={k}>{monthLabel(k, multiYear)}</option>)}
+                </select>
+              </div>
+            </>
           )}
         </div>
         <div className="spacer" />
@@ -916,7 +934,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
         <div className="card" style={{ marginBottom: 14 }}>
           <h3>Presupuesto vs. gastado — nivel general</h3>
           <p className="card-sub">
-            Suma de las áreas con presupuesto configurado para {viewMode === "mensual" ? `${refYear} (prorrateado por mes)` : refYear}.
+            Suma de las áreas con presupuesto configurado para {refYear}.
           </p>
           <div className="kpi-row" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
             <div className="kpi" style={{ "--kpi-c": "var(--accent)" }}>
@@ -1330,7 +1348,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
       <div className="card" style={{ marginBottom: 14 }}>
         <h3>Consumo por categoría y área</h3>
         <p className="card-sub">
-          Presupuesto {refYear}: {viewMode === "mensual" ? "presupuesto del año dividido en 12 (mes)" : "presupuesto configurado para el año"} (configúralo en la sección "Presupuesto").
+          Presupuesto {refYear}: presupuesto configurado para el año (configúralo en la sección "Presupuesto").
           Se resalta en amarillo desde el {PRESUPUESTO_ALERTA_PCT}% de consumo, y en rojo desde el {PRESUPUESTO_CRITICO_PCT}% (cerca del límite o ya excedido).
         </p>
         <div className="table-wrap-plain">
@@ -1338,7 +1356,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
             <thead>
               <tr>
                 <th>Área</th><th className="num">Cant.</th><th className="num">Valor total</th>
-                <th className="num">Presupuesto {viewMode === "mensual" ? "(mes)" : `(${refYear})`}</th>
+                <th className="num">Presupuesto ({refYear})</th>
                 <th className="num">Disponible</th>
                 <th className="num">% consumido</th>
                 <th>Categorías</th>
