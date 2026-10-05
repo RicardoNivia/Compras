@@ -18,12 +18,14 @@ export async function POST(request) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   const body = await request.json().catch(() => ({}));
-  if (!body.prompt || !String(body.prompt).trim()) {
-    return NextResponse.json({ error: "Describe qué debe contener el informe." }, { status: 400 });
+  const hasPrompt = !!(body.prompt && String(body.prompt).trim());
+  const hasBloques = Array.isArray(body.bloques) && body.bloques.length > 0;
+  if (!hasPrompt && !hasBloques) {
+    return NextResponse.json({ error: "Describe qué debe contener el informe (prompt) o agrega al menos un bloque." }, { status: 400 });
   }
 
   const jobId = createJob(async () => {
-    const content = await generateReportContent(body.prompt);
+    const content = await generateReportContent({ prompt: body.prompt, bloques: body.bloques, nombre: body.nombre });
     const [pdfBuffer, emailBody] = await Promise.all([
       generateReportPdfBuffer(content, { nombre: body.nombre, prioridad: body.prioridad || "media" }),
       generateEmailBody({ content, nombre: body.nombre || "Informe", cuerpoModo: body.cuerpoModo || "resumen", cuerpoPrompt: body.cuerpoPrompt }),

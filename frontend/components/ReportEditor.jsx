@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { previewReportApi, createReportApi, updateReportApi, renderReportPdfApi } from "@/lib/api";
 import { IconSpark, IconAlert, IconCheck } from "@/components/icons";
+import ReportBloqueBuilder, { nuevoBloque, tieneBloqueIaSinGenerar } from "@/components/ReportBloqueBuilder";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -24,6 +25,7 @@ function emptyForm(report) {
   return {
     nombre: report?.nombre || "",
     prompt: report?.prompt || "",
+    bloques: report?.bloques || [],
     frecuencia: report?.frecuencia || "diaria",
     diaSemana: report?.diaSemana ?? 1,
     diaMes: report?.diaMes ?? 1,
@@ -86,6 +88,7 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
   const [restoringPdf, setRestoringPdf] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [draftLoading, setDraftLoading] = useState(false);
 
   // Al editar un informe ya guardado, el PDF en sí no se persiste en la BD
   // (solo el contenido estructurado) — se vuelve a dibujar al instante desde
@@ -107,13 +110,35 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
+  async function handleGenerarBorrador() {
+    if (!form.prompt.trim()) return;
+    setError("");
+    setDraftLoading(true);
+    try {
+      const res = await previewReportApi({
+        prompt: form.prompt, nombre: form.nombre,
+        cuerpoModo: form.cuerpoModo, cuerpoPrompt: form.cuerpoPrompt || "Sé formal y conciso.",
+      });
+      const nuevosBloques = (res.content?.secciones || []).map((s) => ({
+        ...nuevoBloque("texto"), titulo: s.titulo || "", contenido: s.contenido || "", destacado: s.destacado || "",
+      }));
+      update("bloques", [...form.bloques, ...nuevosBloques]);
+    } catch (err) {
+      setError(err.message || "No se pudo generar el borrador.");
+    } finally {
+      setDraftLoading(false);
+    }
+  }
+
   async function handlePreview() {
-    if (!form.prompt.trim()) { setError("Describe qué debe contener el informe antes de generar la vista previa."); return; }
+    if (form.bloques.length === 0) { setError("Agrega al menos un bloque al informe antes de generar la vista previa."); return; }
+    const sinGenerar = tieneBloqueIaSinGenerar(form.bloques);
+    if (sinGenerar) { setError(`Genera el contenido del bloque de IA "${sinGenerar.titulo || "sin título"}" antes de continuar.`); return; }
     setError("");
     setPreviewing(true);
     try {
       const res = await previewReportApi({
-        prompt: form.prompt, nombre: form.nombre,
+        bloques: form.bloques, nombre: form.nombre,
         cuerpoModo: form.cuerpoModo, cuerpoPrompt: form.cuerpoPrompt,
       });
       setPreview(res);
@@ -129,7 +154,9 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
     setError("");
     if (!form.nombre.trim()) return setError("Dale un nombre al informe.");
     if (!form.cuerpoPrompt.trim()) return setError("Describe las instrucciones de estilo para el cuerpo del correo.");
-    if (!form.prompt.trim()) return setError("Describe qué debe contener el informe.");
+    if (form.bloques.length === 0) return setError("Agrega al menos un bloque al informe.");
+    const sinGenerar = tieneBloqueIaSinGenerar(form.bloques);
+    if (sinGenerar) return setError(`Genera el contenido del bloque de IA "${sinGenerar.titulo || "sin título"}" antes de guardar.`);
     if (!form.destinatarios.length) return setError("Agrega al menos un destinatario en \"Para\".");
     if (!preview?.content) return setError("Genera la vista previa antes de guardar, para confirmar cómo se verá el correo.");
 
@@ -180,12 +207,25 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
         </div>
 
         <div className="field full">
-          <label htmlFor="rp-prompt">¿Qué debe contener? (prompt) *</label>
-          <textarea
-            id="rp-prompt" rows={4} value={form.prompt} onChange={(e) => update("prompt", e.target.value)}
-            placeholder="Ej. Resume el total comprado por área, destaca las compras sin legalizar, muestra el cumplimiento de tiempos de entrega y grafica la distribución por categoría."
-          />
+          <label>Bloques del informe *</label>
+          <ReportBloqueBuilder bloques={form.bloques} onChange={(bloques) => update("bloques", bloques)} />
         </div>
+
+        <details className="ia-draft-details">
+          <summary><IconSpark size={12} /> Generar un borrador con IA a partir de un prompt (opcional)</summary>
+          <textarea
+            rows={3} value={form.prompt} onChange={(e) => update("prompt", e.target.value)}
+            placeholder="Ej. Resume el total comprado por área, destaca las compras sin legalizar y muestra el cumplimiento de tiempos de entrega."
+          />
+          <button type="button" className="btn btn-sync small" onClick={handleGenerarBorrador} disabled={draftLoading || !form.prompt.trim()}>
+            {draftLoading ? <span className="spinner" /> : <IconSpark size={12} />}
+            {draftLoading ? "Generando borrador…" : "Agregar bloques de texto con IA"}
+          </button>
+          <p className="schedule-note">
+            Agrega bloques de texto editables a partir del prompt — luego puedes editarlos, moverlos o borrarlos, y
+            complementarlos con bloques de Gráfico/Tabla/KPI calculados exactos sobre los datos reales (sin IA).
+          </p>
+        </details>
 
         <div className="field full">
           <button type="button" className="btn btn-sync" onClick={handlePreview} disabled={previewing}>
@@ -297,7 +337,7 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
 
         {!preview ? (
           <div className="report-preview-placeholder">
-            Escribe el prompt y presiona &quot;Generar vista previa&quot; para ver cómo se vería el envío antes de guardar.
+            Agrega bloques y presiona &quot;Generar vista previa&quot; para ver cómo se vería el envío antes de guardar.
           </div>
         ) : previewTab === "cuerpo" ? (
           preview.emailBody ? (

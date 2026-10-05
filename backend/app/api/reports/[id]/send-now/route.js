@@ -27,7 +27,7 @@ export async function POST(request, { params }) {
     let report;
     try {
       report = await getReport(params.id);
-      const content = await generateReportContent(report.prompt);
+      const content = await generateReportContent({ prompt: report.prompt, bloques: report.bloques, nombre: report.nombre });
       const [pdfBuffer, emailBody] = await Promise.all([
         generateReportPdfBuffer(content, { nombre: report.nombre, prioridad: report.prioridad }),
         generateEmailBody({ content, nombre: report.nombre, cuerpoModo: report.cuerpoModo, cuerpoPrompt: report.cuerpoPrompt }),

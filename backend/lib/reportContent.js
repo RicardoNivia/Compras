@@ -213,12 +213,10 @@ function buildAggregates(records, presupuestos) {
   };
 }
 
-// Genera el contenido estructurado del informe a partir del prompt del admin
-// y los datos reales de compras — sin streaming, probando modelos en orden
-// (Gemini y luego Anthropic, ver lib/aiStructured.js) hasta obtener
-// respuesta. Se usa tanto para la vista previa como para el envío real, así
-// ambas rutas comparten exactamente la misma lógica de generación.
-export async function generateReportContent(prompt) {
+// Trae records+presupuestos y arma agregados/muestra — compartido entre el
+// flujo legado (un solo prompt para todo el informe) y el flujo nuevo por
+// bloques (ver renderReportFromBloques/generateBloqueIaContent más abajo).
+async function loadAggregates() {
   const anioActual = new Date().getFullYear();
   const [records, { presupuestos }] = await Promise.all([
     listRecords(),
@@ -228,6 +226,17 @@ export async function generateReportContent(prompt) {
   // Muestra para ejemplos puntuales: prioriza los más recientes (más
   // relevantes para un informe ejecutivo que una muestra arbitraria).
   const sample = [...records].reverse().slice(0, MAX_RECORDS).map(compactRecord);
+  return { records, aggregates, sample };
+}
+
+// Genera el contenido estructurado del informe a partir de UN SOLO prompt del
+// admin — sin streaming, probando modelos en orden (Gemini y luego Anthropic,
+// ver lib/aiStructured.js) hasta obtener respuesta. Flujo legado: la IA decide
+// toda la estructura del informe. Se mantiene para informes guardados antes
+// del constructor por bloques, y como motor de "generar borrador con IA"
+// dentro de ese constructor (ver ReportBloqueBuilder.jsx).
+async function generateReportContentFromPrompt(prompt) {
+  const { records, aggregates, sample } = await loadAggregates();
 
   const userPrompt = `Instrucción del administrador sobre qué debe contener el informe:
 """${prompt}"""
@@ -239,5 +248,179 @@ Muestra de registros más recientes (JSON, ${sample.length} de ${records.length}
 ${JSON.stringify(sample)}`;
 
   return generateStructuredJson({ systemInstruction: SYSTEM_INSTRUCTION, prompt: userPrompt, schema: REPORT_SCHEMA });
+}
+
+const KPI_METRICAS = {
+  totalValorConIva: { label: "Valor total comprado", formato: "moneda" },
+  totalRegistros: { label: "Total de compras", formato: "entero" },
+  totalSinLegalizar: { label: "Compras sin legalizar", formato: "entero" },
+  cumplimientoPct: { label: "Cumplimiento de tiempos de entrega", formato: "porcentaje", path: "tiemposEntrega.cumplimientoPct" },
+  promedioDiasHabiles: { label: "Promedio días hábiles de entrega", formato: "dias", path: "tiemposEntrega.promedioDiasHabiles" },
+  totalPendientesVencidos: { label: "Pendientes vencidos (fuera de SLA)", formato: "entero", path: "tiemposEntrega.totalPendientesVencidos" },
+};
+
+const AGRUPAR_LABELS = {
+  area: "área", categoria: "categoría", estado: "estado",
+  estadoLegalizacion: "estado de legalización", proveedor: "proveedor",
+};
+
+function resolvePath(obj, path) {
+  return path.split(".").reduce((o, k) => (o == null ? null : o[k]), obj);
+}
+
+function fmtMoneda(n) {
+  return `$${Math.round(n || 0).toLocaleString("es-CO")}`;
+}
+
+function fmtKpiValue(valor, formato) {
+  if (valor === null || valor === undefined) return "Sin datos";
+  if (formato === "moneda") return fmtMoneda(valor);
+  if (formato === "porcentaje") return `${valor}%`;
+  if (formato === "dias") return `${valor} días hábiles`;
+  return String(valor);
+}
+
+// Agrupación genérica por cualquier campo del registro (incluye "proveedor",
+// que no viene precalculado en "agregados") — usada por los bloques de tipo
+// grafico/tabla. A diferencia del resto de "agregados" (exactos sobre el
+// 100%), aquí se limita a las "limit" agrupaciones de mayor valor, igual que
+// hace la IA en el flujo legado, para no saturar el PDF.
+function groupRecordsBy(records, field, limit) {
+  const map = countBy(records, field);
+  return Object.entries(map)
+    .map(([nombre, v]) => ({ nombre, cantidad: v.cantidad, valorConIva: v.valorConIva }))
+    .sort((a, b) => b.valorConIva - a.valorConIva)
+    .slice(0, limit);
+}
+
+function renderBloqueTexto(b) {
+  return { titulo: b.titulo || "Nota", contenido: b.contenido || "", destacado: b.destacado || null, grafico: null, tabla: null };
+}
+
+function renderBloqueKpi(b, aggregates) {
+  const def = KPI_METRICAS[b.metrica] || KPI_METRICAS.totalValorConIva;
+  const valor = def.path ? resolvePath(aggregates, def.path) : aggregates[b.metrica];
+  const texto = fmtKpiValue(valor, def.formato);
+  return { titulo: b.titulo || def.label, contenido: `${def.label}: ${texto}.`, destacado: texto, grafico: null, tabla: null };
+}
+
+function renderBloqueGrafico(b, records) {
+  const campo = b.agruparPor || "area";
+  const metrica = b.metricaAgrupada === "cantidad" ? "cantidad" : "valorConIva";
+  const grupos = groupRecordsBy(records, campo, 8);
+  const datos = grupos.map((g) => ({ etiqueta: g.nombre, valor: g[metrica] }));
+  const top = datos[0];
+  const destacado = top ? `${top.etiqueta}: ${metrica === "valorConIva" ? fmtMoneda(top.valor) : `${top.valor} compra(s)`}` : null;
+  const etiquetaCampo = AGRUPAR_LABELS[campo] || campo;
+  return {
+    titulo: b.titulo || `Por ${etiquetaCampo}`,
+    contenido: `Comparación de ${metrica === "valorConIva" ? "valor comprado" : "cantidad de compras"} por ${etiquetaCampo}.`,
+    destacado,
+    grafico: { titulo: b.titulo || "Comparación", tipo: "barras", datos },
+    tabla: null,
+  };
+}
+
+function renderBloqueTabla(b, records) {
+  const campo = b.agruparPor || "area";
+  const etiquetaCampo = AGRUPAR_LABELS[campo] || campo;
+  const grupos = groupRecordsBy(records, campo, 15);
+  const totalValor = records.reduce((s, r) => s + (r.valorConIva || 0), 0);
+  const columnas = [etiquetaCampo.charAt(0).toUpperCase() + etiquetaCampo.slice(1), "Cantidad", "Valor", "% del total"];
+  const filas = grupos.map((g) => [
+    g.nombre,
+    String(g.cantidad),
+    fmtMoneda(g.valorConIva),
+    totalValor ? `${Math.round((g.valorConIva / totalValor) * 1000) / 10}%` : "—",
+  ]);
+  return {
+    titulo: b.titulo || `Resumen por ${etiquetaCampo}`,
+    contenido: `Desglose de compras por ${etiquetaCampo}.`,
+    destacado: null,
+    grafico: null,
+    tabla: { columnas, filas },
+  };
+}
+
+function renderBloqueIa(b) {
+  return {
+    titulo: b.titulo || "Análisis con IA",
+    contenido: b.contenidoCongelado || "(Este bloque aún no se ha generado — ábrelo en el editor y genera su contenido con IA antes de enviar el informe.)",
+    destacado: b.destacadoCongelado || null,
+    grafico: null,
+    tabla: null,
+  };
+}
+
+// Arma el informe de forma determinística a partir de los bloques que el
+// usuario configuró manualmente en el constructor (ReportBloqueBuilder.jsx):
+// kpi/grafico/tabla se calculan en JS directo sobre los datos reales (sin IA,
+// sin posibilidad de inventar cifras); "texto" es lo que el usuario escribió
+// a mano (o lo que trajo "generar borrador con IA", ya congelado); "ia" es la
+// respuesta — también ya congelada — de la pregunta puntual que el usuario le
+// hizo a la IA para ese bloque (ver generateBloqueIaContent).
+export async function renderReportFromBloques(bloques, { nombre } = {}) {
+  const { records, aggregates } = await loadAggregates();
+  const secciones = (bloques || []).map((b) => {
+    if (b.tipo === "kpi") return renderBloqueKpi(b, aggregates);
+    if (b.tipo === "grafico") return renderBloqueGrafico(b, records);
+    if (b.tipo === "tabla") return renderBloqueTabla(b, records);
+    if (b.tipo === "ia") return renderBloqueIa(b);
+    return renderBloqueTexto(b);
+  });
+  return {
+    asunto: nombre || "Informe",
+    saludo: "Buen día,",
+    secciones,
+    cierre: "Para más detalle, ingresa al Panel de Compras.",
+  };
+}
+
+const BLOQUE_IA_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    contenido: { type: "STRING" },
+    destacado: { type: "STRING", nullable: true },
+  },
+  required: ["contenido"],
+};
+
+const BLOQUE_IA_SYSTEM_INSTRUCTION = `Eres el asistente de IA de UN bloque dentro de un informe de compras que un administrador arma manualmente, bloque por bloque (el resto del informe puede tener bloques de KPI/gráfico/tabla calculados exactos, sin IA). Te hacen una pregunta puntual sobre los datos de compras; respondes con el contenido de ESE bloque: 2 a 5 líneas en español, usa "- " para viñetas si ayuda a la lectura. "destacado" es opcional: una cifra clave de la respuesta (ej. "$42.300.000" o "6 compras"), o null si no aplica.
+
+Reglas estrictas: basa cualquier cifra, suma, conteo o porcentaje EXCLUSIVAMENTE en los "agregados" que te entregan (calculados sobre el 100% de los datos, son exactos) — la "muestra" de registros es solo para citar ejemplos puntuales (proveedor, área, descripción), nunca para calcular totales. Si el dato que piden no está en los agregados ni se puede derivar de ellos con certeza, dilo explícitamente en vez de inventarlo o calcularlo a ojo sobre la muestra. Nunca inventes cifras, proveedores, fechas ni datos que no estén en la información entregada. Sé conciso — esto es un solo bloque de un correo, no un documento extenso.`;
+
+// Genera (o regenera) el contenido de un bloque tipo "ia" dentro del
+// constructor — el resultado se "congela" (se guarda en el bloque, ver
+// bloque.contenidoCongelado) y de ahí en adelante se reutiliza tal cual al
+// renderizar el informe (renderBloqueIa), sin volver a llamar a la IA en cada
+// envío programado.
+export async function generateBloqueIaContent(pregunta) {
+  const { aggregates, sample } = await loadAggregates();
+  const userPrompt = `Pregunta del administrador para este bloque del informe:
+"""${pregunta}"""
+
+Agregados exactos:
+${JSON.stringify(aggregates)}
+
+Muestra de registros recientes (solo para ejemplos puntuales, no para totales):
+${JSON.stringify(sample)}`;
+  return generateStructuredJson({ systemInstruction: BLOQUE_IA_SYSTEM_INSTRUCTION, prompt: userPrompt, schema: BLOQUE_IA_SCHEMA });
+}
+
+// Punto de entrada único usado por preview/send-now/reportScheduler: acepta el
+// prompt legado como string suelto (compatibilidad hacia atrás) o un objeto
+// {prompt, bloques, nombre}. Si trae bloques (al menos uno), el informe se
+// arma de forma determinística/por bloques; si no, cae al flujo legado de un
+// solo prompt para todo el informe.
+export async function generateReportContent(reportOrPrompt) {
+  if (typeof reportOrPrompt === "string") {
+    return generateReportContentFromPrompt(reportOrPrompt);
+  }
+  const { prompt, bloques, nombre } = reportOrPrompt || {};
+  const parsedBloques = Array.isArray(bloques) ? bloques : (typeof bloques === "string" ? JSON.parse(bloques || "[]") : []);
+  if (parsedBloques.length > 0) {
+    return renderReportFromBloques(parsedBloques, { nombre });
+  }
+  return generateReportContentFromPrompt(prompt);
 }
 

@@ -197,7 +197,8 @@ model RolePermission {
 model ReportConfig {
   id              String    @id @default(cuid())
   nombre          String
-  prompt          String
+  prompt          String?   // opcional: solo se usa para "generar un borrador con IA" (ver ReportBloqueBuilder.jsx) — el contenido real del informe vive en "bloques"
+  bloques         String    @default("[]") // JSON: bloque[] del constructor manual (texto/kpi/grafico/tabla/ia) — ver lib/reportContent.js#renderReportFromBloques. Si viene vacío, se usa el flujo legado de un solo "prompt" para todo el informe.
   destinatarios   String    // JSON: string[] de correos (Para / To)
   cc              String?   // JSON: string[] de correos en copia (CC), opcional
   frecuencia      String    // "diaria" | "semanal" | "mensual"

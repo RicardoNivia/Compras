@@ -42,6 +42,7 @@ export const USER_FIELD_LABELS = {
 export const REPORT_FIELD_LABELS = {
   nombre: "Nombre",
   prompt: "Instrucción (prompt)",
+  bloques: "Bloques del informe",
   destinatarios: "Destinatarios (Para)",
   cc: "Copia (CC)",
   frecuencia: "Frecuencia",

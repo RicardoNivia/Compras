@@ -228,14 +228,28 @@ export async function renderReportPdfApi({ content, nombre }) {
   return handle(res);
 }
 
-export async function previewReportApi({ prompt, nombre, prioridad, cuerpoModo, cuerpoPrompt }) {
+export async function previewReportApi({ prompt, bloques, nombre, prioridad, cuerpoModo, cuerpoPrompt }) {
   const res = await fetch("/api/reports/preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, nombre, prioridad, cuerpoModo, cuerpoPrompt }),
+    body: JSON.stringify({ prompt, bloques, nombre, prioridad, cuerpoModo, cuerpoPrompt }),
   });
   const { jobId } = await handle(res);
   return pollReportJob(jobId);
+}
+
+// Genera (o regenera) el contenido de un bloque tipo "ia" del constructor por
+// bloques (ver ReportBloqueBuilder.jsx) — no guarda nada, solo devuelve
+// {contenido, destacado} para que el usuario lo revise antes de dejarlo en el
+// bloque.
+export async function generateBloqueIaApi({ pregunta }) {
+  const res = await fetch("/api/reports/bloque-ia", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pregunta }),
+  });
+  const { jobId } = await handle(res);
+  return pollReportJob(jobId, { maxWaitMs: 60000 });
 }
 
 export async function createReportApi(data) {

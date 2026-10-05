@@ -540,6 +540,39 @@ rect.mark:hover{ opacity:0.82; cursor:pointer; }
 .invoice-conflict-label{ display:block; font-weight:600; font-size:12.5px; }
 .invoice-conflict-values{ display:block; font-size:12px; color:var(--muted); }
 .invoice-conflict-actions{ display:flex; gap:6px; flex:none; }
+
+.bloques-builder{ display:flex; flex-direction:column; gap:10px; }
+.bloques-toolbar{ display:flex; flex-wrap:wrap; gap:6px; }
+.bloques-list{ display:flex; flex-direction:column; gap:10px; }
+.bloque-card{
+  display:flex; flex-direction:column; gap:8px; padding:12px;
+  border:1.5px solid var(--border); border-radius:12px; background:var(--surface);
+}
+.bloque-card-head{ display:flex; align-items:center; gap:8px; }
+.bloque-tipo-tag{
+  flex:none; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.02em;
+  padding:3px 8px; border-radius:999px; background:var(--surface-2); color:var(--muted);
+}
+.bloque-tipo-tag.tipo-kpi{ background:color-mix(in srgb, var(--accent) 16%, transparent); color:var(--accent); }
+.bloque-tipo-tag.tipo-grafico{ background:rgba(34,197,94,.14); color:#16803d; }
+.bloque-tipo-tag.tipo-tabla{ background:rgba(234,179,8,.16); color:#92650a; }
+.bloque-tipo-tag.tipo-ia{ background:rgba(168,85,247,.14); color:#7e22ce; }
+.bloque-titulo-input{ flex:1; border:none; background:transparent; font-weight:600; font-size:13px; padding:4px 2px; }
+.bloque-titulo-input:focus{ outline:none; background:var(--surface-2); border-radius:6px; }
+.bloque-card-actions{ display:flex; gap:2px; flex:none; }
+.bloque-card-actions .icon-btn:disabled{ opacity:.35; }
+.bloque-ia-resultado{
+  font-size:12.5px; padding:8px 10px; border-radius:8px;
+  background:var(--surface-2); color:var(--text); white-space:pre-wrap;
+}
+
+.ia-draft-details{
+  border:1.5px dashed var(--border); border-radius:12px; padding:10px 14px; margin:-6px 0 2px;
+  display:flex; flex-direction:column; gap:8px;
+}
+.ia-draft-details summary{ cursor:pointer; font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:6px; color:var(--muted); }
+.ia-draft-details[open] summary{ color:var(--text); }
+.ia-draft-details textarea{ margin-top:6px; }
 .presupuesto-total-cat{ font-size:13px; color:var(--ink-2); padding-top:4px; border-top:1px dashed var(--border); }
 .presupuesto-card-foot{ display:flex; align-items:center; gap:10px; margin-top:auto; padding-top:4px; }
 .presupuesto-confirm{
