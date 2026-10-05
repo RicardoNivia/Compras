@@ -635,10 +635,16 @@ export default function DashboardView({ records, presupuestos = [] }) {
     const areaMap = new Map();
     for (const r of yearRecordsForCategoriaArea) {
       const a = r.area || "Sin área";
-      if (!areaMap.has(a)) areaMap.set(a, { count: 0, value: 0, cats: new Map() });
+      if (!areaMap.has(a)) areaMap.set(a, { count: 0, value: 0, valueMes: 0, cats: new Map() });
       const e = areaMap.get(a);
       e.count += 1;
       e.value += r.valorConIva || 0;
+      // Además del acumulado del año (value), en la vista Mensual se guarda
+      // aparte lo que corresponde SOLO al mes seleccionado — para mostrar
+      // ambos números en la tabla (valor del mes vs. acumulado del año).
+      if (viewMode === "mensual" && monthKey(r.fechaSolicitud) === selectedMonth) {
+        e.valueMes += r.valorConIva || 0;
+      }
       const cat = r.categoria || "Sin categoría";
       e.cats.set(cat, (e.cats.get(cat) || 0) + (r.valorConIva || 0));
     }
@@ -680,20 +686,21 @@ export default function DashboardView({ records, presupuestos = [] }) {
         .sort((a, b) => b.value - a.value);
 
       return {
-        name, count: v.count, value: v.value, top, moreCount: Math.max(0, catList.length - top.length),
+        name, count: v.count, value: v.value, valueMes: v.valueMes, top, moreCount: Math.max(0, catList.length - top.length),
         presupuestoAnual, presupuesto, pctPresupuesto, presupuestoEstado, disponible,
       };
     }).sort((a, b) => b.value - a.value);
     const totals = rows.reduce((acc, r) => ({
       count: acc.count + r.count,
       value: acc.value + r.value,
+      valueMes: acc.valueMes + r.valueMes,
       presupuesto: acc.presupuesto + (r.presupuesto || 0),
       disponible: acc.disponible + (r.disponible || 0),
       gastadoConPresupuesto: acc.gastadoConPresupuesto + (r.presupuesto != null ? r.value : 0),
       conPresupuesto: acc.conPresupuesto || r.presupuesto != null,
-    }), { count: 0, value: 0, presupuesto: 0, disponible: 0, gastadoConPresupuesto: 0, conPresupuesto: false });
+    }), { count: 0, value: 0, valueMes: 0, presupuesto: 0, disponible: 0, gastadoConPresupuesto: 0, conPresupuesto: false });
     return { rows, totals };
-  }, [yearRecordsForCategoriaArea, presupuestoPorArea, presupuestoCategoriasPorArea]);
+  }, [yearRecordsForCategoriaArea, presupuestoPorArea, presupuestoCategoriasPorArea, viewMode, selectedMonth]);
 
   async function handleExportPDF() {
     if (!containerRef.current) return;
@@ -1355,7 +1362,9 @@ export default function DashboardView({ records, presupuestos = [] }) {
           <table className="plain-table">
             <thead>
               <tr>
-                <th>Área</th><th className="num">Cant.</th><th className="num">Valor total</th>
+                <th>Área</th><th className="num">Cant.</th>
+                {viewMode === "mensual" && <th className="num">Valor del mes</th>}
+                <th className="num">Valor acumulado ({refYear})</th>
                 <th className="num">Presupuesto ({refYear})</th>
                 <th className="num">Disponible</th>
                 <th className="num">% consumido</th>
@@ -1367,6 +1376,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
                 <tr key={r.name} className={r.presupuestoEstado === "excedido" ? "row-critical" : r.presupuestoEstado === "alerta" ? "row-warning" : ""}>
                   <td>{r.name}</td>
                   <td className="num">{fmtNum(r.count)}</td>
+                  {viewMode === "mensual" && <td className="num">{fmtCOP(r.valueMes)}</td>}
                   <td className="num">{fmtCOP(r.value)}</td>
                   <td className="num">{r.presupuesto != null ? fmtCOP(r.presupuesto) : "—"}</td>
                   <td className={`num${r.disponible !== null && r.disponible < 0 ? " text-critical" : ""}`}>
@@ -1398,6 +1408,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
               <tr className="total-row">
                 <td>Total</td>
                 <td className="num">{fmtNum(porCategoriaArea.totals.count)}</td>
+                {viewMode === "mensual" && <td className="num">{fmtCOP(porCategoriaArea.totals.valueMes)}</td>}
                 <td className="num">{fmtCOP(porCategoriaArea.totals.value)}</td>
                 <td className="num">{porCategoriaArea.totals.conPresupuesto ? fmtCOP(porCategoriaArea.totals.presupuesto) : "—"}</td>
                 <td className={`num${porCategoriaArea.totals.conPresupuesto && porCategoriaArea.totals.disponible < 0 ? " text-critical" : ""}`}>

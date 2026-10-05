@@ -4,9 +4,7 @@ import { listRecords } from "@/lib/records";
 import { listPresupuestos } from "@/lib/presupuestos";
 import { listAuditLogs, logAgentViolation } from "@/lib/audit";
 import { reviewAgentReply } from "@/lib/agentModeration";
-import { streamGeminiChat } from "@/lib/gemini";
-import { streamAnthropicChat } from "@/lib/anthropic";
-import { isValidAiModel, isAiModelAllowedFor, DEFAULT_AI_MODEL, getAiModel } from "@/lib/aiModels";
+import { streamChatCascade } from "@/lib/aiChatCascade";
 import { createConversation, getConversation, appendMessages, makeTitle } from "@/lib/conversations";
 import { PROCUREMENT_POLICY_TITLE, PROCUREMENT_POLICY_TEXT } from "@/lib/procurementPolicy";
 import { APP_GUIDE_TITLE, APP_GUIDE_TEXT } from "@/lib/appGuide";
@@ -185,9 +183,6 @@ export async function POST(request) {
   const canSeeAuditoria = await isRoleAllowed(user.role, "viewAuditoria");
 
   const body = await request.json().catch(() => ({}));
-  const requestedModel = isValidAiModel(body.model) ? body.model : DEFAULT_AI_MODEL;
-  const model = isAiModelAllowedFor(requestedModel, canUsePaid) ? requestedModel : DEFAULT_AI_MODEL;
-  const provider = getAiModel(model)?.provider || "gemini";
   const message = (body.message || "").toString().trim();
   if (!message) return jsonError("El mensaje no puede estar vacío.", 400);
 
@@ -201,7 +196,7 @@ export async function POST(request) {
     if (!conv) return jsonError("Conversación no encontrada.", 404);
     priorMessages = conv.messages.slice(-MAX_HISTORY_MESSAGES);
   } else {
-    const conv = await createConversation(user.id, { title: makeTitle(message), model });
+    const conv = await createConversation(user.id, { title: makeTitle(message), model: "auto" });
     conversationId = conv.id;
   }
 
@@ -228,7 +223,6 @@ export async function POST(request) {
   ];
 
   const encoder = new TextEncoder();
-  const streamChat = provider === "anthropic" ? streamAnthropicChat : streamGeminiChat;
   const BLOCKED_REPLY = "No puedo responder eso — solo puedo ayudarte con temas de compras, el procedimiento de compras, y el uso de esta aplicación.";
 
   // La respuesta se junta completa ANTES de mostrársela al usuario (no se va
@@ -245,10 +239,10 @@ export async function POST(request) {
     async start(controller) {
       let fullText = "";
       try {
-        for await (const chunk of streamChat({
-          model,
+        for await (const chunk of streamChatCascade({
           systemInstruction: buildSystemInstruction(records, user, presupuestos, canSeePresupuesto, auditLogs, canSeeAuditoria),
           contents,
+          canUsePaid,
         })) {
           fullText += chunk;
         }

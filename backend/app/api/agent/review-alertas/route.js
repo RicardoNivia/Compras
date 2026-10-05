@@ -32,9 +32,9 @@ export async function POST() {
     return jsonError("No autorizado.", 403);
   }
 
-  const { solicitudesPendientes, riesgoPresupuesto, riesgoTiempos } = await getAlertsData();
+  const { solicitudesPendientes, riesgoPresupuesto, riesgoTiempos, noRadicadas } = await getAlertsData();
 
-  const systemInstruction = `Eres un analista de compras del Panel de Compras de Sinco. Te dan tres listas ya calculadas por el sistema (no las recalcules, básate solo en ellas): solicitudes pendientes de entrega (con días hábiles transcurridos), áreas según % de presupuesto anual ya gastado, y compras cuyo tiempo de solicitud a entrega superó el límite de 8 días hábiles (SLA).
+  const systemInstruction = `Eres un analista de compras del Panel de Compras de Sinco. Te dan cuatro listas ya calculadas por el sistema (no las recalcules, básate solo en ellas): solicitudes pendientes de entrega (con días hábiles transcurridos), áreas según % de presupuesto anual ya gastado, compras cuyo tiempo de solicitud a entrega superó el límite de 8 días hábiles (SLA), y compras ya legalizadas que todavía no se han radicado (último paso del trámite pendiente).
 
 Devuelve:
 - "resumen": 2-4 frases con el panorama general (cuántas solicitudes pendientes hay, cuántas áreas están en alerta/excedidas de presupuesto, cuántas compras incumplieron el SLA).
@@ -51,7 +51,10 @@ Riesgo de presupuesto por área (año actual, % gastado de mayor a menor):
 ${JSON.stringify(riesgoPresupuesto)}
 
 Compras fuera del SLA de 8 días hábiles (${riesgoTiempos.length}, peores primero, máx. ${MAX_ITEMS} mostradas):
-${JSON.stringify(riesgoTiempos.slice(0, MAX_ITEMS))}`;
+${JSON.stringify(riesgoTiempos.slice(0, MAX_ITEMS))}
+
+Compras legalizadas pero aún no radicadas (${noRadicadas.length}, más antiguas primero, máx. ${MAX_ITEMS} mostradas):
+${JSON.stringify(noRadicadas.slice(0, MAX_ITEMS))}`;
 
   try {
     const result = await generateStructuredJson({ systemInstruction, prompt, schema: REVIEW_SCHEMA, budgetMs: 25000 });

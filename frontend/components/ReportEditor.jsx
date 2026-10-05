@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { previewReportApi, createReportApi, updateReportApi, renderReportPdfApi } from "@/lib/api";
+import { previewReportApi, createReportApi, updateReportApi, renderReportPdfApi, sugerirBloquesApi } from "@/lib/api";
 import { IconSpark, IconAlert, IconCheck } from "@/components/icons";
+import ReportBloqueBuilder, { nuevoBloque, PERIODOS, METRICAS_KPI, AGRUPACIONES } from "@/components/ReportBloqueBuilder";
+import ReportBodyEditor from "@/components/ReportBodyEditor";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -15,15 +17,12 @@ const FRECUENCIAS = [
 const DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const DIAS_SEMANA_VALUE = [1, 2, 3, 4, 5, 6, 0]; // getDay(): 0 = domingo
 
-const CUERPO_MODOS = [
-  { key: "plano", label: "Texto plano" },
-  { key: "resumen", label: "Texto plano + resumen" },
-];
-
 function emptyForm(report) {
   return {
     nombre: report?.nombre || "",
     prompt: report?.prompt || "",
+    bloques: report?.bloques || [],
+    periodoGeneral: report?.periodoGeneral || "historico",
     frecuencia: report?.frecuencia || "diaria",
     diaSemana: report?.diaSemana ?? 1,
     diaMes: report?.diaMes ?? 1,
@@ -32,8 +31,7 @@ function emptyForm(report) {
     domingoHabil: report?.domingoHabil ?? false,
     destinatarios: report?.destinatarios || [],
     cc: report?.cc || [],
-    cuerpoModo: report?.cuerpoModo || "resumen",
-    cuerpoPrompt: report?.cuerpoPrompt || "",
+    cuerpoHtml: report?.cuerpoHtml || "",
   };
 }
 
@@ -82,10 +80,13 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
   const [form, setForm] = useState(emptyForm(report));
   const [preview, setPreview] = useState(report?.ultimoContenido ? { content: report.ultimoContenido, pdfBase64: null, emailBody: report.ultimoCuerpoCorreo || null } : null);
   const [previewTab, setPreviewTab] = useState("cuerpo"); // "cuerpo" | "pdf"
+  const [formTab, setFormTab] = useState("informe"); // "informe" | "envio"
   const [previewing, setPreviewing] = useState(false);
   const [restoringPdf, setRestoringPdf] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [sugiriendo, setSugiriendo] = useState(false);
 
   // Al editar un informe ya guardado, el PDF en sí no se persiste en la BD
   // (solo el contenido estructurado) — se vuelve a dibujar al instante desde
@@ -107,15 +108,71 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
+  async function handleGenerarBorrador() {
+    if (!form.prompt.trim()) return;
+    setError("");
+    setDraftLoading(true);
+    try {
+      const res = await previewReportApi({ prompt: form.prompt, nombre: form.nombre });
+      const nuevosBloques = (res.content?.secciones || []).map((s) => ({
+        ...nuevoBloque("texto"), titulo: s.titulo || "", contenido: s.contenido || "", destacado: s.destacado || "",
+      }));
+      update("bloques", [...form.bloques, ...nuevosBloques]);
+    } catch (err) {
+      setError(err.message || "No se pudo generar el borrador.");
+    } finally {
+      setDraftLoading(false);
+    }
+  }
+
+  // Botón "Armar informe automáticamente con IA" — sin prompt: la IA analiza
+  // los agregados reales y propone qué bloques armar (kpi/gráfico/tabla/texto)
+  // y con qué métrica/agrupación. Los valores de esos bloques se siguen
+  // calculando 100% determinísticos al generar el informe — la IA solo elige
+  // la estructura, nunca una cifra.
+  async function handleSugerirInforme() {
+    setError("");
+    setSugiriendo(true);
+    try {
+      const res = await sugerirBloquesApi();
+      const metricasValidas = new Set(METRICAS_KPI.map((m) => m.key));
+      const agrupacionesValidas = new Set(AGRUPACIONES.map((a) => a.key));
+      const periodosValidos = new Set(PERIODOS.map((p) => p.key));
+      const tiposValidos = new Set(["texto", "kpi", "grafico", "tabla"]);
+
+      const nuevos = (res.bloques || []).map((spec) => {
+        const tipo = tiposValidos.has(spec.tipo) ? spec.tipo : "texto";
+        const b = nuevoBloque(tipo);
+        b.titulo = spec.titulo || "";
+        if (tipo === "texto") {
+          b.contenido = spec.contenido || spec.justificacion || "";
+        } else if (tipo === "kpi") {
+          b.metrica = metricasValidas.has(spec.metrica) ? spec.metrica : METRICAS_KPI[0].key;
+        } else {
+          b.agruparPor = agrupacionesValidas.has(spec.agruparPor) ? spec.agruparPor : "area";
+          if (tipo === "grafico") b.metricaAgrupada = spec.metricaAgrupada === "cantidad" ? "cantidad" : "valorConIva";
+        }
+        return b;
+      });
+
+      if (nuevos.length === 0) { setError("La IA no propuso ningún bloque — intenta de nuevo."); return; }
+      update("bloques", [...form.bloques, ...nuevos]);
+      if (res.periodoSugerido && periodosValidos.has(res.periodoSugerido)) {
+        update("periodoGeneral", res.periodoSugerido);
+      }
+    } catch (err) {
+      setError(err.message || "No se pudo generar el informe sugerido.");
+    } finally {
+      setSugiriendo(false);
+    }
+  }
+
   async function handlePreview() {
-    if (!form.prompt.trim()) { setError("Describe qué debe contener el informe antes de generar la vista previa."); return; }
+    if (form.bloques.length === 0) { setError("Agrega al menos un bloque al informe antes de generar la vista previa."); return; }
     setError("");
     setPreviewing(true);
     try {
-      const res = await previewReportApi({
-        prompt: form.prompt, nombre: form.nombre,
-        cuerpoModo: form.cuerpoModo, cuerpoPrompt: form.cuerpoPrompt,
-      });
+      const res = await previewReportApi({ bloques: form.bloques, nombre: form.nombre, cuerpoHtml: form.cuerpoHtml, periodoGeneral: form.periodoGeneral });
       setPreview(res);
       setPreviewTab("cuerpo");
     } catch (err) {
@@ -127,11 +184,13 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
 
   async function handleSave() {
     setError("");
+    // Si falta algo, se lleva al usuario a la pestaña donde realmente está
+    // ese campo — así el error nunca se queda mostrado debajo de "Armar
+    // informe" cuando en realidad es de "Programación" (o viceversa).
     if (!form.nombre.trim()) return setError("Dale un nombre al informe.");
-    if (!form.cuerpoPrompt.trim()) return setError("Describe las instrucciones de estilo para el cuerpo del correo.");
-    if (!form.prompt.trim()) return setError("Describe qué debe contener el informe.");
-    if (!form.destinatarios.length) return setError("Agrega al menos un destinatario en \"Para\".");
-    if (!preview?.content) return setError("Genera la vista previa antes de guardar, para confirmar cómo se verá el correo.");
+    if (form.bloques.length === 0) { setFormTab("informe"); return setError("Agrega al menos un bloque al informe."); }
+    if (!form.destinatarios.length) { setFormTab("programacion"); return setError("Agrega al menos un destinatario en \"Para\"."); }
+    if (!preview?.content) { setFormTab("informe"); return setError("Genera la vista previa antes de guardar, para confirmar cómo se verá el correo."); }
 
     setSaving(true);
     try {
@@ -148,142 +207,194 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
   return (
     <div className="report-editor-grid">
       <div className="report-editor-form">
+        {sugiriendo && (
+          <div className="report-editor-form-overlay">
+            <span className="spinner" />
+            Analizando tus datos y armando el informe… espera un momento, no se puede editar mientras tanto.
+          </div>
+        )}
         <div className="field full">
           <label htmlFor="rp-nombre">Nombre del informe *</label>
           <input id="rp-nombre" value={form.nombre} onChange={(e) => update("nombre", e.target.value)} placeholder="Ej. Resumen semanal de compras" />
         </div>
 
-        <div className="field full">
-          <label>Cuerpo del correo (el informe completo va como PDF adjunto)</label>
-          <div className="pill-group">
-            {CUERPO_MODOS.map((m) => (
-              <button
-                key={m.key} type="button"
-                className={`pill-btn${form.cuerpoModo === m.key ? " active" : ""}`}
-                onClick={() => update("cuerpoModo", m.key)}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="field full">
-          <label htmlFor="rp-cuerpo-prompt">Instrucciones de estilo para el cuerpo *</label>
-          <textarea
-            id="rp-cuerpo-prompt" rows={2} value={form.cuerpoPrompt} onChange={(e) => update("cuerpoPrompt", e.target.value)}
-            placeholder="Ej. Sé formal y dirígete a los jefes de área."
-          />
-          <p className="schedule-note">
-            El cuerpo del correo siempre es texto plano (nunca tablas ni gráficas, para que no se vea descuadrado en el correo): aunque pidas aquí una tabla o gráfica, solo generará un análisis o resumen en texto de lo que ya trae el informe en PDF adjunto.
-          </p>
-        </div>
-
-        <div className="field full">
-          <label htmlFor="rp-prompt">¿Qué debe contener? (prompt) *</label>
-          <textarea
-            id="rp-prompt" rows={4} value={form.prompt} onChange={(e) => update("prompt", e.target.value)}
-            placeholder="Ej. Resume el total comprado por área, destaca las compras sin legalizar, muestra el cumplimiento de tiempos de entrega y grafica la distribución por categoría."
-          />
-        </div>
-
-        <div className="field full">
-          <button type="button" className="btn btn-sync" onClick={handlePreview} disabled={previewing}>
-            {previewing ? <span className="spinner" /> : <IconSpark size={14} />}
-            {previewing ? "Generando vista previa…" : "Generar vista previa"}
+        <div className="dash-tabs" role="tablist" aria-label="Secciones del informe">
+          <button type="button" role="tab" aria-selected={formTab === "cuerpo"} className="dash-tab" onClick={() => { setFormTab("cuerpo"); setError(""); }} disabled={sugiriendo}>
+            Cuerpo del correo
           </button>
-          {previewing && <p className="schedule-note" style={{ marginTop: 6 }}>Puede tardar hasta 1-2 minutos con informes grandes.</p>}
+          <button type="button" role="tab" aria-selected={formTab === "informe"} className="dash-tab" onClick={() => { setFormTab("informe"); setError(""); }} disabled={sugiriendo}>
+            Armar informe
+          </button>
+          <button type="button" role="tab" aria-selected={formTab === "programacion"} className="dash-tab" onClick={() => { setFormTab("programacion"); setError(""); }} disabled={sugiriendo}>
+            Programación
+          </button>
         </div>
 
-        <div className="field-row">
-          <div className="field">
-            <label>Frecuencia de envío</label>
-            <div className="pill-group">
-              {FRECUENCIAS.map((f) => (
-                <button
-                  key={f.key} type="button"
-                  className={`pill-btn${form.frecuencia === f.key ? " active" : ""}`}
-                  onClick={() => update("frecuencia", f.key)}
-                >
-                  {f.label}
-                </button>
-              ))}
+        {formTab === "informe" ? (
+          <>
+            <div className="field full">
+              <button type="button" className="btn btn-sync" onClick={handleSugerirInforme} disabled={sugiriendo}>
+                {sugiriendo ? <span className="spinner" /> : <IconSpark size={14} />}
+                {sugiriendo ? "Analizando tus datos…" : "Armar informe automáticamente con IA"}
+              </button>
+              <p className="schedule-note" style={{ marginTop: 8 }}>
+                Analiza tus datos reales y propone qué bloques armar (KPI, Gráfico, Tabla) según lo que de verdad
+                destaca — los agrega a la lista de abajo para que los revises, edites o borres. No inventa cifras: la
+                IA solo elige la estructura, los valores se calculan igual que en cualquier bloque manual.
+              </p>
             </div>
-          </div>
 
-          <div className="field">
-            <label>Fin de semana hábil</label>
-            <div className="pill-group">
-              <button type="button" className={`pill-btn${form.sabadoHabil ? " active" : ""}`} onClick={() => update("sabadoHabil", !form.sabadoHabil)}>Sábado</button>
-              <button type="button" className={`pill-btn${form.domingoHabil ? " active" : ""}`} onClick={() => update("domingoHabil", !form.domingoHabil)}>Domingo</button>
+            <div className="field full">
+              <label htmlFor="rp-periodo">Periodo de los datos (aplica a todo el informe)</label>
+              <select id="rp-periodo" value={form.periodoGeneral} onChange={(e) => update("periodoGeneral", e.target.value)}>
+                {PERIODOS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+              </select>
+              <p className="schedule-note" style={{ marginTop: 8 }}>
+                Se aplica a todos los bloques de KPI, Gráfico y Tabla por igual — se recalcula relativo a la fecha de
+                envío, no es una fecha fija (p. ej. un envío mensual con "Mes anterior" siempre toma el mes antes de
+                cada envío).
+              </p>
             </div>
-          </div>
-        </div>
-        <p className="schedule-note">
-          Por defecto ninguno es hábil (no se envía sábado ni domingo). Si el envío cae en un día no seleccionado aquí, se enviará el siguiente día hábil.
-        </p>
 
-        {form.frecuencia === "diaria" && (
-          <p className="schedule-note">Se enviará todos los días a la hora indicada.</p>
-        )}
-
-        {form.frecuencia === "semanal" && (
-          <div className="field full">
-            <label>Día de la semana</label>
-            <div className="pill-group">
-              {DIAS_SEMANA.map((d, i) => (
-                <button
-                  key={d} type="button"
-                  className={`pill-btn${form.diaSemana === DIAS_SEMANA_VALUE[i] ? " active" : ""}`}
-                  onClick={() => update("diaSemana", DIAS_SEMANA_VALUE[i])}
-                >
-                  {d}
-                </button>
-              ))}
+            <div className="field full">
+              <label>Bloques del informe *</label>
+              <ReportBloqueBuilder bloques={form.bloques} onChange={(bloques) => update("bloques", bloques)} />
             </div>
-          </div>
-        )}
 
-        {form.frecuencia === "mensual" && (
-          <div className="field full">
-            <label htmlFor="rp-dia-mes">Día del mes</label>
-            <select id="rp-dia-mes" value={form.diaMes} onChange={(e) => update("diaMes", Number(e.target.value))}>
-              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
+            <details className="ia-draft-details">
+              <summary><IconSpark size={12} /> Generar un borrador con IA a partir de un prompt (opcional)</summary>
+              <textarea
+                rows={3} value={form.prompt} onChange={(e) => update("prompt", e.target.value)}
+                placeholder="Ej. Resume el total comprado por área, destaca las compras sin legalizar y muestra el cumplimiento de tiempos de entrega."
+              />
+              <button type="button" className="btn btn-sync small" onClick={handleGenerarBorrador} disabled={draftLoading || !form.prompt.trim() || sugiriendo}>
+                {draftLoading ? <span className="spinner" /> : <IconSpark size={12} />}
+                {draftLoading ? "Generando borrador…" : "Agregar bloques de texto con IA"}
+              </button>
+              <p className="schedule-note">
+                Agrega bloques de texto editables a partir del prompt — luego puedes editarlos, moverlos o borrarlos, y
+                complementarlos con bloques de Gráfico/Tabla/KPI calculados exactos sobre los datos reales (sin IA).
+              </p>
+            </details>
+
+            <div className="field full">
+              <button type="button" className="btn btn-sync" onClick={handlePreview} disabled={previewing || sugiriendo}>
+                {previewing ? <span className="spinner" /> : <IconSpark size={14} />}
+                {previewing ? "Generando vista previa…" : "Generar vista previa"}
+              </button>
+              {previewing && <p className="schedule-note" style={{ marginTop: 6 }}>Puede tardar hasta 1-2 minutos con informes grandes.</p>}
+            </div>
+
+          </>
+        ) : formTab === "cuerpo" ? (
+          <>
+            <div className="field full">
+              <label>Cuerpo del correo (el informe completo va adjunto en PDF aparte)</label>
+              <ReportBodyEditor value={form.cuerpoHtml} onChange={(html) => update("cuerpoHtml", html)} disabled={saving} />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="field-row">
+              <div className="field">
+                <label>Frecuencia de envío</label>
+                <div className="pill-group">
+                  {FRECUENCIAS.map((f) => (
+                    <button
+                      key={f.key} type="button"
+                      className={`pill-btn${form.frecuencia === f.key ? " active" : ""}`}
+                      onClick={() => update("frecuencia", f.key)}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="field">
+                <label>Fin de semana hábil</label>
+                <div className="pill-group">
+                  <button type="button" className={`pill-btn${form.sabadoHabil ? " active" : ""}`} onClick={() => update("sabadoHabil", !form.sabadoHabil)}>Sábado</button>
+                  <button type="button" className={`pill-btn${form.domingoHabil ? " active" : ""}`} onClick={() => update("domingoHabil", !form.domingoHabil)}>Domingo</button>
+                </div>
+              </div>
+            </div>
             <p className="schedule-note">
-              Si eliges el día 31: en meses de 30 días se envía el día 30, y en febrero se envía el último día del mes.
+              Por defecto ninguno es hábil (no se envía sábado ni domingo). Si el envío cae en un día no seleccionado aquí, se enviará el siguiente día hábil.
             </p>
-          </div>
+
+            {form.frecuencia === "diaria" && (
+              <p className="schedule-note">Se enviará todos los días a la hora indicada.</p>
+            )}
+
+            {form.frecuencia === "semanal" && (
+              <div className="field full">
+                <label>Día de la semana</label>
+                <div className="pill-group">
+                  {DIAS_SEMANA.map((d, i) => (
+                    <button
+                      key={d} type="button"
+                      className={`pill-btn${form.diaSemana === DIAS_SEMANA_VALUE[i] ? " active" : ""}`}
+                      onClick={() => update("diaSemana", DIAS_SEMANA_VALUE[i])}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {form.frecuencia === "mensual" && (
+              <div className="field full">
+                <label htmlFor="rp-dia-mes">Día del mes</label>
+                <select id="rp-dia-mes" value={form.diaMes} onChange={(e) => update("diaMes", Number(e.target.value))}>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <p className="schedule-note">
+                  Si eliges el día 31: en meses de 30 días se envía el día 30, y en febrero se envía el último día del mes.
+                </p>
+              </div>
+            )}
+
+            <div className="field">
+              <label htmlFor="rp-hora">Hora de envío</label>
+              <input id="rp-hora" type="time" value={form.hora} onChange={(e) => update("hora", e.target.value)} />
+            </div>
+
+            <EmailField
+              label="Para" required placeholder="correo@sinco.com.co y Enter"
+              value={form.destinatarios} onChange={(v) => update("destinatarios", v)}
+            />
+            <EmailField
+              label="Con copia (CC)" placeholder="Opcional — correo@sinco.com.co y Enter"
+              value={form.cc} onChange={(v) => update("cc", v)}
+            />
+
+          </>
         )}
-
-        <div className="field">
-          <label htmlFor="rp-hora">Hora de envío</label>
-          <input id="rp-hora" type="time" value={form.hora} onChange={(e) => update("hora", e.target.value)} />
-        </div>
-
-        <EmailField
-          label="Para" required placeholder="correo@sinco.com.co y Enter"
-          value={form.destinatarios} onChange={(v) => update("destinatarios", v)}
-        />
-        <EmailField
-          label="Con copia (CC)" placeholder="Opcional — correo@sinco.com.co y Enter"
-          value={form.cc} onChange={(v) => update("cc", v)}
-        />
 
         {error && <div className="modal-error full"><IconAlert size={13} /> {error}</div>}
 
         <div className="report-editor-actions">
-          <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving || sugiriendo}>
             {saving && <span className="spinner" />}
             {saving ? "Guardando…" : "Guardar informe"}
           </button>
-          <button type="button" className="btn" onClick={onCancel} disabled={saving}>Cancelar</button>
+          <button type="button" className="btn" onClick={onCancel} disabled={saving || sugiriendo}>Cancelar</button>
         </div>
       </div>
 
       <div className="report-editor-preview">
         <div className="report-preview-label">
           <IconCheck size={12} /> Así se enviará: cuerpo del correo + informe en PDF adjunto
+        </div>
+
+        <div className="field full" style={{ marginBottom: 2 }}>
+          <button type="button" className="btn btn-sync" onClick={handlePreview} disabled={previewing || sugiriendo}>
+            {previewing ? <span className="spinner" /> : <IconSpark size={14} />}
+            {previewing ? "Generando vista previa…" : "Generar vista previa"}
+          </button>
+          {previewing && <p className="schedule-note" style={{ marginTop: 6 }}>Puede tardar hasta 1-2 minutos con informes grandes.</p>}
         </div>
 
         <div className="dash-tabs" role="tablist" aria-label="Vista previa del envío" style={{ marginBottom: 2 }}>
@@ -295,18 +406,18 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
           </button>
         </div>
 
-        {!preview ? (
-          <div className="report-preview-placeholder">
-            Escribe el prompt y presiona &quot;Generar vista previa&quot; para ver cómo se vería el envío antes de guardar.
-          </div>
-        ) : previewTab === "cuerpo" ? (
-          preview.emailBody ? (
-            <div className="report-email-body-preview">{preview.emailBody}</div>
+        {previewTab === "cuerpo" ? (
+          form.cuerpoHtml?.trim() ? (
+            <div className="report-email-body-preview" dangerouslySetInnerHTML={{ __html: form.cuerpoHtml }} />
           ) : (
             <div className="report-preview-placeholder">
-              Vista previa guardada anteriormente. Genera una nueva para ver el cuerpo del correo.
+              Escribe el cuerpo del correo en la pestaña &quot;Cuerpo del correo&quot; — se ve aquí tal cual, sin esperar a generar nada.
             </div>
           )
+        ) : !preview ? (
+          <div className="report-preview-placeholder">
+            Agrega bloques y presiona &quot;Generar vista previa&quot; para ver cómo se vería el envío antes de guardar.
+          </div>
         ) : preview.pdfBase64 ? (
           <iframe title="Vista previa del PDF" src={`data:application/pdf;base64,${preview.pdfBase64}`} className="report-preview-frame" />
         ) : restoringPdf ? (

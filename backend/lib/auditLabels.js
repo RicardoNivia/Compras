@@ -42,6 +42,7 @@ export const USER_FIELD_LABELS = {
 export const REPORT_FIELD_LABELS = {
   nombre: "Nombre",
   prompt: "Instrucción (prompt)",
+  bloques: "Bloques del informe",
   destinatarios: "Destinatarios (Para)",
   cc: "Copia (CC)",
   frecuencia: "Frecuencia",
@@ -53,6 +54,8 @@ export const REPORT_FIELD_LABELS = {
   domingoHabil: "Domingo hábil",
   cuerpoModo: "Modo del cuerpo del correo",
   cuerpoPrompt: "Instrucción de estilo del cuerpo",
+  cuerpoHtml: "Cuerpo del correo",
+  periodoGeneral: "Periodo de los datos",
   activo: "Activo",
 };
 

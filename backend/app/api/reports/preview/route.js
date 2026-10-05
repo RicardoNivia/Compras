@@ -3,7 +3,7 @@ import { getSessionUser } from "@/lib/auth-server";
 import { isRoleAllowed } from "@/lib/permissions";
 import { generateReportContent } from "@/lib/reportContent";
 import { generateReportPdfBuffer } from "@/lib/reportPdf";
-import { generateEmailBody } from "@/lib/reportEmailBody";
+import { resolveEmailBody } from "@/lib/reportEmailBody";
 import { createJob } from "@/lib/reportJobs";
 
 // Arranca (sin guardar nada) la generación de la vista previa del informe a
@@ -18,17 +18,19 @@ export async function POST(request) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
   const body = await request.json().catch(() => ({}));
-  if (!body.prompt || !String(body.prompt).trim()) {
-    return NextResponse.json({ error: "Describe qué debe contener el informe." }, { status: 400 });
+  const hasPrompt = !!(body.prompt && String(body.prompt).trim());
+  const hasBloques = Array.isArray(body.bloques) && body.bloques.length > 0;
+  if (!hasPrompt && !hasBloques) {
+    return NextResponse.json({ error: "Describe qué debe contener el informe (prompt) o agrega al menos un bloque." }, { status: 400 });
   }
 
   const jobId = createJob(async () => {
-    const content = await generateReportContent(body.prompt);
-    const [pdfBuffer, emailBody] = await Promise.all([
+    const content = await generateReportContent({ prompt: body.prompt, bloques: body.bloques, nombre: body.nombre, periodoGeneral: body.periodoGeneral });
+    const [pdfBuffer, cuerpo] = await Promise.all([
       generateReportPdfBuffer(content, { nombre: body.nombre, prioridad: body.prioridad || "media" }),
-      generateEmailBody({ content, nombre: body.nombre || "Informe", cuerpoModo: body.cuerpoModo || "resumen", cuerpoPrompt: body.cuerpoPrompt }),
+      resolveEmailBody({ cuerpoHtml: body.cuerpoHtml, content, nombre: body.nombre || "Informe", cuerpoModo: body.cuerpoModo || "resumen", cuerpoPrompt: body.cuerpoPrompt }),
     ]);
-    return { content, pdfBase64: pdfBuffer.toString("base64"), emailBody };
+    return { content, pdfBase64: pdfBuffer.toString("base64"), emailBody: cuerpo.text };
   });
 
   return NextResponse.json({ jobId }, { status: 202 });

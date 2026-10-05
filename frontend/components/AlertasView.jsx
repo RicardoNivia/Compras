@@ -266,14 +266,61 @@ function RiesgoPresupuesto({ items }) {
   );
 }
 
+function NoRadicadas({ items }) {
+  const { pageItems, page, totalPages, setPage } = usePageSlice(items);
+  return (
+    <div className="table-card" style={{ marginTop: 18 }}>
+      <div className="modal-head" style={{ border: "none", paddingBottom: 14, flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
+        <h3>Compras legalizadas sin radicar ({items.length})</h3>
+        <p className="card-sub" style={{ margin: 0 }}>
+          Ya pasaron por legalización ("Legalizado") pero todavía no se han radicado — el último paso del trámite sigue pendiente. Ordenadas por fecha de solicitud, las más antiguas primero.
+        </p>
+      </div>
+      {items.length === 0 ? (
+        <div className="empty">
+          <IconCheck size={13} /> No hay compras legalizadas pendientes de radicar.
+        </div>
+      ) : (
+        <>
+          <table className="audit-log">
+            <thead>
+              <tr>
+                <th>Descripción</th>
+                <th>Área</th>
+                <th>Responsable</th>
+                <th>Proveedor</th>
+                <th>F. solicitud</th>
+                <th>Valor + IVA</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageItems.map((r) => (
+                <tr key={r.id}>
+                  <td className="truncate wide" title={r.descripcion || ""}>{r.descripcion || "—"}</td>
+                  <td>{r.area || "—"}</td>
+                  <td>{r.responsable || "—"}</td>
+                  <td>{r.proveedor || "—"}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{fmtDateDisplay(r.fechaSolicitud)}</td>
+                  <td>{fmtCOP(r.valorConIva)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <TableFooter page={page} totalPages={totalPages} onPageChange={setPage} total={items.length} label="compra(s)" />
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function AlertasView({ initialData }) {
-  const { solicitudesPendientes = [], riesgoPresupuesto = [], riesgoTiempos = [] } = initialData || {};
+  const { solicitudesPendientes = [], riesgoPresupuesto = [], riesgoTiempos = [], noRadicadas = [] } = initialData || {};
 
   return (
     <div>
       <div className="view-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <p className="card-sub" style={{ margin: 0, maxWidth: 680 }}>
-          Vista rápida de lo que necesita atención ahora mismo: solicitudes sin entregar, compras que ya superaron el tiempo esperado de entrega y áreas más cerca de agotar su presupuesto.
+          Vista rápida de lo que necesita atención ahora mismo: solicitudes sin entregar, compras que ya superaron el tiempo esperado de entrega, áreas más cerca de agotar su presupuesto y compras legalizadas sin radicar.
         </p>
         <RevisarConIA />
       </div>
@@ -281,6 +328,7 @@ export default function AlertasView({ initialData }) {
       <SolicitudesPendientes items={solicitudesPendientes} />
       <RiesgoTiempos items={riesgoTiempos} />
       <RiesgoPresupuesto items={riesgoPresupuesto} />
+      <NoRadicadas items={noRadicadas} />
     </div>
   );
 }

@@ -197,7 +197,9 @@ model RolePermission {
 model ReportConfig {
   id              String    @id @default(cuid())
   nombre          String
-  prompt          String
+  prompt          String?   // opcional: solo se usa para "generar un borrador con IA" (ver ReportBloqueBuilder.jsx) — el contenido real del informe vive en "bloques"
+  bloques         String    @default("[]") // JSON: bloque[] del constructor manual (texto/kpi/grafico/tabla/ia) — ver lib/reportContent.js#renderReportFromBloques. Si viene vacío, se usa el flujo legado de un solo "prompt" para todo el informe.
+  periodoGeneral  String    @default("historico") // "historico" | "mes_actual" | "mes_anterior" | "anio_actual" | "anio_anterior" — un solo periodo para TODO el informe (se eligió esto en vez de uno por bloque, ver ReportEditor.jsx), aplicado a los bloques kpi/grafico/tabla, recalculado relativo a "ahora" en cada generación (ver filterRecordsByPeriodo)
   destinatarios   String    // JSON: string[] de correos (Para / To)
   cc              String?   // JSON: string[] de correos en copia (CC), opcional
   frecuencia      String    // "diaria" | "semanal" | "mensual"
@@ -207,8 +209,9 @@ model ReportConfig {
   sabadoHabil     Boolean   @default(false) // si es false, un envío programado en sábado se corre al siguiente día hábil (ver lib/reportScheduler.js)
   domingoHabil    Boolean   @default(false) // ídem para domingo — sábado y domingo se controlan por separado (uno puede ser hábil y el otro no)
   prioridad       String    @default("media") // "alta" | "media" | "baja"
-  cuerpoModo      String    @default("resumen") // "plano" | "resumen" — ver lib/reportEmailBody.js
-  cuerpoPrompt    String?   // instrucción opcional de estilo/tono para el cuerpo del correo
+  cuerpoModo      String    @default("resumen") // "plano" | "resumen" — legado, solo usado cuando "cuerpoHtml" viene vacío (ver lib/reportEmailBody.js)
+  cuerpoPrompt    String?   // legado: instrucción de estilo/tono para generar el cuerpo con IA — reemplazado por edición directa en "cuerpoHtml"; se conserva para informes guardados antes de ese cambio
+  cuerpoHtml      String?   // HTML del cuerpo del correo, editado directamente por el usuario (editor de texto enriquecido, ver ReportBodyEditor.jsx) — si está vacío, se usa el flujo legado (cuerpoModo/cuerpoPrompt, con IA)
   activo          Boolean   @default(true)
   ultimoContenido String?   // JSON: snapshot de la última vista previa/envío generado (ver REPORT_SCHEMA)
   ultimoCuerpoCorreo String? // texto plano del cuerpo de correo de esa misma vista previa/envío — sin esto, al editar un informe ya guardado no había forma de volver a mostrar el cuerpo exacto que se generó (solo el contenido del PDF)

@@ -1,10 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AI_MODELS, DEFAULT_AI_MODEL } from "@/lib/aiModels";
-
-const PROVIDER_LABELS = { gemini: "Google (Gemini)", anthropic: "Anthropic (Claude)" };
-import { canUsePaidModels } from "@/lib/roles";
 import { renderMarkdown, splitChartBlocks } from "@/lib/markdown";
 import ChartFromSpec from "@/components/charts/ChartFromSpec";
 import { IconSpark, IconSend, IconPlus, IconTrash } from "@/components/icons";
@@ -38,9 +34,7 @@ function formatConvDate(iso) {
   }
 }
 
-export default function AgenteChat({ userName, role, permissions }) {
-  const canPaid = permissions?.useAiPaidModels ?? canUsePaidModels(role);
-  const [model, setModel] = useState(DEFAULT_AI_MODEL);
+export default function AgenteChat({ userName }) {
   const [messages, setMessages] = useState([]); // { role: "user" | "model", text }
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -49,11 +43,6 @@ export default function AgenteChat({ userName, role, permissions }) {
   const [loadingConv, setLoadingConv] = useState(false);
   const [deletingConvId, setDeletingConvId] = useState(null);
   const scrollRef = useRef(null);
-  const selectedModel = AI_MODELS.find((m) => m.id === model);
-  const modelsByProvider = AI_MODELS.reduce((acc, m) => {
-    (acc[m.provider] ||= []).push(m);
-    return acc;
-  }, {});
   const userInitials = (userName || "?").trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "?";
 
   useEffect(() => {
@@ -123,7 +112,7 @@ export default function AgenteChat({ userName, role, permissions }) {
       const res = await fetch("/api/agent/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, message, conversationId }),
+        body: JSON.stringify({ message, conversationId }),
       });
 
       if (!res.ok || !res.body) {
@@ -199,35 +188,6 @@ export default function AgenteChat({ userName, role, permissions }) {
       </div>
 
       <div className="agent-chat">
-        <div className="agent-chat-top">
-          <div className="field" style={{ minWidth: 260 }}>
-            <label htmlFor="agent-model">Modelo</label>
-            <select id="agent-model" value={model} onChange={(e) => setModel(e.target.value)} disabled={sending}>
-              {Object.entries(modelsByProvider).map(([provider, models]) => (
-                <optgroup key={provider} label={PROVIDER_LABELS[provider] || provider}>
-                  {models.map((m) => (
-                    <option key={m.id} value={m.id} disabled={m.tier === "paid" && !canPaid}>
-                      {m.label} · {m.tier === "free" ? "Gratis" : canPaid ? "De pago" : "De pago (solo admin)"}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-          {selectedModel && (
-            <div className="agent-model-info">
-              <span className={`pill ${selectedModel.tier === "free" ? "good" : "warning"}`}>
-                {selectedModel.tier === "free" ? "Nivel gratuito disponible" : "Solo de pago"}
-              </span>
-              <span className="agent-model-desc">{selectedModel.description} · {selectedModel.limits}</span>
-            </div>
-          )}
-          {!canPaid && (
-            <p className="card-sub" style={{ margin: 0 }}>
-              Los modelos de pago solo pueden seleccionarlos los administradores.
-            </p>
-          )}
-        </div>
 
         <div className="agent-chat-scroll" ref={scrollRef}>
           {loadingConv ? (

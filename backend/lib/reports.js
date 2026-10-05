@@ -4,6 +4,7 @@ import { logReportCreate, logReportUpdate, logReportDelete } from "@/lib/audit";
 const FRECUENCIAS = ["diaria", "semanal", "mensual"];
 const PRIORIDADES = ["alta", "media", "baja"];
 const CUERPO_MODOS = ["plano", "resumen"];
+const PERIODOS_VALIDOS = ["historico", "mes_actual", "mes_anterior", "anio_actual", "anio_anterior"];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function badRequest(message) {
@@ -24,6 +25,8 @@ function toClientReport(r) {
     id: r.id,
     nombre: r.nombre,
     prompt: r.prompt,
+    bloques: r.bloques ? JSON.parse(r.bloques) : [],
+    periodoGeneral: r.periodoGeneral || "historico",
     destinatarios: r.destinatarios ? JSON.parse(r.destinatarios) : [],
     cc: r.cc ? JSON.parse(r.cc) : [],
     frecuencia: r.frecuencia,
@@ -35,6 +38,7 @@ function toClientReport(r) {
     prioridad: r.prioridad,
     cuerpoModo: r.cuerpoModo,
     cuerpoPrompt: r.cuerpoPrompt,
+    cuerpoHtml: r.cuerpoHtml,
     activo: r.activo,
     ultimoContenido: r.ultimoContenido ? JSON.parse(r.ultimoContenido) : null,
     ultimoCuerpoCorreo: r.ultimoCuerpoCorreo || null,
@@ -52,9 +56,27 @@ function validate(body, { partial = false } = {}) {
     if (!body.nombre || !String(body.nombre).trim()) throw badRequest("El nombre del informe es obligatorio.");
     out.nombre = String(body.nombre).trim();
   }
+  // El contenido real del informe vive en "bloques" (ver ReportBloqueBuilder.jsx
+  // en el frontend); "prompt" ahora es opcional — solo se usa como semilla para
+  // "generar un borrador con IA" dentro del constructor de bloques. Se valida
+  // que al menos uno de los dos exista, pero solo al crear (!partial): al
+  // editar, cada campo se guarda de forma independiente según lo que mande el
+  // cliente, para no borrar uno al actualizar solo el otro.
   if (!partial || body.prompt !== undefined) {
-    if (!body.prompt || !String(body.prompt).trim()) throw badRequest("Describe qué debe contener el informe (prompt).");
-    out.prompt = String(body.prompt).trim();
+    out.prompt = body.prompt ? String(body.prompt).trim() : null;
+  }
+  if (!partial || body.bloques !== undefined) {
+    out.bloques = JSON.stringify(Array.isArray(body.bloques) ? body.bloques : []);
+  }
+  if (!partial || body.periodoGeneral !== undefined) {
+    out.periodoGeneral = PERIODOS_VALIDOS.includes(body.periodoGeneral) ? body.periodoGeneral : "historico";
+  }
+  if (!partial) {
+    const hasPrompt = !!(out.prompt && out.prompt.trim());
+    const hasBloques = out.bloques && JSON.parse(out.bloques).length > 0;
+    if (!hasPrompt && !hasBloques) {
+      throw badRequest("Describe qué debe contener el informe (prompt) o agrega al menos un bloque.");
+    }
   }
   if (!partial || body.destinatarios !== undefined) {
     const list = parseEmailList(body.destinatarios);
@@ -93,14 +115,17 @@ function validate(body, { partial = false } = {}) {
     if (!PRIORIDADES.includes(body.prioridad)) throw badRequest("Prioridad inválida.");
     out.prioridad = body.prioridad;
   }
+  // cuerpoModo/cuerpoPrompt quedaron como legado (generación del cuerpo con
+  // IA) — el flujo actual es editar "cuerpoHtml" directamente (ver
+  // ReportBodyEditor.jsx), así que ninguno de los tres es obligatorio.
   if (!partial || body.cuerpoModo !== undefined) {
-    if (!CUERPO_MODOS.includes(body.cuerpoModo)) throw badRequest("Modo de cuerpo de correo inválido.");
-    out.cuerpoModo = body.cuerpoModo;
+    out.cuerpoModo = CUERPO_MODOS.includes(body.cuerpoModo) ? body.cuerpoModo : "resumen";
   }
   if (!partial || body.cuerpoPrompt !== undefined) {
-    const cuerpoPrompt = body.cuerpoPrompt ? String(body.cuerpoPrompt).trim() : "";
-    if (!cuerpoPrompt) throw badRequest("Describe las instrucciones de estilo para el cuerpo del correo.");
-    out.cuerpoPrompt = cuerpoPrompt;
+    out.cuerpoPrompt = body.cuerpoPrompt ? String(body.cuerpoPrompt).trim() : null;
+  }
+  if (!partial || body.cuerpoHtml !== undefined) {
+    out.cuerpoHtml = body.cuerpoHtml ? String(body.cuerpoHtml) : null;
   }
   if (partial && body.activo !== undefined) {
     out.activo = !!body.activo;
