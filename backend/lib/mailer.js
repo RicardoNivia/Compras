@@ -39,11 +39,13 @@ export function isMailerConfigured() {
   return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD);
 }
 
-// El cuerpo del correo es TEXTO PLANO (ver lib/reportEmailBody.js) — el
-// informe completo (secciones + gráficas) va como PDF adjunto (ver
-// lib/reportPdf.js), no en el cuerpo. "attachments" sigue el formato de
-// nodemailer: [{ filename, content: Buffer, contentType }].
-export async function sendReportEmail({ to, cc, subject, text, attachments }) {
+// El cuerpo del correo es "text" (siempre, respaldo para clientes que no
+// renderizan HTML) y opcionalmente "html" (cuando el usuario lo editó
+// directamente en el editor de texto enriquecido — ver
+// lib/reportEmailBody.js#resolveEmailBody). El informe completo (secciones +
+// gráficas) va como PDF adjunto (ver lib/reportPdf.js), no en el cuerpo.
+// "attachments" sigue el formato de nodemailer: [{ filename, content: Buffer, contentType }].
+export async function sendReportEmail({ to, cc, subject, text, html, attachments }) {
   const transporter = getTransporter();
   if (!transporter) {
     throw new Error("El correo saliente no está configurado (SMTP_HOST/SMTP_USER/SMTP_PASSWORD en .env).");
@@ -56,6 +58,7 @@ export async function sendReportEmail({ to, cc, subject, text, attachments }) {
       ...(cc && cc.length ? { cc: Array.isArray(cc) ? cc.join(", ") : cc } : {}),
       subject,
       text,
+      ...(html ? { html } : {}),
       ...(attachments && attachments.length ? { attachments } : {}),
     });
   } catch (err) {

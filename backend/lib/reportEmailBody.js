@@ -6,6 +6,49 @@ const BODY_SCHEMA = {
   required: ["texto"],
 };
 
+// Versión en texto plano del HTML que el usuario escribe en el editor del
+// cuerpo del correo (ver ReportBodyEditor.jsx) — se usa como "text" del
+// correo (fallback para clientes que no renderizan HTML) junto al "html" real.
+export function stripHtmlToText(html) {
+  if (!html) return "";
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<li>/gi, "- ")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// Resuelve el cuerpo del correo a enviar: si el informe tiene "cuerpoHtml"
+// (editado directamente por el usuario, ver ReportBodyEditor.jsx), se usa tal
+// cual (con su versión en texto plano como respaldo) — sin IA, sin red, al
+// instante. Si no (informes guardados antes de ese cambio), cae al flujo
+// legado por IA (generateEmailBody, más abajo).
+export async function resolveEmailBody({ cuerpoHtml, content, nombre, cuerpoModo, cuerpoPrompt }) {
+  if (cuerpoHtml && cuerpoHtml.trim()) {
+    return { html: cuerpoHtml, text: stripHtmlToText(cuerpoHtml) };
+  }
+  const text = await generateEmailBody({ content, nombre, cuerpoModo, cuerpoPrompt });
+  return { html: null, text };
+}
+
+const CUERPO_IA_SYSTEM_INSTRUCTION = `Eres un asistente de redacción de correos corporativos en español. Te dan el texto actual del cuerpo de un correo (que acompaña un informe de compras adjunto en PDF, escrito directamente por un administrador). Revisa ortografía, gramática y claridad, y propone una redacción alternativa — más clara, profesional y concisa — manteniendo el mismo mensaje e intención. Nunca inventes datos, cifras, nombres ni compromisos que no estén en el texto original; si el texto está vacío o no tiene sentido, dilo en el propio "texto" de respuesta en vez de inventar contenido genérico de relleno. Devuelve SIEMPRE texto plano (párrafos separados por una línea en blanco), nunca HTML ni Markdown.`;
+
+// Botón "Mejorar con IA" del editor del cuerpo del correo (ver
+// ReportBodyEditor.jsx): valida/reescribe el texto que el usuario ya
+// escribió — nunca genera el cuerpo desde cero ni reemplaza nada sin que el
+// usuario vea la propuesta primero.
+export async function generateCuerpoCorreoSugerido(textoActual) {
+  const prompt = `Texto actual del cuerpo del correo:\n"""${textoActual}"""`;
+  return generateStructuredJson({ systemInstruction: CUERPO_IA_SYSTEM_INSTRUCTION, prompt, schema: BODY_SCHEMA, budgetMs: 30000 });
+}
+
 function summaryLines(content) {
   return (content?.secciones || [])
     .map((s) => `- ${s.titulo}${s.destacado ? `: ${s.destacado}` : ""}`)

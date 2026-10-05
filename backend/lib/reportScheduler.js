@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { generateReportContent } from "@/lib/reportContent";
 import { generateReportPdfBuffer } from "@/lib/reportPdf";
-import { generateEmailBody } from "@/lib/reportEmailBody";
+import { resolveEmailBody } from "@/lib/reportEmailBody";
 import { sendReportEmail, isMailerConfigured, MAIL_MAINTENANCE } from "@/lib/mailer";
 import { markSent } from "@/lib/reports";
 import { logReportSent } from "@/lib/audit";
@@ -93,10 +93,10 @@ async function runDueReports() {
   for (const report of due) {
     if (!isDue(report, now)) continue;
     try {
-      const content = await generateReportContent({ prompt: report.prompt, bloques: report.bloques, nombre: report.nombre });
-      const [pdfBuffer, emailBody] = await Promise.all([
+      const content = await generateReportContent({ prompt: report.prompt, bloques: report.bloques, nombre: report.nombre, periodoGeneral: report.periodoGeneral });
+      const [pdfBuffer, cuerpo] = await Promise.all([
         generateReportPdfBuffer(content, { nombre: report.nombre, prioridad: report.prioridad }),
-        generateEmailBody({ content, nombre: report.nombre, cuerpoModo: report.cuerpoModo, cuerpoPrompt: report.cuerpoPrompt }),
+        resolveEmailBody({ cuerpoHtml: report.cuerpoHtml, content, nombre: report.nombre, cuerpoModo: report.cuerpoModo, cuerpoPrompt: report.cuerpoPrompt }),
       ]);
       const destinatarios = JSON.parse(report.destinatarios || "[]");
       const cc = JSON.parse(report.cc || "[]");
@@ -104,10 +104,11 @@ async function runDueReports() {
         to: destinatarios,
         cc,
         subject: content.asunto || report.nombre,
-        text: emailBody,
+        text: cuerpo.text,
+        html: cuerpo.html,
         attachments: [{ filename: `${report.nombre || "Informe"}.pdf`, content: pdfBuffer, contentType: "application/pdf" }],
       });
-      await markSent(report.id, content, emailBody);
+      await markSent(report.id, content, cuerpo.text);
       await logReportSent(null, report, true).catch(() => {});
     } catch (err) {
       await logReportSent(null, report, false, err.message).catch(() => {});

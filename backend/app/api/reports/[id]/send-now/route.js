@@ -4,7 +4,7 @@ import { isRoleAllowed } from "@/lib/permissions";
 import { getReport, markSent } from "@/lib/reports";
 import { generateReportContent } from "@/lib/reportContent";
 import { generateReportPdfBuffer } from "@/lib/reportPdf";
-import { generateEmailBody } from "@/lib/reportEmailBody";
+import { resolveEmailBody } from "@/lib/reportEmailBody";
 import { sendReportEmail, MAIL_MAINTENANCE, MAIL_MAINTENANCE_MESSAGE } from "@/lib/mailer";
 import { logReportSent } from "@/lib/audit";
 import { createJob } from "@/lib/reportJobs";
@@ -27,10 +27,10 @@ export async function POST(request, { params }) {
     let report;
     try {
       report = await getReport(params.id);
-      const content = await generateReportContent({ prompt: report.prompt, bloques: report.bloques, nombre: report.nombre });
-      const [pdfBuffer, emailBody] = await Promise.all([
+      const content = await generateReportContent({ prompt: report.prompt, bloques: report.bloques, nombre: report.nombre, periodoGeneral: report.periodoGeneral });
+      const [pdfBuffer, cuerpo] = await Promise.all([
         generateReportPdfBuffer(content, { nombre: report.nombre, prioridad: report.prioridad }),
-        generateEmailBody({ content, nombre: report.nombre, cuerpoModo: report.cuerpoModo, cuerpoPrompt: report.cuerpoPrompt }),
+        resolveEmailBody({ cuerpoHtml: report.cuerpoHtml, content, nombre: report.nombre, cuerpoModo: report.cuerpoModo, cuerpoPrompt: report.cuerpoPrompt }),
       ]);
       const destinatarios = JSON.parse(report.destinatarios || "[]");
       const cc = JSON.parse(report.cc || "[]");
@@ -38,12 +38,13 @@ export async function POST(request, { params }) {
         to: destinatarios,
         cc,
         subject: content.asunto || report.nombre,
-        text: emailBody,
+        text: cuerpo.text,
+        html: cuerpo.html,
         attachments: [{ filename: `${report.nombre || "Informe"}.pdf`, content: pdfBuffer, contentType: "application/pdf" }],
       });
-      await markSent(report.id, content, emailBody);
+      await markSent(report.id, content, cuerpo.text);
       await logReportSent(user, report, true).catch(() => {});
-      return { ok: true, content, emailBody };
+      return { ok: true, content, emailBody: cuerpo.text };
     } catch (err) {
       if (report) await logReportSent(user, report, false, err.message).catch(() => {});
       throw err;

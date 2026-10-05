@@ -54,6 +54,8 @@ export const REPORT_FIELD_LABELS = {
   domingoHabil: "Domingo hábil",
   cuerpoModo: "Modo del cuerpo del correo",
   cuerpoPrompt: "Instrucción de estilo del cuerpo",
+  cuerpoHtml: "Cuerpo del correo",
+  periodoGeneral: "Periodo de los datos",
   activo: "Activo",
 };
 

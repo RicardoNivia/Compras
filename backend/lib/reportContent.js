@@ -213,20 +213,74 @@ function buildAggregates(records, presupuestos) {
   };
 }
 
-// Trae records+presupuestos y arma agregados/muestra — compartido entre el
-// flujo legado (un solo prompt para todo el informe) y el flujo nuevo por
-// bloques (ver renderReportFromBloques/generateBloqueIaContent más abajo).
-async function loadAggregates() {
+// Trae records+presupuestos sin agregar nada todavía — lo usan tanto
+// loadAggregates (flujo legado/bloque IA, siempre sobre el histórico
+// completo) como renderReportFromBloques (que filtra por bloque según su
+// "periodo" antes de agregar, ver filterRecordsByPeriodo).
+async function loadRecordsAndPresupuestos() {
   const anioActual = new Date().getFullYear();
   const [records, { presupuestos }] = await Promise.all([
     listRecords(),
     listPresupuestos({ anio: anioActual }),
   ]);
+  return { records, presupuestos };
+}
+
+// Trae records+presupuestos y arma agregados/muestra — compartido entre el
+// flujo legado (un solo prompt para todo el informe) y el bloque "ia" (ver
+// generateBloqueIaContent), ambos siempre sobre el histórico completo (el
+// prompt/la pregunta puede pedir un periodo específico en su propio texto).
+async function loadAggregates() {
+  const { records, presupuestos } = await loadRecordsAndPresupuestos();
   const aggregates = buildAggregates(records, presupuestos);
   // Muestra para ejemplos puntuales: prioriza los más recientes (más
   // relevantes para un informe ejecutivo que una muestra arbitraria).
   const sample = [...records].reverse().slice(0, MAX_RECORDS).map(compactRecord);
   return { records, aggregates, sample };
+}
+
+// Periodo dinámico de un bloque kpi/grafico/tabla (ver ReportBloqueBuilder.jsx):
+// se recalcula en cada generación (vista previa, envío manual o programado)
+// relativo al momento en que corre — "mes anterior" siempre es el mes antes
+// de HOY, nunca una fecha fija guardada en el bloque. "historico" (default,
+// también el comportamiento de un bloque guardado antes de que existiera este
+// selector) no filtra nada.
+const PERIODO_LABELS = {
+  mes_actual: "mes actual",
+  mes_anterior: "mes anterior",
+  anio_actual: "año actual",
+  anio_anterior: "año anterior",
+};
+
+function periodoSufijo(periodo) {
+  const label = PERIODO_LABELS[periodo];
+  return label ? ` (${label})` : "";
+}
+
+function filterRecordsByPeriodo(records, periodo) {
+  if (!periodo || periodo === "historico" || !PERIODO_LABELS[periodo]) return records;
+  const now = new Date();
+  const anioActual = now.getFullYear();
+  const mesActual = now.getMonth(); // 0 = enero
+  let anio;
+  let mes = null;
+  if (periodo === "mes_actual") {
+    anio = anioActual; mes = mesActual;
+  } else if (periodo === "mes_anterior") {
+    const d = new Date(anioActual, mesActual - 1, 1);
+    anio = d.getFullYear(); mes = d.getMonth();
+  } else if (periodo === "anio_actual") {
+    anio = anioActual;
+  } else if (periodo === "anio_anterior") {
+    anio = anioActual - 1;
+  }
+  return records.filter((r) => {
+    if (!r.fechaSolicitud) return false;
+    const [y, m] = r.fechaSolicitud.split("-").map(Number);
+    if (!y) return false;
+    if (mes !== null) return y === anio && m - 1 === mes;
+    return y === anio;
+  });
 }
 
 // Genera el contenido estructurado del informe a partir de UN SOLO prompt del
@@ -293,38 +347,83 @@ function groupRecordsBy(records, field, limit) {
     .slice(0, limit);
 }
 
-function renderBloqueTexto(b) {
-  return { titulo: b.titulo || "Nota", contenido: b.contenido || "", destacado: b.destacado || null, grafico: null, tabla: null };
+// Permite escribir, dentro de un bloque de texto, placeholders como
+// "{{totalValorConIva}}" o "{{cumplimientoPct}}" (mismas claves que el
+// selector de bloque KPI, ver KPI_METRICAS) — se reemplazan por el valor
+// real, ya formateado, calculado sobre el periodo general del informe. Un
+// placeholder con una clave desconocida se deja tal cual, sin romper el texto.
+function interpolarTexto(texto, aggregates) {
+  if (!texto) return texto;
+  return texto.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key) => {
+    const def = KPI_METRICAS[key];
+    if (!def) return match;
+    const valor = def.path ? resolvePath(aggregates, def.path) : aggregates[key];
+    return fmtKpiValue(valor, def.formato);
+  });
 }
 
-function renderBloqueKpi(b, aggregates) {
+function renderBloqueTexto(b, aggregates) {
+  return {
+    titulo: interpolarTexto(b.titulo, aggregates) || "Nota",
+    contenido: interpolarTexto(b.contenido, aggregates) || "",
+    destacado: b.destacado ? interpolarTexto(b.destacado, aggregates) : null,
+    grafico: null,
+    tabla: null,
+  };
+}
+
+// Si el bloque tiene marcada la casilla "Agregar análisis de IA" (ver
+// AnalisisIaToggle en ReportBloqueBuilder.jsx), ejecuta la IA con el
+// "contexto" EXACTO de ese bloque (su propia métrica/agrupación y el periodo
+// general del informe) y añade el resultado al final del contenido del
+// mismo bloque — nunca crea una sección aparte, ni usa otros datos.
+async function conAnalisisIa(b, contenidoBase, contexto) {
+  if (!b.analisisIa) return contenidoBase;
+  try {
+    const analisis = await generateBloqueIaContent(b.analisisPregunta, contexto);
+    return `${contenidoBase}\n\n${analisis.contenido}`;
+  } catch (err) {
+    return `${contenidoBase}\n\n(No se pudo generar el análisis de IA: ${err.message})`;
+  }
+}
+
+async function renderBloqueKpi(b, aggregates, sufijo, periodo) {
   const def = KPI_METRICAS[b.metrica] || KPI_METRICAS.totalValorConIva;
   const valor = def.path ? resolvePath(aggregates, def.path) : aggregates[b.metrica];
   const texto = fmtKpiValue(valor, def.formato);
-  return { titulo: b.titulo || def.label, contenido: `${def.label}: ${texto}.`, destacado: texto, grafico: null, tabla: null };
+  const contenido = await conAnalisisIa(b, `${def.label}${sufijo}: ${texto}.`, { tipoOrigen: "kpi", metrica: b.metrica, periodo });
+  return { titulo: b.titulo || `${def.label}${sufijo}`, contenido, destacado: texto, grafico: null, tabla: null };
 }
 
-function renderBloqueGrafico(b, records) {
+async function renderBloqueGrafico(b, records, sufijo, periodo) {
   const campo = b.agruparPor || "area";
   const metrica = b.metricaAgrupada === "cantidad" ? "cantidad" : "valorConIva";
+  const etiquetaCampo = AGRUPAR_LABELS[campo] || campo;
   const grupos = groupRecordsBy(records, campo, 8);
+  if (grupos.length === 0) {
+    return { titulo: b.titulo || `Por ${etiquetaCampo}${sufijo}`, contenido: "No hay compras registradas en este periodo.", destacado: null, grafico: null, tabla: null };
+  }
   const datos = grupos.map((g) => ({ etiqueta: g.nombre, valor: g[metrica] }));
   const top = datos[0];
-  const destacado = top ? `${top.etiqueta}: ${metrica === "valorConIva" ? fmtMoneda(top.valor) : `${top.valor} compra(s)`}` : null;
-  const etiquetaCampo = AGRUPAR_LABELS[campo] || campo;
+  const destacado = `${top.etiqueta}: ${metrica === "valorConIva" ? fmtMoneda(top.valor) : `${top.valor} compra(s)`}`;
+  const contextoIa = { tipoOrigen: "grafico", agruparPor: campo, metricaAgrupada: b.metricaAgrupada, periodo };
+  const contenido = await conAnalisisIa(b, `Comparación de ${metrica === "valorConIva" ? "valor comprado" : "cantidad de compras"} por ${etiquetaCampo}${sufijo}.`, contextoIa);
   return {
-    titulo: b.titulo || `Por ${etiquetaCampo}`,
-    contenido: `Comparación de ${metrica === "valorConIva" ? "valor comprado" : "cantidad de compras"} por ${etiquetaCampo}.`,
+    titulo: b.titulo || `Por ${etiquetaCampo}${sufijo}`,
+    contenido,
     destacado,
     grafico: { titulo: b.titulo || "Comparación", tipo: "barras", datos },
     tabla: null,
   };
 }
 
-function renderBloqueTabla(b, records) {
+async function renderBloqueTabla(b, records, sufijo, periodo) {
   const campo = b.agruparPor || "area";
   const etiquetaCampo = AGRUPAR_LABELS[campo] || campo;
   const grupos = groupRecordsBy(records, campo, 15);
+  if (grupos.length === 0) {
+    return { titulo: b.titulo || `Resumen por ${etiquetaCampo}${sufijo}`, contenido: "No hay compras registradas en este periodo.", destacado: null, grafico: null, tabla: null };
+  }
   const totalValor = records.reduce((s, r) => s + (r.valorConIva || 0), 0);
   const columnas = [etiquetaCampo.charAt(0).toUpperCase() + etiquetaCampo.slice(1), "Cantidad", "Valor", "% del total"];
   const filas = grupos.map((g) => [
@@ -333,41 +432,58 @@ function renderBloqueTabla(b, records) {
     fmtMoneda(g.valorConIva),
     totalValor ? `${Math.round((g.valorConIva / totalValor) * 1000) / 10}%` : "—",
   ]);
+  const contextoIa = { tipoOrigen: "tabla", agruparPor: campo, periodo };
+  const contenido = await conAnalisisIa(b, `Desglose de compras por ${etiquetaCampo}${sufijo}.`, contextoIa);
   return {
-    titulo: b.titulo || `Resumen por ${etiquetaCampo}`,
-    contenido: `Desglose de compras por ${etiquetaCampo}.`,
+    titulo: b.titulo || `Resumen por ${etiquetaCampo}${sufijo}`,
+    contenido,
     destacado: null,
     grafico: null,
     tabla: { columnas, filas },
   };
 }
 
-function renderBloqueIa(b) {
-  return {
-    titulo: b.titulo || "Análisis con IA",
-    contenido: b.contenidoCongelado || "(Este bloque aún no se ha generado — ábrelo en el editor y genera su contenido con IA antes de enviar el informe.)",
-    destacado: b.destacadoCongelado || null,
-    grafico: null,
-    tabla: null,
-  };
+// El bloque "ia" solo guarda la pregunta (y, si vino del botón "Agregar
+// análisis de IA" de un bloque kpi/grafico/tabla, su "contexto") — la
+// pregunta se ejecuta contra la IA AQUÍ, al generar el informe (vista previa,
+// envío manual o programado), no al agregar el bloque en el editor. Así
+// siempre responde con datos frescos del momento del envío, igual que
+// kpi/grafico/tabla (ver generateBloqueIaContent).
+async function renderBloqueIa(b) {
+  if (!b.pregunta || !b.pregunta.trim()) {
+    return { titulo: b.titulo || "Análisis con IA", contenido: "(Este bloque no tiene una pregunta configurada.)", destacado: null, grafico: null, tabla: null };
+  }
+  try {
+    const res = await generateBloqueIaContent(b.pregunta, b.contexto);
+    return { titulo: b.titulo || "Análisis con IA", contenido: res.contenido, destacado: res.destacado || null, grafico: null, tabla: null };
+  } catch (err) {
+    return { titulo: b.titulo || "Análisis con IA", contenido: `(No se pudo generar este análisis con IA: ${err.message})`, destacado: null, grafico: null, tabla: null };
+  }
 }
 
 // Arma el informe de forma determinística a partir de los bloques que el
 // usuario configuró manualmente en el constructor (ReportBloqueBuilder.jsx):
 // kpi/grafico/tabla se calculan en JS directo sobre los datos reales (sin IA,
 // sin posibilidad de inventar cifras); "texto" es lo que el usuario escribió
-// a mano (o lo que trajo "generar borrador con IA", ya congelado); "ia" es la
-// respuesta — también ya congelada — de la pregunta puntual que el usuario le
-// hizo a la IA para ese bloque (ver generateBloqueIaContent).
-export async function renderReportFromBloques(bloques, { nombre } = {}) {
-  const { records, aggregates } = await loadAggregates();
-  const secciones = (bloques || []).map((b) => {
-    if (b.tipo === "kpi") return renderBloqueKpi(b, aggregates);
-    if (b.tipo === "grafico") return renderBloqueGrafico(b, records);
-    if (b.tipo === "tabla") return renderBloqueTabla(b, records);
+// a mano (o lo que trajo "generar borrador con IA"); "ia" ejecuta la pregunta
+// puntual contra la IA en este mismo momento (ver renderBloqueIa arriba).
+export async function renderReportFromBloques(bloques, { nombre, periodo } = {}) {
+  // El periodo es UNO SOLO para todo el informe (se eligió al inicio de
+  // "Armar informe" en vez de uno por bloque) — se recalcula relativo a
+  // "ahora" en cada generación (ver filterRecordsByPeriodo), nunca con una
+  // fecha fija guardada. Aplica a kpi/grafico/tabla y a los placeholders
+  // "{{...}}" dentro de los bloques de texto (ver interpolarTexto).
+  const { records: allRecords, presupuestos } = await loadRecordsAndPresupuestos();
+  const records = filterRecordsByPeriodo(allRecords, periodo);
+  const aggregates = buildAggregates(records, presupuestos);
+  const sufijo = periodoSufijo(periodo);
+  const secciones = await Promise.all((bloques || []).map((b) => {
     if (b.tipo === "ia") return renderBloqueIa(b);
-    return renderBloqueTexto(b);
-  });
+    if (b.tipo === "kpi") return renderBloqueKpi(b, aggregates, sufijo, periodo);
+    if (b.tipo === "grafico") return renderBloqueGrafico(b, records, sufijo, periodo);
+    if (b.tipo === "tabla") return renderBloqueTabla(b, records, sufijo, periodo);
+    return renderBloqueTexto(b, aggregates);
+  }));
   return {
     asunto: nombre || "Informe",
     saludo: "Buen día,",
@@ -389,14 +505,54 @@ const BLOQUE_IA_SYSTEM_INSTRUCTION = `Eres el asistente de IA de UN bloque dentr
 
 Reglas estrictas: basa cualquier cifra, suma, conteo o porcentaje EXCLUSIVAMENTE en los "agregados" que te entregan (calculados sobre el 100% de los datos, son exactos) — la "muestra" de registros es solo para citar ejemplos puntuales (proveedor, área, descripción), nunca para calcular totales. Si el dato que piden no está en los agregados ni se puede derivar de ellos con certeza, dilo explícitamente en vez de inventarlo o calcularlo a ojo sobre la muestra. Nunca inventes cifras, proveedores, fechas ni datos que no estén en la información entregada. Sé conciso — esto es un solo bloque de un correo, no un documento extenso.`;
 
+// Arma el recorte exacto de datos de un bloque kpi/grafico/tabla ya existente
+// (mismo cálculo que renderBloqueKpi/Grafico/Tabla, con su mismo periodo) —
+// usado por el botón "Agregar análisis de IA" de esos bloques (ver
+// ReportBloqueBuilder.jsx), para que el análisis hable EXACTAMENTE de los
+// datos que el bloque muestra, no de otro corte del dataset.
+async function buildContextoDatos(contexto) {
+  const { records: allRecords, presupuestos } = await loadRecordsAndPresupuestos();
+  const records = filterRecordsByPeriodo(allRecords, contexto.periodo);
+  const periodoLabel = PERIODO_LABELS[contexto.periodo] || "histórico completo";
+
+  if (contexto.tipoOrigen === "kpi") {
+    const def = KPI_METRICAS[contexto.metrica] || KPI_METRICAS.totalValorConIva;
+    const aggregates = buildAggregates(records, presupuestos);
+    const valor = def.path ? resolvePath(aggregates, def.path) : aggregates[contexto.metrica];
+    return { tipo: "kpi", metrica: def.label, periodo: periodoLabel, valor: fmtKpiValue(valor, def.formato) };
+  }
+
+  const campo = contexto.agruparPor || "area";
+  const grupos = groupRecordsBy(records, campo, contexto.tipoOrigen === "tabla" ? 15 : 8);
+  return {
+    tipo: contexto.tipoOrigen,
+    agrupadoPor: AGRUPAR_LABELS[campo] || campo,
+    metrica: contexto.metricaAgrupada === "cantidad" ? "cantidad de compras" : "valor comprado",
+    periodo: periodoLabel,
+    datos: grupos,
+  };
+}
+
 // Genera (o regenera) el contenido de un bloque tipo "ia" dentro del
 // constructor — el resultado se "congela" (se guarda en el bloque, ver
 // bloque.contenidoCongelado) y de ahí en adelante se reutiliza tal cual al
 // renderizar el informe (renderBloqueIa), sin volver a llamar a la IA en cada
-// envío programado.
-export async function generateBloqueIaContent(pregunta) {
-  const { aggregates, sample } = await loadAggregates();
-  const userPrompt = `Pregunta del administrador para este bloque del informe:
+// envío programado. "contexto" es opcional: lo manda el botón "Agregar
+// análisis de IA" de un bloque kpi/grafico/tabla para que el análisis se
+// base EXCLUSIVAMENTE en los datos exactos de ESE bloque; sin él, se
+// comporta como una pregunta libre sobre todo el histórico (flujo original).
+export async function generateBloqueIaContent(pregunta, contexto) {
+  let userPrompt;
+  if (contexto && contexto.tipoOrigen) {
+    const datos = await buildContextoDatos(contexto);
+    userPrompt = `Petición del administrador sobre este análisis:
+"""${pregunta || "Escribe un análisis breve: qué destaca, qué está concentrado o disperso, y cualquier patrón relevante."}"""
+
+Estos son TODOS los datos disponibles para este bloque (ya es el recorte exacto que el administrador configuró — no asumas que falta información ni pidas más):
+${JSON.stringify(datos)}`;
+  } else {
+    const { aggregates, sample } = await loadAggregates();
+    userPrompt = `Pregunta del administrador para este bloque del informe:
 """${pregunta}"""
 
 Agregados exactos:
@@ -404,7 +560,59 @@ ${JSON.stringify(aggregates)}
 
 Muestra de registros recientes (solo para ejemplos puntuales, no para totales):
 ${JSON.stringify(sample)}`;
+  }
   return generateStructuredJson({ systemInstruction: BLOQUE_IA_SYSTEM_INSTRUCTION, prompt: userPrompt, schema: BLOQUE_IA_SCHEMA });
+}
+
+const SUGERENCIA_BLOQUES_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    periodoSugerido: { type: "STRING", nullable: true },
+    bloques: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          tipo: { type: "STRING" },
+          titulo: { type: "STRING" },
+          metrica: { type: "STRING", nullable: true },
+          agruparPor: { type: "STRING", nullable: true },
+          metricaAgrupada: { type: "STRING", nullable: true },
+          contenido: { type: "STRING", nullable: true },
+          justificacion: { type: "STRING" },
+        },
+        required: ["tipo", "titulo", "justificacion"],
+      },
+    },
+  },
+  required: ["bloques"],
+};
+
+const SUGERENCIA_SYSTEM_INSTRUCTION = `Eres un analista que arma la ESTRUCTURA de un informe ejecutivo de compras — no inventas cifras, solo decides QUÉ bloques mostrar según lo que de verdad destaca en los "agregados" exactos que te entregan (calculados sobre el 100% del dataset real).
+
+Tipos de bloque disponibles (usa EXACTAMENTE estos valores en "tipo"):
+- "texto": un bloque introductorio breve (1-3 líneas) — usa "contenido" para el texto; no necesita más campos.
+- "kpi": muestra un indicador clave. "metrica" debe ser EXACTAMENTE una de: totalValorConIva, totalRegistros, totalSinLegalizar, cumplimientoPct, promedioDiasHabiles, totalPendientesVencidos.
+- "grafico": compara una métrica agrupada. "agruparPor" debe ser EXACTAMENTE una de: area, categoria, estado, estadoLegalizacion, proveedor. "metricaAgrupada" debe ser "valorConIva" o "cantidad".
+- "tabla": desglose detallado. "agruparPor" igual que en "grafico" (sin "metricaAgrupada").
+
+Para cada bloque, "justificacion" es una frase breve (se la mostramos al usuario) explicando por qué lo elegiste — basada en lo que realmente ves en los agregados entregados, nunca inventada.
+
+Propón entre 4 y 8 bloques en total: normalmente un "texto" introductorio, 2-3 "kpi" con los indicadores más relevantes, 1-2 "grafico" de las agrupaciones con mayor concentración o variación de gasto, y opcionalmente 1 "tabla" si hay un desglose que valga destacar. Prioriza lo que realmente resalta en los datos (un área que concentra mucho gasto, un % de cumplimiento bajo, muchas compras sin legalizar, etc.) en vez de una lista genérica siempre igual.
+
+"periodoSugerido" es opcional: una de historico, mes_actual, mes_anterior, anio_actual, anio_anterior (o null para dejar histórico completo) — solo si los datos recientes muestran algo distinto al histórico que valga la pena resaltar en todo el informe.`;
+
+// Botón "Armar informe automáticamente con IA" (ver ReportEditor.jsx): la IA
+// no inventa ninguna cifra — solo decide la ESTRUCTURA (qué bloques, con qué
+// métrica/agrupación) según lo que realmente destaca en los agregados reales.
+// Los bloques resultantes son kpi/grafico/tabla normales: sus valores se
+// siguen calculando de forma 100% determinística al generar el informe (ver
+// renderBloqueKpi/Grafico/Tabla), igual que si el usuario los hubiera armado
+// a mano.
+export async function generateBloquesSugeridos() {
+  const { aggregates } = await loadAggregates();
+  const prompt = `Agregados exactos de compras (calculados sobre el 100% de los datos):\n${JSON.stringify(aggregates)}`;
+  return generateStructuredJson({ systemInstruction: SUGERENCIA_SYSTEM_INSTRUCTION, prompt, schema: SUGERENCIA_BLOQUES_SCHEMA, budgetMs: 30000 });
 }
 
 // Punto de entrada único usado por preview/send-now/reportScheduler: acepta el
@@ -416,10 +624,10 @@ export async function generateReportContent(reportOrPrompt) {
   if (typeof reportOrPrompt === "string") {
     return generateReportContentFromPrompt(reportOrPrompt);
   }
-  const { prompt, bloques, nombre } = reportOrPrompt || {};
+  const { prompt, bloques, nombre, periodoGeneral } = reportOrPrompt || {};
   const parsedBloques = Array.isArray(bloques) ? bloques : (typeof bloques === "string" ? JSON.parse(bloques || "[]") : []);
   if (parsedBloques.length > 0) {
-    return renderReportFromBloques(parsedBloques, { nombre });
+    return renderReportFromBloques(parsedBloques, { nombre, periodo: periodoGeneral });
   }
   return generateReportContentFromPrompt(prompt);
 }

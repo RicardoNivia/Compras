@@ -3,7 +3,7 @@ import { getSessionUser } from "@/lib/auth-server";
 import { isRoleAllowed } from "@/lib/permissions";
 import { generateReportContent } from "@/lib/reportContent";
 import { generateReportPdfBuffer } from "@/lib/reportPdf";
-import { generateEmailBody } from "@/lib/reportEmailBody";
+import { resolveEmailBody } from "@/lib/reportEmailBody";
 import { createJob } from "@/lib/reportJobs";
 
 // Arranca (sin guardar nada) la generación de la vista previa del informe a
@@ -25,12 +25,12 @@ export async function POST(request) {
   }
 
   const jobId = createJob(async () => {
-    const content = await generateReportContent({ prompt: body.prompt, bloques: body.bloques, nombre: body.nombre });
-    const [pdfBuffer, emailBody] = await Promise.all([
+    const content = await generateReportContent({ prompt: body.prompt, bloques: body.bloques, nombre: body.nombre, periodoGeneral: body.periodoGeneral });
+    const [pdfBuffer, cuerpo] = await Promise.all([
       generateReportPdfBuffer(content, { nombre: body.nombre, prioridad: body.prioridad || "media" }),
-      generateEmailBody({ content, nombre: body.nombre || "Informe", cuerpoModo: body.cuerpoModo || "resumen", cuerpoPrompt: body.cuerpoPrompt }),
+      resolveEmailBody({ cuerpoHtml: body.cuerpoHtml, content, nombre: body.nombre || "Informe", cuerpoModo: body.cuerpoModo || "resumen", cuerpoPrompt: body.cuerpoPrompt }),
     ]);
-    return { content, pdfBase64: pdfBuffer.toString("base64"), emailBody };
+    return { content, pdfBase64: pdfBuffer.toString("base64"), emailBody: cuerpo.text };
   });
 
   return NextResponse.json({ jobId }, { status: 202 });

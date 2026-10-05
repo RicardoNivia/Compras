@@ -228,25 +228,33 @@ export async function renderReportPdfApi({ content, nombre }) {
   return handle(res);
 }
 
-export async function previewReportApi({ prompt, bloques, nombre, prioridad, cuerpoModo, cuerpoPrompt }) {
+export async function previewReportApi({ prompt, bloques, nombre, prioridad, cuerpoHtml, periodoGeneral }) {
   const res = await fetch("/api/reports/preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, bloques, nombre, prioridad, cuerpoModo, cuerpoPrompt }),
+    body: JSON.stringify({ prompt, bloques, nombre, prioridad, cuerpoHtml, periodoGeneral }),
   });
   const { jobId } = await handle(res);
   return pollReportJob(jobId);
 }
 
-// Genera (o regenera) el contenido de un bloque tipo "ia" del constructor por
-// bloques (ver ReportBloqueBuilder.jsx) — no guarda nada, solo devuelve
-// {contenido, destacado} para que el usuario lo revise antes de dejarlo en el
-// bloque.
-export async function generateBloqueIaApi({ pregunta }) {
-  const res = await fetch("/api/reports/bloque-ia", {
+// Botón "Armar informe automáticamente con IA" (ReportEditor.jsx) — sin
+// prompt: la IA analiza los datos reales y propone una estructura de bloques
+// {periodoSugerido, bloques: [{tipo, titulo, metrica?, agruparPor?, ...}]}.
+export async function sugerirBloquesApi() {
+  const res = await fetch("/api/reports/sugerir-bloques", { method: "POST" });
+  const { jobId } = await handle(res);
+  return pollReportJob(jobId);
+}
+
+// Botón "IA" del editor del cuerpo del correo (ReportBodyEditor.jsx) — no
+// genera nada desde cero, revisa/reescribe el texto que el usuario ya
+// escribió y devuelve {texto} para que decida si lo aplica.
+export async function generateCuerpoCorreoIaApi({ texto }) {
+  const res = await fetch("/api/reports/cuerpo-ia", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pregunta }),
+    body: JSON.stringify({ texto }),
   });
   const { jobId } = await handle(res);
   return pollReportJob(jobId, { maxWaitMs: 60000 });

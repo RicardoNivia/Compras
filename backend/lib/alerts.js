@@ -82,6 +82,17 @@ export async function getRiesgoTiempos(records) {
   return items.sort((a, b) => b.diasHabiles - a.diasHabiles);
 }
 
+// Compras ya legalizadas pero que todavía no se han radicado — el último
+// paso del trámite sigue pendiente (una vez "Legalizado" y radicado, ya no
+// requiere más seguimiento). Ordenadas por fecha de solicitud, las más
+// antiguas primero (las que más tiempo llevan esperando ese último paso).
+function getNoRadicadas(records) {
+  const items = records
+    .filter((r) => r.estadoLegalizacion === "Legalizado" && !r.radicado)
+    .map((r) => miniFields(r));
+  return items.sort((a, b) => (a.fechaSolicitud || "").localeCompare(b.fechaSolicitud || ""));
+}
+
 // Datos crudos para la página /alertas y para el prompt de "Revisar con IA"
 // (ver app/api/agent/review-alertas/route.js) — ambos deben partir de
 // exactamente los mismos registros/cálculos para que el análisis de la IA
@@ -93,5 +104,6 @@ export async function getAlertsData() {
     getRiesgoPresupuesto(records),
     getRiesgoTiempos(records),
   ]);
-  return { solicitudesPendientes, riesgoPresupuesto, riesgoTiempos };
+  const noRadicadas = getNoRadicadas(records);
+  return { solicitudesPendientes, riesgoPresupuesto, riesgoTiempos, noRadicadas };
 }
