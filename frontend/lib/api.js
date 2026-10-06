@@ -141,9 +141,26 @@ export async function setPermissionApi(role, feature, allowed) {
   return handle(res);
 }
 
+// Mensaje del chat del Agente IA (ver AgenteChat.jsx). Con "tool use" el
+// modelo puede ir y volver varias veces pidiendo datos antes de responder, y
+// la respuesta final pasa por una segunda capa de moderación — nada de eso
+// se puede mostrar en vivo, así que el backend corre esto como trabajo en
+// segundo plano (mismo patrón que Informes automáticos) en vez de streaming;
+// aquí se hace polling hasta tener el texto final.
+export async function sendAgentChatApi({ message, conversationId, section, widget }) {
+  const res = await fetch("/api/agent/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, conversationId, section, widget }),
+  });
+  const { jobId, conversationId: newConversationId } = await handle(res);
+  const result = await pollJob(jobId, { jobsPath: "/api/agent/chat/jobs" });
+  return { text: result.text, conversationId: newConversationId };
+}
+
 // Traduce una búsqueda en lenguaje natural a los mismos filtros que usa el
-// modo manual de Registros (ver RegistrosView.jsx) — siempre con el modelo
-// gratis de Gemini por defecto, del lado del servidor.
+// modo manual de Registros (ver RegistrosView.jsx) — con Anthropic, del lado
+// del servidor.
 export async function searchFiltersWithAiApi(query, options) {
   const res = await fetch("/api/agent/search-filters", {
     method: "POST",
@@ -198,16 +215,19 @@ export async function fetchReportsApi() {
   return handle(res);
 }
 
-// La generación puede tardar hasta ~100s (fallback Gemini→Anthropic sobre
-// cientos de registros, ver backend/lib/aiStructured.js) — más de lo que el
+// La generación puede tardar hasta ~100s (Anthropic sobre cientos de
+// registros, ver backend/lib/aiStructured.js) — más de lo que el
 // proxy de rewrites deja esperar en una sola llamada. El backend arranca un
 // trabajo en segundo plano y devuelve su id de inmediato; esta función hace
 // el polling acá (varios GETs cortos y rápidos) para que quien la llama siga
 // viéndola como una promesa normal que resuelve con el resultado final.
-async function pollReportJob(jobId, { maxWaitMs = 115000, intervalMs = 2000 } = {}) {
+// "jobsPath" es la ruta de consulta de estado (distinta por feature: Informes
+// automáticos usa /api/reports/jobs/[jobId], el chat del Agente IA usa
+// /api/agent/chat/jobs/[jobId] — mismo patrón, mismo lib/reportJobs.js del lado del backend).
+async function pollJob(jobId, { jobsPath = "/api/reports/jobs", maxWaitMs = 115000, intervalMs = 2000 } = {}) {
   const deadline = Date.now() + maxWaitMs;
   while (Date.now() < deadline) {
-    const res = await fetch(`/api/reports/jobs/${jobId}`, { cache: "no-store" });
+    const res = await fetch(`${jobsPath}/${jobId}`, { cache: "no-store" });
     const data = await handle(res);
     if (data.status === "done") return data.result;
     if (data.status === "error") throw new Error(data.error || "No se pudo completar la operación.");
@@ -219,23 +239,23 @@ async function pollReportJob(jobId, { maxWaitMs = 115000, intervalMs = 2000 } = 
 // Vuelve a dibujar el PDF a partir de un contenido ya generado (sin IA, sin
 // polling — responde al instante) — se usa al abrir "Editar informe" para
 // mostrar de nuevo el mismo PDF guardado la última vez.
-export async function renderReportPdfApi({ content, nombre }) {
+export async function renderReportPdfApi({ content, nombre, tipo }) {
   const res = await fetch("/api/reports/render-pdf", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content, nombre }),
+    body: JSON.stringify({ content, nombre, tipo }),
   });
   return handle(res);
 }
 
-export async function previewReportApi({ prompt, bloques, nombre, prioridad, cuerpoHtml, periodoGeneral }) {
+export async function previewReportApi({ prompt, bloques, nombre, prioridad, cuerpoHtml, periodoGeneral, tipo }) {
   const res = await fetch("/api/reports/preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, bloques, nombre, prioridad, cuerpoHtml, periodoGeneral }),
+    body: JSON.stringify({ prompt, bloques, nombre, prioridad, cuerpoHtml, periodoGeneral, tipo }),
   });
   const { jobId } = await handle(res);
-  return pollReportJob(jobId);
+  return pollJob(jobId);
 }
 
 // Botón "Armar informe automáticamente con IA" (ReportEditor.jsx) — sin
@@ -244,7 +264,7 @@ export async function previewReportApi({ prompt, bloques, nombre, prioridad, cue
 export async function sugerirBloquesApi() {
   const res = await fetch("/api/reports/sugerir-bloques", { method: "POST" });
   const { jobId } = await handle(res);
-  return pollReportJob(jobId);
+  return pollJob(jobId);
 }
 
 // Botón "IA" del editor del cuerpo del correo (ReportBodyEditor.jsx) — no
@@ -257,7 +277,7 @@ export async function generateCuerpoCorreoIaApi({ texto }) {
     body: JSON.stringify({ texto }),
   });
   const { jobId } = await handle(res);
-  return pollReportJob(jobId, { maxWaitMs: 60000 });
+  return pollJob(jobId, { maxWaitMs: 60000 });
 }
 
 export async function createReportApi(data) {
@@ -286,5 +306,5 @@ export async function deleteReportApi(id) {
 export async function sendReportNowApi(id) {
   const res = await fetch(`/api/reports/${id}/send-now`, { method: "POST" });
   const { jobId } = await handle(res);
-  return pollReportJob(jobId);
+  return pollJob(jobId);
 }

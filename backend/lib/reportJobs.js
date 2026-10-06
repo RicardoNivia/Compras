@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 
 // Trabajos en memoria para desacoplar la generación de informes (puede tardar
-// hasta ~100s con el fallback Gemini→Anthropic, ver lib/aiStructured.js) del
-// límite de ~30s que el proxy de rewrites del frontend le impone a cualquier
-// request iniciado desde el navegador (ver el comentario en lib/gemini.js).
+// hasta ~100s, ver lib/aiStructured.js) del límite de ~30s que el proxy de
+// rewrites del frontend le impone a cualquier request iniciado desde el
+// navegador (ver el comentario en lib/anthropic.js).
 // En vez de esperar la respuesta completa en una sola llamada HTTP, el POST
 // inicial solo crea el trabajo y responde al toque; el cliente consulta su
 // estado con GETs cortos y rápidos hasta que termina — ver

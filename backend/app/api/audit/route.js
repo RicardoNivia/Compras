@@ -3,6 +3,51 @@ import { getSessionUser } from "@/lib/auth-server";
 import { isRoleAllowed } from "@/lib/permissions";
 import { listAuditLogs } from "@/lib/audit";
 
+/**
+ * @openapi
+ * /api/audit:
+ *   get:
+ *     tags: [Auditoría]
+ *     summary: Historial de acciones sensibles, paginado y filtrable (requiere permiso "viewAuditoria").
+ *     parameters:
+ *       - { name: from, in: query, schema: { type: string, format: date }, description: "Fecha inicial (incluida)." }
+ *       - { name: to, in: query, schema: { type: string, format: date }, description: "Fecha final (incluida)." }
+ *       - { name: userId, in: query, schema: { type: string }, description: "Filtra por autor." }
+ *       - { name: recordId, in: query, schema: { type: string }, description: "Filtra por entidad afectada." }
+ *       - { name: page, in: query, schema: { type: integer, default: 1 } }
+ *       - { name: pageSize, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+ *     responses:
+ *       200:
+ *         description: Página de resultados.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 total: { type: integer }
+ *                 page: { type: integer }
+ *                 pageSize: { type: integer }
+ *                 logs:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: string }
+ *                       action: { type: string }
+ *                       entityType: { type: string }
+ *                       recordId: { type: string, nullable: true }
+ *                       recordInfo: { type: string, nullable: true }
+ *                       userId: { type: string, nullable: true }
+ *                       userNombre: { type: string, nullable: true }
+ *                       userEmail: { type: string, nullable: true }
+ *                       changes: { type: array, nullable: true, items: { type: object } }
+ *                       createdAt: { type: string, format: date-time }
+ *       403:
+ *         description: No autorizado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
 export async function GET(request) {
   const user = await getSessionUser();
   if (!user || !(await isRoleAllowed(user.role, "viewAuditoria"))) {

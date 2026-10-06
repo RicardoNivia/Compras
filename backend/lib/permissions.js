@@ -19,7 +19,6 @@ export const FEATURES = [
   { key: "viewDashboard", label: "Ver Dashboard de compras", section: "Dashboard", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR] },
   { key: "viewAlertas", label: "Ver Alertas y notificaciones", section: "Alertas", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR] },
   { key: "viewAgenteIA", label: "Ver Agente IA", section: "Agente IA", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR] },
-  { key: "useAiPaidModels", label: "Usar modelos de pago del Agente IA", section: "Agente IA", defaultRoles: [ROLES.ADMIN] },
   { key: "createRecord", label: "Crear registro de compra", section: "Registros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
   { key: "editRecord", label: "Editar registro de compra", section: "Registros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR] },
   { key: "deleteRecord", label: "Eliminar registro de compra", section: "Registros", defaultRoles: [ROLES.ADMIN] },

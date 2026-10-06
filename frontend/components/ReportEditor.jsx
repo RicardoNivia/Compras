@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { previewReportApi, createReportApi, updateReportApi, renderReportPdfApi, sugerirBloquesApi } from "@/lib/api";
 import { IconSpark, IconAlert, IconCheck } from "@/components/icons";
-import ReportBloqueBuilder, { nuevoBloque, PERIODOS, METRICAS_KPI, AGRUPACIONES } from "@/components/ReportBloqueBuilder";
+import ReportBloqueBuilder, {
+  nuevoBloque, PERIODOS, METRICAS_KPI, AGRUPACIONES, DASHBOARD_SECCIONES, nuevoBloqueDeSeccion, seccionBloqueId,
+} from "@/components/ReportBloqueBuilder";
 import ReportBodyEditor from "@/components/ReportBodyEditor";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -17,11 +19,18 @@ const FRECUENCIAS = [
 const DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const DIAS_SEMANA_VALUE = [1, 2, 3, 4, 5, 6, 0]; // getDay(): 0 = domingo
 
-function emptyForm(report) {
+function emptyForm(report, modo) {
+  // Informe nuevo en modo "dashboard": arranca con TODAS las secciones
+  // activadas (el usuario desactiva las que no quiera) en vez de empezar
+  // vacío, para que se sienta como "el Dashboard" desde el primer momento.
+  const bloquesIniciales = !report && modo === "dashboard"
+    ? DASHBOARD_SECCIONES.map((s) => nuevoBloqueDeSeccion(s.key))
+    : (report?.bloques || []);
   return {
     nombre: report?.nombre || "",
+    tipo: report?.tipo || modo || "bloques",
     prompt: report?.prompt || "",
-    bloques: report?.bloques || [],
+    bloques: bloquesIniciales,
     periodoGeneral: report?.periodoGeneral || "historico",
     frecuencia: report?.frecuencia || "diaria",
     diaSemana: report?.diaSemana ?? 1,
@@ -75,12 +84,14 @@ function EmailField({ label, placeholder, value, onChange, required }) {
   );
 }
 
-export default function ReportEditor({ report, onCancel, onSaved }) {
+export default function ReportEditor({ report, modo = "bloques", onCancel, onSaved }) {
   const isEdit = !!report;
-  const [form, setForm] = useState(emptyForm(report));
+  const modoEfectivo = report?.tipo || modo;
+  const esDashboard = modoEfectivo === "dashboard";
+  const [form, setForm] = useState(emptyForm(report, modo));
   const [preview, setPreview] = useState(report?.ultimoContenido ? { content: report.ultimoContenido, pdfBase64: null, emailBody: report.ultimoCuerpoCorreo || null } : null);
   const [previewTab, setPreviewTab] = useState("cuerpo"); // "cuerpo" | "pdf"
-  const [formTab, setFormTab] = useState("informe"); // "informe" | "envio"
+  const [formTab, setFormTab] = useState(esDashboard ? "secciones" : "informe");
   const [previewing, setPreviewing] = useState(false);
   const [restoringPdf, setRestoringPdf] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -96,7 +107,7 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
     if (!report?.ultimoContenido) return;
     let cancelled = false;
     setRestoringPdf(true);
-    renderReportPdfApi({ content: report.ultimoContenido, nombre: report.nombre })
+    renderReportPdfApi({ content: report.ultimoContenido, nombre: report.nombre, tipo: report.tipo })
       .then((res) => { if (!cancelled) setPreview((p) => ({ ...p, pdfBase64: res.pdfBase64 })); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setRestoringPdf(false); });
@@ -172,7 +183,7 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
     setError("");
     setPreviewing(true);
     try {
-      const res = await previewReportApi({ bloques: form.bloques, nombre: form.nombre, cuerpoHtml: form.cuerpoHtml, periodoGeneral: form.periodoGeneral });
+      const res = await previewReportApi({ bloques: form.bloques, nombre: form.nombre, cuerpoHtml: form.cuerpoHtml, periodoGeneral: form.periodoGeneral, tipo: form.tipo });
       setPreview(res);
       setPreviewTab("cuerpo");
     } catch (err) {
@@ -188,9 +199,9 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
     // ese campo — así el error nunca se queda mostrado debajo de "Armar
     // informe" cuando en realidad es de "Programación" (o viceversa).
     if (!form.nombre.trim()) return setError("Dale un nombre al informe.");
-    if (form.bloques.length === 0) { setFormTab("informe"); return setError("Agrega al menos un bloque al informe."); }
+    if (form.bloques.length === 0) { setFormTab(esDashboard ? "secciones" : "informe"); return setError(esDashboard ? "Activa al menos una sección del Dashboard." : "Agrega al menos un bloque al informe."); }
     if (!form.destinatarios.length) { setFormTab("programacion"); return setError("Agrega al menos un destinatario en \"Para\"."); }
-    if (!preview?.content) { setFormTab("informe"); return setError("Genera la vista previa antes de guardar, para confirmar cómo se verá el correo."); }
+    if (!preview?.content) { setFormTab(esDashboard ? "secciones" : "informe"); return setError("Genera la vista previa antes de guardar, para confirmar cómo se verá el correo."); }
 
     setSaving(true);
     try {
@@ -207,10 +218,12 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
   return (
     <div className="report-editor-grid">
       <div className="report-editor-form">
-        {sugiriendo && (
+        {(sugiriendo || previewing) && (
           <div className="report-editor-form-overlay">
             <span className="spinner" />
-            Analizando tus datos y armando el informe… espera un momento, no se puede editar mientras tanto.
+            {sugiriendo
+              ? "Analizando tus datos y armando el informe… espera un momento, no se puede editar mientras tanto."
+              : "Generando la vista previa… espera un momento, no se puede editar mientras tanto."}
           </div>
         )}
         <div className="field full">
@@ -219,21 +232,80 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
         </div>
 
         <div className="dash-tabs" role="tablist" aria-label="Secciones del informe">
-          <button type="button" role="tab" aria-selected={formTab === "cuerpo"} className="dash-tab" onClick={() => { setFormTab("cuerpo"); setError(""); }} disabled={sugiriendo}>
+          <button type="button" role="tab" aria-selected={formTab === "cuerpo"} className="dash-tab" onClick={() => { setFormTab("cuerpo"); setError(""); }} disabled={sugiriendo || previewing}>
             Cuerpo del correo
           </button>
-          <button type="button" role="tab" aria-selected={formTab === "informe"} className="dash-tab" onClick={() => { setFormTab("informe"); setError(""); }} disabled={sugiriendo}>
-            Armar informe
-          </button>
-          <button type="button" role="tab" aria-selected={formTab === "programacion"} className="dash-tab" onClick={() => { setFormTab("programacion"); setError(""); }} disabled={sugiriendo}>
+          {esDashboard ? (
+            <button type="button" role="tab" aria-selected={formTab === "secciones"} className="dash-tab" onClick={() => { setFormTab("secciones"); setError(""); }} disabled={sugiriendo || previewing}>
+              Secciones del Dashboard
+            </button>
+          ) : (
+            <button type="button" role="tab" aria-selected={formTab === "informe"} className="dash-tab" onClick={() => { setFormTab("informe"); setError(""); }} disabled={sugiriendo || previewing}>
+              Armar informe
+            </button>
+          )}
+          <button type="button" role="tab" aria-selected={formTab === "programacion"} className="dash-tab" onClick={() => { setFormTab("programacion"); setError(""); }} disabled={sugiriendo || previewing}>
             Programación
           </button>
         </div>
 
-        {formTab === "informe" ? (
+        {formTab === "secciones" ? (
           <>
             <div className="field full">
-              <button type="button" className="btn btn-sync" onClick={handleSugerirInforme} disabled={sugiriendo}>
+              <label htmlFor="rp-periodo-dash">Periodo de los datos (aplica a todo el informe)</label>
+              <select id="rp-periodo-dash" value={form.periodoGeneral} onChange={(e) => update("periodoGeneral", e.target.value)}>
+                {PERIODOS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+              </select>
+              <p className="schedule-note" style={{ marginTop: 8 }}>
+                Se recalcula relativo a la fecha de envío, no es una fecha fija (p. ej. un envío mensual con "Mes
+                anterior" siempre toma el mes antes de cada envío).
+              </p>
+            </div>
+
+            <div className="field full">
+              <label>Secciones a incluir</label>
+              <div className="dashboard-secciones-list">
+                {DASHBOARD_SECCIONES.map((s) => {
+                  const bid = seccionBloqueId(s.key);
+                  const activa = form.bloques.some((b) => b.id === bid);
+                  return (
+                    <div className="dashboard-seccion-row" key={s.key}>
+                      <span className="bloque-analisis-ia-label">{s.label}</span>
+                      <label className="switch-toggle">
+                        <input
+                          type="checkbox"
+                          checked={activa}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              update("bloques", [...form.bloques, nuevoBloqueDeSeccion(s.key)]);
+                            } else {
+                              update("bloques", form.bloques.filter((b) => b.id !== bid));
+                            }
+                          }}
+                        />
+                        <span className="switch-toggle-track"><span className="switch-toggle-thumb" /></span>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="schedule-note" style={{ marginTop: 8 }}>
+                Cada sección se calcula con datos reales (sin IA), igual que un bloque normal del constructor manual.
+              </p>
+            </div>
+
+            <div className="field full">
+              <button type="button" className="btn btn-sync" onClick={handlePreview} disabled={previewing || sugiriendo}>
+                {previewing ? <span className="spinner" /> : <IconSpark size={14} />}
+                {previewing ? "Generando vista previa…" : "Generar vista previa"}
+              </button>
+              {previewing && <p className="schedule-note" style={{ marginTop: 6 }}>Puede tardar hasta 1-2 minutos con informes grandes.</p>}
+            </div>
+          </>
+        ) : formTab === "informe" ? (
+          <>
+            <div className="field full">
+              <button type="button" className="btn btn-sync" onClick={handleSugerirInforme} disabled={sugiriendo || previewing}>
                 {sugiriendo ? <span className="spinner" /> : <IconSpark size={14} />}
                 {sugiriendo ? "Analizando tus datos…" : "Armar informe automáticamente con IA"}
               </button>
@@ -267,7 +339,7 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
                 rows={3} value={form.prompt} onChange={(e) => update("prompt", e.target.value)}
                 placeholder="Ej. Resume el total comprado por área, destaca las compras sin legalizar y muestra el cumplimiento de tiempos de entrega."
               />
-              <button type="button" className="btn btn-sync small" onClick={handleGenerarBorrador} disabled={draftLoading || !form.prompt.trim() || sugiriendo}>
+              <button type="button" className="btn btn-sync small" onClick={handleGenerarBorrador} disabled={draftLoading || !form.prompt.trim() || sugiriendo || previewing}>
                 {draftLoading ? <span className="spinner" /> : <IconSpark size={12} />}
                 {draftLoading ? "Generando borrador…" : "Agregar bloques de texto con IA"}
               </button>
@@ -376,25 +448,17 @@ export default function ReportEditor({ report, onCancel, onSaved }) {
         {error && <div className="modal-error full"><IconAlert size={13} /> {error}</div>}
 
         <div className="report-editor-actions">
-          <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving || sugiriendo}>
+          <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving || sugiriendo || previewing}>
             {saving && <span className="spinner" />}
             {saving ? "Guardando…" : "Guardar informe"}
           </button>
-          <button type="button" className="btn" onClick={onCancel} disabled={saving || sugiriendo}>Cancelar</button>
+          <button type="button" className="btn" onClick={onCancel} disabled={saving || sugiriendo || previewing}>Cancelar</button>
         </div>
       </div>
 
       <div className="report-editor-preview">
         <div className="report-preview-label">
           <IconCheck size={12} /> Así se enviará: cuerpo del correo + informe en PDF adjunto
-        </div>
-
-        <div className="field full" style={{ marginBottom: 2 }}>
-          <button type="button" className="btn btn-sync" onClick={handlePreview} disabled={previewing || sugiriendo}>
-            {previewing ? <span className="spinner" /> : <IconSpark size={14} />}
-            {previewing ? "Generando vista previa…" : "Generar vista previa"}
-          </button>
-          {previewing && <p className="schedule-note" style={{ marginTop: 6 }}>Puede tardar hasta 1-2 minutos con informes grandes.</p>}
         </div>
 
         <div className="dash-tabs" role="tablist" aria-label="Vista previa del envío" style={{ marginBottom: 2 }}>

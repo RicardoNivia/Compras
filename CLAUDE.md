@@ -73,7 +73,9 @@ There is no test suite in this repo currently.
 
 ### Files duplicated across both apps
 
-`lib/session.js`, `lib/roles.js`, and `lib/auditLabels.js` have no Prisma/Node-only dependency, so each app keeps its own copy (`backend/lib/*` and `frontend/lib/*`) rather than sharing a package. `lib/geminiModels.js` (pure catalog, no secrets) is duplicated the same way so the frontend model-picker dropdown doesn't need a backend round-trip. **When editing any of these, update both copies.**
+`lib/session.js`, `lib/roles.js`, and `lib/auditLabels.js` have no Prisma/Node-only dependency, so each app keeps its own copy (`backend/lib/*` and `frontend/lib/*`) rather than sharing a package. **When editing any of these, update both copies.**
+
+Anthropic (Claude) is the only AI provider configured in the app — there is no Gemini fallback. `backend/lib/anthropic.js` wraps the Messages API (`ANTHROPIC_API_KEY` env var), `backend/lib/anthropicModels.js` is the model catalog (`DEFAULT_ANTHROPIC_MODEL`), `backend/lib/aiChatCascade.js` is the streaming entry point used by the Agente IA chat, and `backend/lib/aiStructured.js` is the non-streaming structured-JSON entry point used by Informes automáticos, moderation, "Explícame este número", etc. All roles use the same model — there is no paid/free distinction or per-role AI model gating.
 
 - **`legacy/panel-original.html`** (repo root): an incomplete, unreliable leftover fragment from an early failed transcription attempt — not a real reference copy of the original app. Do not treat its contents as authoritative.
 

@@ -37,6 +37,7 @@ function fmtDate(d) {
 export default function InformesView({ initialReports }) {
   const [reports, setReports] = useState(initialReports || []);
   const [tab, setTab] = useState("lista"); // "lista" | "crear"
+  const [modoCrear, setModoCrear] = useState("bloques"); // "bloques" | "dashboard" — solo aplica al crear uno nuevo
   const [editingReport, setEditingReport] = useState(null); // null = informe nuevo
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -54,11 +55,19 @@ export default function InformesView({ initialReports }) {
 
   function openCreate() {
     setEditingReport(null);
+    setModoCrear("bloques");
+    setTab("crear");
+  }
+
+  function openCreateDashboard() {
+    setEditingReport(null);
+    setModoCrear("dashboard");
     setTab("crear");
   }
 
   function openEdit(report) {
     setEditingReport(report);
+    setModoCrear(report.tipo || "bloques");
     setTab("crear");
   }
 
@@ -116,10 +125,16 @@ export default function InformesView({ initialReports }) {
           Mis informes
         </button>
         <button
-          type="button" role="tab" aria-selected={tab === "crear"} className="dash-tab"
-          onClick={() => (tab === "crear" ? null : openCreate())}
+          type="button" role="tab" aria-selected={tab === "crear" && modoCrear !== "dashboard"} className="dash-tab"
+          onClick={() => (tab === "crear" && modoCrear !== "dashboard" ? null : openCreate())}
         >
-          {editingReport && tab === "crear" ? "Editar informe" : "Crear informe"}
+          {editingReport && tab === "crear" && modoCrear !== "dashboard" ? "Editar informe" : "Crear informe"}
+        </button>
+        <button
+          type="button" role="tab" aria-selected={tab === "crear" && modoCrear === "dashboard"} className="dash-tab"
+          onClick={() => (tab === "crear" && modoCrear === "dashboard" ? null : openCreateDashboard())}
+        >
+          {editingReport && tab === "crear" && modoCrear === "dashboard" ? "Editar Dashboard" : "Dashboard"}
         </button>
       </div>
 
@@ -133,8 +148,9 @@ export default function InformesView({ initialReports }) {
 
       {tab === "crear" ? (
         <ReportEditor
-          key={editingReport?.id || "nuevo"}
+          key={editingReport?.id || `nuevo-${modoCrear}`}
           report={editingReport}
+          modo={modoCrear}
           onCancel={() => setTab("lista")}
           onSaved={handleSaved}
         />
@@ -163,7 +179,10 @@ export default function InformesView({ initialReports }) {
                       </label>
                     </div>
 
-                    <div className="report-card-name">{r.nombre}</div>
+                    <div className="report-card-name">
+                      {r.nombre}
+                      {r.tipo === "dashboard" && <span className="bloque-tipo-tag tipo-kpi" style={{ marginLeft: 8 }}>Dashboard</span>}
+                    </div>
                     <div className="report-card-prompt">{r.prompt}</div>
 
                     <div className="report-card-meta">

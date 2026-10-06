@@ -1,7 +1,5 @@
-// Catálogo de modelos Anthropic (Claude) disponibles para el Agente IA.
-// A diferencia de Gemini, la cuenta de Anthropic configurada es 100% de pago
-// (sin nivel gratuito) — por eso TODOS estos modelos son "paid" y quedan
-// restringidos a admin (ver lib/roles.js#canUsePaidModels).
+// Catálogo de modelos Anthropic (Claude) disponibles para el Agente IA —
+// único proveedor de IA configurado en la app.
 
 export const ANTHROPIC_MODELS = [
   {

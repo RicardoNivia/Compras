@@ -177,12 +177,48 @@ function drawSection(doc, s, width) {
   doc.moveDown(1.1);
 }
 
+// Cuadrícula de tarjetas KPI (2 columnas) — SOLO para el informe tipo
+// "Dashboard" (dashboardLayout=true, ver generateReportPdfBuffer). Un informe
+// normal (tipo "bloques") nunca pasa por aquí: sus KPI siguen dibujándose
+// igual que siempre, uno debajo del otro, con drawSection — este cambio de
+// diseño no les afecta en nada.
+const KPI_CARD_H = 58;
+const KPI_GAP = 12;
+
+function measureKpiGrid(count, cols) {
+  return Math.ceil(count / cols) * (KPI_CARD_H + KPI_GAP);
+}
+
+function drawKpiGrid(doc, kpis, width) {
+  const cols = 2;
+  const gap = KPI_GAP;
+  const cardW = (width - gap * (cols - 1)) / cols;
+  let col = 0;
+  let rowY = doc.y;
+  for (const s of kpis) {
+    const x = MARGIN + col * (cardW + gap);
+    doc.roundedRect(x, rowY, cardW, KPI_CARD_H, 8).fillAndStroke("#f3f7fc", "#dbe6f2");
+    doc.fillColor("#5a6b85").font("Helvetica-Bold").fontSize(8.5)
+      .text((s.titulo || "").toUpperCase(), x + 12, rowY + 10, { width: cardW - 24 });
+    doc.fillColor(ACCENT_HEX).font("Helvetica-Bold").fontSize(16)
+      .text(s.destacado || "—", x + 12, rowY + 26, { width: cardW - 24, ellipsis: true });
+    col++;
+    if (col >= cols) { col = 0; rowY += KPI_CARD_H + gap; }
+  }
+  doc.x = MARGIN;
+  doc.y = col === 0 ? rowY : rowY + KPI_CARD_H + gap;
+}
+
 // Genera el PDF del informe (secciones + gráficas) como Buffer, para
 // adjuntarlo al envío — ver
 // lib/mailer.js#sendReportEmail. Usa pdfkit (sin dependencias nativas ni
 // Chromium) y controla manualmente los saltos de página por sección
 // (measureSection) para que una gráfica nunca quede cortada entre dos páginas.
-export function generateReportPdfBuffer(content, { nombre } = {}) {
+// "dashboardLayout": true solo para informes tipo "Dashboard" — agrupa los
+// bloques KPI en una cuadrícula en vez de la lista vertical de siempre; el
+// resto de secciones (gráfico/tabla/texto/ia) se dibuja exactamente igual,
+// con el mismo drawSection que usan los informes normales.
+export function generateReportPdfBuffer(content, { nombre, dashboardLayout } = {}) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: "A4", margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } });
@@ -215,8 +251,19 @@ export function generateReportPdfBuffer(content, { nombre } = {}) {
       doc.fillColor("#132a46").font("Helvetica").fontSize(11.5).text(content?.saludo || "Buen día,", { width });
       doc.moveDown(0.8);
 
-      for (const s of content?.secciones || []) {
-        drawSection(doc, s, width);
+      const secciones = content?.secciones || [];
+      if (dashboardLayout) {
+        const kpis = secciones.filter((s) => s._origen === "kpi");
+        const resto = secciones.filter((s) => s._origen !== "kpi");
+        if (kpis.length) {
+          const required = measureKpiGrid(kpis.length, 2);
+          if (required > doc.page.height - doc.page.margins.bottom - doc.y) doc.addPage();
+          drawKpiGrid(doc, kpis, width);
+          doc.moveDown(1.1);
+        }
+        for (const s of resto) drawSection(doc, s, width);
+      } else {
+        for (const s of secciones) drawSection(doc, s, width);
       }
 
       doc.moveDown(0.4);

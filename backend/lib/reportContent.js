@@ -10,7 +10,7 @@ const SLA_DIAS_HABILES = 8;
 
 // Más bajo que el límite de "Explícame este número" (300): ahí el cliente ya
 // manda el periodo filtrado; aquí siempre se parte del dataset completo, así
-// que hay que recortar más para que el POST a Gemini no quede tan pesado que
+// que hay que recortar más para que el POST a la IA no quede tan pesado que
 // se pase del timeout de conexión en una red corporativa lenta. Los totales
 // exactos no dependen de este recorte (ver buildAggregates) — solo limita
 // cuántos registros "de ejemplo" recibe el modelo para citar casos puntuales.
@@ -109,7 +109,7 @@ function compactRecord(r) {
 // Versión más liviana que compactRecord, solo para las "muestras" de
 // agregados (tiemposEntrega, sinLegalizar) — ahí no hace falta el detalle
 // completo del registro, y recortar campos reduce bastante el tamaño del
-// POST a Gemini (ver MAX_RECORDS/MAX_MUESTRA más arriba).
+// POST a la IA (ver MAX_RECORDS/MAX_MUESTRA más arriba).
 function miniRecord(r, extra) {
   return { informe: r.informe, area: r.area, proveedor: r.proveedor, valorConIva: r.valorConIva, observaciones: r.observaciones || null, ...extra };
 }
@@ -192,12 +192,27 @@ function buildPresupuestoComparativo(records, presupuestos) {
   return porArea;
 }
 
+// Top N de un countBy() por valorConIva descendente — para desgloses con
+// muchos valores posibles (proveedores: puede haber cientos) donde devolver
+// TODOS inflaría el resultado sin necesidad; el top N ya cubre lo que
+// cualquier "análisis general" necesita citar. Útil especialmente como
+// resultado de herramienta del Agente IA del chat (ver lib/agentTools.js):
+// así el modelo nunca necesita iterar registro por registro para sacar un
+// ranking de proveedores, lo recibe ya calculado en un solo llamado.
+function topByValor(countByObj, n) {
+  return Object.entries(countByObj)
+    .map(([nombre, v]) => ({ nombre, ...v }))
+    .sort((a, b) => b.valorConIva - a.valorConIva)
+    .slice(0, n);
+}
+
 // Totales exactos sobre el 100% de los registros — lo que el prompt le pide a
-// Gemini que use para cualquier cifra, en vez de la muestra recortada (que
+// modelo que use para cualquier cifra, en vez de la muestra recortada (que
 // puede no representar el dataset completo y llevaría a cifras incorrectas
 // o a que el modelo diga "no se puede calcular" sin necesidad).
-function buildAggregates(records, presupuestos) {
+export function buildAggregates(records, presupuestos) {
   const sinLegalizar = records.filter((r) => (r.estadoLegalizacion || "").toLowerCase() !== "legalizado");
+  const porProveedor = countBy(records, "proveedor");
   return {
     totalRegistros: records.length,
     totalValorConIva: records.reduce((s, r) => s + (r.valorConIva || 0), 0),
@@ -208,6 +223,9 @@ function buildAggregates(records, presupuestos) {
     porEstado: countBy(records, "estado"),
     porCategoria: countBy(records, "categoria"),
     porEstadoLegalizacion: countBy(records, "estadoLegalizacion"),
+    porMedioPago: countBy(records, "medioPago"),
+    totalProveedoresDistintos: Object.keys(porProveedor).length,
+    porProveedorTop15: topByValor(porProveedor, 15),
     tiemposEntrega: buildTiemposEntrega(records),
     presupuesto: buildPresupuestoComparativo(records, presupuestos),
   };
@@ -284,8 +302,8 @@ function filterRecordsByPeriodo(records, periodo) {
 }
 
 // Genera el contenido estructurado del informe a partir de UN SOLO prompt del
-// admin — sin streaming, probando modelos en orden (Gemini y luego Anthropic,
-// ver lib/aiStructured.js) hasta obtener respuesta. Flujo legado: la IA decide
+// admin — sin streaming, usando Anthropic (ver lib/aiStructured.js). Flujo
+// legado: la IA decide
 // toda la estructura del informe. Se mantiene para informes guardados antes
 // del constructor por bloques, y como motor de "generar borrador con IA"
 // dentro de ese constructor (ver ReportBloqueBuilder.jsx).
@@ -304,6 +322,33 @@ ${JSON.stringify(sample)}`;
   return generateStructuredJson({ systemInstruction: SYSTEM_INSTRUCTION, prompt: userPrompt, schema: REPORT_SCHEMA });
 }
 
+// Mismo criterio de "atípico" que usa el Dashboard (DashboardView.jsx#ahorro):
+// una cotización más de 20x el valor de compra se excluye del cálculo de
+// ahorro (suele ser un error de digitación, no un ahorro real).
+function cotizacionesValidas(records) {
+  return records.filter((r) => r.valorCot != null && r.valorConIva != null && !(r.valorCot > r.valorConIva * 20));
+}
+
+function computeTicketPromedio(records) {
+  if (!records.length) return null;
+  const total = records.reduce((s, r) => s + (r.valorConIva || 0), 0);
+  return total / records.length;
+}
+
+function computeAhorroTotal(records) {
+  const validCot = cotizacionesValidas(records);
+  const valorCotizado = validCot.reduce((s, r) => s + (r.valorCot || 0), 0);
+  const valorCompraCotizados = validCot.reduce((s, r) => s + (r.valorConIva || 0), 0);
+  return valorCotizado - valorCompraCotizados;
+}
+
+function computePctAhorro(records) {
+  const validCot = cotizacionesValidas(records);
+  const valorCotizado = validCot.reduce((s, r) => s + (r.valorCot || 0), 0);
+  if (!valorCotizado) return null;
+  return Math.round((computeAhorroTotal(records) / valorCotizado) * 1000) / 10;
+}
+
 const KPI_METRICAS = {
   totalValorConIva: { label: "Valor total comprado", formato: "moneda" },
   totalRegistros: { label: "Total de compras", formato: "entero" },
@@ -311,11 +356,22 @@ const KPI_METRICAS = {
   cumplimientoPct: { label: "Cumplimiento de tiempos de entrega", formato: "porcentaje", path: "tiemposEntrega.cumplimientoPct" },
   promedioDiasHabiles: { label: "Promedio días hábiles de entrega", formato: "dias", path: "tiemposEntrega.promedioDiasHabiles" },
   totalPendientesVencidos: { label: "Pendientes vencidos (fuera de SLA)", formato: "entero", path: "tiemposEntrega.totalPendientesVencidos" },
+  ticketPromedio: { label: "Ticket promedio por compra", formato: "moneda", compute: computeTicketPromedio },
+  ahorroTotal: { label: "Ahorro total (cotizado vs. comprado)", formato: "moneda", compute: computeAhorroTotal },
+  pctAhorro: { label: "% de ahorro global", formato: "porcentaje", compute: computePctAhorro },
 };
+
+function resolveKpiValue(metrica, records, aggregates) {
+  const def = KPI_METRICAS[metrica] || KPI_METRICAS.totalValorConIva;
+  if (def.compute) return def.compute(records);
+  if (def.path) return resolvePath(aggregates, def.path);
+  return aggregates[metrica];
+}
 
 const AGRUPAR_LABELS = {
   area: "área", categoria: "categoría", estado: "estado",
   estadoLegalizacion: "estado de legalización", proveedor: "proveedor",
+  responsable: "responsable", medioPago: "medio de pago", mes: "mes",
 };
 
 function resolvePath(obj, path) {
@@ -345,6 +401,31 @@ function groupRecordsBy(records, field, limit) {
     .map(([nombre, v]) => ({ nombre, cantidad: v.cantidad, valorConIva: v.valorConIva }))
     .sort((a, b) => b.valorConIva - a.valorConIva)
     .slice(0, limit);
+}
+
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+// Agrupación cronológica por mes (no por valor, a diferencia de
+// groupRecordsBy) — para el bloque "Valor de compras por mes" del catálogo
+// Dashboard (ver DASHBOARD_SECCIONES en ReportBloqueBuilder.jsx). Limitado a
+// los últimos 12 meses con datos, para no saturar el PDF.
+function groupRecordsByMonth(records) {
+  const map = new Map();
+  for (const r of records) {
+    if (!r.fechaSolicitud) continue;
+    const key = r.fechaSolicitud.slice(0, 7); // YYYY-MM
+    if (!map.has(key)) map.set(key, { cantidad: 0, valorConIva: 0 });
+    const e = map.get(key);
+    e.cantidad += 1;
+    e.valorConIva += r.valorConIva || 0;
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-12)
+    .map(([key, v]) => {
+      const [y, m] = key.split("-");
+      return { nombre: `${MESES_CORTOS[Number(m) - 1]} ${y}`, cantidad: v.cantidad, valorConIva: v.valorConIva };
+    });
 }
 
 // Permite escribir, dentro de un bloque de texto, placeholders como
@@ -387,19 +468,23 @@ async function conAnalisisIa(b, contenidoBase, contexto) {
   }
 }
 
-async function renderBloqueKpi(b, aggregates, sufijo, periodo) {
+async function renderBloqueKpi(b, records, aggregates, sufijo, periodo) {
   const def = KPI_METRICAS[b.metrica] || KPI_METRICAS.totalValorConIva;
-  const valor = def.path ? resolvePath(aggregates, def.path) : aggregates[b.metrica];
+  const valor = resolveKpiValue(b.metrica, records, aggregates);
   const texto = fmtKpiValue(valor, def.formato);
   const contenido = await conAnalisisIa(b, `${def.label}${sufijo}: ${texto}.`, { tipoOrigen: "kpi", metrica: b.metrica, periodo });
-  return { titulo: b.titulo || `${def.label}${sufijo}`, contenido, destacado: texto, grafico: null, tabla: null };
+  // "_origen" es solo una etiqueta interna (no afecta el correo ni el PDF de
+  // los informes normales): el PDF del informe tipo "Dashboard" la usa para
+  // agrupar los KPI en una cuadrícula en vez de mostrarlos en lista (ver
+  // generateReportPdfBuffer, opción dashboardLayout).
+  return { titulo: b.titulo || `${def.label}${sufijo}`, contenido, destacado: texto, grafico: null, tabla: null, _origen: "kpi" };
 }
 
 async function renderBloqueGrafico(b, records, sufijo, periodo) {
   const campo = b.agruparPor || "area";
   const metrica = b.metricaAgrupada === "cantidad" ? "cantidad" : "valorConIva";
   const etiquetaCampo = AGRUPAR_LABELS[campo] || campo;
-  const grupos = groupRecordsBy(records, campo, 8);
+  const grupos = campo === "mes" ? groupRecordsByMonth(records) : groupRecordsBy(records, campo, 8);
   if (grupos.length === 0) {
     return { titulo: b.titulo || `Por ${etiquetaCampo}${sufijo}`, contenido: "No hay compras registradas en este periodo.", destacado: null, grafico: null, tabla: null };
   }
@@ -420,7 +505,7 @@ async function renderBloqueGrafico(b, records, sufijo, periodo) {
 async function renderBloqueTabla(b, records, sufijo, periodo) {
   const campo = b.agruparPor || "area";
   const etiquetaCampo = AGRUPAR_LABELS[campo] || campo;
-  const grupos = groupRecordsBy(records, campo, 15);
+  const grupos = campo === "mes" ? groupRecordsByMonth(records) : groupRecordsBy(records, campo, 15);
   if (grupos.length === 0) {
     return { titulo: b.titulo || `Resumen por ${etiquetaCampo}${sufijo}`, contenido: "No hay compras registradas en este periodo.", destacado: null, grafico: null, tabla: null };
   }
@@ -461,6 +546,41 @@ async function renderBloqueIa(b) {
   }
 }
 
+// Secciones del informe tipo "Dashboard" (ver DASHBOARD_SECCIONES en
+// ReportBloqueBuilder.jsx) que no encajan en el modelo kpi/grafico/tabla por
+// agrupación — presupuesto vs. gastado y solicitudes pendientes son vistas
+// propias del Dashboard con su propia lógica, igual de determinísticas
+// (ningún dato inventado), solo que no agrupan por un campo de "records".
+function renderBloquePresupuesto(b, aggregates, sufijo) {
+  const areas = Object.entries(aggregates.presupuesto || {});
+  if (areas.length === 0) {
+    return { titulo: b.titulo || `Presupuesto vs. gastado${sufijo}`, contenido: "No hay presupuesto configurado para el año.", destacado: null, grafico: null, tabla: null };
+  }
+  const columnas = ["Área", "Presupuestado", "Gastado", "% gastado"];
+  const filas = areas.map(([area, p]) => [
+    area, fmtMoneda(p.presupuestado), fmtMoneda(p.gastado), p.porcentajeGastado != null ? `${p.porcentajeGastado}%` : "—",
+  ]);
+  return {
+    titulo: b.titulo || `Presupuesto vs. gastado${sufijo}`,
+    contenido: "Comparación entre el presupuesto configurado y lo gastado por área (año en curso).",
+    destacado: null, grafico: null, tabla: { columnas, filas },
+  };
+}
+
+function renderBloquePendientes(b, records, sufijo) {
+  const pendientes = records.filter((r) => !r.fechaEntrega && (!r.estado || r.estado === "Pendiente" || r.estado === "Proceso"));
+  if (pendientes.length === 0) {
+    return { titulo: b.titulo || `Solicitudes pendientes${sufijo}`, contenido: "No hay solicitudes pendientes de entrega en este periodo.", destacado: null, grafico: null, tabla: null };
+  }
+  const columnas = ["Descripción", "Área", "Responsable", "F. solicitud"];
+  const filas = pendientes.slice(0, 15).map((r) => [r.descripcion || "—", r.area || "—", r.responsable || "—", r.fechaSolicitud || "—"]);
+  return {
+    titulo: b.titulo || `Solicitudes pendientes${sufijo}`,
+    contenido: `${pendientes.length} solicitud(es) sin entregar en este periodo.`,
+    destacado: null, grafico: null, tabla: { columnas, filas },
+  };
+}
+
 // Arma el informe de forma determinística a partir de los bloques que el
 // usuario configuró manualmente en el constructor (ReportBloqueBuilder.jsx):
 // kpi/grafico/tabla se calculan en JS directo sobre los datos reales (sin IA,
@@ -479,9 +599,11 @@ export async function renderReportFromBloques(bloques, { nombre, periodo } = {})
   const sufijo = periodoSufijo(periodo);
   const secciones = await Promise.all((bloques || []).map((b) => {
     if (b.tipo === "ia") return renderBloqueIa(b);
-    if (b.tipo === "kpi") return renderBloqueKpi(b, aggregates, sufijo, periodo);
+    if (b.tipo === "kpi") return renderBloqueKpi(b, records, aggregates, sufijo, periodo);
     if (b.tipo === "grafico") return renderBloqueGrafico(b, records, sufijo, periodo);
     if (b.tipo === "tabla") return renderBloqueTabla(b, records, sufijo, periodo);
+    if (b.tipo === "presupuesto") return renderBloquePresupuesto(b, aggregates, sufijo);
+    if (b.tipo === "pendientes") return renderBloquePendientes(b, records, sufijo);
     return renderBloqueTexto(b, aggregates);
   }));
   return {
@@ -518,7 +640,7 @@ async function buildContextoDatos(contexto) {
   if (contexto.tipoOrigen === "kpi") {
     const def = KPI_METRICAS[contexto.metrica] || KPI_METRICAS.totalValorConIva;
     const aggregates = buildAggregates(records, presupuestos);
-    const valor = def.path ? resolvePath(aggregates, def.path) : aggregates[contexto.metrica];
+    const valor = resolveKpiValue(contexto.metrica, records, aggregates);
     return { tipo: "kpi", metrica: def.label, periodo: periodoLabel, valor: fmtKpiValue(valor, def.formato) };
   }
 

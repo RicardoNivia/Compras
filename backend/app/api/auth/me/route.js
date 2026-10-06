@@ -2,6 +2,32 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth-server";
 import { getEffectivePermissions } from "@/lib/permissions";
 
+/**
+ * @openapi
+ * /api/auth/me:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Usuario de la sesión actual, con su mapa de permisos efectivos.
+ *     responses:
+ *       200:
+ *         description: Usuario autenticado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   allOf:
+ *                     - $ref: '#/components/schemas/User'
+ *                     - type: object
+ *                       properties:
+ *                         permissions: { type: object, additionalProperties: { type: boolean } }
+ *       401:
+ *         description: No autenticado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
 export async function GET() {
   const user = await getSessionUser();
   if (!user) {

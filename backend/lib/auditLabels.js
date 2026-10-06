@@ -41,6 +41,7 @@ export const USER_FIELD_LABELS = {
 
 export const REPORT_FIELD_LABELS = {
   nombre: "Nombre",
+  tipo: "Tipo de informe",
   prompt: "Instrucción (prompt)",
   bloques: "Bloques del informe",
   destinatarios: "Destinatarios (Para)",
@@ -57,6 +58,7 @@ export const REPORT_FIELD_LABELS = {
   cuerpoHtml: "Cuerpo del correo",
   periodoGeneral: "Periodo de los datos",
   activo: "Activo",
+  esBorrador: "Borrador",
 };
 
 export const ACTION_LABELS = {

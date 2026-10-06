@@ -206,8 +206,8 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
     setAiError("");
   }
 
-  // Traduce aiQuery a los mismos filtros de arriba (vía el modelo gratis de
-  // Gemini, del lado del servidor) y los aplica — el filtrado en sí sigue
+  // Traduce aiQuery a los mismos filtros de arriba (vía Anthropic, del lado
+  // del servidor) y los aplica — el filtrado en sí sigue
   // siendo el mismo useMemo de siempre, no hay un motor de filtrado aparte.
   async function handleAiSearch() {
     const q = aiQuery.trim();

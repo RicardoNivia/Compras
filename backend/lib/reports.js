@@ -5,6 +5,7 @@ const FRECUENCIAS = ["diaria", "semanal", "mensual"];
 const PRIORIDADES = ["alta", "media", "baja"];
 const CUERPO_MODOS = ["plano", "resumen"];
 const PERIODOS_VALIDOS = ["historico", "mes_actual", "mes_anterior", "anio_actual", "anio_anterior"];
+const TIPOS_VALIDOS = ["bloques", "dashboard"];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function badRequest(message) {
@@ -24,6 +25,7 @@ function toClientReport(r) {
   return {
     id: r.id,
     nombre: r.nombre,
+    tipo: r.tipo || "bloques",
     prompt: r.prompt,
     bloques: r.bloques ? JSON.parse(r.bloques) : [],
     periodoGeneral: r.periodoGeneral || "historico",
@@ -40,6 +42,7 @@ function toClientReport(r) {
     cuerpoPrompt: r.cuerpoPrompt,
     cuerpoHtml: r.cuerpoHtml,
     activo: r.activo,
+    esBorrador: r.esBorrador,
     ultimoContenido: r.ultimoContenido ? JSON.parse(r.ultimoContenido) : null,
     ultimoCuerpoCorreo: r.ultimoCuerpoCorreo || null,
     ultimoEnvio: r.ultimoEnvio,
@@ -51,10 +54,18 @@ function toClientReport(r) {
 
 function validate(body, { partial = false } = {}) {
   const out = {};
+  // Un borrador se puede guardar incompleto a propósito (sin destinatarios,
+  // sin prompt/bloques todavía) para retomarlo después — ver botón "Guardar
+  // como borrador" en ReportEditor.jsx. El scheduler lo ignora por completo
+  // mientras esBorrador sea true (ver reportScheduler.js).
+  const esBorrador = !!body.esBorrador;
 
   if (!partial || body.nombre !== undefined) {
     if (!body.nombre || !String(body.nombre).trim()) throw badRequest("El nombre del informe es obligatorio.");
     out.nombre = String(body.nombre).trim();
+  }
+  if (!partial || body.tipo !== undefined) {
+    out.tipo = TIPOS_VALIDOS.includes(body.tipo) ? body.tipo : "bloques";
   }
   // El contenido real del informe vive en "bloques" (ver ReportBloqueBuilder.jsx
   // en el frontend); "prompt" ahora es opcional — solo se usa como semilla para
@@ -71,7 +82,7 @@ function validate(body, { partial = false } = {}) {
   if (!partial || body.periodoGeneral !== undefined) {
     out.periodoGeneral = PERIODOS_VALIDOS.includes(body.periodoGeneral) ? body.periodoGeneral : "historico";
   }
-  if (!partial) {
+  if (!partial && !esBorrador) {
     const hasPrompt = !!(out.prompt && out.prompt.trim());
     const hasBloques = out.bloques && JSON.parse(out.bloques).length > 0;
     if (!hasPrompt && !hasBloques) {
@@ -80,7 +91,7 @@ function validate(body, { partial = false } = {}) {
   }
   if (!partial || body.destinatarios !== undefined) {
     const list = parseEmailList(body.destinatarios);
-    if (!list.length) throw badRequest("Agrega al menos un destinatario.");
+    if (!list.length && !esBorrador) throw badRequest("Agrega al menos un destinatario.");
     out.destinatarios = JSON.stringify(list);
   }
   if (!partial || body.cc !== undefined) {
@@ -130,6 +141,9 @@ function validate(body, { partial = false } = {}) {
   if (partial && body.activo !== undefined) {
     out.activo = !!body.activo;
   }
+  if (!partial || body.esBorrador !== undefined) {
+    out.esBorrador = esBorrador;
+  }
   if (body.contenido !== undefined) {
     out.ultimoContenido = body.contenido ? JSON.stringify(body.contenido) : null;
   }
@@ -153,7 +167,7 @@ export async function getReport(id) {
 
 export async function createReport(body, actor) {
   const data = validate(body);
-  data.activo = true;
+  data.activo = !data.esBorrador;
   if (!data.prioridad) data.prioridad = "media";
   const row = await prisma.reportConfig.create({
     data: { ...data, createdBy: actor?.id || null, createdByNombre: actor?.nombre || null },

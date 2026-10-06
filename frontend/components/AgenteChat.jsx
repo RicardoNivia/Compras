@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { renderMarkdown, splitChartBlocks } from "@/lib/markdown";
-import ChartFromSpec from "@/components/charts/ChartFromSpec";
+import { sendAgentChatApi } from "@/lib/api";
+import AssistantContent from "@/components/AgentMessageContent";
 import { IconSpark, IconSend, IconPlus, IconTrash } from "@/components/icons";
 
 const SUGGESTIONS = [
@@ -12,19 +12,6 @@ const SUGGESTIONS = [
   "¿A partir de qué monto se requiere cuadro comparativo?",
   "¿Qué puedo hacer en esta aplicación según mi rol?",
 ];
-
-function AssistantContent({ text }) {
-  const parts = splitChartBlocks(text);
-  return (
-    <>
-      {parts.map((part, i) =>
-        part.type === "chart"
-          ? <ChartFromSpec key={i} spec={part.spec} />
-          : <div key={i} className="chat-markdown">{renderMarkdown(part.text)}</div>
-      )}
-    </>
-  );
-}
 
 function formatConvDate(iso) {
   try {
@@ -109,34 +96,13 @@ export default function AgenteChat({ userName }) {
     setSending(true);
 
     try {
-      const res = await fetch("/api/agent/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, conversationId }),
-      });
-
-      if (!res.ok || !res.body) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Error ${res.status}`);
-      }
-
-      const newConvId = res.headers.get("X-Conversation-Id");
+      const { text: reply, conversationId: newConvId } = await sendAgentChatApi({ message, conversationId });
       if (newConvId && newConvId !== conversationId) setConversationId(newConvId);
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let acc = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        acc += decoder.decode(value, { stream: true });
-        const snapshot = acc;
-        setMessages((prev) => {
-          const next = [...prev];
-          next[next.length - 1] = { role: "model", text: snapshot };
-          return next;
-        });
-      }
+      setMessages((prev) => {
+        const next = [...prev];
+        next[next.length - 1] = { role: "model", text: reply };
+        return next;
+      });
       refreshConversations();
     } catch (err) {
       setMessages((prev) => {

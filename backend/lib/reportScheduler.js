@@ -84,7 +84,7 @@ async function runDueReports() {
   if (MAIL_MAINTENANCE || !isMailerConfigured()) return;
   let due;
   try {
-    due = await prisma.reportConfig.findMany({ where: { activo: true } });
+    due = await prisma.reportConfig.findMany({ where: { activo: true, esBorrador: false } });
   } catch {
     return; // BD no disponible en este tick — se reintenta en el siguiente
   }
@@ -95,7 +95,7 @@ async function runDueReports() {
     try {
       const content = await generateReportContent({ prompt: report.prompt, bloques: report.bloques, nombre: report.nombre, periodoGeneral: report.periodoGeneral });
       const [pdfBuffer, cuerpo] = await Promise.all([
-        generateReportPdfBuffer(content, { nombre: report.nombre, prioridad: report.prioridad }),
+        generateReportPdfBuffer(content, { nombre: report.nombre, prioridad: report.prioridad, dashboardLayout: report.tipo === "dashboard" }),
         resolveEmailBody({ cuerpoHtml: report.cuerpoHtml, content, nombre: report.nombre, cuerpoModo: report.cuerpoModo, cuerpoPrompt: report.cuerpoPrompt }),
       ]);
       const destinatarios = JSON.parse(report.destinatarios || "[]");

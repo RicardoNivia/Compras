@@ -27,10 +27,66 @@ const FILTER_SCHEMA = {
   required: ["onlyIncumplimiento"],
 };
 
-// Usa Gemini (modelo gratis) por defecto, con fallback automático a
-// Anthropic si Gemini falla (ver lib/aiStructured.js) — esta es una utilidad
-// puntual (traducir texto a filtros), no el chat completo del Agente IA, así
-// que no expone selector de modelo ni permite elegir modelos de pago.
+// Usa Anthropic (ver lib/aiStructured.js) — esta es una utilidad puntual
+// (traducir texto a filtros), no el chat completo del Agente IA, así que no
+// expone selector de modelo.
+/**
+ * @openapi
+ * /api/agent/search-filters:
+ *   post:
+ *     tags: [Agente IA]
+ *     summary: Traduce una búsqueda en lenguaje natural a los filtros exactos de la tabla de Registros — utilidad puntual, no el chat completo del Agente IA (no expone selector de modelo). Llamada síncrona (no usa el patrón de trabajo en segundo plano).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [query]
+ *             properties:
+ *               query: { type: string }
+ *               options:
+ *                 type: object
+ *                 description: "Valores válidos actuales de cada lista maestra, para que la IA no invente uno."
+ *                 properties:
+ *                   areas: { type: array, items: { type: string } }
+ *                   estados: { type: array, items: { type: string } }
+ *                   medios: { type: array, items: { type: string } }
+ *                   licitaciones: { type: array, items: { type: string } }
+ *                   estadosLegalizacion: { type: array, items: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Filtros interpretados.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 filters:
+ *                   type: object
+ *                   properties:
+ *                     search: { type: string, nullable: true }
+ *                     area: { type: string, nullable: true }
+ *                     estado: { type: string, nullable: true }
+ *                     medioPago: { type: string, nullable: true }
+ *                     licitacion: { type: string, nullable: true }
+ *                     estadoLegalizacion: { type: string, nullable: true }
+ *                     dateFrom: { type: string, nullable: true, format: date }
+ *                     dateTo: { type: string, nullable: true, format: date }
+ *                     valorMin: { type: number, nullable: true }
+ *                     valorMax: { type: number, nullable: true }
+ *                     onlyIncumplimiento: { type: boolean }
+ *       400:
+ *         description: Falta qué buscar.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401:
+ *         description: No autorizado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
 export async function POST(request) {
   const user = await getSessionUser();
   if (!user) return jsonError("No autorizado.", 401);
@@ -60,8 +116,7 @@ Valores válidos de "licitacion": ${listOrNone(options.licitaciones)}
 Valores válidos de "estadoLegalizacion": ${listOrNone(options.estadosLegalizacion)}`;
 
   try {
-    const filters = await generateGeminiJson({
-      model: DEFAULT_GEMINI_MODEL,
+    const filters = await generateStructuredJson({
       systemInstruction,
       prompt: query,
       schema: FILTER_SCHEMA,

@@ -11,7 +11,7 @@ import CommandPalette from "@/components/CommandPalette";
 // "feature" referencia la Matriz de permisos (lib/permissions.js en el
 // backend) — si el usuario trae user.permissions (siempre debería, viene de
 // /api/auth/me), se usa eso; "show" queda como valor por defecto de respaldo.
-const ALL_NAV_ITEMS = [
+export const ALL_NAV_ITEMS = [
   { key: "dashboard", href: "/dashboard", label: "Dashboard de compras", Icon: IconDashboard, feature: "viewDashboard", show: canViewDashboard },
   { key: "alertas", href: "/alertas", label: "Alertas y notificaciones", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas },
   { key: "registros", href: "/registros", label: "Registros", Icon: IconTable, feature: null, show: () => true },
