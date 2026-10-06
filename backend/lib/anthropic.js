@@ -8,11 +8,22 @@ const ANTHROPIC_VERSION = "2023-06-01";
 // que realmente genera, "max_tokens" es solo un techo — así que se deja bien
 // holgado (el modelo acepta hasta 64000 para claude-haiku-4-5).
 const MAX_TOKENS = 32000;
-// Mismo criterio que lib/gemini.js: un solo intento con timeout generoso
-// (en vez de varios cortos) — debe fallar con margen antes de que el proxy
+// Un solo intento con timeout generoso (en vez de varios cortos) — debe
+// fallar con margen antes de que el proxy
 // de rewrites del frontend corte la conexión a los ~30s.
 const MAX_CONNECT_RETRIES = 0;
 const CONNECT_TIMEOUT_MS = 25000;
+// Timeout por ronda del loop de "tool use" (ver runAnthropicAgentChat): a
+// diferencia de streamAnthropicChat (SSE, el primer byte llega casi de
+// inmediato), estas llamadas NO son streaming — Anthropic no manda nada hasta
+// tener la respuesta completa. Para una pregunta que pide un análisis extenso
+// (varios gráficos/tablas), generar la respuesta final puede tardar bastante
+// más que CONNECT_TIMEOUT_MS; con ese límite corto, la llamada se abortaba a
+// mitad de generación y el mensaje de error (que menciona "Anthropic" por
+// diseño) terminaba disparando la moderación de infraestructura (ver
+// agentModeration.js) en vez de mostrarse — no era un falso positivo de la
+// moderación, era este timeout cortando la respuesta real antes de tiempo.
+const AGENT_ROUND_TIMEOUT_MS = 120000;
 
 async function fetchWithRetry(url, options, timeoutMs = CONNECT_TIMEOUT_MS) {
   let lastErr;
@@ -36,10 +47,9 @@ async function fetchWithRetry(url, options, timeoutMs = CONNECT_TIMEOUT_MS) {
   );
 }
 
-// "contents" llega en el mismo formato usado en toda la ruta de chat
-// ({role: "user"|"model", parts:[{text}]}, estilo Gemini) para que quien
-// arma la conversación no tenga que conocer el formato propio de cada
-// proveedor — aquí se traduce al formato de mensajes de Anthropic.
+// "contents" llega en el formato usado en toda la ruta de chat
+// ({role: "user"|"model", parts:[{text}]}) — aquí se traduce al formato de
+// mensajes de Anthropic.
 function toAnthropicMessages(contents) {
   return contents.map((c) => ({
     role: c.role === "model" ? "assistant" : "user",
@@ -49,11 +59,23 @@ function toAnthropicMessages(contents) {
 
 // Llama a la Messages API de Anthropic en modo streaming (SSE) y va
 // entregando (yield) cada fragmento de texto a medida que llega.
-export async function* streamAnthropicChat({ model, systemInstruction, contents }) {
-  const apiKey = process.env.ANTROPIC_API_KEY;
+// "cacheableSystemPrefix" (opcional): parte del system prompt idéntica entre
+// llamadas (ver aiChatCascade.js) — se manda como bloque de contenido propio
+// con cache_control "ephemeral" para que Anthropic la reutilice en vez de
+// reprocesarla en cada mensaje (ahorra tiempo y costo en prompts grandes con
+// mucho texto fijo, como el dataset+procedimiento+guía del Agente IA).
+export async function* streamAnthropicChat({ model, systemInstruction, contents, cacheableSystemPrefix }) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    throw new Error("ANTROPIC_API_KEY no está configurada en el servidor.");
+    throw new Error("ANTHROPIC_API_KEY no está configurada en el servidor.");
   }
+
+  const system = cacheableSystemPrefix
+    ? [
+        { type: "text", text: cacheableSystemPrefix, cache_control: { type: "ephemeral" } },
+        { type: "text", text: systemInstruction },
+      ]
+    : systemInstruction;
 
   const res = await fetchWithRetry(`${ANTHROPIC_API_BASE}/messages`, {
     method: "POST",
@@ -65,7 +87,7 @@ export async function* streamAnthropicChat({ model, systemInstruction, contents 
     body: JSON.stringify({
       model,
       max_tokens: MAX_TOKENS,
-      system: systemInstruction,
+      system,
       messages: toAnthropicMessages(contents),
       stream: true,
     }),
@@ -115,23 +137,103 @@ export async function* streamAnthropicChat({ model, systemInstruction, contents 
   }
 }
 
-// Anthropic no tiene un modo "responseSchema" nativo como Gemini. El patrón
-// de forzar una tool con tool_choice:{type:"tool"} NO es compatible con
-// todos los modelos (p.ej. Haiku 4.5 responde 400 "tool_choice: type \"tool\"
-// ... are not supported for this model") — así que en su lugar se le pide el
-// JSON por instrucción directa en el system prompt y se parsea el texto de
-// respuesta, igual de confiable en la práctica con modelos Claude recientes
-// y sin esa restricción de compatibilidad. "schema" llega en el formato de
-// lib/gemini.js (type: "OBJECT"/"STRING"/..., nullable) — se incluye tal
-// cual en la instrucción, no hace falta traducirlo a JSON Schema.
+// Llama a la Messages API de Anthropic con "tool use" (function calling): el
+// modelo puede pedir ejecutar una o varias herramientas (ver lib/agentTools.js)
+// antes de responder, en vez de recibir todos los datos de una sola vez en el
+// system prompt. Hace el ciclo completo (llamar → ejecutar herramientas →
+// volver a llamar con los resultados) hasta que el modelo responde en texto
+// normal o se alcanza "maxRounds", y devuelve el texto final acumulado (no es
+// streaming real: con tool use no hay texto definitivo que mostrar hasta que
+// termina de decidir qué herramientas necesita, igual que ya pasaba antes con
+// la moderación posterior — ver el comentario en app/api/agent/chat/route.js).
+export async function runAnthropicAgentChat({ model, systemInstruction, contents, cacheableSystemPrefix, tools, executeTool, maxRounds = 8 }) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error("ANTHROPIC_API_KEY no está configurada en el servidor.");
+  }
+
+  const system = cacheableSystemPrefix
+    ? [
+        { type: "text", text: cacheableSystemPrefix, cache_control: { type: "ephemeral" } },
+        { type: "text", text: systemInstruction },
+      ]
+    : systemInstruction;
+
+  const messages = toAnthropicMessages(contents);
+  const textChunks = [];
+
+  for (let round = 0; round < maxRounds; round++) {
+    const res = await fetchWithRetry(`${ANTHROPIC_API_BASE}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: MAX_TOKENS,
+        system,
+        messages,
+        tools,
+      }),
+    }, AGENT_ROUND_TIMEOUT_MS);
+
+    if (!res.ok) {
+      let detail = "";
+      try {
+        detail = (await res.text()).slice(0, 400);
+      } catch {
+        // ignore
+      }
+      throw new Error(`Anthropic API respondió ${res.status}. ${detail}`);
+    }
+
+    const data = await res.json();
+    const content = data?.content || [];
+    const toolUseBlocks = content.filter((b) => b.type === "tool_use");
+    const textBlocks = content.filter((b) => b.type === "text" && b.text);
+    for (const b of textBlocks) textChunks.push(b.text);
+
+    if (data?.stop_reason !== "tool_use" || toolUseBlocks.length === 0) {
+      return textChunks.join("\n\n");
+    }
+
+    messages.push({ role: "assistant", content });
+    const toolResults = [];
+    for (const block of toolUseBlocks) {
+      let result;
+      try {
+        result = await executeTool(block.name, block.input);
+      } catch (err) {
+        result = { error: err.message || "Error ejecutando la herramienta." };
+      }
+      toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(result) });
+    }
+    messages.push({ role: "user", content: toolResults });
+  }
+
+  if (textChunks.length) return textChunks.join("\n\n");
+  throw new Error("El agente alcanzó el máximo de consultas a herramientas sin poder generar una respuesta.");
+}
+
+// Anthropic no tiene un modo "responseSchema" nativo. El patrón de forzar una
+// tool con tool_choice:{type:"tool"} NO es compatible con todos los modelos
+// (p.ej. Haiku 4.5 responde 400 "tool_choice: type \"tool\" ... are not
+// supported for this model") — así que en su lugar se le pide el JSON por
+// instrucción directa en el system prompt y se parsea el texto de respuesta,
+// igual de confiable en la práctica con modelos Claude recientes y sin esa
+// restricción de compatibilidad. "schema" llega en formato
+// (type: "OBJECT"/"STRING"/..., nullable) — se incluye tal cual en la
+// instrucción, no hace falta traducirlo a JSON Schema.
 function stripCodeFence(text) {
   return text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
 }
 
 export async function generateAnthropicJson({ model, systemInstruction, prompt, schema, timeoutMs }) {
-  const apiKey = process.env.ANTROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    throw new Error("ANTROPIC_API_KEY no está configurada en el servidor.");
+    throw new Error("ANTHROPIC_API_KEY no está configurada en el servidor.");
   }
 
   const jsonInstruction = schema
@@ -149,9 +251,9 @@ export async function generateAnthropicJson({ model, systemInstruction, prompt, 
       model,
       max_tokens: MAX_TOKENS,
       // temperature 0: esta función solo la usa lib/aiStructured.js (Informes
-      // automáticos) — mismo prompt siempre debe devolver el mismo informe,
-      // igual que generateGeminiJson (ver lib/gemini.js). No afecta el chat
-      // del Agente IA ni "Explícame este número", que usan streamAnthropicChat.
+      // automáticos, moderación, etc.) — mismo prompt siempre debe devolver el
+      // mismo resultado. No afecta el chat del Agente IA, que usa
+      // streamAnthropicChat.
       temperature: 0,
       system: `${systemInstruction}${jsonInstruction}`,
       messages: [{ role: "user", content: prompt }],

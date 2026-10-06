@@ -8,6 +8,42 @@ import { generateReportPdfBuffer } from "@/lib/reportPdf";
 // PDF que se había guardado la última vez, sin esperar una nueva generación.
 // Es puro pdfkit (sin red), así que responde al instante — no necesita el
 // patrón de trabajo en segundo plano de preview/route.js.
+/**
+ * @openapi
+ * /api/reports/render-pdf:
+ *   post:
+ *     tags: [Informes]
+ *     summary: Vuelve a dibujar el PDF a partir de un contenido ya generado, sin llamar a la IA (requiere permiso "viewReportes"). Responde al instante, no usa el patrón de trabajo en segundo plano.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [content]
+ *             properties:
+ *               content: { type: object, description: "Contenido ya generado del informe (ver generateReportContent)." }
+ *               nombre: { type: string }
+ *               tipo: { type: string, enum: [bloques, dashboard] }
+ *     responses:
+ *       200:
+ *         description: PDF generado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties: { pdfBase64: { type: string, description: "PDF codificado en base64." } }
+ *       400:
+ *         description: Falta el contenido del informe.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       403:
+ *         description: No autorizado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
 export async function POST(request) {
   const user = await getSessionUser();
   if (!user || !(await isRoleAllowed(user.role, "viewReportes"))) {
@@ -18,7 +54,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "Falta el contenido del informe." }, { status: 400 });
   }
   try {
-    const pdfBuffer = await generateReportPdfBuffer(body.content, { nombre: body.nombre });
+    const pdfBuffer = await generateReportPdfBuffer(body.content, { nombre: body.nombre, dashboardLayout: body.tipo === "dashboard" });
     return NextResponse.json({ pdfBase64: pdfBuffer.toString("base64") });
   } catch (err) {
     return NextResponse.json({ error: err.message || "No se pudo generar el PDF." }, { status: 500 });

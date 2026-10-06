@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import Sidebar from "@/components/Sidebar";
+import FloatingAgentChat from "@/components/FloatingAgentChat";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function AppLayout({ children }) {
     <div className="app-shell">
       <Sidebar user={user} />
       <div className="app-main">{children}</div>
+      <FloatingAgentChat user={user} />
     </div>
   );
 }

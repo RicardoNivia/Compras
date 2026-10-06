@@ -17,10 +17,50 @@ const MAX_RECORDS = 300;
 // "Explícame este número": una explicación puntual en lenguaje natural de un
 // KPI del Dashboard, a partir de los registros que lo componen (los manda el
 // cliente, ya filtrados al periodo relevante — este endpoint no vuelve a
-// consultar la base). Gemini primero, con fallback a Anthropic si falla (ver
-// lib/aiStructured.js) — budget acotado porque esto corre síncrono dentro de
+// consultar la base). Usa Anthropic (ver lib/aiStructured.js) — budget
+// acotado porque esto corre síncrono dentro de
 // una sola llamada HTTP (sujeta al límite de ~30s del proxy del frontend),
 // no como trabajo en segundo plano.
+/**
+ * @openapi
+ * /api/agent/explain:
+ *   post:
+ *     tags: [Agente IA]
+ *     summary: "\"Explícame este número\": explicación puntual en lenguaje natural de un KPI del Dashboard, a partir de los registros que lo componen (los manda el cliente). Llamada síncrona (no usa el patrón de trabajo en segundo plano)."
+ *     responses:
+ *       200:
+ *         description: Explicación generada.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties: { explanation: { type: string } }
+ *       400:
+ *         description: Falta el indicador a explicar.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401:
+ *         description: No autenticado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [label]
+ *             properties:
+ *               label: { type: string }
+ *               value: { type: number, nullable: true }
+ *               comparisonLabel: { type: string, nullable: true }
+ *               comparisonValue: { type: number, nullable: true }
+ *               records:
+ *                 type: array
+ *                 items: { $ref: '#/components/schemas/Record' }
+ */
 export async function POST(request) {
   const user = await getSessionUser();
   if (!user) return jsonError("No autorizado.", 401);

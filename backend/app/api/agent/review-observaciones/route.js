@@ -18,11 +18,53 @@ const REVIEW_SCHEMA = {
 };
 
 // "Revisar con IA" en el campo Observaciones del registro — mismo patrón no
-// streaming que agent/explain/route.js (generateStructuredJson, con fallback
-// de Gemini a Anthropic), pero evalúa si
-// el texto alcanza a justificar el estado de legalización en vez de explicar
+// streaming que agent/explain/route.js (generateStructuredJson), pero evalúa
+// si el texto alcanza a justificar el estado de legalización en vez de explicar
 // un KPI. Solo lo pueden usar roles que pueden editar el registro (mismo
 // permiso que el campo que están revisando).
+/**
+ * @openapi
+ * /api/agent/review-observaciones:
+ *   post:
+ *     tags: [Agente IA]
+ *     summary: "\"Revisar con IA\" en el campo Observaciones del registro: evalúa si el texto justifica el estado de legalización y propone una mejora (requiere permiso \"editRecord\", el mismo del campo que revisa). Llamada síncrona (no usa el patrón de trabajo en segundo plano)."
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [observaciones]
+ *             properties:
+ *               observaciones: { type: string }
+ *               estadoLegalizacion: { type: string, nullable: true }
+ *               descripcion: { type: string, nullable: true }
+ *               area: { type: string, nullable: true }
+ *               categoria: { type: string, nullable: true }
+ *               proveedor: { type: string, nullable: true }
+ *               valorConIva: { type: number, nullable: true }
+ *     responses:
+ *       200:
+ *         description: Revisión generada.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 suficiente: { type: boolean }
+ *                 comentario: { type: string }
+ *                 sugerencia: { type: string, nullable: true }
+ *       400:
+ *         description: Falta escribir una observación.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       403:
+ *         description: No autorizado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
 export async function POST(request) {
   const user = await getSessionUser();
   if (!user || !(await isRoleAllowed(user.role, "editRecord"))) {

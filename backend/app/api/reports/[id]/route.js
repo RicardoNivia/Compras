@@ -9,6 +9,41 @@ async function guard() {
   return user;
 }
 
+/**
+ * @openapi
+ * /api/reports/{id}:
+ *   patch:
+ *     tags: [Informes]
+ *     summary: Edita un informe automático — actualización parcial, cada campo se guarda independiente (requiere permiso "viewReportes").
+ *     parameters:
+ *       - { name: id, in: path, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, description: "Ver cuerpo de POST /api/reports — todos los campos opcionales." }
+ *     responses:
+ *       200:
+ *         description: Informe actualizado.
+ *         content:
+ *           application/json:
+ *             schema: { type: object }
+ *       400:
+ *         description: Datos inválidos.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       403:
+ *         description: No autorizado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404:
+ *         description: Informe no encontrado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
 export async function PATCH(request, { params }) {
   const user = await guard();
   if (!user) return NextResponse.json({ error: "No autorizado." }, { status: 403 });
@@ -21,6 +56,31 @@ export async function PATCH(request, { params }) {
   }
 }
 
+/**
+ * @openapi
+ * /api/reports/{id}:
+ *   delete:
+ *     tags: [Informes]
+ *     summary: Elimina un informe automático (requiere permiso "viewReportes").
+ *     parameters:
+ *       - { name: id, in: path, required: true, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Informe eliminado.
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { ok: { type: boolean } } }
+ *       403:
+ *         description: No autorizado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       404:
+ *         description: Informe no encontrado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
 export async function DELETE(request, { params }) {
   const user = await guard();
   if (!user) return NextResponse.json({ error: "No autorizado." }, { status: 403 });

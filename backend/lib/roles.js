@@ -89,12 +89,6 @@ export function canToggleRadicado(role) {
   return role === ROLES.ADMIN || role === ROLES.RADICAR;
 }
 
-// Agente IA: visible para todos, pero solo admin puede usar modelos "paid"
-// (ver lib/geminiModels.js) — el resto queda limitado a los modelos "free".
-export function canUsePaidModels(role) {
-  return role === ROLES.ADMIN;
-}
-
 // legalizar solo puede tocar estos 5 campos al editar un registro; el resto
 // queda intacto sin importar qué envíe el cliente (ver lib/records.js#updateRecord).
 export const LEGALIZAR_EDITABLE_FIELDS = [

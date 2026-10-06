@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { IconPlus, IconTrash, IconSpark, IconChevronDown } from "@/components/icons";
 
 // Tipos de bloque del constructor manual de informes (ver reportContent.js en
@@ -24,6 +24,9 @@ export const METRICAS_KPI = [
   { key: "cumplimientoPct", label: "Cumplimiento de tiempos de entrega" },
   { key: "promedioDiasHabiles", label: "Promedio días hábiles de entrega" },
   { key: "totalPendientesVencidos", label: "Pendientes vencidos (fuera de SLA)" },
+  { key: "ticketPromedio", label: "Ticket promedio por compra" },
+  { key: "ahorroTotal", label: "Ahorro total (cotizado vs. comprado)" },
+  { key: "pctAhorro", label: "% de ahorro global" },
 ];
 
 export const AGRUPACIONES = [
@@ -32,6 +35,9 @@ export const AGRUPACIONES = [
   { key: "estado", label: "Estado" },
   { key: "estadoLegalizacion", label: "Estado de legalización" },
   { key: "proveedor", label: "Proveedor" },
+  { key: "responsable", label: "Responsable" },
+  { key: "medioPago", label: "Medio de pago" },
+  { key: "mes", label: "Mes (últimos 12 con datos)" },
 ];
 
 // Periodo dinámico: se recalcula relativo a "ahora" cada vez que se genera el
@@ -60,6 +66,53 @@ export function nuevoBloque(tipo) {
   return base;
 }
 
+// Catálogo del informe tipo "Dashboard" (ver ReportEditor.jsx, pestaña
+// "Secciones del Dashboard"): cada sección equivale a un bloque normal
+// (kpi/grafico/tabla), calculado 100% determinístico sobre datos reales —
+// igual motor que el constructor manual, solo que aquí se eligen con un
+// switch en vez de armarse a mano. No es una captura pixel-por-pixel del
+// Dashboard en pantalla, pero muestra la misma información real.
+// Nota honesta: no incluye "Cumplimiento por mes" ni "Valor por área y mes"
+// (series apiladas por área+mes a la vez) del Dashboard en pantalla — el
+// motor de bloques agrupa por UN campo, y esas dos necesitan dos dimensiones
+// cruzadas o un cálculo de SLA por mes; agregarlo requeriría un tipo de
+// bloque nuevo. "Valor de compras por mes" sí está cubierto (agruparPor:
+// "mes"). El resto de secciones reales del Dashboard sí están cubiertas.
+export const DASHBOARD_SECCIONES = [
+  { key: "resumenEjecutivo", label: "Resumen ejecutivo (IA)", bloque: { tipo: "ia", pregunta: "Resume el panorama general de compras: total comprado, cumplimiento de tiempos de entrega, compras sin legalizar y cualquier otro dato relevante." } },
+  { key: "kpiValorComprado", label: "KPI — Valor total comprado", bloque: { tipo: "kpi", metrica: "totalValorConIva" } },
+  { key: "kpiTotalCompras", label: "KPI — Total de compras", bloque: { tipo: "kpi", metrica: "totalRegistros" } },
+  { key: "kpiCumplimiento", label: "KPI — Cumplimiento de tiempos de entrega", bloque: { tipo: "kpi", metrica: "cumplimientoPct" } },
+  { key: "kpiSinLegalizar", label: "KPI — Compras sin legalizar", bloque: { tipo: "kpi", metrica: "totalSinLegalizar" } },
+  { key: "kpiPendientesVencidos", label: "KPI — Pendientes vencidos (fuera de SLA)", bloque: { tipo: "kpi", metrica: "totalPendientesVencidos" } },
+  { key: "kpiTicketPromedio", label: "KPI — Ticket promedio por compra", bloque: { tipo: "kpi", metrica: "ticketPromedio" } },
+  { key: "kpiAhorroTotal", label: "KPI — Ahorro total (cotizado vs. comprado)", bloque: { tipo: "kpi", metrica: "ahorroTotal" } },
+  { key: "kpiPctAhorro", label: "KPI — % de ahorro global", bloque: { tipo: "kpi", metrica: "pctAhorro" } },
+  { key: "graficoValorMes", label: "Gráfico — Valor de compras por mes", bloque: { tipo: "grafico", agruparPor: "mes", metricaAgrupada: "valorConIva" } },
+  { key: "graficoArea", label: "Gráfico — Consumo por área", bloque: { tipo: "grafico", agruparPor: "area", metricaAgrupada: "valorConIva" } },
+  { key: "graficoCategoria", label: "Gráfico — Consumo por categoría", bloque: { tipo: "grafico", agruparPor: "categoria", metricaAgrupada: "valorConIva" } },
+  { key: "graficoEstado", label: "Gráfico — Compras por estado", bloque: { tipo: "grafico", agruparPor: "estado", metricaAgrupada: "cantidad" } },
+  { key: "graficoMedioPago", label: "Gráfico — Compras por medio de pago", bloque: { tipo: "grafico", agruparPor: "medioPago", metricaAgrupada: "cantidad" } },
+  { key: "graficoResponsable", label: "Gráfico — Compras por responsable", bloque: { tipo: "grafico", agruparPor: "responsable", metricaAgrupada: "valorConIva" } },
+  { key: "graficoProveedor", label: "Gráfico — Top proveedores por volumen de compra", bloque: { tipo: "grafico", agruparPor: "proveedor", metricaAgrupada: "valorConIva" } },
+  { key: "tablaArea", label: "Tabla — Consumo detallado por área", bloque: { tipo: "tabla", agruparPor: "area" } },
+  { key: "tablaCategoria", label: "Tabla — Consumo detallado por categoría", bloque: { tipo: "tabla", agruparPor: "categoria" } },
+  { key: "tablaResponsable", label: "Tabla — Compras por responsable", bloque: { tipo: "tabla", agruparPor: "responsable" } },
+  { key: "tablaPresupuesto", label: "Tabla — Presupuesto vs. gastado por área", bloque: { tipo: "presupuesto" } },
+  { key: "tablaPendientes", label: "Tabla — Solicitudes pendientes", bloque: { tipo: "pendientes" } },
+];
+
+export function seccionBloqueId(seccionKey) {
+  return `dash-${seccionKey}`;
+}
+
+export function nuevoBloqueDeSeccion(seccionKey) {
+  const def = DASHBOARD_SECCIONES.find((s) => s.key === seccionKey);
+  if (!def) return null;
+  const base = nuevoBloque(def.bloque.tipo);
+  return { ...base, ...def.bloque, id: seccionBloqueId(seccionKey), titulo: def.label.replace(/^.*? — /, "") };
+}
+
 // Mismas claves que selecciona el bloque KPI — se pueden usar como
 // "{{clave}}" dentro de un bloque de texto, para que ese texto incluya un
 // dato real sin tener que agregar un bloque KPI aparte (ver interpolarTexto
@@ -67,29 +120,13 @@ export function nuevoBloque(tipo) {
 // general del informe al momento de generar).
 const PLACEHOLDERS_TEXTO = METRICAS_KPI;
 
-// Ejemplo puramente ilustrativo (NUNCA llama a la IA ni usa datos reales) de
-// cómo se vería la respuesta a la pregunta del bloque — solo para que el
-// usuario se haga una idea de formato/extensión mientras arma el informe. El
-// análisis real, con cifras reales, se genera recién al presionar "Generar
-// vista previa" o al enviarse el informe (ver renderBloqueIa en el backend).
-function ejemploFicticio(pregunta) {
-  const p = (pregunta || "").trim() || "tu pregunta";
-  return `Ejemplo ilustrativo (datos ficticios, no reales) de cómo se vería la respuesta a "${p}":
-
-- El área de Tecnología concentra el mayor gasto, con 18 compras por $350.000.000 (32% del total).
-- Hay 4 compras sin legalizar que suman $28.500.000.
-- El proveedor "Proveedor Ejemplo S.A.S." es el más recurrente, con 7 compras en el periodo.
-
-Esto es solo un ejemplo de formato — el contenido real, con tus datos, se calcula al generar la vista previa o al enviar el informe.`;
-}
-
 // Casilla "Agregar análisis de IA" integrada en el propio bloque KPI/Gráfico/
 // Tabla (no un bloque aparte) — al marcarla, el análisis se ejecuta al
 // generar el informe usando EXCLUSIVAMENTE los datos de ESE bloque (su
 // métrica/agrupación y periodo), igual que antes, pero ahora como una opción
 // del bloque en vez de un bloque de IA independiente (ver renderBloqueKpi/
 // Grafico/Tabla en backend/lib/reportContent.js).
-function AnalisisIaToggle({ bloque, updateBloque, ejemplos, toggleEjemplo }) {
+function AnalisisIaToggle({ bloque, updateBloque }) {
   return (
     <div className="bloque-analisis-ia">
       <div className="bloque-analisis-ia-row">
@@ -109,17 +146,11 @@ function AnalisisIaToggle({ bloque, updateBloque, ejemplos, toggleEjemplo }) {
         </label>
       </div>
       {bloque.analisisIa && (
-        <>
-          <textarea
-            rows={2} value={bloque.analisisPregunta || ""}
-            onChange={(e) => updateBloque(bloque.id, { analisisPregunta: e.target.value })}
-            placeholder="Opcional — qué quieres que destaque el análisis (si lo dejas vacío, hace un resumen simple)"
-          />
-          <button type="button" className="btn-ghost small" onClick={() => toggleEjemplo(bloque, bloque.analisisPregunta)}>
-            <IconSpark size={11} /> {ejemplos[bloque.id] ? "Ocultar ejemplo" : "Ver ejemplo (datos ficticios)"}
-          </button>
-          {ejemplos[bloque.id] && <div className="bloque-ia-resultado">{ejemplos[bloque.id]}</div>}
-        </>
+        <textarea
+          rows={2} value={bloque.analisisPregunta || ""}
+          onChange={(e) => updateBloque(bloque.id, { analisisPregunta: e.target.value })}
+          placeholder="Opcional — qué quieres que destaque el análisis (si lo dejas vacío, hace un resumen simple)"
+        />
       )}
     </div>
   );
@@ -127,7 +158,6 @@ function AnalisisIaToggle({ bloque, updateBloque, ejemplos, toggleEjemplo }) {
 
 export default function ReportBloqueBuilder({ bloques, onChange }) {
   const dragIndexRef = useRef(null);
-  const [ejemplos, setEjemplos] = useState({}); // { [bloqueId]: texto ficticio visible }
 
   function addBloque(tipo) {
     onChange([...bloques, nuevoBloque(tipo)]);
@@ -152,16 +182,6 @@ export default function ReportBloqueBuilder({ bloques, onChange }) {
     const [moved] = next.splice(fromIdx, 1);
     next.splice(toIdx, 0, moved);
     onChange(next);
-  }
-
-  function toggleEjemplo(bloque, pregunta) {
-    setEjemplos((prev) => {
-      if (prev[bloque.id]) {
-        const { [bloque.id]: _omit, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [bloque.id]: ejemploFicticio(pregunta) };
-    });
   }
 
   return (
@@ -252,7 +272,7 @@ export default function ReportBloqueBuilder({ bloques, onChange }) {
                   <select value={b.metrica} onChange={(e) => updateBloque(b.id, { metrica: e.target.value })}>
                     {METRICAS_KPI.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
                   </select>
-                  <AnalisisIaToggle bloque={b} updateBloque={updateBloque} ejemplos={ejemplos} toggleEjemplo={toggleEjemplo} />
+                  <AnalisisIaToggle bloque={b} updateBloque={updateBloque} />
                 </>
               )}
 
@@ -269,7 +289,7 @@ export default function ReportBloqueBuilder({ bloques, onChange }) {
                       </select>
                     )}
                   </div>
-                  <AnalisisIaToggle bloque={b} updateBloque={updateBloque} ejemplos={ejemplos} toggleEjemplo={toggleEjemplo} />
+                  <AnalisisIaToggle bloque={b} updateBloque={updateBloque} />
                 </>
               )}
 
@@ -280,16 +300,9 @@ export default function ReportBloqueBuilder({ bloques, onChange }) {
                     onChange={(e) => updateBloque(b.id, { pregunta: e.target.value })}
                     placeholder="Ej. ¿Qué proveedor tuvo más compras sin legalizar este trimestre?"
                   />
-                  <button type="button" className="btn-ghost small" onClick={() => toggleEjemplo(b, b.pregunta)}>
-                    <IconSpark size={11} /> {ejemplos[b.id] ? "Ocultar ejemplo" : "Ver ejemplo (datos ficticios)"}
-                  </button>
-                  {ejemplos[b.id] ? (
-                    <div className="bloque-ia-resultado">{ejemplos[b.id]}</div>
-                  ) : (
-                    <p className="schedule-note" style={{ margin: 0 }}>
-                      Se ejecuta contra tus datos reales al generar la vista previa o al enviar el informe — no hace falta generarlo aquí.
-                    </p>
-                  )}
+                  <p className="schedule-note" style={{ margin: 0 }}>
+                    Se ejecuta contra tus datos reales al generar la vista previa o al enviar el informe — no hace falta generarlo aquí.
+                  </p>
                 </>
               )}
             </div>

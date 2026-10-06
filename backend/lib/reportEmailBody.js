@@ -71,7 +71,7 @@ export function buildDefaultEmailBody(content, { nombre, cuerpoModo }) {
 // Cuerpo del correo en TEXTO PLANO (nunca HTML) — independiente del contenido
 // del PDF adjunto. Si el admin no dio "cuerpoPrompt", se usa el texto
 // determinístico de buildDefaultEmailBody (sin llamar a la IA). Si lo dio, se
-// se pide a la IA (Gemini, con fallback a Anthropic — ver lib/aiStructured.js)
+// se pide a la IA (Anthropic — ver lib/aiStructured.js)
 // que lo redacte siguiendo el estilo pedido, pero SIEMPRE con fallback al
 // texto por defecto si ningún modelo responde — nunca se bloquea un envío por esto.
 export async function generateEmailBody({ content, nombre, cuerpoModo, cuerpoPrompt }) {

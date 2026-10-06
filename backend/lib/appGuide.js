@@ -27,7 +27,7 @@ export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 7 secc
 3. AGENTE IA (todos los roles) — esta misma sección donde estás respondiendo
    - Chat que responde preguntas sobre los datos de compras, sobre el procedimiento oficial de compras (ADM-P-01), sobre el funcionamiento de la aplicación (esta guía) y, solo para admin, sobre el presupuesto configurado.
    - Puede generar tablas y gráficos (barra, línea, pie) a partir de los datos reales.
-   - Selector de modelo con dos proveedores: Google (Gemini, con modelos gratuitos y uno de pago) y Anthropic (Claude, todos de pago). Los modelos "de pago" de ambos proveedores solo los puede elegir el rol admin; el resto de roles queda limitado a los modelos gratuitos de Gemini.
+   - Usa un modelo de Anthropic (Claude), el mismo para todos los roles, sin selector de modelo.
    - Tiene un historial de conversaciones a la izquierda (se guarda automáticamente, se puede abrir una anterior o eliminarla).
    - Es de SOLO CONSULTA: no puede crear, editar, eliminar ni aprobar nada (tampoco presupuestos) — todo eso se hace desde las otras secciones o siguiendo el procedimiento oficial.
 
@@ -56,9 +56,9 @@ export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 7 secc
    - Filtros por rango de fechas, usuario y tipo de entidad afectada.
 
 ROLES Y PERMISOS (definidos en el sistema, no se pueden cambiar desde el chat):
-- admin: acceso total a las 7 secciones. Es el ÚNICO rol que puede: eliminar registros de compra, editar/mover la fecha de solicitud de un registro ya creado, ver y configurar Maestros, ver y configurar Presupuesto, ver Auditoría, administrar Usuarios, y usar los modelos de pago del Agente IA (tanto Gemini como Anthropic).
-- registro: ve Dashboard, Registros y Agente IA (solo modelos gratuitos). En Registros tiene CRUD completo salvo eliminar y salvo mover la fecha de solicitud una vez creado el registro. No ve Maestros, Presupuesto, Usuarios ni Auditoría.
-- legalizar (Legalizar factura): ve Registros y Agente IA (solo modelos gratuitos). En Registros puede editar solicitudes existentes pero solo estos campos: estado de legalización, número de factura (FE), valor con IVA, valor sin IVA y observaciones — el resto queda intacto. No puede crear, no puede eliminar y no puede tocar el check de radicado.
-- radicar (Radicar): ve Registros y Agente IA (solo modelos gratuitos). Lo único que puede hacer en Registros es MARCAR (nunca desmarcar) el check de "radicado" en cada fila, y solo si esa solicitud ya tiene estado de legalización "Legalizado" — una vez marcado el radicado, no se puede deshacer por nadie. No puede crear, editar (otros campos) ni eliminar solicitudes.
+- admin: acceso total a las 7 secciones. Es el ÚNICO rol que puede: eliminar registros de compra, editar/mover la fecha de solicitud de un registro ya creado, ver y configurar Maestros, ver y configurar Presupuesto, ver Auditoría y administrar Usuarios.
+- registro: ve Dashboard, Registros y Agente IA. En Registros tiene CRUD completo salvo eliminar y salvo mover la fecha de solicitud una vez creado el registro. No ve Maestros, Presupuesto, Usuarios ni Auditoría.
+- legalizar (Legalizar factura): ve Registros y Agente IA. En Registros puede editar solicitudes existentes pero solo estos campos: estado de legalización, número de factura (FE), valor con IVA, valor sin IVA y observaciones — el resto queda intacto. No puede crear, no puede eliminar y no puede tocar el check de radicado.
+- radicar (Radicar): ve Registros y Agente IA. Lo único que puede hacer en Registros es MARCAR (nunca desmarcar) el check de "radicado" en cada fila, y solo si esa solicitud ya tiene estado de legalización "Legalizado" — una vez marcado el radicado, no se puede deshacer por nadie. No puede crear, editar (otros campos) ni eliminar solicitudes.
 
 Inicio de sesión: la app pide correo corporativo y contraseña; tras iniciar sesión, redirige automáticamente al Dashboard (si el rol lo permite) o a Registros. El botón "Cerrar sesión" está al final del menú lateral, junto con "Cambiar contraseña".`;

@@ -3,6 +3,34 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { createSessionToken, SESSION_COOKIE, SESSION_MAX_AGE_SECONDS } from "@/lib/session";
 
+/**
+ * @openapi
+ * /api/auth/login:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Inicia sesión (única ruta pública, no requiere cookie previa).
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email: { type: string, format: email }
+ *               password: { type: string, format: password }
+ *     responses:
+ *       200:
+ *         description: Sesión iniciada — la cookie httpOnly "session" queda seteada en la respuesta.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties: { user: { $ref: '#/components/schemas/User' } }
+ *       400: { description: Faltan correo o contraseña. }
+ *       401: { description: Credenciales inválidas o usuario inactivo. }
+ */
 export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const email = (body.email || "").toLowerCase().trim();

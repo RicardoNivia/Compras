@@ -26,6 +26,30 @@ const MAX_ITEMS = 40;
 // tres listas de la página (no sobre un solo KPI/registro): da un análisis
 // completo con riesgo de mayor atraso, una proyección de gasto según el
 // ritmo actual, y sugerencias concretas de mejora.
+/**
+ * @openapi
+ * /api/agent/review-alertas:
+ *   post:
+ *     tags: [Agente IA]
+ *     summary: "\"Revisar con IA\" de la página Alertas y notificaciones: análisis completo (resumen, riesgos, proyección de gasto y sugerencias) sobre las listas ya calculadas de la página (requiere permiso \"viewAlertas\"). Sin body. Llamada síncrona (no usa el patrón de trabajo en segundo plano)."
+ *     responses:
+ *       200:
+ *         description: Análisis generado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resumen: { type: string }
+ *                 riesgos: { type: string }
+ *                 proyeccion: { type: string }
+ *                 sugerencias: { type: array, items: { type: string } }
+ *       403:
+ *         description: No autorizado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
 export async function POST() {
   const user = await getSessionUser();
   if (!user || !(await isRoleAllowed(user.role, "viewAlertas"))) {

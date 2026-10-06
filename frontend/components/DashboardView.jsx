@@ -43,8 +43,8 @@ function isAnulado(r) {
   return r.estado === "Anulado";
 }
 
-// Botón "Explícame este número": pide al Agente IA (modelo gratis de Gemini,
-// sin streaming) una explicación puntual del KPI a partir de los registros
+// Botón "Explícame este número": pide al Agente IA (Anthropic, sin streaming)
+// una explicación puntual del KPI a partir de los registros
 // que lo componen, y la muestra en un modal con el mismo renderizado
 // Markdown del chat — se calcula una sola vez y se cachea mientras el
 // componente esté montado con las mismas props.
