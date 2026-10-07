@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { listMaestros, createMaestro } from "@/lib/maestros";
-import { getSessionUser } from "@/lib/auth-server";
-import { isRoleAllowed } from "@/lib/permissions";
+import { requirePermission, apiError } from "@/lib/apiGuard";
 
 // Sin chequeo de rol más allá de estar autenticado (lo garantiza el
 // middleware): cualquier rol que pueda editar registros necesita leer estas
@@ -48,7 +47,7 @@ export async function GET(request) {
     const maestros = await listMaestros({ tipo, onlyActive });
     return NextResponse.json({ maestros });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 500 });
+    return apiError(err);
   }
 }
 
@@ -87,15 +86,13 @@ export async function GET(request) {
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function POST(request) {
-  const user = await getSessionUser();
-  if (!user || !(await isRoleAllowed(user.role, "viewMaestros"))) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
+  const { user, denied } = await requirePermission("viewMaestros");
+  if (denied) return denied;
   try {
     const body = await request.json();
     const maestro = await createMaestro(body, user);
     return NextResponse.json(maestro, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 500 });
+    return apiError(err);
   }
 }

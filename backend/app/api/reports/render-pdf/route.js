@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth-server";
-import { isRoleAllowed } from "@/lib/permissions";
+import { requirePermission } from "@/lib/apiGuard";
 import { generateReportPdfBuffer } from "@/lib/reportPdf";
 
 // Vuelve a dibujar el PDF a partir de un contenido YA GENERADO (sin llamar a
@@ -45,10 +44,8 @@ import { generateReportPdfBuffer } from "@/lib/reportPdf";
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function POST(request) {
-  const user = await getSessionUser();
-  if (!user || !(await isRoleAllowed(user.role, "viewReportes"))) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
+  const { denied } = await requirePermission("viewReportes");
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   if (!body.content) {
     return NextResponse.json({ error: "Falta el contenido del informe." }, { status: 400 });

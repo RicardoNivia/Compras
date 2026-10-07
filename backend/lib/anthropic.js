@@ -100,7 +100,11 @@ export async function* streamAnthropicChat({ model, systemInstruction, contents,
     } catch {
       // ignore
     }
-    throw new Error(`Anthropic API respondió ${res.status}. ${detail}`);
+    // El detalle crudo de la respuesta de Anthropic solo se loguea server-side
+    // (puede incluir parámetros de la petición saliente) — al cliente final
+    // solo le llega el status.
+    console.error(`Anthropic API respondió ${res.status}.`, detail);
+    throw new Error(`Error al conectar con el servicio de IA (${res.status}).`);
   }
 
   const reader = res.body.getReader();
@@ -186,7 +190,8 @@ export async function runAnthropicAgentChat({ model, systemInstruction, contents
       } catch {
         // ignore
       }
-      throw new Error(`Anthropic API respondió ${res.status}. ${detail}`);
+      console.error(`Anthropic API respondió ${res.status}.`, detail);
+      throw new Error(`Error al conectar con el servicio de IA (${res.status}).`);
     }
 
     const data = await res.json();
@@ -277,7 +282,8 @@ export async function generateAnthropicJson({ model, systemInstruction, prompt, 
     } catch {
       // ignore
     }
-    throw new Error(`Anthropic API respondió ${res.status}. ${detail}`);
+    console.error(`Anthropic API respondió ${res.status}.`, detail);
+    throw new Error(`Error al conectar con el servicio de IA (${res.status}).`);
   }
 
   const data = await res.json();

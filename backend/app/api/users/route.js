@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { listUsers, createUser } from "@/lib/users";
-import { getSessionUser } from "@/lib/auth-server";
-import { isRoleAllowed } from "@/lib/permissions";
+import { requirePermission, apiError } from "@/lib/apiGuard";
 
 // Gestión de usuarios: restringida por la funcionalidad "viewUsuarios" de la
 // Matriz de permisos (por defecto, solo admin) — antes gateado a nivel de
@@ -28,10 +27,8 @@ import { isRoleAllowed } from "@/lib/permissions";
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function GET() {
-  const user = await getSessionUser();
-  if (!user || !(await isRoleAllowed(user.role, "viewUsuarios"))) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
+  const { denied } = await requirePermission("viewUsuarios");
+  if (denied) return denied;
   const users = await listUsers();
   return NextResponse.json({ users });
 }
@@ -69,15 +66,13 @@ export async function GET() {
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function POST(request) {
-  const actor = await getSessionUser();
-  if (!actor || !(await isRoleAllowed(actor.role, "viewUsuarios"))) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
+  const { user: actor, denied } = await requirePermission("viewUsuarios");
+  if (denied) return denied;
   try {
     const body = await request.json();
     const user = await createUser(body, actor);
     return NextResponse.json(user, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 500 });
+    return apiError(err);
   }
 }

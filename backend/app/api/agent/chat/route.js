@@ -97,6 +97,10 @@ function buildDynamicInstructionSuffix(currentUser, section) {
   return `El usuario que te habla ahora es ${currentUser.nombre}, con rol "${ROLE_LABELS[currentUser.role] || currentUser.role}". Hoy es ${hoy}.${ubicacion}`;
 }
 
+// Esta ruta usa `Response` crudo (no `NextResponse.json`) en todas sus respuestas
+// porque la respuesta de éxito necesita una cabecera custom (`X-Conversation-Id`,
+// ver más abajo) — se usa el mismo mecanismo también para los errores por consistencia
+// dentro del archivo.
 function jsonError(message, status) {
   return new Response(JSON.stringify({ error: message }), {
     status,

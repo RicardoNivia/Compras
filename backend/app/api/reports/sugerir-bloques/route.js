@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth-server";
-import { isRoleAllowed } from "@/lib/permissions";
+import { requirePermission } from "@/lib/apiGuard";
 import { generateBloquesSugeridos } from "@/lib/reportContent";
 import { createJob } from "@/lib/reportJobs";
 
@@ -31,10 +30,8 @@ import { createJob } from "@/lib/reportJobs";
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function POST() {
-  const user = await getSessionUser();
-  if (!user || !(await isRoleAllowed(user.role, "viewReportes"))) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
+  const { denied } = await requirePermission("viewReportes");
+  if (denied) return denied;
 
   const jobId = createJob(async () => generateBloquesSugeridos());
   return NextResponse.json({ jobId }, { status: 202 });
