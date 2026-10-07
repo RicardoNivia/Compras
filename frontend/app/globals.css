@@ -644,8 +644,14 @@ input:focus, select:focus, textarea:focus{ border-color:var(--accent); box-shado
 }
 .btn:hover{ background: var(--grid); }
 .btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
-.btn-primary{ background: var(--accent); border-color:var(--accent); color:var(--accent-ink); }
-.btn-primary:hover{ filter:brightness(1.06); }
+.btn-primary{
+  background: linear-gradient(135deg, var(--accent), var(--secondary)); border-color:transparent; color:#fff;
+  border-radius:999px; font-weight:700;
+  box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--accent) 50%, transparent);
+  transition: transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .15s ease, filter .15s ease;
+}
+.btn-primary:hover{ filter:brightness(1.06); transform:translateY(-1px); box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--accent) 55%, transparent); }
+.btn-primary:active{ transform:translateY(0) scale(.97); }
 /* El :disabled genérico (opacity:.55) deja el fondo azul pálido pero el
    texto blanco intacto — casi ilegible. Acá se usa un estilo propio (fondo
    claro + texto azul) en vez de solo atenuar, para que siga leyéndose sin
@@ -1057,11 +1063,15 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
   padding:14px; overflow:hidden;
 }
 .agent-new-chat-btn{
-  appearance:none; cursor:pointer; border:1px solid var(--border); background: var(--accent-wash); color: var(--accent);
-  font-size:13px; font-weight:700; padding:9px 12px; border-radius:10px;
-  display:flex; align-items:center; gap:8px;
+  appearance:none; cursor:pointer; border:none;
+  background: linear-gradient(135deg, var(--accent), var(--secondary)); color:#fff;
+  font-size:13px; font-weight:700; padding:10px 14px; border-radius:999px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--accent) 50%, transparent);
+  transition: transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .15s ease, filter .15s ease;
 }
-.agent-new-chat-btn:hover{ filter:brightness(0.98); }
+.agent-new-chat-btn:hover{ filter:brightness(1.06); transform:translateY(-1px); box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--accent) 55%, transparent); }
+.agent-new-chat-btn:active{ transform:translateY(0) scale(.97); }
 .agent-new-chat-btn span{ font-size:15px; line-height:1; }
 .agent-history-list{ flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
 .agent-history-empty{ font-size:12px; color:var(--muted); padding:8px 4px; }
