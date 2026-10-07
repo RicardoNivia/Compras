@@ -25,6 +25,7 @@ const COLUMNS = [
   { key: "medioPago", label: "Medio de pago" },
   { key: "licitacion", label: "Licitación" },
   { key: "estadoLegalizacion", label: "Estado legaliz." },
+  { key: "nit", label: "Nit" },
   { key: "proveedor", label: "Proveedor" },
   { key: "fe", label: "FE" },
   { key: "valorConIva", label: "Valor + IVA" },
@@ -142,6 +143,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
           r.medioPago,
           r.licitacion,
           r.estadoLegalizacion,
+          r.nit,
           r.proveedor,
           r.fe,
           r.valorConIva,
@@ -482,6 +484,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                     <td>{r.medioPago || "—"}</td>
                     <td className="truncate">{r.licitacion || "—"}</td>
                     <td><span className={`pill ${legalizacionPillClass(r.estadoLegalizacion)}`}>{r.estadoLegalizacion || "—"}</span></td>
+                    <td className="mono">{r.nit || "—"}</td>
                     <td className="truncate wide">{r.proveedor || "—"}</td>
                     <td className="mono cell-fe">{r.fe || "—"}</td>
                     <td className="num">{fmtCOP(r.valorConIva)}</td>

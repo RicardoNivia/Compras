@@ -14,6 +14,7 @@ export const FIELD_LABELS = {
   medioPago: "Medio de pago",
   licitacion: "Licitación",
   estadoLegalizacion: "Estado legalización",
+  nit: "Nit",
   proveedor: "Proveedor",
   fe: "FE",
   valorConIva: "Valor con IVA",
