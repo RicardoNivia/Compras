@@ -30,6 +30,17 @@ export async function fetchRecordTimelineApi(id) {
   return handle(res);
 }
 
+// Lectura de facturas con Nova (ver InvoiceScanner.jsx) — "imageBase64" sin
+// el prefijo "data:...;base64,". Nunca guarda nada, solo propone campos.
+export async function invoiceExtractApi({ imageBase64, mimeType }) {
+  const res = await fetch("/api/agent/invoice-extract", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageBase64, mimeType }),
+  });
+  return handle(res);
+}
+
 export async function createRecordApi(data) {
   const res = await fetch("/api/records", {
     method: "POST",

@@ -230,7 +230,10 @@ function stripCodeFence(text) {
   return text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
 }
 
-export async function generateAnthropicJson({ model, systemInstruction, prompt, schema, timeoutMs }) {
+// "image" (opcional): { base64, mediaType } — adjunta una imagen al mensaje
+// (lectura de facturas con visión, ver app/api/agent/invoice-extract/route.js)
+// antes del texto del prompt, en vez de solo texto.
+export async function generateAnthropicJson({ model, systemInstruction, prompt, schema, image, timeoutMs }) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY no está configurada en el servidor.");
@@ -239,6 +242,13 @@ export async function generateAnthropicJson({ model, systemInstruction, prompt, 
   const jsonInstruction = schema
     ? `\n\nResponde ÚNICAMENTE con un objeto JSON válido que cumpla exactamente este esquema — sin texto adicional, sin explicaciones, sin bloques de código ni backticks (tipos: OBJECT/STRING/NUMBER/BOOLEAN/ARRAY; "nullable": true significa que el campo puede ir en null): ${JSON.stringify(schema)}`
     : "";
+
+  const userContent = image
+    ? [
+        { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.base64 } },
+        { type: "text", text: prompt },
+      ]
+    : prompt;
 
   const res = await fetchWithRetry(`${ANTHROPIC_API_BASE}/messages`, {
     method: "POST",
@@ -256,7 +266,7 @@ export async function generateAnthropicJson({ model, systemInstruction, prompt, 
       // streamAnthropicChat.
       temperature: 0,
       system: `${systemInstruction}${jsonInstruction}`,
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: userContent }],
     }),
   }, timeoutMs);
 
