@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { sendAgentChatApi } from "@/lib/api";
-import AssistantContent from "@/components/AgentMessageContent";
-import { IconSpark, IconSend, IconPlus, IconTrash } from "@/components/icons";
+import AssistantContent, { ThinkingLabel } from "@/components/AgentMessageContent";
+import { IconSend, IconPlus, IconTrash } from "@/components/icons";
 
 // Barra de entrada compartida entre el estado "vacío" (centrada, junto al
 // saludo) y el estado "con mensajes" (pegada abajo) — mismo markup en ambos
@@ -240,7 +240,7 @@ export default function AgenteChat({ userName }) {
           ) : isEmpty ? (
             <div className="agent-hero-centered">
               <div className="agent-empty">
-                <div className="agent-empty-mark"><IconSpark size={22} /></div>
+                <div className="agent-empty-mark"><img src="/nova/nova-saludo.png" alt="" /></div>
                 <h2>Hola{userName ? `, ${userName.split(" ")[0]}` : ""}. Soy Nova, tu asistente de IA de compras.</h2>
                 <p>Respondo preguntas sobre los datos de compras, el procedimiento oficial de compras (ADM-P-01) y cómo usar esta aplicación según tu rol — no invento información y no puedo crear, modificar ni aprobar nada.</p>
               </div>
@@ -270,11 +270,14 @@ export default function AgenteChat({ userName }) {
               {messages.map((m, i) => (
                 <div key={i} className={`agent-msg ${m.role}`}>
                   <div className="agent-msg-avatar">
-                    {m.role === "user" ? userInitials : <IconSpark size={14} />}
+                    {m.role === "user" ? userInitials : <img src="/nova/nova-face.png" alt="" />}
                   </div>
                   <div className="agent-msg-bubble">
                     {m.role === "model" && m.text === "" && sending && i === messages.length - 1 ? (
-                      <span className="agent-typing"><span /><span /><span /></span>
+                      <span className="agent-thinking">
+                        <img src="/nova/nova-pensando-face.png" alt="" className="agent-thinking-nova" />
+                        <ThinkingLabel />
+                      </span>
                     ) : m.role === "model" ? (
                       <AssistantContent text={m.text} />
                     ) : (

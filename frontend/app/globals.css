@@ -1182,11 +1182,15 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 }
 .agent-empty{ max-width:560px; margin:0 auto; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px; animation: agentFadeUp .4s ease both; }
 .agent-empty-mark{
-  width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-  font-size:24px; color:#fff; background: linear-gradient(135deg, var(--accent), var(--secondary));
-  box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--accent) 60%, transparent);
-  margin-bottom:6px;
+  width:140px; height:140px; display:flex; align-items:center; justify-content:center;
+  margin-bottom:2px;
 }
+.agent-empty-mark img{
+  width:100%; height:100%; object-fit:contain;
+  filter: drop-shadow(0 12px 18px rgba(16,24,64,.25));
+  animation: novaIdle 8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce){ .agent-empty-mark img{ animation:none; } }
 .agent-empty h2{ margin:0; font-size:21px; }
 .agent-empty p{ margin:0; color:var(--ink-2); font-size:13.5px; line-height:1.6; }
 .agent-suggestions{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:20px; text-align:left; }
@@ -1212,7 +1216,8 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
   flex:none; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;
   font-size:14px; background: var(--surface-2); border:1px solid var(--border);
 }
-.agent-msg.model .agent-msg-avatar{ background: linear-gradient(135deg, var(--accent), var(--secondary)); color:#fff; border:none; }
+.agent-msg.model .agent-msg-avatar{ background:transparent; border:none; }
+.agent-msg.model .agent-msg-avatar img{ width:100%; height:100%; object-fit:contain; filter: drop-shadow(0 4px 6px rgba(16,24,64,.25)); }
 .agent-msg-bubble{
   max-width:min(920px, 88%); padding:12px 16px; border-radius:16px; font-size:14px; line-height:1.6;
   background: var(--surface-2); color: var(--ink);
@@ -1237,6 +1242,19 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 
 @keyframes agentTyping{ 0%, 60%, 100%{ opacity:.3; transform:translateY(0); } 30%{ opacity:1; transform:translateY(-3px); } }
 @keyframes agentFadeUp{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+
+/* "Pensando/analizando/..." mientras se espera la respuesta — reemplaza los
+   puntos genéricos por Nova (en pose de pensar) moviéndose un poco + una
+   frase que va rotando (ver AgentMessageContent.jsx#ThinkingLabel), para que
+   se sienta como que Nova está trabajando en la pregunta, no solo "cargando". */
+.agent-thinking{ display:inline-flex; align-items:center; gap:9px; }
+.agent-thinking-nova{ width:30px; height:30px; object-fit:contain; animation: agentThinkWiggle 1.3s ease-in-out infinite; }
+@keyframes agentThinkWiggle{
+  0%, 100%{ transform: rotate(-4deg) translateY(0); }
+  50%{ transform: rotate(4deg) translateY(-2px); }
+}
+.thinking-label{ font-size:13px; color:var(--ink-2); }
+@media (prefers-reduced-motion: reduce){ .agent-thinking-nova{ animation:none; } }
 
 .agent-chat-input{ display:flex; align-items:flex-end; gap:10px; padding:14px 20px; border-top:1px solid var(--border); }
 .agent-chat-input textarea{
@@ -1418,31 +1436,54 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
    circular, efecto genie tipo macOS) — ver la propuesta interactiva acordada
    antes de implementar esto. */
 .floating-agent-fab{
-  position:fixed; right:24px; bottom:24px; width:56px; height:56px; border-radius:50%; border:none;
+  position:fixed; right:12px; bottom:8px; width:126px; height:126px; border-radius:50%; border:none;
   cursor:pointer; color:#fff; z-index:200;
-  background: radial-gradient(circle at 30% 25%, var(--secondary), var(--accent) 65%);
+  background:transparent; box-shadow:none;
   display:flex; align-items:center; justify-content:center;
-  box-shadow: 0 14px 30px -10px rgba(32,99,160,.55), 0 2px 6px rgba(16,24,64,.15);
-  transition: transform .35s cubic-bezier(.34,1.56,.64,1), box-shadow .25s ease;
+  transition: transform .35s cubic-bezier(.34,1.56,.64,1);
 }
-.floating-agent-fab::before{
-  content:""; position:absolute; inset:-6px; border-radius:50%;
-  border:1.5px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  animation: floatingAgentPulse 2.6s ease-out infinite;
+/* Nova se queda exactamente igual (tamaño, posición, sin círculo de fondo)
+   esté el panel abierto o cerrado — a propósito no hay un estado ".is-open"
+   que la reemplace por un botón de cerrar distinto; el mismo clic que la
+   abre la vuelve a cerrar. Su propio anillo de levitación (parte del PNG)
+   ya cumple el rol que antes hacía el círculo de degradado. */
+/* Dos imágenes apiladas (de frente / saludando) en vez de una sola: así el
+   saludo al pasar el mouse es un simple cruce de opacidad en CSS, sin
+   JS ni estado de React — "de frente" siempre animada (flota + cada
+   cierto tiempo gira la cabeza, ver novaIdle), "saludo" aparece encima
+   solo en :hover. */
+.floating-agent-fab-icon{ position:relative; width:100%; height:100%; }
+.floating-agent-fab-icon img{
+  position:absolute; inset:0; width:100%; height:100%; object-fit:contain;
+  pointer-events:none; filter: drop-shadow(0 10px 14px rgba(16,24,64,.28));
+  transition: opacity .3s ease;
 }
-@keyframes floatingAgentPulse{
-  0%{ transform:scale(.85); opacity:.75; }
-  70%{ transform:scale(1.35); opacity:0; }
-  100%{ opacity:0; }
+.floating-agent-fab-icon .nova-frente{ opacity:1; animation: novaIdle 8s ease-in-out infinite; }
+.floating-agent-fab-icon .nova-saludo{ opacity:0; }
+.floating-agent-fab:hover .floating-agent-fab-icon .nova-frente{ opacity:0; }
+.floating-agent-fab:hover .floating-agent-fab-icon .nova-saludo{ opacity:1; }
+/* Flota suave casi todo el tiempo; alrededor del 65%-85% del ciclo (cada
+   ~8s) hace un gesto breve — gira la cabeza a un lado y al otro — antes de
+   volver a quedar quieta, para que de vez en cuando "se mueva o haga algo"
+   en vez de solo flotar siempre igual. */
+@keyframes novaIdle{
+  0%, 55%, 100%{ transform: translateY(0) rotate(0deg); }
+  15%{ transform: translateY(-6%) rotate(0deg); }
+  30%{ transform: translateY(0) rotate(0deg); }
+  65%{ transform: translateY(-2%) rotate(-7deg); }
+  73%{ transform: translateY(-2%) rotate(7deg); }
+  80%{ transform: translateY(0) rotate(-3deg); }
+  88%{ transform: translateY(0) rotate(0deg); }
 }
-.floating-agent-fab:hover{ transform: scale(1.07); box-shadow: 0 18px 36px -10px rgba(32,99,160,.6); }
+@media (prefers-reduced-motion: reduce){
+  .floating-agent-fab-icon .nova-frente{ animation:none; }
+}
+.floating-agent-fab:hover{ transform: scale(1.07); }
 .floating-agent-fab:active{ transform: scale(.96); }
-.floating-agent-fab-icon{ display:flex; transition: transform .4s cubic-bezier(.34,1.56,.64,1); }
-.floating-agent-fab.is-open .floating-agent-fab-icon{ transform: rotate(135deg); }
-.floating-agent-fab.is-open::before{ display:none; }
+.floating-agent-fab-icon{ display:flex; }
 
 .floating-agent-panel{
-  position:fixed; right:24px; bottom:92px; width:380px; max-width:calc(100vw - 32px);
+  position:fixed; right:20px; bottom:142px; width:380px; max-width:calc(100vw - 32px);
   height:580px; max-height:calc(100vh - 150px);
   background: var(--surface); border:1px solid var(--border); border-radius:22px;
   box-shadow: 0 40px 90px -24px rgba(16,24,64,.45), 0 0 0 1px rgba(16,24,64,.03);
@@ -1539,6 +1580,8 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 .floating-agent-typing span:nth-child(2){ animation-delay:.14s; }
 .floating-agent-typing span:nth-child(3){ animation-delay:.28s; }
 @keyframes floatingAgentTyping{ 0%,60%,100%{ opacity:.35; transform:translateY(0) scale(.85); } 30%{ opacity:1; transform:translateY(-3px) scale(1); } }
+.floating-agent-thinking{ display:inline-flex; align-items:center; gap:7px; }
+.floating-agent-thinking .thinking-label{ font-size:12px; }
 
 .floating-agent-suggestions{ display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; justify-content:center; }
 .floating-agent-suggestion{
@@ -1569,7 +1612,7 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 .floating-agent-send:disabled{ opacity:.45; cursor:default; }
 
 @media (max-width: 480px){
-  .floating-agent-panel, .floating-agent-panel.is-expanded{ right:12px; left:12px; width:auto; bottom:84px; }
-  .floating-agent-fab{ right:16px; bottom:16px; }
+  .floating-agent-panel, .floating-agent-panel.is-expanded{ right:12px; left:12px; width:auto; bottom:118px; }
+  .floating-agent-fab{ right:8px; bottom:4px; width:104px; height:104px; }
 }
 .body-editor-sugerencia-actions{ display:flex; gap:8px; }
