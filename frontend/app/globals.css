@@ -119,7 +119,7 @@ button{ font-family: inherit; }
    100vh). .sidebar es un panel absoluto DENTRO de ese riel que solo crece en
    ancho al hacer hover, superponiéndose al contenido — igual que Linear/
    Vercel/VS Code. */
-.sidebar-track{ flex:none; width:68px; height:100vh; position:relative; }
+.sidebar-track{ flex:none; width:72px; height:100vh; position:relative; }
 .sidebar{
   /* Degradado de marca (azul -> turquesa, mismos --accent/--secondary que el
      resto de la app); fijo (no reacciona al tema claro/oscuro) igual que el
@@ -129,10 +129,10 @@ button{ font-family: inherit; }
   --sb-ink-active: #ffffff;
   --sb-border: rgba(255,255,255,0.12);
   --sb-accent: #2063a0;
-  position:absolute; inset:0; width:68px; display:flex; flex-direction:column;
+  position:absolute; inset:0; width:72px; display:flex; flex-direction:column;
   background: linear-gradient(165deg, color-mix(in srgb, var(--accent) 72%, #000 28%), color-mix(in srgb, var(--secondary) 66%, #000 34%));
   border-right:1px solid var(--sb-border);
-  padding: 16px 10px; gap:4px; overflow:hidden; box-sizing:border-box;
+  padding: 16px 12px; gap:4px; overflow:hidden; box-sizing:border-box;
   transition: width .16s ease; z-index:50;
 }
 .sidebar-track:hover .sidebar{ width:232px; overflow-y:auto; box-shadow:16px 0 36px -14px rgba(0,0,0,0.45); }
@@ -144,8 +144,8 @@ button{ font-family: inherit; }
   font-family:"Nunito",sans-serif; font-weight:800; font-size:15px;
   display:flex; align-items:center; justify-content:center;
 }
-.sidebar-brand-label{ font-family:"Nunito",sans-serif; font-weight:700; font-size:14px; color:var(--sb-ink-active); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:0; transition:opacity .1s; }
-.sidebar-track:hover .sidebar-brand-label{ opacity:1; }
+.sidebar-brand-label{ font-family:"Nunito",sans-serif; font-weight:700; font-size:14px; color:var(--sb-ink-active); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:0; transition:opacity .08s ease; }
+.sidebar-track:hover .sidebar-brand-label{ opacity:1; transition:opacity .1s ease .09s; }
 
 .sidebar-nav{ display:flex; flex-direction:column; gap:3px; flex:1; }
 .sidebar-link{
@@ -163,12 +163,12 @@ button{ font-family: inherit; }
   font-size:14px; line-height:1; background: rgba(255,255,255,0.06); color: var(--sb-ink);
 }
 .sidebar-link.active .sidebar-link-ic{ background: rgba(255,255,255,0.22); color:#fff; }
-.sidebar-link .label, .sidebar-logout-btn .label, .sidebar-collapse-btn .label{ overflow:hidden; text-overflow:ellipsis; opacity:0; transition:opacity .1s; }
-.sidebar-track:hover .sidebar-link .label, .sidebar-track:hover .sidebar-logout-btn .label, .sidebar-track:hover .sidebar-collapse-btn .label{ opacity:1; }
+.sidebar-link .label, .sidebar-logout-btn .label, .sidebar-collapse-btn .label{ overflow:hidden; text-overflow:ellipsis; opacity:0; transition:opacity .08s ease; }
+.sidebar-track:hover .sidebar-link .label, .sidebar-track:hover .sidebar-logout-btn .label, .sidebar-track:hover .sidebar-collapse-btn .label{ opacity:1; transition:opacity .1s ease .09s; }
 
 .sidebar-search-btn{ margin-bottom:6px; border:1px solid var(--sb-border); }
-.sidebar-kbd{ margin-left:auto; font-size:10px; font-weight:700; color: var(--sb-ink); opacity:0; transition:opacity .1s; flex:none; }
-.sidebar-track:hover .sidebar-kbd{ opacity:1; }
+.sidebar-kbd{ margin-left:auto; font-size:10px; font-weight:700; color: var(--sb-ink); opacity:0; transition:opacity .08s ease; flex:none; }
+.sidebar-track:hover .sidebar-kbd{ opacity:1; transition:opacity .1s ease .09s; }
 
 .sidebar-foot{ display:flex; flex-direction:column; gap:8px; margin-top:auto; padding-top:12px; border-top:1px solid var(--sb-border); flex:none; }
 .sidebar-user{ display:flex; align-items:center; gap:10px; padding:8px 8px; border-radius:10px; background: rgba(255,255,255,0.06); margin-bottom: 4px; }
@@ -177,9 +177,9 @@ button{ font-family: inherit; }
   font-family:"Nunito",sans-serif; font-weight:800; font-size:12px;
   display:flex; align-items:center; justify-content:center;
 }
-.sidebar-user-name{ font-size:12px; font-weight:700; color:var(--sb-ink-active); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:0; transition:opacity .1s; }
-.sidebar-user-role{ font-size:10.5px; color:var(--sb-ink); opacity:0; transition:opacity .1s; }
-.sidebar-track:hover .sidebar-user-name, .sidebar-track:hover .sidebar-user-role{ opacity:1; }
+.sidebar-user-name{ font-size:12px; font-weight:700; color:var(--sb-ink-active); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:0; transition:opacity .08s ease; }
+.sidebar-user-role{ font-size:10.5px; color:var(--sb-ink); opacity:0; transition:opacity .08s ease; }
+.sidebar-track:hover .sidebar-user-name, .sidebar-track:hover .sidebar-user-role{ opacity:1; transition:opacity .1s ease .09s; }
 .sidebar-logout-btn, .sidebar-collapse-btn{
   appearance:none; border:1px solid var(--sb-border); background: var(--sb-bg-2); color:var(--sb-ink);
   display:flex; align-items:center; gap:8px; padding:6px; border-radius:9px;
@@ -288,6 +288,34 @@ main{ flex:1; min-width:0; padding: 26px 32px 60px; width:100%; box-sizing:borde
   background: linear-gradient(135deg, var(--accent), var(--secondary)); color:#fff;
 }
 .kpi-explain-loading{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2); padding:6px 0; }
+
+/* ---------- Línea de tiempo de un registro (ver RecordTimelineModal.jsx) ----------
+   Diseño vertical: un riel de puntos + línea conectora a la izquierda, el
+   contenido a la derecha — cada evento entra con una animación propia en
+   cascada (igual que el historial del Agente IA) para que se sienta vivo. */
+.timeline-modal-overlay{ align-items:center; }
+.timeline-modal{ max-width:480px; }
+/* Selector con más especificidad que ".modal-body" (display:grid de 2
+   columnas) a propósito — si no, esa regla genérica le gana sin importar el
+   orden en la hoja de estilos, y la línea de tiempo queda comprimida a
+   medio ancho en una sola fila de grilla. */
+.timeline-modal .modal-body.timeline-modal-body{ display:block; max-height:60vh; }
+.timeline{ display:flex; flex-direction:column; }
+.timeline-item{ display:flex; gap:12px; animation: agentFadeUp .3s ease both; }
+.timeline-rail{ flex:none; display:flex; flex-direction:column; align-items:center; width:26px; }
+.timeline-dot{
+  flex:none; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background: var(--surface-2); color: var(--muted); border:1px solid var(--border);
+}
+.timeline-dot.kind-creado{ background: linear-gradient(135deg, var(--accent), var(--secondary)); color:#fff; border:none; }
+.timeline-dot.kind-estado{ background: var(--accent-wash); color: var(--accent); border-color:transparent; }
+.timeline-dot.kind-legalizacion, .timeline-dot.kind-radicado{ background: color-mix(in srgb, var(--good) 16%, var(--surface)); color: var(--good); border-color:transparent; }
+.timeline-dot.kind-eliminado{ background: color-mix(in srgb, var(--critical) 14%, var(--surface)); color: var(--critical); border-color:transparent; }
+.timeline-dot.is-current{ box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
+.timeline-line{ flex:1; width:2px; min-height:22px; background: var(--border); margin:3px 0; }
+.timeline-content{ flex:1; min-width:0; padding-bottom:20px; }
+.timeline-label{ font-size:13.5px; font-weight:700; color:var(--ink); }
+.timeline-meta{ font-size:11.5px; color:var(--muted); margin-top:2px; }
 
 /* ---------- Cards / charts ---------- */
 .grid-2{ display:grid; grid-template-columns: 1.4fr 1fr; gap:14px; margin-bottom:14px; align-items:stretch; }
@@ -512,15 +540,24 @@ rect.mark:hover{ opacity:0.82; cursor:pointer; }
 .invoice-scanner{ display:flex; flex-direction:column; gap:8px; margin-bottom:4px; }
 .invoice-scanner-input{ position:absolute; width:1px; height:1px; overflow:hidden; opacity:0; pointer-events:none; }
 .invoice-scanner-box{
-  display:flex; align-items:center; gap:12px; padding:12px 14px;
-  border:1.5px dashed var(--border); border-radius:12px; background:var(--surface-2);
-  cursor:pointer; transition:border-color .15s, background .15s;
+  display:flex; align-items:center; gap:14px; padding:14px 16px;
+  border:1.5px dashed color-mix(in srgb, var(--accent) 35%, var(--border)); border-radius:16px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 7%, var(--surface)), color-mix(in srgb, var(--secondary) 7%, var(--surface)));
+  cursor:pointer; transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
 }
-.invoice-scanner-box:hover{ border-color:var(--accent); background:var(--surface-3, var(--surface-2)); }
-.invoice-scanner-box.busy{ cursor:progress; opacity:.75; }
-.invoice-scanner-box svg{ flex:none; color:var(--accent); }
-.invoice-scanner-title{ font-weight:600; font-size:13.5px; margin:0; }
-.invoice-scanner-sub{ font-size:11.5px; color:var(--muted); margin:2px 0 0; }
+.invoice-scanner-box:hover{ border-color:var(--accent); transform:translateY(-1px); box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--accent) 45%, transparent); }
+.invoice-scanner-box.busy{ cursor:progress; opacity:.75; transform:none; box-shadow:none; }
+.invoice-scanner-ic{
+  flex:none; width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+  background: linear-gradient(135deg, var(--accent), var(--secondary)); color:#fff;
+  box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.invoice-scanner-title{ font-weight:700; font-size:13.5px; margin:0; display:flex; align-items:center; gap:7px; }
+.invoice-scanner-badge{
+  font-size:9.5px; font-weight:800; letter-spacing:.05em; padding:2px 7px; border-radius:999px;
+  background: var(--accent-wash); color: var(--accent); text-transform:uppercase;
+}
+.invoice-scanner-sub{ font-size:11.5px; color:var(--muted); margin:3px 0 0; line-height:1.4; }
 .invoice-scanner-msg{ display:flex; align-items:flex-start; gap:8px; padding:9px 12px; border-radius:10px; font-size:12.5px; }
 .invoice-scanner-msg p{ margin:0; }
 .invoice-scanner-msg.ok{ background:rgba(34,197,94,.1); color:#16803d; }
@@ -650,7 +687,17 @@ input:focus, select:focus, textarea:focus{ border-color:var(--accent); box-shado
   box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--accent) 50%, transparent);
   transition: transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .15s ease, filter .15s ease;
 }
-.btn-primary:hover{ filter:brightness(1.06); transform:translateY(-1px); box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--accent) 55%, transparent); }
+/* .btn:hover (arriba) pone un fondo claro en CUALQUIER botón con la clase
+   .btn — como ".btn:hover" tiene más especificidad que ".btn-primary" a
+   secas, ese fondo le ganaba al degradado en hover y dejaba el texto blanco
+   casi invisible sobre un fondo pálido. Se repite el degradado acá (misma
+   especificidad que ".btn:hover", y como viene después en la hoja de
+   estilos, gana) — un solo lugar centralizado que corrige el hover de TODOS
+   los botones primarios de la app a la vez. */
+.btn-primary:hover{
+  background: linear-gradient(135deg, var(--accent), var(--secondary)); filter:brightness(1.06);
+  transform:translateY(-1px); box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--accent) 55%, transparent);
+}
 .btn-primary:active{ transform:translateY(0) scale(.97); }
 /* El :disabled genérico (opacity:.55) deja el fondo azul pálido pero el
    texto blanco intacto — casi ilegible. Acá se usa un estilo propio (fondo
@@ -676,6 +723,7 @@ th.check-col, td.check-col{ text-align:center; }
 .icon-action-btn.check{ background: var(--surface-2); color: transparent; border-color: var(--border); }
 .icon-action-btn.check.checked{ background: var(--good); border-color: var(--good); color:#fff; }
 .icon-action-btn.check:not(.checked):hover{ border-color: var(--good); color: var(--good); }
+.icon-action-btn.history:hover{ background: var(--accent-wash); color: var(--accent); border-color: var(--accent); }
 
 .btn-check{
   appearance:none; width:24px; height:24px; border-radius:8px;
@@ -690,6 +738,7 @@ th.check-col, td.check-col{ text-align:center; }
 .btn-danger-solid{ background:var(--critical); border-color:var(--critical); color:#fff; }
 .btn-danger-solid:hover{ filter:brightness(1.08); }
 .btn.small{ padding:5px 9px; font-size:12px; }
+.ir-registro-btn{ white-space:nowrap; }
 .spacer{ flex:1; }
 .count-note{ font-size:12.5px; color:var(--ink-2); }
 
@@ -754,7 +803,7 @@ table.audit-log tbody tr:hover td{ background: var(--surface-2); }
 /* ---------- Modal ---------- */
 .modal-overlay{
   position:fixed; inset:0; background: rgba(16,24,64,0.45); backdrop-filter: blur(2px);
-  display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto; z-index:100;
+  display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto; z-index:300;
 }
 .modal-overlay[hidden]{ display:none; }
 .modal{
@@ -1075,13 +1124,21 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 .agent-new-chat-btn span{ font-size:15px; line-height:1; }
 .agent-history-list{ flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
 .agent-history-empty{ font-size:12px; color:var(--muted); padding:8px 4px; }
+.agent-history-group{ display:flex; flex-direction:column; gap:1px; }
+.agent-history-group + .agent-history-group{ margin-top:10px; }
+.agent-history-group-label{ font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding:6px 10px 3px; }
 .agent-history-item{
-  position:relative; cursor:pointer; padding:9px 30px 9px 10px; border-radius:9px;
-  display:flex; flex-direction:column; gap:1px;
-  transition: background .12s ease;
+  position:relative; cursor:pointer; padding:9px 30px 9px 13px; border-radius:9px;
+  display:flex; flex-direction:column; gap:1px; border:1px solid transparent;
+  transition: background .12s ease; animation: agentFadeUp .25s ease both;
+}
+.agent-history-item::before{
+  content:""; position:absolute; left:0; top:12%; bottom:12%; width:3px; border-radius:3px;
+  background:linear-gradient(180deg, var(--accent), var(--secondary)); opacity:0; transition:opacity .15s ease;
 }
 .agent-history-item:hover{ background: var(--surface-2); }
-.agent-history-item.active{ background: var(--accent-wash); }
+.agent-history-item.active{ background: var(--accent-wash); border-color: color-mix(in srgb, var(--accent) 25%, transparent); }
+.agent-history-item.active::before{ opacity:1; }
 .agent-history-item.active .agent-history-title{ color: var(--accent); }
 .agent-history-title{ font-size:12.5px; font-weight:600; color: var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .agent-history-date{ font-size:10.5px; color: var(--muted); }
@@ -1107,7 +1164,23 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 
 .agent-chat-scroll{ flex:1; overflow-y:auto; padding:24px; }
 
-.agent-empty{ max-width:560px; margin:6vh auto 0; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px; animation: agentFadeUp .4s ease both; }
+/* Estado vacío estilo Gemini: saludo + barra de entrada centrados como un
+   solo bloque en el medio de la pantalla; al mandar el primer mensaje, la
+   barra (.agent-input-vt) pasa a quedar pegada abajo (ver el otro uso de esa
+   misma clase, fuera de .agent-hero-centered) — la View Transition API
+   (ver AgenteChat.jsx#send) anima ese cambio de posición solo porque ambos
+   usos comparten el mismo view-transition-name. */
+.agent-hero-centered{
+  min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px;
+}
+.agent-hero-centered .agent-chat-input{ width:100%; max-width:720px; border-top:none; padding:0; }
+.agent-input-vt{ view-transition-name: agent-input-bar; }
+@media (prefers-reduced-motion: reduce){
+  ::view-transition-group(agent-input-bar), ::view-transition-old(agent-input-bar), ::view-transition-new(agent-input-bar){
+    animation:none !important;
+  }
+}
+.agent-empty{ max-width:560px; margin:0 auto; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px; animation: agentFadeUp .4s ease both; }
 .agent-empty-mark{
   width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center;
   font-size:24px; color:#fff; background: linear-gradient(135deg, var(--accent), var(--secondary));
@@ -1116,13 +1189,21 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 }
 .agent-empty h2{ margin:0; font-size:21px; }
 .agent-empty p{ margin:0; color:var(--ink-2); font-size:13.5px; line-height:1.6; }
-.agent-suggestions{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:14px; }
-.agent-suggestion-chip{
-  appearance:none; cursor:pointer; border:1px solid var(--border); background: var(--surface-2); color: var(--ink);
-  padding:9px 14px; border-radius:999px; font-size:12.5px; font-weight:600;
-  transition: transform .12s ease, border-color .15s ease, background .15s ease;
+.agent-suggestions{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:20px; text-align:left; }
+@media (max-width:620px){ .agent-suggestions{ grid-template-columns:1fr; } }
+.agent-suggestion-card{
+  appearance:none; cursor:pointer; border:1px solid var(--border); background: var(--surface); color: var(--ink);
+  padding:13px 14px; border-radius:14px; display:flex; align-items:flex-start; gap:10px; text-align:left;
+  animation: agentFadeUp .3s ease both;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
 }
-.agent-suggestion-chip:hover{ transform: translateY(-2px); border-color: var(--accent); background: var(--accent-wash); color: var(--accent); }
+.agent-suggestion-card:hover{ transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 12px 24px -16px color-mix(in srgb, var(--accent) 50%, transparent); }
+.agent-suggestion-ic{
+  flex:none; width:30px; height:30px; border-radius:10px; background: var(--accent-wash); color: var(--accent);
+  display:flex; align-items:center; justify-content:center;
+}
+.agent-suggestion-title{ display:block; font-size:12.5px; font-weight:700; color:var(--ink); }
+.agent-suggestion-sub{ display:block; font-size:11.5px; color:var(--muted); margin-top:2px; line-height:1.4; }
 
 .agent-messages{ display:flex; flex-direction:column; gap:18px; max-width:1200px; margin:0 auto; }
 .agent-msg{ display:flex; gap:12px; align-items:flex-start; animation: agentFadeUp .28s ease both; }
@@ -1137,7 +1218,7 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
   background: var(--surface-2); color: var(--ink);
 }
 .agent-msg.user .agent-msg-bubble{ max-width:min(700px, 88%); }
-.agent-msg.user .agent-msg-bubble{ background: var(--accent); color: var(--accent-ink); border-radius:16px 16px 4px 16px; }
+.agent-msg.user .agent-msg-bubble{ background: linear-gradient(135deg, var(--accent), var(--secondary)); color:#fff; border-radius:16px 16px 4px 16px; }
 .agent-msg.model .agent-msg-bubble{ background: var(--surface-2); border-radius:16px 16px 16px 4px; }
 .chat-markdown p{ margin:0 0 8px; }
 .chat-markdown p:last-child{ margin-bottom:0; }
@@ -1150,7 +1231,7 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 .chat-chart-card{ margin:8px 0; max-width:500px; }
 
 .agent-typing{ display:inline-flex; gap:4px; padding:4px 0; }
-.agent-typing span{ width:6px; height:6px; border-radius:50%; background: var(--muted); animation: agentTyping 1s infinite ease-in-out; }
+.agent-typing span{ width:6px; height:6px; border-radius:50%; background: linear-gradient(135deg, var(--accent), var(--secondary)); animation: agentTyping 1s infinite ease-in-out; }
 .agent-typing span:nth-child(2){ animation-delay:.15s; }
 .agent-typing span:nth-child(3){ animation-delay:.3s; }
 

@@ -24,7 +24,7 @@ export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 7 secc
    - Botón "+ Agregar registro" (según el rol): abre un modal para crear una nueva solicitud.
    - Botón "Exportar": exporta a Excel (.csv), PDF o Word los registros que la tabla está mostrando en ese momento (respeta los filtros activos), con la opción adicional de acotar por año/mes.
 
-3. AGENTE IA (todos los roles) — esta misma sección donde estás respondiendo
+3. NOVA (todos los roles) — esta misma sección donde estás respondiendo (tu nombre es Nova)
    - Chat que responde preguntas sobre los datos de compras, sobre el procedimiento oficial de compras (ADM-P-01), sobre el funcionamiento de la aplicación (esta guía) y, solo para admin, sobre el presupuesto configurado.
    - Puede generar tablas y gráficos (barra, línea, pie) a partir de los datos reales.
    - Usa un modelo de Anthropic (Claude), el mismo para todos los roles, sin selector de modelo.
@@ -36,7 +36,7 @@ export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 7 secc
    - Por cada pestaña se pueden agregar, editar, inactivar/reactivar y (si no está en uso en ningún registro) eliminar valores. Un valor ya usado en algún registro no se puede eliminar ni renombrar, para no romper la integridad de los datos existentes — solo se puede inactivar, y así deja de ofrecerse como opción en el formulario sin afectar los registros que ya lo usan.
    - Tiene una barra de búsqueda por nombre dentro de cada pestaña.
 
-5. PRESUPUESTO (solo admin, incluida la lectura — ningún otro rol ve esta información, ni siquiera a través del Agente IA)
+5. PRESUPUESTO (solo admin, incluida la lectura — ningún otro rol ve esta información, ni siquiera a través de Nova)
    - Selector de año (siempre incluye el año actual y el siguiente, más los años anteriores en los que ya hay compras registradas).
    - Para cada año hay que elegir primero el MODO de presupuesto, una configuración GENERAL que aplica por igual a TODAS las áreas de ese año (no se elige por separado por cada área):
      · "Por área": se asigna un solo valor total de presupuesto anual a cada área.
@@ -57,8 +57,8 @@ export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 7 secc
 
 ROLES Y PERMISOS (definidos en el sistema, no se pueden cambiar desde el chat):
 - admin: acceso total a las 7 secciones. Es el ÚNICO rol que puede: eliminar registros de compra, editar/mover la fecha de solicitud de un registro ya creado, ver y configurar Maestros, ver y configurar Presupuesto, ver Auditoría y administrar Usuarios.
-- registro: ve Dashboard, Registros y Agente IA. En Registros tiene CRUD completo salvo eliminar y salvo mover la fecha de solicitud una vez creado el registro. No ve Maestros, Presupuesto, Usuarios ni Auditoría.
-- legalizar (Legalizar factura): ve Registros y Agente IA. En Registros puede editar solicitudes existentes pero solo estos campos: estado de legalización, número de factura (FE), valor con IVA, valor sin IVA y observaciones — el resto queda intacto. No puede crear, no puede eliminar y no puede tocar el check de radicado.
-- radicar (Radicar): ve Registros y Agente IA. Lo único que puede hacer en Registros es MARCAR (nunca desmarcar) el check de "radicado" en cada fila, y solo si esa solicitud ya tiene estado de legalización "Legalizado" — una vez marcado el radicado, no se puede deshacer por nadie. No puede crear, editar (otros campos) ni eliminar solicitudes.
+- registro: ve Dashboard, Registros y Nova. En Registros tiene CRUD completo salvo eliminar y salvo mover la fecha de solicitud una vez creado el registro. No ve Maestros, Presupuesto, Usuarios ni Auditoría.
+- legalizar (Legalizar factura): ve Registros y Nova. En Registros puede editar solicitudes existentes pero solo estos campos: estado de legalización, número de factura (FE), valor con IVA, valor sin IVA y observaciones — el resto queda intacto. No puede crear, no puede eliminar y no puede tocar el check de radicado.
+- radicar (Radicar): ve Registros y Nova. Lo único que puede hacer en Registros es MARCAR (nunca desmarcar) el check de "radicado" en cada fila, y solo si esa solicitud ya tiene estado de legalización "Legalizado" — una vez marcado el radicado, no se puede deshacer por nadie. No puede crear, editar (otros campos) ni eliminar solicitudes.
 
 Inicio de sesión: la app pide correo corporativo y contraseña; tras iniciar sesión, redirige automáticamente al Dashboard (si el rol lo permite) o a Registros. El botón "Cerrar sesión" está al final del menú lateral, junto con "Cambiar contraseña".`;

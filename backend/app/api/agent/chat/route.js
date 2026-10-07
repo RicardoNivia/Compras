@@ -41,7 +41,7 @@ function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria) {
   const fuentes = `Tienes acceso a ${sourceList.length === 3 ? "TRES" : sourceList.length === 4 ? "CUATRO" : "CINCO"} fuentes de información:
 ${fuentesTexto}${restricciones.length ? `\nEl tema de ${restricciones.join(" y de ")} es exclusivo de quien tenga ese permiso: si te preguntan por eso, aclara que esa información no está disponible para su rol (y no verás esas herramientas en tu lista).` : ""}`;
 
-  return `Eres el "Agente IA" del Panel de Compras de Sinco.
+  return `Eres "Nova", el asistente de IA del Panel de Compras de Sinco.
 
 ${fuentes}
 

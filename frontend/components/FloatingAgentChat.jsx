@@ -136,7 +136,7 @@ export default function FloatingAgentChat({ user }) {
               <div className="floating-agent-brand">
                 <div className="floating-agent-mark"><IconSpark size={17} /></div>
                 <div>
-                  <div className="floating-agent-title">Agente IA</div>
+                  <div className="floating-agent-title">Nova</div>
                   <div className="floating-agent-status"><span className="floating-agent-status-dot" />En línea</div>
                 </div>
               </div>
@@ -240,8 +240,8 @@ export default function FloatingAgentChat({ user }) {
         type="button"
         className={`floating-agent-fab${open ? " is-open" : ""}`}
         onClick={() => (open ? closePanel() : openPanel())}
-        title="Agente IA"
-        aria-label={open ? "Cerrar Agente IA" : "Abrir Agente IA"}
+        title="Nova"
+        aria-label={open ? "Cerrar Nova" : "Abrir Nova"}
       >
         <span className="floating-agent-fab-icon">
           {open ? (

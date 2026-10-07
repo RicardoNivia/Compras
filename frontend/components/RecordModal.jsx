@@ -583,7 +583,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
           </div>
 
           <div className="modal-foot">
-            <button type="submit" className="btn btn-primary" disabled={saving || deleting || aiReviewLoading} title={aiReviewLoading ? "Espera a que termine la revisión con IA" : undefined}>
+            <button type="submit" className="btn btn-primary" disabled={saving || deleting || aiReviewLoading} title={aiReviewLoading ? "Espera a que termine la revisión con Nova" : undefined}>
               {saving && <span className="spinner" />}
               {saving ? "Guardando…" : "Guardar"}
             </button>

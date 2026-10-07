@@ -7,7 +7,7 @@ import { IconSpark, IconAlert, IconCheck, IconInfo, IconCopy } from "@/component
 
 const INFO_TEXT = "La IA revisa si el texto de Observaciones justifica bien el estado de legalización actual (qué falta, si es muy vago, etc.) y, si no alcanza, te propone un texto mejorado para que lo copies tú mismo — no cambia nada en el registro automáticamente.";
 
-// "Revisar con IA" junto al campo Observaciones — evalúa si el texto
+// "Revisar con Nova" junto al campo Observaciones — evalúa si el texto
 // justifica bien el estado de legalización actual y, si no, propone una
 // versión mejorada en texto plano, puramente informativa: este componente
 // NUNCA modifica el registro ni el formulario por sí mismo — solo muestra la
@@ -64,11 +64,11 @@ export default function ObservacionesReview({ observaciones, estadoLegalizacion,
     <div className="kpi-explain">
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
         <button type="button" className="kpi-explain-btn" onClick={handleClick} disabled={loading || !observaciones || !observaciones.trim()}>
-          {loading ? <span className="spinner" /> : <IconSpark size={11} />} {loading ? "Revisando…" : "Revisar con IA"}
+          {loading ? <span className="spinner" /> : <IconSpark size={11} />} {loading ? "Revisando…" : "Revisar con Nova"}
         </button>
         <button
           ref={infoBtnRef}
-          type="button" className="btn-ghost icon-btn" aria-label="¿Qué hace Revisar con IA?"
+          type="button" className="btn-ghost icon-btn" aria-label="¿Qué hace Revisar con Nova?"
           style={{ width: 18, height: 18, padding: 0, opacity: 0.6 }}
           onClick={() => (showInfo ? setShowInfo(false) : openInfo())}
           onMouseEnter={openInfo}

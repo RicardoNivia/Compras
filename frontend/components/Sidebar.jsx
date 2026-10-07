@@ -15,7 +15,7 @@ export const ALL_NAV_ITEMS = [
   { key: "dashboard", href: "/dashboard", label: "Dashboard de compras", Icon: IconDashboard, feature: "viewDashboard", show: canViewDashboard },
   { key: "alertas", href: "/alertas", label: "Alertas y notificaciones", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas },
   { key: "registros", href: "/registros", label: "Registros", Icon: IconTable, feature: null, show: () => true },
-  { key: "agente-ia", href: "/agente-ia", label: "Agente IA", Icon: IconSpark, feature: "viewAgenteIA", show: canViewAgenteIA },
+  { key: "agente-ia", href: "/agente-ia", label: "Nova", Icon: IconSpark, feature: "viewAgenteIA", show: canViewAgenteIA },
   { key: "maestros", href: "/maestros", label: "Maestros", Icon: IconLayers, feature: "viewMaestros", show: canViewMaestros },
   { key: "presupuesto", href: "/presupuesto", label: "Presupuesto", Icon: IconMoney, feature: "viewPresupuesto", show: canViewPresupuesto },
   { key: "informes", href: "/informes", label: "Informes", Icon: IconMail, feature: "viewReportes", show: canViewReportes },

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import RecordModal from "@/components/RecordModal";
+import { TimelineButton } from "@/components/RecordTimelineModal";
 import { fmtCOP } from "@/lib/format";
 import { getDiasInfo } from "@/lib/diasInfo";
 import { patchRecordApi, deleteRecordApi, searchFiltersWithAiApi } from "@/lib/api";
@@ -70,7 +72,23 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
   const editableFields = getEditableFields(role);
   const hasRowActions = allowToggle || allowEdit || allowDelete;
 
-  const [search, setSearch] = useState("");
+  // Llega como "/registros?q=%23123" desde el botón "Ir" de Alertas y
+  // notificaciones (ver AlertasView.jsx) — precarga la búsqueda manual con el
+  // número de registro (#123) para llegar directo a esa fila, reutilizando el
+  // mismo buscador de texto libre en vez de un mecanismo de filtro aparte.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [search, setSearch] = useState(() => searchParams.get("q") || "");
+
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) {
+      setSearch(q);
+      router.replace(pathname, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [area, setArea] = useState("");
   const [estado, setEstado] = useState("");
   const [medioPago, setMedioPago] = useState("");
@@ -297,7 +315,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
             Filtros manuales
           </button>
           <button type="button" role="tab" aria-selected={searchMode === "ia"} className="dash-tab" onClick={() => setSearchMode("ia")}>
-            <IconSpark size={13} /> Buscar con IA
+            <IconSpark size={13} /> Buscar con Nova
           </button>
         </div>
 
@@ -484,6 +502,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                         </div>
                       ) : (
                         <div className="row-actions">
+                          <TimelineButton recordId={r.id} localSeq={r.localSeq} />
                           <button
                             type="button"
                             className={`icon-action-btn check${r.radicado ? " checked" : ""}`}

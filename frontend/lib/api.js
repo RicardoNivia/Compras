@@ -23,6 +23,13 @@ export async function fetchRecords() {
   return handle(res);
 }
 
+// Línea de tiempo de alto nivel de un registro (ver RecordTimelineModal.jsx)
+// — visible para cualquier rol, a diferencia de la sección Auditoría completa.
+export async function fetchRecordTimelineApi(id) {
+  const res = await fetch(`/api/records/${id}/timeline`, { cache: "no-store" });
+  return handle(res);
+}
+
 export async function createRecordApi(data) {
   const res = await fetch("/api/records", {
     method: "POST",
