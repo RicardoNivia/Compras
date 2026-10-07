@@ -136,7 +136,7 @@ export default function ReportEditor({ report, modo = "bloques", onCancel, onSav
     }
   }
 
-  // Botón "Armar informe automáticamente con IA" — sin prompt: la IA analiza
+  // Botón "Armar informe automáticamente con Nova" — sin prompt: la IA analiza
   // los agregados reales y propone qué bloques armar (kpi/gráfico/tabla/texto)
   // y con qué métrica/agrupación. Los valores de esos bloques se siguen
   // calculando 100% determinísticos al generar el informe — la IA solo elige
@@ -307,7 +307,7 @@ export default function ReportEditor({ report, modo = "bloques", onCancel, onSav
             <div className="field full">
               <button type="button" className="btn btn-sync" onClick={handleSugerirInforme} disabled={sugiriendo || previewing}>
                 {sugiriendo ? <span className="spinner" /> : <IconSpark size={14} />}
-                {sugiriendo ? "Analizando tus datos…" : "Armar informe automáticamente con IA"}
+                {sugiriendo ? "Analizando tus datos…" : "Armar informe automáticamente con Nova"}
               </button>
               <p className="schedule-note" style={{ marginTop: 8 }}>
                 Analiza tus datos reales y propone qué bloques armar (KPI, Gráfico, Tabla) según lo que de verdad
@@ -334,14 +334,14 @@ export default function ReportEditor({ report, modo = "bloques", onCancel, onSav
             </div>
 
             <details className="ia-draft-details">
-              <summary><IconSpark size={12} /> Generar un borrador con IA a partir de un prompt (opcional)</summary>
+              <summary><IconSpark size={12} /> Generar un borrador con Nova a partir de un prompt (opcional)</summary>
               <textarea
                 rows={3} value={form.prompt} onChange={(e) => update("prompt", e.target.value)}
                 placeholder="Ej. Resume el total comprado por área, destaca las compras sin legalizar y muestra el cumplimiento de tiempos de entrega."
               />
               <button type="button" className="btn btn-sync small" onClick={handleGenerarBorrador} disabled={draftLoading || !form.prompt.trim() || sugiriendo || previewing}>
                 {draftLoading ? <span className="spinner" /> : <IconSpark size={12} />}
-                {draftLoading ? "Generando borrador…" : "Agregar bloques de texto con IA"}
+                {draftLoading ? "Generando borrador…" : "Agregar bloques de texto con Nova"}
               </button>
               <p className="schedule-note">
                 Agrega bloques de texto editables a partir del prompt — luego puedes editarlos, moverlos o borrarlos, y

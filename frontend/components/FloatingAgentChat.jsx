@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { sendAgentChatApi } from "@/lib/api";
 import { canViewAgenteIA } from "@/lib/roles";
 import { ALL_NAV_ITEMS } from "@/components/Sidebar";
-import AssistantContent from "@/components/AgentMessageContent";
+import AssistantContent, { ThinkingLabel } from "@/components/AgentMessageContent";
 import { IconSpark, IconSend, IconPlus } from "@/components/icons";
 
 // Duración de la animación de cierre (debe calzar con la transición de
@@ -136,7 +136,7 @@ export default function FloatingAgentChat({ user }) {
               <div className="floating-agent-brand">
                 <div className="floating-agent-mark"><IconSpark size={17} /></div>
                 <div>
-                  <div className="floating-agent-title">Agente IA</div>
+                  <div className="floating-agent-title">Nova</div>
                   <div className="floating-agent-status"><span className="floating-agent-status-dot" />En línea</div>
                 </div>
               </div>
@@ -206,7 +206,10 @@ export default function FloatingAgentChat({ user }) {
                   </div>
                   <div className="floating-agent-msg-bubble">
                     {m.role === "model" && m.text === "" && sending && i === messages.length - 1 ? (
-                      <span className="floating-agent-typing"><span /><span /><span /></span>
+                      <span className="floating-agent-thinking">
+                        <span className="floating-agent-typing"><span /><span /><span /></span>
+                        <ThinkingLabel intervalMs={1500} />
+                      </span>
                     ) : m.role === "model" ? (
                       <AssistantContent text={m.text} />
                     ) : (
@@ -238,17 +241,17 @@ export default function FloatingAgentChat({ user }) {
 
       <button
         type="button"
-        className={`floating-agent-fab${open ? " is-open" : ""}`}
+        className="floating-agent-fab"
         onClick={() => (open ? closePanel() : openPanel())}
-        title="Agente IA"
-        aria-label={open ? "Cerrar Agente IA" : "Abrir Agente IA"}
+        title="Nova"
+        aria-label={open ? "Cerrar Nova" : "Abrir Nova"}
       >
+        {/* Nova se queda igual (tamaño, posición, sin círculo) esté abierto o
+            cerrado el panel — a propósito no hay un ícono de "×" ni un
+            círculo de fondo que la reemplace al abrir. */}
         <span className="floating-agent-fab-icon">
-          {open ? (
-            <svg width="18" height="18" viewBox="0 0 17 17" fill="none"><path d="M8.5 1.5v15M1 9h15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
-          ) : (
-            <IconSpark size={20} />
-          )}
+          <img className="nova-frente" src="/nova/nova-frente.png" alt="" />
+          <img className="nova-saludo" src="/nova/nova-saludo.png" alt="" />
         </span>
       </button>
     </>

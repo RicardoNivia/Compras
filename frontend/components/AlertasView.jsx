@@ -1,9 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { reviewAlertasApi } from "@/lib/api";
 import { fmtCOP, fmtDateDisplay } from "@/lib/format";
-import { IconSpark, IconAlert, IconCheck, IconClock } from "@/components/icons";
+import { IconSpark, IconAlert, IconCheck, IconClock, IconArrowRight } from "@/components/icons";
+import { TimelineButton } from "@/components/RecordTimelineModal";
+
+// Botón "Ir" de cada fila: lleva a Registros con el buscador ya cargado con
+// el número de registro (#123, el mismo "search" de texto libre de
+// RegistrosView.jsx) para llegar directo a esa compra sin tener que
+// reescribirlo a mano.
+function IrARegistro({ localSeq }) {
+  const router = useRouter();
+  if (!localSeq) return null;
+  return (
+    <button
+      type="button" className="btn small ir-registro-btn"
+      onClick={() => router.push(`/registros?q=${encodeURIComponent(`#${localSeq}`)}`)}
+      title={`Ir al registro #${localSeq} en Registros`}
+    >
+      Ir <IconArrowRight size={11} />
+    </button>
+  );
+}
 
 const PAGE_SIZE = 10;
 
@@ -53,7 +73,7 @@ function TableFooter({ page, totalPages, onPageChange, total, label }) {
   );
 }
 
-// "Revisar con IA" de esta página — mismo patrón no streaming que
+// "Revisar con Nova" de esta página — mismo patrón no streaming que
 // "Explícame este número" (ver DashboardView.jsx#KpiExplain), pero el
 // análisis cubre las tres secciones a la vez (solicitudes pendientes,
 // presupuesto, tiempos de entrega) en vez de un solo KPI.
@@ -80,7 +100,7 @@ function RevisarConIA() {
   return (
     <div className="kpi-explain">
       <button type="button" className="btn btn-sync" onClick={handleClick} disabled={loading}>
-        {loading ? <span className="spinner" /> : <IconSpark size={14} />} {loading ? "Analizando…" : "Revisar con IA"}
+        {loading ? <span className="spinner" /> : <IconSpark size={14} />} {loading ? "Analizando…" : "Revisar con Nova"}
       </button>
       {open && (
         <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
@@ -146,6 +166,7 @@ function SolicitudesPendientes({ items }) {
           <table className="audit-log">
             <thead>
               <tr>
+                <th>#</th>
                 <th>Descripción</th>
                 <th>Área</th>
                 <th>Responsable</th>
@@ -153,11 +174,13 @@ function SolicitudesPendientes({ items }) {
                 <th>Días hábiles</th>
                 <th>Estado</th>
                 <th>Observaciones</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {pageItems.map((r) => (
                 <tr key={r.id}>
+                  <td className="mono">{r.localSeq ? `#${r.localSeq}` : "—"}</td>
                   <td className="truncate wide" title={r.descripcion || ""}>{r.descripcion || "—"}</td>
                   <td>{r.area || "—"}</td>
                   <td>{r.responsable || "—"}</td>
@@ -165,6 +188,7 @@ function SolicitudesPendientes({ items }) {
                   <td><span className={`pill ${diasPillClass(r.diasHabiles)}`}><IconClock size={11} /> {r.diasHabiles}</span></td>
                   <td>{r.estado || "—"}</td>
                   <td className="truncate wide" title={r.observaciones || ""}>{r.observaciones || "—"}</td>
+                  <td style={{ display: "flex", gap: 6 }}><TimelineButton recordId={r.id} localSeq={r.localSeq} /><IrARegistro localSeq={r.localSeq} /></td>
                 </tr>
               ))}
             </tbody>
@@ -195,23 +219,27 @@ function RiesgoTiempos({ items }) {
           <table className="audit-log">
             <thead>
               <tr>
+                <th>#</th>
                 <th>Descripción</th>
                 <th>Área</th>
                 <th>Proveedor</th>
                 <th>Días hábiles</th>
                 <th>Estado</th>
                 <th>Observaciones</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {pageItems.map((r) => (
                 <tr key={r.id}>
+                  <td className="mono">{r.localSeq ? `#${r.localSeq}` : "—"}</td>
                   <td className="truncate wide" title={r.descripcion || ""}>{r.descripcion || "—"}</td>
                   <td>{r.area || "—"}</td>
                   <td>{r.proveedor || "—"}</td>
                   <td><span className={`pill ${diasPillClass(r.diasHabiles)}`}><IconClock size={11} /> {r.diasHabiles}</span></td>
                   <td>{r.entregado ? "Entregada tarde" : "Aún pendiente"}</td>
                   <td className="truncate wide" title={r.observaciones || ""}>{r.observaciones || "—"}</td>
+                  <td style={{ display: "flex", gap: 6 }}><TimelineButton recordId={r.id} localSeq={r.localSeq} /><IrARegistro localSeq={r.localSeq} /></td>
                 </tr>
               ))}
             </tbody>
@@ -285,23 +313,27 @@ function NoRadicadas({ items }) {
           <table className="audit-log">
             <thead>
               <tr>
+                <th>#</th>
                 <th>Descripción</th>
                 <th>Área</th>
                 <th>Responsable</th>
                 <th>Proveedor</th>
                 <th>F. solicitud</th>
                 <th>Valor + IVA</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {pageItems.map((r) => (
                 <tr key={r.id}>
+                  <td className="mono">{r.localSeq ? `#${r.localSeq}` : "—"}</td>
                   <td className="truncate wide" title={r.descripcion || ""}>{r.descripcion || "—"}</td>
                   <td>{r.area || "—"}</td>
                   <td>{r.responsable || "—"}</td>
                   <td>{r.proveedor || "—"}</td>
                   <td style={{ whiteSpace: "nowrap" }}>{fmtDateDisplay(r.fechaSolicitud)}</td>
                   <td>{fmtCOP(r.valorConIva)}</td>
+                  <td style={{ display: "flex", gap: 6 }}><TimelineButton recordId={r.id} localSeq={r.localSeq} /><IrARegistro localSeq={r.localSeq} /></td>
                 </tr>
               ))}
             </tbody>

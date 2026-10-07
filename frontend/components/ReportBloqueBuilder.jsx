@@ -79,7 +79,7 @@ export function nuevoBloque(tipo) {
 // bloque nuevo. "Valor de compras por mes" sí está cubierto (agruparPor:
 // "mes"). El resto de secciones reales del Dashboard sí están cubiertas.
 export const DASHBOARD_SECCIONES = [
-  { key: "resumenEjecutivo", label: "Resumen ejecutivo (IA)", bloque: { tipo: "ia", pregunta: "Resume el panorama general de compras: total comprado, cumplimiento de tiempos de entrega, compras sin legalizar y cualquier otro dato relevante." } },
+  { key: "resumenEjecutivo", label: "Resumen ejecutivo (Nova)", bloque: { tipo: "ia", pregunta: "Resume el panorama general de compras: total comprado, cumplimiento de tiempos de entrega, compras sin legalizar y cualquier otro dato relevante." } },
   { key: "kpiValorComprado", label: "KPI — Valor total comprado", bloque: { tipo: "kpi", metrica: "totalValorConIva" } },
   { key: "kpiTotalCompras", label: "KPI — Total de compras", bloque: { tipo: "kpi", metrica: "totalRegistros" } },
   { key: "kpiCumplimiento", label: "KPI — Cumplimiento de tiempos de entrega", bloque: { tipo: "kpi", metrica: "cumplimientoPct" } },
@@ -196,7 +196,7 @@ export default function ReportBloqueBuilder({ bloques, onChange }) {
 
       {bloques.length === 0 ? (
         <p className="schedule-note" style={{ marginTop: 8 }}>
-          Aún no hay bloques. Agrega uno con los botones de arriba, o genera un borrador con IA más abajo.
+          Aún no hay bloques. Agrega uno con los botones de arriba, o genera un borrador con Nova más abajo.
         </p>
       ) : (
         <div className="bloques-list">

@@ -17,6 +17,7 @@ function isPendienteSinEntrega(r) {
 function miniFields(r, extra) {
   return {
     id: r.id,
+    localSeq: r.localSeq,
     informe: r.informe,
     descripcion: r.descripcion,
     area: r.area,

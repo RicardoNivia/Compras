@@ -111,12 +111,12 @@ export default function InvoiceScanner({ onExtract, disabled }) {
         className="invoice-scanner-input"
       />
       <label htmlFor="invoice-scanner-input" className={`invoice-scanner-box${busy ? " busy" : ""}`}>
-        <IconFile size={18} />
+        <span className="invoice-scanner-ic"><IconFile size={17} /></span>
         <div>
           <p className="invoice-scanner-title">
             {busy
               ? status === "reading" ? "Leyendo archivo…" : `Analizando factura… ${progress}%`
-              : "Llenar con una factura (IA)"}
+              : <>Llenar con factura con <span className="invoice-scanner-nova">Nova</span></>}
           </p>
           <p className="invoice-scanner-sub">Sube una imagen o PDF de la factura — se valida y se proponen los datos, tú revisas y guardas.</p>
         </div>
