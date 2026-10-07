@@ -553,9 +553,9 @@ rect.mark:hover{ opacity:0.82; cursor:pointer; }
   box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 .invoice-scanner-title{ font-weight:700; font-size:13.5px; margin:0; display:flex; align-items:center; gap:7px; }
-.invoice-scanner-badge{
-  font-size:9.5px; font-weight:800; letter-spacing:.05em; padding:2px 7px; border-radius:999px;
-  background: var(--accent-wash); color: var(--accent); text-transform:uppercase;
+.invoice-scanner-nova{
+  font-weight:800; background: linear-gradient(135deg, var(--accent), var(--secondary));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
 }
 .invoice-scanner-sub{ font-size:11.5px; color:var(--muted); margin:3px 0 0; line-height:1.4; }
 .invoice-scanner-msg{ display:flex; align-items:flex-start; gap:8px; padding:9px 12px; border-radius:10px; font-size:12.5px; }
