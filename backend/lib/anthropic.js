@@ -1,3 +1,12 @@
+// El grupo de variables de producción en Azure DevOps ("compras-prod") tiene
+// la variable mal escrita como ANTROPIC_API_KEY (sin "H") y no se puede
+// corregir ahí — se acepta también ese nombre para no depender de que se
+// arregle en Azure. ANTHROPIC_API_KEY (el nombre correcto) sigue teniendo
+// prioridad si ambas estuvieran definidas.
+function getAnthropicApiKey() {
+  return process.env.ANTHROPIC_API_KEY || process.env.ANTROPIC_API_KEY;
+}
+
 const ANTHROPIC_API_BASE = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
 // 4096 (y luego 8192) se quedaban cortos para informes con muchas secciones +
@@ -65,7 +74,7 @@ function toAnthropicMessages(contents) {
 // reprocesarla en cada mensaje (ahorra tiempo y costo en prompts grandes con
 // mucho texto fijo, como el dataset+procedimiento+guía del Agente IA).
 export async function* streamAnthropicChat({ model, systemInstruction, contents, cacheableSystemPrefix }) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = getAnthropicApiKey();
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY no está configurada en el servidor.");
   }
@@ -100,7 +109,11 @@ export async function* streamAnthropicChat({ model, systemInstruction, contents,
     } catch {
       // ignore
     }
-    throw new Error(`Anthropic API respondió ${res.status}. ${detail}`);
+    // El detalle crudo de la respuesta de Anthropic solo se loguea server-side
+    // (puede incluir parámetros de la petición saliente) — al cliente final
+    // solo le llega el status.
+    console.error(`Anthropic API respondió ${res.status}.`, detail);
+    throw new Error(`Error al conectar con el servicio de IA (${res.status}).`);
   }
 
   const reader = res.body.getReader();
@@ -147,7 +160,7 @@ export async function* streamAnthropicChat({ model, systemInstruction, contents,
 // termina de decidir qué herramientas necesita, igual que ya pasaba antes con
 // la moderación posterior — ver el comentario en app/api/agent/chat/route.js).
 export async function runAnthropicAgentChat({ model, systemInstruction, contents, cacheableSystemPrefix, tools, executeTool, maxRounds = 8 }) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = getAnthropicApiKey();
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY no está configurada en el servidor.");
   }
@@ -186,7 +199,8 @@ export async function runAnthropicAgentChat({ model, systemInstruction, contents
       } catch {
         // ignore
       }
-      throw new Error(`Anthropic API respondió ${res.status}. ${detail}`);
+      console.error(`Anthropic API respondió ${res.status}.`, detail);
+      throw new Error(`Error al conectar con el servicio de IA (${res.status}).`);
     }
 
     const data = await res.json();
@@ -234,7 +248,7 @@ function stripCodeFence(text) {
 // (lectura de facturas con visión, ver app/api/agent/invoice-extract/route.js)
 // antes del texto del prompt, en vez de solo texto.
 export async function generateAnthropicJson({ model, systemInstruction, prompt, schema, image, timeoutMs }) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = getAnthropicApiKey();
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY no está configurada en el servidor.");
   }
@@ -277,7 +291,8 @@ export async function generateAnthropicJson({ model, systemInstruction, prompt, 
     } catch {
       // ignore
     }
-    throw new Error(`Anthropic API respondió ${res.status}. ${detail}`);
+    console.error(`Anthropic API respondió ${res.status}.`, detail);
+    throw new Error(`Error al conectar con el servicio de IA (${res.status}).`);
   }
 
   const data = await res.json();

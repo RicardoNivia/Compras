@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth-server";
-import { isRoleAllowed } from "@/lib/permissions";
+import { requirePermission } from "@/lib/apiGuard";
 import { generateCuerpoCorreoSugerido } from "@/lib/reportEmailBody";
 import { createJob } from "@/lib/reportJobs";
 
@@ -43,10 +42,8 @@ import { createJob } from "@/lib/reportJobs";
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function POST(request) {
-  const user = await getSessionUser();
-  if (!user || !(await isRoleAllowed(user.role, "viewReportes"))) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
+  const { denied } = await requirePermission("viewReportes");
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   if (!body.texto || !String(body.texto).trim()) {
     return NextResponse.json({ error: "Escribe algo en el cuerpo del correo antes de pedirle a la IA que lo mejore." }, { status: 400 });

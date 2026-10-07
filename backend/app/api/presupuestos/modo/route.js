@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { setModoAnio } from "@/lib/presupuestos";
-import { getSessionUser } from "@/lib/auth-server";
-import { isRoleAllowed } from "@/lib/permissions";
+import { requirePermission } from "@/lib/apiGuard";
 
 // Define o cambia el modo (por área / por categoría) general de un año.
 // Si ya hay presupuestos configurados en otro modo, requiere body.confirm=true
@@ -57,10 +56,8 @@ import { isRoleAllowed } from "@/lib/permissions";
  *                   properties: { requiresConfirm: { type: boolean }, afectados: { type: integer } }
  */
 export async function POST(request) {
-  const user = await getSessionUser();
-  if (!user || !(await isRoleAllowed(user.role, "viewPresupuesto"))) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
+  const { user, denied } = await requirePermission("viewPresupuesto");
+  if (denied) return denied;
   try {
     const body = await request.json();
     const result = await setModoAnio(body, user);

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth-server";
-import { isRoleAllowed } from "@/lib/permissions";
+import { requirePermission, apiError } from "@/lib/apiGuard";
 import { getConversation, deleteConversation } from "@/lib/conversations";
 
 /**
@@ -40,10 +39,8 @@ import { getConversation, deleteConversation } from "@/lib/conversations";
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function GET(_request, { params }) {
-  const user = await getSessionUser();
-  if (!user || !(await isRoleAllowed(user.role, "viewAgenteIA"))) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
+  const { user, denied } = await requirePermission("viewAgenteIA");
+  if (denied) return denied;
   const conversation = await getConversation(user.id, params.id);
   if (!conversation) {
     return NextResponse.json({ error: "Conversación no encontrada." }, { status: 404 });
@@ -72,14 +69,12 @@ export async function GET(_request, { params }) {
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function DELETE(_request, { params }) {
-  const user = await getSessionUser();
-  if (!user || !(await isRoleAllowed(user.role, "viewAgenteIA"))) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
+  const { user, denied } = await requirePermission("viewAgenteIA");
+  if (denied) return denied;
   try {
     await deleteConversation(user.id, params.id);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 500 });
+    return apiError(err);
   }
 }

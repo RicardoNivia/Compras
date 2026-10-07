@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth-server";
-import { isRoleAllowed } from "@/lib/permissions";
+import { requirePermission } from "@/lib/apiGuard";
 import { getJob } from "@/lib/reportJobs";
 
 // Consulta genérica de estado para trabajos en segundo plano de Informes
@@ -38,10 +37,8 @@ import { getJob } from "@/lib/reportJobs";
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function GET(request, { params }) {
-  const user = await getSessionUser();
-  if (!user || !(await isRoleAllowed(user.role, "viewReportes"))) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
+  const { denied } = await requirePermission("viewReportes");
+  if (denied) return denied;
   const job = getJob(params.jobId);
   if (!job) return NextResponse.json({ error: "Trabajo no encontrado o expirado." }, { status: 404 });
 

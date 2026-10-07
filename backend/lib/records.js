@@ -56,27 +56,38 @@ function numOrNull(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Tope de tamaño para campos de texto libre — evita que un payload gigante
+// (abuso de almacenamiento, por error o intencional) se guarde tal cual; no
+// es una medida contra inyección (Prisma ya parametriza las queries).
+function textOrNull(maxLength) {
+  return (v) => {
+    if (!v) return null;
+    const s = String(v);
+    return s.length > maxLength ? s.slice(0, maxLength) : s;
+  };
+}
+
 const FIELD_SANITIZERS = {
-  informe: (v) => v || null,
+  informe: textOrNull(100),
   fechaSolicitud: (v) => v || null,
   fechaEntrega: (v) => v || null,
-  area: (v) => v || null,
-  responsable: (v) => v || null,
-  estado: (v) => v || null,
-  categoria: (v) => v || null,
-  descripcion: (v) => v || null,
-  medioPago: (v) => v || null,
-  licitacion: (v) => (v != null && v !== "" ? String(v) : null),
-  estadoLegalizacion: (v) => v || null,
-  proveedor: (v) => v || null,
-  fe: (v) => (v != null && v !== "" ? String(v) : null),
+  area: textOrNull(100),
+  responsable: textOrNull(150),
+  estado: textOrNull(100),
+  categoria: textOrNull(100),
+  descripcion: textOrNull(2000),
+  medioPago: textOrNull(100),
+  licitacion: textOrNull(100),
+  estadoLegalizacion: textOrNull(100),
+  proveedor: textOrNull(200),
+  fe: textOrNull(100),
   valorConIva: numOrNull,
   valorSinIva: numOrNull,
   valorCot: numOrNull,
   moneda: (v) => (v === "USD" ? "USD" : "COP"),
   valorUsd: numOrNull,
   trm: numOrNull,
-  observaciones: (v) => v || null,
+  observaciones: textOrNull(4000),
   radicado: (v) => !!v,
 };
 

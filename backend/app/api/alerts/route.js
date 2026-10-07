@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth-server";
-import { isRoleAllowed } from "@/lib/permissions";
+import { requirePermission } from "@/lib/apiGuard";
 import { getAlertsData } from "@/lib/alerts";
 
 /**
@@ -44,10 +43,8 @@ import { getAlertsData } from "@/lib/alerts";
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function GET() {
-  const user = await getSessionUser();
-  if (!user || !(await isRoleAllowed(user.role, "viewAlertas"))) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
+  const { denied } = await requirePermission("viewAlertas");
+  if (denied) return denied;
   const data = await getAlertsData();
   return NextResponse.json(data);
 }

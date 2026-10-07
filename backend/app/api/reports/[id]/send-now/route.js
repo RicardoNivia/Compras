@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth-server";
-import { isRoleAllowed } from "@/lib/permissions";
+import { requirePermission } from "@/lib/apiGuard";
 import { getReport, markSent } from "@/lib/reports";
 import { generateReportContent } from "@/lib/reportContent";
 import { generateReportPdfBuffer } from "@/lib/reportPdf";
@@ -47,10 +46,8 @@ import { createJob } from "@/lib/reportJobs";
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function POST(request, { params }) {
-  const user = await getSessionUser();
-  if (!user || !(await isRoleAllowed(user.role, "viewReportes"))) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-  }
+  const { user, denied } = await requirePermission("viewReportes");
+  if (denied) return denied;
   if (MAIL_MAINTENANCE) {
     return NextResponse.json({ error: MAIL_MAINTENANCE_MESSAGE }, { status: 503 });
   }
