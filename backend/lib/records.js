@@ -17,6 +17,7 @@ export function toClientRecord(r) {
     medioPago: r.medioPago,
     licitacion: r.licitacion,
     estadoLegalizacion: r.estadoLegalizacion,
+    nit: r.nit,
     proveedor: r.proveedor,
     fe: r.fe,
     valorConIva: r.valorConIva,
@@ -79,6 +80,8 @@ const FIELD_SANITIZERS = {
   medioPago: textOrNull(100),
   licitacion: textOrNull(100),
   estadoLegalizacion: textOrNull(100),
+  // Sin dígito de verificación (se valida/normaliza en el formulario, no aquí).
+  nit: textOrNull(20),
   proveedor: textOrNull(200),
   fe: textOrNull(100),
   valorConIva: numOrNull,

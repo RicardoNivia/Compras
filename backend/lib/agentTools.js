@@ -119,12 +119,14 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria }) {
   const tools = [
     {
       name: "resumen_compras",
-      description: "Cifras EXACTAS (sumas, conteos, promedios, porcentajes) calculadas sobre el 100% de los registros de compra que cumplan los filtros dados — totales por área/categoría/estado/proveedor, cumplimiento de tiempos de entrega, % de legalización, etc. Úsala SIEMPRE para cualquier pregunta de totales, promedios, distribución o \"análisis general\" — nunca sumes o calcules estos números tú mismo a partir de buscar_registros (esa es solo para citar ejemplos puntuales, no para agregados).",
+      description: "Cifras EXACTAS (sumas, conteos, promedios, porcentajes) calculadas sobre el 100% de los registros de compra que cumplan los filtros dados — totales por área/categoría/estado/proveedor, cumplimiento de tiempos de entrega, % de legalización, etc. Úsala SIEMPRE para cualquier pregunta de totales, promedios, distribución o \"análisis general\" — nunca sumes o calcules estos números tú mismo a partir de buscar_registros (esa es solo para citar ejemplos puntuales, no para agregados). Para comparar dos periodos (ej. \"2025 vs 2026\", \"este trimestre vs el anterior\"), llama esta misma herramienta UNA VEZ POR CADA periodo (con 'anio', o con 'fechaDesde'/'fechaHasta' si el periodo no es un año calendario completo) y compara tú los totales ya exactos que te devuelva cada llamada — no hace falta (ni debes) sumar registros individuales para esto.",
       input_schema: {
         type: "object",
         properties: {
           area: { type: "string", description: "Filtra solo por esta área (opcional, nombre exacto tal como aparece en los datos)." },
-          anio: { type: "integer", description: "Filtra solo por año de la fecha de solicitud (opcional, ej. 2026)." },
+          anio: { type: "integer", description: "Filtra solo por año de la fecha de solicitud (opcional, ej. 2026). Se ignora si se envían fechaDesde/fechaHasta." },
+          fechaDesde: { type: "string", description: "Fecha mínima de solicitud, formato YYYY-MM-DD (opcional) — úsala en vez de 'anio' para periodos que no son un año completo (trimestres, meses, rangos arbitrarios)." },
+          fechaHasta: { type: "string", description: "Fecha máxima de solicitud, formato YYYY-MM-DD (opcional)." },
           categoria: { type: "string", description: "Filtra solo por esta categoría (opcional, nombre exacto)." },
           proveedor: { type: "string", description: "Filtra solo por este proveedor (opcional, coincidencia parcial, sin distinguir mayúsculas/minúsculas)." },
         },
@@ -201,10 +203,13 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria }) {
     switch (name) {
       case "resumen_compras": {
         const records = await getRecords();
+        // fechaDesde/fechaHasta explícitos tienen prioridad sobre "anio" —
+        // permite comparar periodos que no son un año calendario completo
+        // (trimestres, meses, rangos arbitrarios), no solo año contra año.
         const filtered = records.filter((r) => matchesFilters(r, {
           area: args.area, categoria: args.categoria, proveedor: args.proveedor,
-          fechaDesde: args.anio ? `${args.anio}-01-01` : undefined,
-          fechaHasta: args.anio ? `${args.anio}-12-31` : undefined,
+          fechaDesde: args.fechaDesde || (args.anio ? `${args.anio}-01-01` : undefined),
+          fechaHasta: args.fechaHasta || (args.anio ? `${args.anio}-12-31` : undefined),
         }));
         const presupuestos = canSeePresupuesto ? await getPresupuestos() : [];
         const aggregates = buildAggregates(filtered, presupuestos);

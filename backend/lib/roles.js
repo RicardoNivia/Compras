@@ -116,6 +116,7 @@ export const NON_ADMIN_EDITABLE_FIELDS = [
   "medioPago",
   "licitacion",
   "estadoLegalizacion",
+  "nit",
   "proveedor",
   "fe",
   "valorConIva",

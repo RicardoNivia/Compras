@@ -22,6 +22,7 @@ model Record {
   medioPago           String?
   licitacion          String?
   estadoLegalizacion  String?
+  nit                 String?  // NIT del proveedor, sin dígito de verificación
   proveedor           String?
   fe                  String?  // número de factura/referencia — puede repetirse (p.ej. una misma factura cubre varias compras); la duplicidad solo se advierte a nivel de aplicación, no se bloquea en la BD
   valorConIva         Float?

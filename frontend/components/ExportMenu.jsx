@@ -8,7 +8,7 @@ import { IconDownload, IconFile } from "@/components/icons";
 const CSV_HEADERS = [
   "Fecha solicitud", "Fecha entrega", "Área", "Responsable", "Estado de compra",
   "Categoría", "Descripción", "Medio de pago", "Licitación", "Estado legalización",
-  "Radicado", "Proveedor", "FE", "Valor + IVA", "Valor sin IVA", "Valor cotizado", "Observaciones",
+  "Radicado", "Nit", "Proveedor", "FE", "Valor + IVA", "Valor sin IVA", "Valor cotizado", "Observaciones",
 ];
 
 function csvField(v) {
@@ -22,7 +22,7 @@ function recordToCsvRow(r) {
     r.fechaSolicitud || "", r.fechaEntrega || "", r.area || "", r.responsable || "",
     r.estado || "", r.categoria || "", r.descripcion || "", r.medioPago || "",
     r.licitacion || "", r.estadoLegalizacion || "", r.radicado ? "Sí" : "No",
-    r.proveedor || "", r.fe || "",
+    r.nit || "", r.proveedor || "", r.fe || "",
     r.valorConIva ?? "", r.valorSinIva ?? "", r.valorCot ?? "", r.observaciones || "",
   ].map(csvField).join(";");
 }
@@ -118,6 +118,7 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
         "Licitación": r.licitacion || "",
         "Estado legalización": r.estadoLegalizacion || "",
         "Radicado": r.radicado ? "Sí" : "No",
+        "Nit": r.nit || "",
         "Proveedor": r.proveedor || "",
         "FE": r.fe || "",
         "Valor + IVA": r.valorConIva ?? "",
@@ -128,7 +129,7 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
       const ws = XLSX.utils.json_to_sheet(data);
       ws["!cols"] = [
         { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 16 }, { wch: 16 },
-        { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 9 }, { wch: 20 },
+        { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 9 }, { wch: 14 }, { wch: 20 },
         { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 32 },
       ];
       const wb = XLSX.utils.book_new();
@@ -165,13 +166,13 @@ export default function ExportMenu({ allRecords, filteredRecords }) {
         startY: 58,
         head: [[
           "F. solicitud", "F. entrega", "Área", "Responsable", "Estado", "Categoría",
-          "Descripción", "Medio de pago", "Estado legaliz.", "Radicado", "Proveedor",
+          "Descripción", "Medio de pago", "Estado legaliz.", "Radicado", "Nit", "Proveedor",
           "Valor + IVA", "Observaciones",
         ]],
         body: rows.map((r) => [
           r.fechaSolicitud || "", r.fechaEntrega || "", r.area || "", r.responsable || "",
           r.estado || "", r.categoria || "", r.descripcion || "", r.medioPago || "",
-          r.estadoLegalizacion || "", r.radicado ? "Sí" : "No", r.proveedor || "",
+          r.estadoLegalizacion || "", r.radicado ? "Sí" : "No", r.nit || "", r.proveedor || "",
           r.valorConIva != null ? new Intl.NumberFormat("es-CO").format(r.valorConIva) : "",
           r.observaciones || "",
         ]),

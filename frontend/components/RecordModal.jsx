@@ -39,6 +39,7 @@ const emptyForm = {
   categoria: "",
   descripcion: "",
   medioPago: "",
+  nit: "",
   proveedor: "",
   licitacion: "",
   estadoLegalizacion: "",
@@ -393,6 +394,17 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
               <datalist id="categorias-list">
                 {optionsFor("categoria").map((o) => <option key={o.value} value={o.value} />)}
               </datalist>
+            </div>
+            <div className="field">
+              <label htmlFor="f-nit">Nit</label>
+              <input
+                id="f-nit"
+                value={form.nit || ""}
+                onChange={(e) => update("nit", e.target.value)}
+                disabled={!isEditable("nit")}
+                placeholder="Sin dígito de verificación"
+                spellCheck={false}
+              />
             </div>
             <div className="field">
               <label htmlFor="f-proveedor">Proveedor</label>
