@@ -674,6 +674,29 @@ textarea{ resize:vertical; }
 input:focus, select:focus, textarea:focus{ border-color:var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
 .search-field{ flex:1; min-width:180px; }
 .search-field input{ width:100%; }
+
+/* ---------- Autocompletar de proveedor (RecordModal) ---------- */
+.autocomplete-wrap{ position:relative; }
+.autocomplete-nit-tag{
+  position:absolute; right:10px; top:50%; transform:translateY(-50%);
+  font-size:11px; font-weight:700; color:var(--accent); background:var(--accent-wash);
+  padding:3px 8px; border-radius:999px; pointer-events:none;
+}
+.autocomplete-menu{
+  position:absolute; z-index:20; top:calc(100% + 4px); left:0; right:0;
+  max-height:260px; overflow-y:auto; background:var(--surface-2); border:1px solid var(--border);
+  border-radius:10px; box-shadow:0 12px 24px -12px rgba(0,0,0,.25); padding:4px;
+}
+.autocomplete-empty{ padding:10px 12px; font-size:12.5px; color:var(--muted); }
+.autocomplete-item{
+  display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;
+  padding:8px 10px; border:none; background:transparent; border-radius:8px; cursor:pointer;
+  font-family:inherit; text-align:left;
+}
+.autocomplete-item-nombre{ font-size:13px; color:var(--ink); }
+.autocomplete-item-nit{ font-size:11.5px; color:var(--muted); white-space:nowrap; }
+.autocomplete-item.active, .autocomplete-item:hover{ background:var(--accent-wash); }
+.autocomplete-item.active .autocomplete-item-nombre, .autocomplete-item:hover .autocomplete-item-nombre{ color:var(--accent); }
 .btn{
   appearance:none; border:1px solid var(--border); background: var(--surface-2); color:var(--ink);
   font-size:13px; font-weight:600; padding:8px 14px; border-radius:10px; cursor:pointer;

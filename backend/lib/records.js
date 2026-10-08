@@ -11,6 +11,7 @@ export function toClientRecord(r) {
     fechaEntrega: r.fechaEntrega,
     area: r.area,
     responsable: r.responsable,
+    responsableUserId: r.responsableUserId,
     estado: r.estado,
     categoria: r.categoria,
     descripcion: r.descripcion,
@@ -74,6 +75,7 @@ const FIELD_SANITIZERS = {
   fechaEntrega: (v) => v || null,
   area: textOrNull(100),
   responsable: textOrNull(150),
+  responsableUserId: textOrNull(40),
   estado: textOrNull(100),
   categoria: textOrNull(100),
   descripcion: textOrNull(2000),
@@ -120,13 +122,58 @@ async function countOtrosConFe(fe, excludeId) {
   return prisma.record.count({ where: { fe, id: excludeId ? { not: excludeId } : undefined } });
 }
 
+// Un registro NUEVO siempre debe apuntar a un proveedor del catálogo (nit +
+// nombre) — no se permite texto libre al crear. Esto NO aplica a editar un
+// registro ya existente (ver updateRecord/patchRecord): los ~800 registros
+// históricos sin nit siguen siendo editables sin forzar una migración masiva.
+// Devuelve el nombre canónico del catálogo (nunca el que mandó el cliente),
+// así un desfase de mayúsculas/espacios no genera un proveedor "distinto".
+async function requireProveedorDelCatalogo(data) {
+  if (!data.nit || !data.proveedor) {
+    const err = new Error("Selecciona un proveedor del catálogo. Si no existe, pide a un administrador que lo agregue en Maestros → Proveedores.");
+    err.status = 400;
+    throw err;
+  }
+  const proveedor = await prisma.proveedor.findUnique({ where: { nit: data.nit } });
+  if (!proveedor || !proveedor.activo) {
+    const err = new Error("El proveedor seleccionado no existe o está inactivo en el catálogo. Pide a un administrador que lo agregue o reactive en Maestros → Proveedores.");
+    err.status = 400;
+    throw err;
+  }
+  return proveedor.nombre;
+}
+
+// El responsable debe ser siempre un usuario real de la app, nunca texto
+// libre (ver lib/maestros.js#resolveResponsableUser) — a diferencia de
+// proveedor, esto se exige tanto al crear COMO al editar, porque los ~800
+// registros históricos ya quedaron migrados a un responsableUserId válido
+// (ver prisma/scripts de migración), así que no hay vacío que proteger.
+// Devuelve el nombre canónico (el nombre actual del usuario), nunca el que
+// mande el cliente.
+async function requireResponsableDelCatalogo(data) {
+  if (!data.responsableUserId) {
+    const err = new Error("Selecciona un responsable de la lista (debe ser un usuario de la aplicación). Si no aparece, pide a un administrador que lo agregue en Maestros → Responsable.");
+    err.status = 400;
+    throw err;
+  }
+  const maestro = await prisma.maestro.findFirst({ where: { tipo: "responsable", userId: data.responsableUserId, activo: true } });
+  if (!maestro) {
+    const err = new Error("El responsable seleccionado no existe o está inactivo en Maestros → Responsable.");
+    err.status = 400;
+    throw err;
+  }
+  return maestro.valor;
+}
+
 export async function createRecord(body, actor) {
   const data = sanitizeInput(body);
-  if (!data.fechaSolicitud || !data.area || !data.responsable || !data.descripcion) {
+  if (!data.fechaSolicitud || !data.area || !data.responsableUserId || !data.descripcion) {
     const err = new Error("Completa fecha de solicitud, área, responsable y descripción.");
     err.status = 400;
     throw err;
   }
+  data.proveedor = await requireProveedorDelCatalogo(data);
+  data.responsable = await requireResponsableDelCatalogo(data);
   const feDuplicados = await countOtrosConFe(data.fe, null);
   // Asigna el siguiente número autoincremental visible (localSeq) desde Meta,
   // en la misma transacción para evitar que dos creaciones simultáneas choquen.
@@ -153,6 +200,9 @@ export async function createRecord(body, actor) {
 export async function updateRecord(id, body, actor, options = {}) {
   const before = await prisma.record.findUnique({ where: { id } });
   const data = options.fields ? sanitizeFields(body, options.fields) : sanitizeInput(body);
+  if ("responsableUserId" in data) {
+    data.responsable = await requireResponsableDelCatalogo(data);
+  }
   const feDuplicados = "fe" in data ? await countOtrosConFe(data.fe, id) : 0;
   const row = await prisma.record.update({ where: { id }, data });
   const after = toClientRecord(row);

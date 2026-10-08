@@ -15,7 +15,8 @@ model Record {
   fechaSolicitud      String?
   fechaEntrega        String?
   area                String?
-  responsable         String?
+  responsable         String?  // nombre del usuario responsable, copiado desde User.nombre (ver responsableUserId)
+  responsableUserId   String?  // id del User atado como responsable — sin FK (igual que nit/proveedor): se valida al guardar, pero no se borra en cascada si el usuario se elimina
   estado              String?
   categoria           String?
   descripcion         String?
@@ -45,7 +46,7 @@ model Record {
 model AuditLog {
   id         String   @id @default(cuid())
   action     String   // "crear" | "editar" | "eliminar" | "radicar"
-  entityType String   @default("record") // "record" | "maestro" | "user" | "presupuesto" | "permiso" | "informe"
+  entityType String   @default("record") // "record" | "maestro" | "proveedor" | "user" | "presupuesto" | "permiso" | "informe"
   recordId   String   // id de la entidad afectada (registro, maestro o usuario)
   recordInfo String?
   userId     String?
@@ -118,12 +119,32 @@ model Maestro {
   id        String   @id @default(cuid())
   tipo      String
   valor     String
+  userId    String?  // solo para tipo="responsable": id del User al que está atado este valor (sin FK, igual que el resto de este modelo — ver lib/maestros.js). null para los demás tipos.
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([tipo, valor])
   @@map("maestros")
+}
+
+// Catálogo de proveedores para el autocompletar del formulario de registros.
+// Los registros guardan una copia de nit y nombre (texto, sin FK) — igual que
+// el resto de maestros — así un cambio en el catálogo se propaga a los
+// registros con cascada explícita (ver lib/proveedores.js), no por join.
+model Proveedor {
+  id                 String   @id @default(cuid())
+  nit                String   @unique // sin dígito de verificación
+  nombre             String
+  descripcion        String   // obligatoria — qué vende/para qué sirve este proveedor (Nova la usa para sugerirlo)
+  telefono           String?  // opcional — solo para que Nova (Agente IA) pueda citarlo, no se usa en validaciones
+  correo             String?  // opcional — ídem
+  documentacionAlDia Boolean  @default(false) // ej. RUT/cámara de comercio vigentes — informativo, no bloquea nada
+  activo             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("proveedores")
 }
 
 // El modo (por área o por categoría) es una configuración GENERAL por año,

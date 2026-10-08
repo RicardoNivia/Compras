@@ -8,6 +8,7 @@ import { IconTrash, IconClock, IconFile, IconLayers, IconMoney, IconEdit } from 
 import ObservacionesReview from "@/components/ObservacionesReview";
 import MoneyInput from "@/components/MoneyInput";
 import InvoiceScanner from "@/components/InvoiceScanner";
+import ProveedorAutocomplete from "@/components/ProveedorAutocomplete";
 import { FIELD_LABELS } from "@/lib/auditLabels";
 
 const PRESUPUESTO_ALERTA_PCT = 80;
@@ -22,19 +23,12 @@ function formatInvoiceFieldValue(field, value) {
   return String(value);
 }
 
-function uniqueSorted(records, field) {
-  const set = new Set();
-  for (const r of records) {
-    if (r[field]) set.add(r[field]);
-  }
-  return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
-}
-
 const emptyForm = {
   fechaSolicitud: "",
   fechaEntrega: "",
   area: "",
   responsable: "",
+  responsableUserId: "",
   estado: "Pendiente",
   categoria: "",
   descripcion: "",
@@ -53,7 +47,7 @@ const emptyForm = {
   observaciones: "",
 };
 
-export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true, editableFields = null, maestros = [], presupuestos = [] }) {
+export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true, editableFields = null, maestros = [], proveedores = [], presupuestos = [] }) {
   const isEdit = !!record;
   // editableFields null = todos los campos editables (admin, registro).
   // Con lista (p.ej. legalizar), los demás campos quedan solo-lectura.
@@ -74,6 +68,24 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
     const current = form[tipo];
     if (current && !activeValues.has(current)) {
       opts.push({ value: current, label: `${current} (inactivo)` });
+    }
+    return opts.sort((a, b) => a.label.localeCompare(b.label, "es"));
+  }
+
+  // El responsable ya no es texto libre: el valor del <select> es el userId
+  // (ver backendlib/maestros.js), así que necesita su propia función en vez
+  // de reusar optionsFor (que trabaja sobre el texto "valor").
+  function responsableOptions() {
+    const activeIds = new Set();
+    const opts = [];
+    for (const m of maestros) {
+      if (m.tipo !== "responsable" || !m.userId) continue;
+      activeIds.add(m.userId);
+      opts.push({ value: m.userId, label: m.valor });
+    }
+    const current = form.responsableUserId;
+    if (current && !activeIds.has(current)) {
+      opts.push({ value: current, label: `${form.responsable || "(usuario)"} (inactivo)` });
     }
     return opts.sort((a, b) => a.label.localeCompare(b.label, "es"));
   }
@@ -122,8 +134,6 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
-
-  const proveedorOptions = useMemo(() => uniqueSorted(records, "proveedor"), [records]);
 
   // Aviso informativo (nunca bloquea guardar): cuántas otras compras ya tienen
   // el mismo FE — un mismo número de factura puede cubrir varias compras.
@@ -203,8 +213,12 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
     e.preventDefault();
     setError("");
 
-    if (!form.fechaSolicitud || !form.area || !form.responsable || !form.descripcion) {
+    if (!form.fechaSolicitud || !form.area || !form.responsableUserId || !form.descripcion) {
       setError("Completa fecha de solicitud, área, responsable y descripción.");
+      return;
+    }
+    if (!isEdit && (!form.nit || !form.proveedor)) {
+      setError("Selecciona un proveedor del catálogo. Si no existe, pide a un administrador que lo agregue en Maestros → Proveedores.");
       return;
     }
     setSaving(true);
@@ -372,12 +386,16 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
               <label htmlFor="f-responsable">Responsable *</label>
               <select
                 id="f-responsable" required
-                value={form.responsable || ""}
-                onChange={(e) => update("responsable", e.target.value)}
+                value={form.responsableUserId || ""}
+                onChange={(e) => {
+                  const userId = e.target.value;
+                  const match = maestros.find((m) => m.tipo === "responsable" && m.userId === userId);
+                  setForm((f) => ({ ...f, responsableUserId: userId, responsable: match ? match.valor : "" }));
+                }}
                 disabled={!isEditable("responsable")}
               >
                 <option value="">Selecciona un responsable…</option>
-                {optionsFor("responsable").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {responsableOptions().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
 
@@ -395,30 +413,17 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 {optionsFor("categoria").map((o) => <option key={o.value} value={o.value} />)}
               </datalist>
             </div>
-            <div className="field">
-              <label htmlFor="f-nit">Nit</label>
-              <input
-                id="f-nit"
-                value={form.nit || ""}
-                onChange={(e) => update("nit", e.target.value)}
-                disabled={!isEditable("nit")}
-                placeholder="Sin dígito de verificación"
-                spellCheck={false}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="f-proveedor">Proveedor</label>
-              <input
-                id="f-proveedor" list="proveedores-list"
-                value={form.proveedor || ""}
-                onChange={(e) => update("proveedor", e.target.value)}
+            <div className="field full">
+              <label htmlFor="f-proveedor">Proveedor{!isEdit && " *"}</label>
+              <ProveedorAutocomplete
+                id="f-proveedor"
+                nombre={form.proveedor || ""}
+                nit={form.nit || ""}
+                proveedores={proveedores}
                 disabled={!isEditable("proveedor")}
-                placeholder="Escribe para buscar…"
-                spellCheck lang="es"
+                required={!isEdit}
+                onChange={({ nombre, nit }) => setForm((f) => ({ ...f, proveedor: nombre, nit }))}
               />
-              <datalist id="proveedores-list">
-                {proveedorOptions.map((v) => <option key={v} value={v} />)}
-              </datalist>
             </div>
 
             {presupuestoInfo && (

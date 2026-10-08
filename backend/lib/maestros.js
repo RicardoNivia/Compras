@@ -25,10 +25,22 @@ export function toClientMaestro(m, enUso = false) {
     id: m.id,
     tipo: m.tipo,
     valor: m.valor,
+    userId: m.userId,
     activo: m.activo,
     enUso,
     createdAt: m.createdAt,
   };
+}
+
+// El maestro "responsable" no acepta texto libre: cada valor debe venir de un
+// usuario real de la aplicación (ver lib/records.js#requireResponsableDelCatalogo,
+// que exige que el registro quede atado al mismo userId). El "valor" se toma
+// siempre del nombre ACTUAL del usuario — nunca el que mande el cliente.
+async function resolveResponsableUser(userId) {
+  if (!userId) throw badRequest("Selecciona un usuario de la aplicación.");
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw badRequest("Usuario no encontrado.");
+  return user;
 }
 
 export async function isValueInUse(tipo, valor) {
@@ -67,13 +79,22 @@ export async function listMaestros({ tipo, onlyActive } = {}) {
 
 export async function createMaestro(body, actor) {
   const tipo = body.tipo;
-  const valor = (body.valor || "").trim();
   if (!TIPOS_MAESTRO.includes(tipo)) throw badRequest("Tipo de maestro inválido.");
-  if (!valor) throw badRequest("El valor es obligatorio.");
+
+  let valor;
+  let userId = null;
+  if (tipo === "responsable") {
+    const user = await resolveResponsableUser(body.userId);
+    userId = user.id;
+    valor = user.nombre;
+  } else {
+    valor = (body.valor || "").trim();
+    if (!valor) throw badRequest("El valor es obligatorio.");
+  }
 
   try {
     const row = await prisma.maestro.create({
-      data: { tipo, valor, activo: body.activo ?? true },
+      data: { tipo, valor, userId, activo: body.activo ?? true },
     });
     const maestro = toClientMaestro(row, false);
     await logMaestroCreate(actor, maestro).catch(() => {});
@@ -95,7 +116,19 @@ export async function updateMaestro(id, body, actor) {
   const data = {};
   if (body.activo !== undefined) data.activo = !!body.activo;
 
-  if (body.valor !== undefined) {
+  if (current.tipo === "responsable") {
+    // Igual que crear: no se acepta texto libre, solo cambiar a otro usuario.
+    if (body.userId !== undefined && body.userId !== current.userId) {
+      if (await isValueInUse(current.tipo, current.valor)) {
+        const err = new Error("No se puede editar: este valor ya está en uso en registros existentes.");
+        err.status = 409;
+        throw err;
+      }
+      const user = await resolveResponsableUser(body.userId);
+      data.userId = user.id;
+      data.valor = user.nombre;
+    }
+  } else if (body.valor !== undefined) {
     const valor = String(body.valor).trim();
     if (!valor) throw badRequest("El valor es obligatorio.");
     if (valor !== current.valor) {

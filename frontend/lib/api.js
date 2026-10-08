@@ -114,6 +114,43 @@ export async function deleteMaestroApi(id) {
   return handle(res);
 }
 
+export async function fetchUsuariosDisponiblesApi() {
+  const res = await fetch("/api/maestros/usuarios-disponibles", { cache: "no-store" });
+  return handle(res);
+}
+
+export async function fetchProveedores(onlyActive, search) {
+  const qs = new URLSearchParams();
+  if (onlyActive) qs.set("onlyActive", "1");
+  if (search) qs.set("search", search);
+  const suffix = qs.toString();
+  const res = await fetch(`/api/proveedores${suffix ? `?${suffix}` : ""}`, { cache: "no-store" });
+  return handle(res);
+}
+
+export async function createProveedorApi(data) {
+  const res = await fetch("/api/proveedores", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handle(res);
+}
+
+export async function updateProveedorApi(id, data) {
+  const res = await fetch(`/api/proveedores/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handle(res);
+}
+
+export async function deleteProveedorApi(id) {
+  const res = await fetch(`/api/proveedores/${id}`, { method: "DELETE" });
+  return handle(res);
+}
+
 export async function fetchPresupuestos(anio) {
   const qs = anio ? `?anio=${anio}` : "";
   const res = await fetch(`/api/presupuestos${qs}`, { cache: "no-store" });

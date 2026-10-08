@@ -2,6 +2,7 @@ import { listRecords } from "@/lib/records";
 import { listPresupuestos } from "@/lib/presupuestos";
 import { listAuditLogs } from "@/lib/audit";
 import { buildAggregates } from "@/lib/reportContent";
+import { prisma } from "@/lib/prisma";
 
 // Herramientas ("tool use" de Anthropic) que el Agente IA del chat puede
 // invocar bajo demanda en vez de recibir TODO el dataset de compras en cada
@@ -25,6 +26,7 @@ function matchesFilters(r, f) {
   if (f.estado && norm(r.estado) !== norm(f.estado)) return false;
   if (f.categoria && norm(r.categoria) !== norm(f.categoria)) return false;
   if (f.proveedor && !norm(r.proveedor).includes(norm(f.proveedor))) return false;
+  if (f.descripcion && !norm(r.descripcion).includes(norm(f.descripcion))) return false;
   if (f.medioPago && norm(r.medioPago) !== norm(f.medioPago)) return false;
   if (f.estadoLegalizacion && norm(r.estadoLegalizacion) !== norm(f.estadoLegalizacion)) return false;
   if (f.fechaDesde && (!r.fechaSolicitud || r.fechaSolicitud < f.fechaDesde)) return false;
@@ -142,6 +144,7 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria }) {
           estado: { type: "string", description: "Nombre exacto del estado de la compra (opcional)." },
           categoria: { type: "string", description: "Nombre exacto de la categoría (opcional)." },
           proveedor: { type: "string", description: "Coincidencia parcial del nombre del proveedor (opcional)." },
+          descripcion: { type: "string", description: "Coincidencia parcial de la descripción de la compra (opcional, ej. \"empanada\", \"tiquete\")." },
           medioPago: { type: "string", description: "Nombre exacto del medio de pago (opcional)." },
           estadoLegalizacion: { type: "string", description: "Nombre exacto del estado de legalización (opcional)." },
           fechaDesde: { type: "string", description: "Fecha mínima de solicitud, formato YYYY-MM-DD (opcional)." },
@@ -149,6 +152,31 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria }) {
           valorMin: { type: "number", description: "Valor con IVA mínimo en pesos colombianos (opcional)." },
           valorMax: { type: "number", description: "Valor con IVA máximo en pesos colombianos (opcional)." },
           limit: { type: "integer", description: "Máximo de registros a devolver (opcional, por defecto 30, máximo 100)." },
+        },
+      },
+    },
+    {
+      name: "sugerir_proveedores_por_articulo",
+      description: "Busca en el HISTORIAL de compras qué proveedores ya han vendido algo similar a una descripción dada (ej. \"empanadas\", \"resmas de papel\", \"tiquetes aéreos\") y los sugiere ordenados por cuántas veces se les ha comprado y qué tan reciente fue la última compra — úsala para responder \"¿a quién le puedo comprar X?\" o \"dame ideas de proveedores para Y\". Incluye teléfono/correo del proveedor cuando está registrado en el catálogo de Proveedores (Maestros). Si no hay coincidencias, dilo así — nunca inventes un proveedor que no haya salido en esta herramienta o en buscar_registros.",
+      input_schema: {
+        type: "object",
+        required: ["descripcion"],
+        properties: {
+          descripcion: { type: "string", description: "Texto a buscar en la descripción de la compra (coincidencia parcial, ej. \"empanada\")." },
+          categoria: { type: "string", description: "Filtra además por esta categoría exacta (opcional)." },
+          area: { type: "string", description: "Filtra además por esta área exacta (opcional)." },
+          limit: { type: "integer", description: "Máximo de proveedores distintos a devolver (opcional, por defecto 8, máximo 20)." },
+        },
+      },
+    },
+    {
+      name: "datos_proveedor",
+      description: "Busca en el catálogo de Proveedores (Maestros → Proveedores) por nombre o nit y devuelve nit, nombre, teléfono y correo registrados — úsala cuando pregunten por el contacto de un proveedor específico. Si no aparece, dilo así — puede que exista en el historial de compras pero todavía no esté cargado en este catálogo.",
+      input_schema: {
+        type: "object",
+        required: ["busqueda"],
+        properties: {
+          busqueda: { type: "string", description: "Nombre (parcial) o nit del proveedor a buscar." },
         },
       },
     },
@@ -225,6 +253,67 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria }) {
           totalCoincidencias: matches.length,
           registrosDevueltos: Math.min(limit, ordenados.length),
           registros: ordenados.slice(0, limit).map(compactRecordForChat),
+        };
+      }
+      case "sugerir_proveedores_por_articulo": {
+        const records = await getRecords();
+        const limit = Math.max(1, Math.min(20, Number(args.limit) || 8));
+        const matches = records.filter((r) => matchesFilters(r, {
+          descripcion: args.descripcion, categoria: args.categoria, area: args.area,
+        }));
+        if (matches.length === 0) {
+          return { encontrados: 0, proveedores: [], nota: "No hay compras previas que coincidan con esa descripción." };
+        }
+        // Agrupa por nit cuando existe (dato confiable); si el registro es
+        // viejo y no tiene nit, agrupa por nombre normalizado (mejor esfuerzo).
+        const groups = new Map();
+        for (const r of matches) {
+          if (!r.proveedor) continue;
+          const key = r.nit ? `nit:${r.nit}` : `nombre:${norm(r.proveedor)}`;
+          const g = groups.get(key) || { nombre: r.proveedor, nit: r.nit || null, veces: 0, ultimaFecha: null, ultimoValor: null };
+          g.veces += 1;
+          if (!g.ultimaFecha || (r.fechaSolicitud && r.fechaSolicitud > g.ultimaFecha)) {
+            g.ultimaFecha = r.fechaSolicitud;
+            g.ultimoValor = r.valorConIva;
+            g.nombre = r.proveedor;
+          }
+          groups.set(key, g);
+        }
+        const ordenados = Array.from(groups.values())
+          .sort((a, b) => b.veces - a.veces || (b.ultimaFecha || "").localeCompare(a.ultimaFecha || ""));
+        const top = ordenados.slice(0, limit);
+        const nits = top.filter((p) => p.nit).map((p) => p.nit);
+        const catalogo = nits.length ? await prisma.proveedor.findMany({ where: { nit: { in: nits } } }) : [];
+        const catalogoPorNit = new Map(catalogo.map((c) => [c.nit, c]));
+        return {
+          encontrados: ordenados.length,
+          proveedores: top.map((p) => {
+            const c = p.nit ? catalogoPorNit.get(p.nit) : null;
+            return {
+              nombre: p.nombre,
+              nit: p.nit,
+              vecesComprado: p.veces,
+              ultimaCompra: p.ultimaFecha,
+              ultimoValorConIva: p.ultimoValor,
+              telefono: c?.telefono || null,
+              correo: c?.correo || null,
+              enCatalogoProveedores: !!c,
+            };
+          }),
+        };
+      }
+      case "datos_proveedor": {
+        const q = norm(args.busqueda);
+        const qDigits = q.replace(/[^0-9]/g, "");
+        const all = await prisma.proveedor.findMany();
+        const matches = all.filter((p) => norm(p.nombre).includes(q) || (qDigits && p.nit.includes(qDigits)));
+        return {
+          encontrados: matches.length,
+          proveedores: matches.slice(0, 10).map((p) => ({
+            nit: p.nit, nombre: p.nombre, descripcion: p.descripcion,
+            telefono: p.telefono || null, correo: p.correo || null,
+            documentacionAlDia: p.documentacionAlDia, activo: p.activo,
+          })),
         };
       }
       case "resumen_presupuesto": {
