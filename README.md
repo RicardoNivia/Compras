@@ -19,6 +19,8 @@ Dashboard de compras de Sinco. Migrado desde una app de un solo archivo HTML (js
 
 ## Arquitectura
 
+**[📐 Ver diagrama de arquitectura completo →](docs/architecture.html)** (interactivo, con flujos de datos, modelos, rutas API)
+
 Dos aplicaciones Next.js independientes, carpetas hermanas en la raíz del repo:
 
 - **`backend/`** — API-only: rutas `app/api/*`, Prisma/PostgreSQL, autenticación. Puerto **3001**.
