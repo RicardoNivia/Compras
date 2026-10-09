@@ -225,6 +225,15 @@ export async function searchFiltersWithAiApi(query, options) {
   return handle(res);
 }
 
+export async function auditSearchFiltersWithAiApi(query, options) {
+  const res = await fetch("/api/agent/audit-search-filters", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, options }),
+  });
+  return handle(res);
+}
+
 // "Explícame este número" — explicación puntual en lenguaje natural de un KPI
 // del Dashboard, a partir de los registros que lo componen (ver DashboardView.jsx).
 export async function explainKpiApi({ label, value, comparisonLabel, comparisonValue, records }) {

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS } from "@/lib/auditLabels";
 
-export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, ACTION_LABELS } from "@/lib/auditLabels";
+export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, ACTION_LABELS, ENTITY_LABELS } from "@/lib/auditLabels";
 
 // Nombre corto del tipo de maestro para el resumen del log — copia local
 // (sin importar lib/maestros.js) para no crear una dependencia circular
@@ -252,7 +252,7 @@ export async function logReportSent(actor, report, ok, detail) {
   });
 }
 
-export async function listAuditLogs({ from, to, userId, recordId, page = 1, pageSize = 50 } = {}) {
+export async function listAuditLogs({ from, to, userId, recordId, action, entityType, page = 1, pageSize = 50 } = {}) {
   const where = {};
   if (from || to) {
     where.createdAt = {};
@@ -261,6 +261,8 @@ export async function listAuditLogs({ from, to, userId, recordId, page = 1, page
   }
   if (userId) where.userId = userId;
   if (recordId) where.recordId = recordId;
+  if (action) where.action = action;
+  if (entityType) where.entityType = entityType;
 
   const safePage = Math.max(1, page);
   const [total, rows] = await Promise.all([
