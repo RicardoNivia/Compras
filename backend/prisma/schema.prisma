@@ -15,16 +15,17 @@ model Record {
   fechaSolicitud      String?
   fechaEntrega        String?
   area                String?
-  responsable         String?  // nombre del usuario responsable, copiado desde User.nombre (ver responsableUserId)
-  responsableUserId   String?  // id del User atado como responsable — sin FK (igual que nit/proveedor): se valida al guardar, pero no se borra en cascada si el usuario se elimina
+  responsable         String?  // nombre del responsable — snapshot al guardar; al listar se reemplaza por el nombre ACTUAL del usuario si responsableUserId resuelve (ver hydrateConDatosActuales en lib/records.js)
+  responsableUserId   String?  // id del User atado como responsable — referencia real; sin FK (igual que proveedorId): se valida al guardar, nunca se borra en cascada
   estado              String?
   categoria           String?
   descripcion         String?
   medioPago           String?
   licitacion          String?
   estadoLegalizacion  String?
-  nit                 String?  // NIT del proveedor, sin dígito de verificación
-  proveedor           String?
+  nit                 String?  // NIT del proveedor — snapshot al guardar, para historial/export; al listar se reemplaza por el valor ACTUAL del catálogo si proveedorId resuelve (ver hydrateConDatosActuales en lib/records.js)
+  proveedor           String?  // nombre del proveedor — mismo criterio: snapshot que se reemplaza por el nombre actual cuando proveedorId resuelve
+  proveedorId         Int?     // código del Proveedor (ver Proveedor.codigo) — referencia real; sin FK (igual que responsableUserId): se valida al guardar, nunca se borra en cascada
   fe                  String?  // número de factura/referencia — puede repetirse (p.ej. una misma factura cubre varias compras); la duplicidad solo se advierte a nivel de aplicación, no se bloquea en la BD
   valorConIva         Float?
   valorSinIva         Float?
@@ -134,6 +135,7 @@ model Maestro {
 // registros con cascada explícita (ver lib/proveedores.js), no por join.
 model Proveedor {
   id                 String   @id @default(cuid())
+  codigo             Int      @unique @default(autoincrement()) // referencia real usada por Record.proveedorId — estable aunque cambien nit/nombre
   nit                String   @unique // sin dígito de verificación
   nombre             String
   descripcion        String   // obligatoria — qué vende/para qué sirve este proveedor (Nova la usa para sugerirlo)

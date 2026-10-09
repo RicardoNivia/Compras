@@ -29,6 +29,7 @@ import { getSessionUser } from "@/lib/auth-server";
  *                     type: object
  *                     properties:
  *                       id: { type: string }
+ *                       codigo: { type: integer, description: "Referencia real usada por Record.proveedorId — estable aunque cambien nit/nombre." }
  *                       nit: { type: string }
  *                       nombre: { type: string }
  *                       descripcion: { type: string }
@@ -36,7 +37,7 @@ import { getSessionUser } from "@/lib/auth-server";
  *                       correo: { type: string, nullable: true }
  *                       documentacionAlDia: { type: boolean, description: "Ej. RUT/cámara de comercio vigentes. Por defecto false." }
  *                       activo: { type: boolean }
- *                       enUso: { type: boolean, description: "Si el nit está usado hoy en algún registro." }
+ *                       enUso: { type: boolean, description: "Si el código está usado hoy en algún registro." }
  *                       createdAt: { type: string, format: date-time }
  */
 export async function GET(request) {

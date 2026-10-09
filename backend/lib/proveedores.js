@@ -22,6 +22,7 @@ function textOrNull(v) {
 export function toClientProveedor(p, enUso = false) {
   return {
     id: p.id,
+    codigo: p.codigo,
     nit: p.nit,
     nombre: p.nombre,
     descripcion: p.descripcion,
@@ -34,19 +35,13 @@ export function toClientProveedor(p, enUso = false) {
   };
 }
 
-// "En uso" cubre dos casos:
-// 1. Registros nuevos: Record.nit coincide con el nit del proveedor (caso normal).
-// 2. Registros históricos (anteriores a este catálogo, o importados por el
-//    backfill con nit placeholder — ver migración proveedores_backfill_desde_historico):
-//    Record.nit es null pero Record.proveedor coincide con el nombre del
-//    proveedor. Sin este segundo caso, cualquier proveedor cuyo nit sea un
-//    placeholder nunca aparece "en uso" (ningún registro tiene ESE nit
-//    exacto) aunque su nombre sí esté citado en cientos de compras —
-//    permitiendo borrarlo/renombrarlo por error.
-export async function isProveedorInUse(nit, nombre) {
-  const count = await prisma.record.count({
-    where: { OR: [{ nit }, { nit: null, proveedor: nombre }] },
-  });
+// La referencia real de un registro a un proveedor es Record.proveedorId =
+// Proveedor.codigo (entero autoincremental, nunca cambia) — no el nit ni el
+// nombre, que son solo texto descriptivo. Por eso nit/nombre se pueden
+// corregir libremente incluso si el proveedor está en uso: cambiarlos nunca
+// rompe la referencia. Solo eliminar el proveedor está bloqueado si está en uso.
+export async function isProveedorInUse(codigo) {
+  const count = await prisma.record.count({ where: { proveedorId: codigo } });
   return count > 0;
 }
 
@@ -64,15 +59,12 @@ export async function listProveedores({ onlyActive, search } = {}) {
   }
 
   const rows = await prisma.proveedor.findMany({ where, orderBy: { nombre: "asc" } });
-  // Dos sets en vez de N+1: todos los nit usados hoy, y todos los nombres de
-  // registros SIN nit (histórico) — ver isProveedorInUse para el porqué.
-  const [conNit, sinNit] = await Promise.all([
-    prisma.record.findMany({ where: { nit: { not: null } }, select: { nit: true }, distinct: ["nit"] }),
-    prisma.record.findMany({ where: { nit: null, proveedor: { not: null } }, select: { proveedor: true }, distinct: ["proveedor"] }),
-  ]);
-  const nitsUsados = new Set(conNit.map((r) => r.nit).filter(Boolean));
-  const nombresSinNitUsados = new Set(sinNit.map((r) => r.proveedor).filter(Boolean));
-  return rows.map((row) => toClientProveedor(row, nitsUsados.has(row.nit) || nombresSinNitUsados.has(row.nombre)));
+  // Un solo IN en vez de N+1: todos los proveedorId usados hoy en registros.
+  const usados = new Set(
+    (await prisma.record.findMany({ where: { proveedorId: { not: null } }, select: { proveedorId: true }, distinct: ["proveedorId"] }))
+      .map((r) => r.proveedorId)
+  );
+  return rows.map((row) => toClientProveedor(row, usados.has(row.codigo)));
 }
 
 export async function createProveedor(body, actor) {
@@ -109,13 +101,17 @@ export async function updateProveedor(id, body, actor) {
     throw err;
   }
 
-  const enUso = await isProveedorInUse(current.nit, current.nombre);
+  const enUsoAntes = await isProveedorInUse(current.codigo);
   const data = {};
   if (body.activo !== undefined) data.activo = !!body.activo;
   if (body.telefono !== undefined) data.telefono = textOrNull(body.telefono);
   if (body.correo !== undefined) data.correo = textOrNull(body.correo);
   if (body.documentacionAlDia !== undefined) data.documentacionAlDia = !!body.documentacionAlDia;
 
+  // nit y nombre se pueden editar libremente, en uso o no — la referencia
+  // real es "codigo", que nunca cambia (ver comentario de isProveedorInUse).
+  // Como los registros leen el nombre/nit ACTUAL del catálogo al listar (ver
+  // hydrateConDatosActuales en lib/records.js), este cambio se refleja solo.
   if (body.nombre !== undefined) {
     const nombre = String(body.nombre).trim();
     if (!nombre) throw badRequest("El nombre es obligatorio.");
@@ -131,20 +127,13 @@ export async function updateProveedor(id, body, actor) {
   if (body.nit !== undefined) {
     const nit = normalizeNit(body.nit);
     if (!nit) throw badRequest("El NIT es obligatorio.");
-    if (nit !== current.nit) {
-      if (enUso) {
-        const err = new Error("No se puede editar el NIT: este proveedor ya está en uso en registros existentes.");
-        err.status = 409;
-        throw err;
-      }
-      data.nit = nit;
-    }
+    data.nit = nit;
   }
 
   try {
     const row = await prisma.proveedor.update({ where: { id }, data });
-    const after = toClientProveedor(row, await isProveedorInUse(row.nit, row.nombre));
-    await logProveedorUpdate(actor, toClientProveedor(current, enUso), after).catch(() => {});
+    const after = toClientProveedor(row, await isProveedorInUse(row.codigo));
+    await logProveedorUpdate(actor, toClientProveedor(current, enUsoAntes), after).catch(() => {});
     return after;
   } catch (err) {
     if (err.code === "P2002") throw badRequest("Ya existe un proveedor con ese NIT.");
@@ -159,7 +148,7 @@ export async function deleteProveedor(id, actor) {
     err.status = 404;
     throw err;
   }
-  if (await isProveedorInUse(current.nit, current.nombre)) {
+  if (await isProveedorInUse(current.codigo)) {
     const err = new Error("No se puede eliminar: este proveedor ya está en uso en registros existentes.");
     err.status = 409;
     throw err;

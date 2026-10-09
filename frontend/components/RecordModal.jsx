@@ -35,6 +35,7 @@ const emptyForm = {
   medioPago: "",
   nit: "",
   proveedor: "",
+  proveedorId: "",
   licitacion: "",
   estadoLegalizacion: "",
   fe: "",
@@ -217,7 +218,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
       setError("Completa fecha de solicitud, área, responsable y descripción.");
       return;
     }
-    if (!isEdit && (!form.nit || !form.proveedor)) {
+    if (!isEdit && !form.proveedorId) {
       setError("Selecciona un proveedor del catálogo. Si no existe, pide a un administrador que lo agregue en Maestros → Proveedores.");
       return;
     }
@@ -422,7 +423,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 proveedores={proveedores}
                 disabled={!isEditable("proveedor")}
                 required={!isEdit}
-                onChange={({ nombre, nit }) => setForm((f) => ({ ...f, proveedor: nombre, nit }))}
+                onChange={({ nombre, nit, proveedorId }) => setForm((f) => ({ ...f, proveedor: nombre, nit, proveedorId }))}
               />
             </div>
 

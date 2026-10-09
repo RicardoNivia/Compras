@@ -492,12 +492,26 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                     <td className="truncate">{r.licitacion || "—"}</td>
                     <td><span className={`pill ${legalizacionPillClass(r.estadoLegalizacion)}`}>{r.estadoLegalizacion || "—"}</span></td>
                     <td className="mono">{r.nit || "—"}</td>
-                    <td className="truncate wide">{r.proveedor || "—"}</td>
+                    <td>
+                      {r.proveedor ? (
+                        <span className="desc-tooltip-wrap">
+                          <span className="desc-text">{r.proveedor}</span>
+                          <span className="desc-tooltip-bubble">{r.proveedor}</span>
+                        </span>
+                      ) : "—"}
+                    </td>
                     <td className="mono cell-fe">{r.fe || "—"}</td>
                     <td className="num">{fmtCOP(r.valorConIva)}</td>
                     <td className="num">{fmtCOP(r.valorSinIva)}</td>
                     <td className="num">{fmtCOP(r.valorCot)}</td>
-                    <td className="truncate wide">{r.observaciones || "—"}</td>
+                    <td>
+                      {r.observaciones ? (
+                        <span className="desc-tooltip-wrap">
+                          <span className="desc-text">{r.observaciones}</span>
+                          <span className="desc-tooltip-bubble">{r.observaciones}</span>
+                        </span>
+                      ) : "—"}
+                    </td>
                     <td className="actions-cell">
                       {confirmDeleteId === r.id ? (
                         <div className="confirm-del">

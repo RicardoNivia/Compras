@@ -264,13 +264,14 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria }) {
         if (matches.length === 0) {
           return { encontrados: 0, proveedores: [], nota: "No hay compras previas que coincidan con esa descripción." };
         }
-        // Agrupa por nit cuando existe (dato confiable); si el registro es
-        // viejo y no tiene nit, agrupa por nombre normalizado (mejor esfuerzo).
+        // Agrupa por proveedorId cuando existe (referencia real al
+        // catálogo); si el registro es viejo y no quedó atado a ninguno,
+        // agrupa por nombre normalizado (mejor esfuerzo).
         const groups = new Map();
         for (const r of matches) {
           if (!r.proveedor) continue;
-          const key = r.nit ? `nit:${r.nit}` : `nombre:${norm(r.proveedor)}`;
-          const g = groups.get(key) || { nombre: r.proveedor, nit: r.nit || null, veces: 0, ultimaFecha: null, ultimoValor: null };
+          const key = r.proveedorId ? `id:${r.proveedorId}` : `nombre:${norm(r.proveedor)}`;
+          const g = groups.get(key) || { nombre: r.proveedor, proveedorId: r.proveedorId || null, veces: 0, ultimaFecha: null, ultimoValor: null };
           g.veces += 1;
           if (!g.ultimaFecha || (r.fechaSolicitud && r.fechaSolicitud > g.ultimaFecha)) {
             g.ultimaFecha = r.fechaSolicitud;
@@ -282,16 +283,16 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria }) {
         const ordenados = Array.from(groups.values())
           .sort((a, b) => b.veces - a.veces || (b.ultimaFecha || "").localeCompare(a.ultimaFecha || ""));
         const top = ordenados.slice(0, limit);
-        const nits = top.filter((p) => p.nit).map((p) => p.nit);
-        const catalogo = nits.length ? await prisma.proveedor.findMany({ where: { nit: { in: nits } } }) : [];
-        const catalogoPorNit = new Map(catalogo.map((c) => [c.nit, c]));
+        const codigos = top.filter((p) => p.proveedorId).map((p) => p.proveedorId);
+        const catalogo = codigos.length ? await prisma.proveedor.findMany({ where: { codigo: { in: codigos } } }) : [];
+        const catalogoPorCodigo = new Map(catalogo.map((c) => [c.codigo, c]));
         return {
           encontrados: ordenados.length,
           proveedores: top.map((p) => {
-            const c = p.nit ? catalogoPorNit.get(p.nit) : null;
+            const c = p.proveedorId ? catalogoPorCodigo.get(p.proveedorId) : null;
             return {
               nombre: p.nombre,
-              nit: p.nit,
+              nit: c?.nit || null,
               vecesComprado: p.veces,
               ultimaCompra: p.ultimaFecha,
               ultimoValorConIva: p.ultimoValor,

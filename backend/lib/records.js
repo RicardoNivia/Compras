@@ -1,8 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { logCreate, logUpdate, logDelete } from "@/lib/audit";
 
-// Mapea un registro de Prisma (SQLite) al shape que usa el front (igual al original).
-export function toClientRecord(r) {
+// Mapea un registro de Prisma al shape que usa el front. "actual" (opcional)
+// trae el proveedor/usuario YA resueltos (ver hydrateConDatosActuales) para
+// mostrar su nombre/nit ACTUAL en vez del texto guardado en el momento de la
+// compra — así, si luego se corrige el nombre de un proveedor o de un
+// usuario, el cambio se ve reflejado en los registros ya existentes sin
+// tener que reeditarlos uno por uno. Si la referencia no resuelve (dato
+// histórico sin proveedorId/responsableUserId, o el proveedor/usuario fue
+// eliminado), se cae al texto guardado tal cual — nunca se pierde el dato.
+export function toClientRecord(r, actual = {}) {
   return {
     id: r.id,
     localSeq: r.localSeq,
@@ -10,7 +17,7 @@ export function toClientRecord(r) {
     fechaSolicitud: r.fechaSolicitud,
     fechaEntrega: r.fechaEntrega,
     area: r.area,
-    responsable: r.responsable,
+    responsable: actual.responsableNombre ?? r.responsable,
     responsableUserId: r.responsableUserId,
     estado: r.estado,
     categoria: r.categoria,
@@ -18,8 +25,9 @@ export function toClientRecord(r) {
     medioPago: r.medioPago,
     licitacion: r.licitacion,
     estadoLegalizacion: r.estadoLegalizacion,
-    nit: r.nit,
-    proveedor: r.proveedor,
+    nit: actual.proveedorNit ?? r.nit,
+    proveedor: actual.proveedorNombre ?? r.proveedor,
+    proveedorId: r.proveedorId,
     fe: r.fe,
     valorConIva: r.valorConIva,
     valorSinIva: r.valorSinIva,
@@ -37,9 +45,36 @@ export function toClientRecord(r) {
   };
 }
 
+// Resuelve, para un lote de registros, el nombre/nit ACTUAL del proveedor
+// (por proveedorId) y el nombre ACTUAL del usuario responsable (por
+// responsableUserId) — un solo IN por tabla en vez de N+1. Úsalo antes de
+// mapear con toClientRecord cuando el resultado se le muestra al usuario
+// (listar, crear, editar); los snapshots "before"/"after" de auditoría NO lo
+// usan a propósito, para que el historial quede con el dato tal como era en
+// ese momento.
+async function hydrateConDatosActuales(rows) {
+  const codigos = [...new Set(rows.map((r) => r.proveedorId).filter((v) => v != null))];
+  const userIds = [...new Set(rows.map((r) => r.responsableUserId).filter(Boolean))];
+  const [proveedores, usuarios] = await Promise.all([
+    codigos.length ? prisma.proveedor.findMany({ where: { codigo: { in: codigos } } }) : [],
+    userIds.length ? prisma.user.findMany({ where: { id: { in: userIds } } }) : [],
+  ]);
+  const proveedorPorCodigo = new Map(proveedores.map((p) => [p.codigo, p]));
+  const usuarioPorId = new Map(usuarios.map((u) => [u.id, u]));
+  return rows.map((r) => {
+    const p = r.proveedorId != null ? proveedorPorCodigo.get(r.proveedorId) : null;
+    const u = r.responsableUserId ? usuarioPorId.get(r.responsableUserId) : null;
+    return toClientRecord(r, {
+      proveedorNombre: p?.nombre,
+      proveedorNit: p?.nit,
+      responsableNombre: u?.nombre,
+    });
+  });
+}
+
 export async function listRecords() {
   const rows = await prisma.record.findMany({ orderBy: { fechaSolicitud: "asc" } });
-  return rows.map(toClientRecord);
+  return hydrateConDatosActuales(rows);
 }
 
 export async function getMeta() {
@@ -56,6 +91,12 @@ function numOrNull(v) {
   if (v === "" || v === null || v === undefined) return null;
   const n = typeof v === "number" ? v : parseFloat(v);
   return Number.isFinite(n) ? n : null;
+}
+
+function intOrNull(v) {
+  if (v === "" || v === null || v === undefined) return null;
+  const n = typeof v === "number" ? v : parseInt(v, 10);
+  return Number.isInteger(n) ? n : null;
 }
 
 // Tope de tamaño para campos de texto libre — evita que un payload gigante
@@ -85,6 +126,7 @@ const FIELD_SANITIZERS = {
   // Sin dígito de verificación (se valida/normaliza en el formulario, no aquí).
   nit: textOrNull(20),
   proveedor: textOrNull(200),
+  proveedorId: intOrNull,
   fe: textOrNull(100),
   valorConIva: numOrNull,
   valorSinIva: numOrNull,
@@ -122,25 +164,29 @@ async function countOtrosConFe(fe, excludeId) {
   return prisma.record.count({ where: { fe, id: excludeId ? { not: excludeId } : undefined } });
 }
 
-// Un registro NUEVO siempre debe apuntar a un proveedor del catálogo (nit +
-// nombre) — no se permite texto libre al crear. Esto NO aplica a editar un
-// registro ya existente (ver updateRecord/patchRecord): los ~800 registros
-// históricos sin nit siguen siendo editables sin forzar una migración masiva.
-// Devuelve el nombre canónico del catálogo (nunca el que mandó el cliente),
-// así un desfase de mayúsculas/espacios no genera un proveedor "distinto".
+// Un registro NUEVO siempre debe apuntar a un proveedor del catálogo — no se
+// permite texto libre al crear. Esto NO aplica a editar un registro ya
+// existente (ver updateRecord/patchRecord): no se fuerza a re-seleccionar
+// proveedor en los ~800 registros históricos ya migrados.
+// La referencia real es Proveedor.codigo (Record.proveedorId); nit/proveedor
+// quedan como snapshot de texto (se reemplazan por el valor actual al listar,
+// ver hydrateConDatosActuales) — así un desfase de mayúsculas/espacios, o un
+// nit que todavía sea un placeholder "PENDIENTE-...", no generan inconsistencias.
 async function requireProveedorDelCatalogo(data) {
-  if (!data.nit || !data.proveedor) {
+  if (!data.proveedorId) {
     const err = new Error("Selecciona un proveedor del catálogo. Si no existe, pide a un administrador que lo agregue en Maestros → Proveedores.");
     err.status = 400;
     throw err;
   }
-  const proveedor = await prisma.proveedor.findUnique({ where: { nit: data.nit } });
+  const proveedor = await prisma.proveedor.findUnique({ where: { codigo: data.proveedorId } });
   if (!proveedor || !proveedor.activo) {
     const err = new Error("El proveedor seleccionado no existe o está inactivo en el catálogo. Pide a un administrador que lo agregue o reactive en Maestros → Proveedores.");
     err.status = 400;
     throw err;
   }
-  return proveedor.nombre;
+  data.nit = proveedor.nit;
+  data.proveedor = proveedor.nombre;
+  return proveedor;
 }
 
 // El responsable debe ser siempre un usuario real de la app, nunca texto
@@ -148,8 +194,6 @@ async function requireProveedorDelCatalogo(data) {
 // proveedor, esto se exige tanto al crear COMO al editar, porque los ~800
 // registros históricos ya quedaron migrados a un responsableUserId válido
 // (ver prisma/scripts de migración), así que no hay vacío que proteger.
-// Devuelve el nombre canónico (el nombre actual del usuario), nunca el que
-// mande el cliente.
 async function requireResponsableDelCatalogo(data) {
   if (!data.responsableUserId) {
     const err = new Error("Selecciona un responsable de la lista (debe ser un usuario de la aplicación). Si no aparece, pide a un administrador que lo agregue en Maestros → Responsable.");
@@ -162,7 +206,8 @@ async function requireResponsableDelCatalogo(data) {
     err.status = 400;
     throw err;
   }
-  return maestro.valor;
+  data.responsable = maestro.valor;
+  return maestro;
 }
 
 export async function createRecord(body, actor) {
@@ -172,8 +217,8 @@ export async function createRecord(body, actor) {
     err.status = 400;
     throw err;
   }
-  data.proveedor = await requireProveedorDelCatalogo(data);
-  data.responsable = await requireResponsableDelCatalogo(data);
+  const proveedor = await requireProveedorDelCatalogo(data);
+  const maestroResponsable = await requireResponsableDelCatalogo(data);
   const feDuplicados = await countOtrosConFe(data.fe, null);
   // Asigna el siguiente número autoincremental visible (localSeq) desde Meta,
   // en la misma transacción para evitar que dos creaciones simultáneas choquen.
@@ -187,7 +232,7 @@ export async function createRecord(body, actor) {
     });
     return tx.record.create({ data: { ...data, localSeq: seq } });
   });
-  const record = toClientRecord(row);
+  const record = toClientRecord(row, { proveedorNombre: proveedor.nombre, proveedorNit: proveedor.nit, responsableNombre: maestroResponsable.valor });
   await logCreate(actor, record).catch(() => {});
   if (feDuplicados > 0) {
     record.feWarning = `Ya existen ${feDuplicados} compra(s) registradas con el número de factura/referencia "${data.fe}".`;
@@ -200,12 +245,13 @@ export async function createRecord(body, actor) {
 export async function updateRecord(id, body, actor, options = {}) {
   const before = await prisma.record.findUnique({ where: { id } });
   const data = options.fields ? sanitizeFields(body, options.fields) : sanitizeInput(body);
+  let maestroResponsable = null;
   if ("responsableUserId" in data) {
-    data.responsable = await requireResponsableDelCatalogo(data);
+    maestroResponsable = await requireResponsableDelCatalogo(data);
   }
   const feDuplicados = "fe" in data ? await countOtrosConFe(data.fe, id) : 0;
   const row = await prisma.record.update({ where: { id }, data });
-  const after = toClientRecord(row);
+  const [after] = await hydrateConDatosActuales([row]);
   await logUpdate(actor, before ? toClientRecord(before) : null, after, "editar").catch(() => {});
   if (feDuplicados > 0) {
     after.feWarning = `Ya existen ${feDuplicados} compra(s) registradas con el número de factura/referencia "${data.fe}".`;
@@ -235,7 +281,7 @@ export async function patchRecord(id, rawPartial, actor, options = {}) {
     }
   }
   const row = await prisma.record.update({ where: { id }, data: partial });
-  const after = toClientRecord(row);
+  const [after] = await hydrateConDatosActuales([row]);
   const action = Object.keys(partial).every((k) => k === "radicado") ? "radicar" : "editar";
   await logUpdate(actor, before ? toClientRecord(before) : null, after, action).catch(() => {});
   return after;

@@ -5,7 +5,7 @@ import ProveedorModal from "@/components/ProveedorModal";
 import { updateProveedorApi, deleteProveedorApi } from "@/lib/api";
 import { IconPlus, IconEdit, IconTrash, IconSearch } from "@/components/icons";
 
-const EN_USO_TITLE = "No se puede editar ni eliminar: este proveedor ya está en uso en uno o más registros. Puedes inactivarlo para que deje de ofrecerse en el autocompletar.";
+const EN_USO_TITLE = "No se puede eliminar: este proveedor ya está en uso en uno o más registros. Puedes inactivarlo para que deje de ofrecerse en el autocompletar.";
 
 const PAGE_SIZE = 8;
 
@@ -200,8 +200,7 @@ export default function ProveedoresView({ initialProveedores }) {
                         type="button"
                         className="icon-action-btn edit"
                         onClick={() => openEdit(p)}
-                        title={locked ? EN_USO_TITLE : "Editar"}
-                        disabled={locked}
+                        title="Editar"
                       >
                         <IconEdit size={13} />
                       </button>

@@ -5,9 +5,6 @@ import { createProveedorApi, updateProveedorApi } from "@/lib/api";
 
 export default function ProveedorModal({ proveedor, onClose, onSaved }) {
   const isEdit = !!proveedor;
-  // Si el nit ya está en uso en registros, no se puede cambiar (rompería la
-  // referencia por texto en Record) — igual que el "valor" de un Maestro.
-  const nitLocked = isEdit && proveedor.enUso;
   const [nit, setNit] = useState(proveedor?.nit || "");
   const [nombre, setNombre] = useState(proveedor?.nombre || "");
   const [descripcion, setDescripcion] = useState(proveedor?.descripcion || "");
@@ -62,21 +59,17 @@ export default function ProveedorModal({ proveedor, onClose, onSaved }) {
           <div className="modal-body" style={{ gridTemplateColumns: "1fr" }}>
             <div className="field">
               <label htmlFor="p-nit">Nit *</label>
-              {nitLocked ? (
-                <>
-                  <div className="dvalue">{nit}</div>
-                  <span className="card-sub" style={{ margin: 0 }}>
-                    En uso en registros existentes: no se puede cambiar.
-                  </span>
-                </>
-              ) : (
-                <input
-                  id="p-nit" autoFocus required
-                  value={nit}
-                  onChange={(e) => setNit(e.target.value)}
-                  placeholder="Sin dígito de verificación"
-                  spellCheck={false}
-                />
+              <input
+                id="p-nit" autoFocus required
+                value={nit}
+                onChange={(e) => setNit(e.target.value)}
+                placeholder="Sin dígito de verificación"
+                spellCheck={false}
+              />
+              {isEdit && proveedor.codigo != null && (
+                <span className="card-sub" style={{ margin: 0 }}>
+                  Código interno #{proveedor.codigo} — la referencia real en los registros, nunca cambia aunque corrijas el nit o el nombre.
+                </span>
               )}
             </div>
             <div className="field">
