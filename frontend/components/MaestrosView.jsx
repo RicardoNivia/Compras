@@ -225,15 +225,17 @@ export default function MaestrosView({ initialMaestros, initialProveedores }) {
                       </div>
                     ) : (
                       <>
-                        <button
-                          type="button"
-                          className="icon-action-btn edit"
-                          onClick={() => openEdit(m)}
-                          title={locked ? EN_USO_TITLE : "Editar"}
-                          disabled={locked}
-                        >
-                          <IconEdit size={13} />
-                        </button>
+                        {tab !== "responsable" && (
+                          <button
+                            type="button"
+                            className="icon-action-btn edit"
+                            onClick={() => openEdit(m)}
+                            title={locked ? EN_USO_TITLE : "Editar"}
+                            disabled={locked}
+                          >
+                            <IconEdit size={13} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="icon-action-btn delete"

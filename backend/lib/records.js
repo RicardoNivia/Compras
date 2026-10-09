@@ -1,25 +1,53 @@
 import { prisma } from "@/lib/prisma";
 import { logCreate, logUpdate, logDelete } from "@/lib/audit";
 
-// Mapea un registro de Prisma (SQLite) al shape que usa el front (igual al original).
-export function toClientRecord(r) {
+// Campos de Record respaldados por un Maestro genérico (area/estado/
+// categoria/medioPago/estadoLegalizacion) — a diferencia de proveedor
+// (modelo propio, Proveedor.id) y responsable (User.id), la referencia
+// real acá es el id de la fila en Maestro. idField guarda esa referencia;
+// textField es el snapshot de texto (se reemplaza por el valor ACTUAL del
+// maestro al listar, ver hydrateConDatosActuales). "required" solo aplica a
+// "area" — los demás son opcionales, igual que antes de este cambio.
+const MAESTRO_CAMPOS = [
+  { tipo: "area", idField: "areaId", textField: "area", required: true, label: "área" },
+  { tipo: "estado", idField: "estadoId", textField: "estado", required: false, label: "estado de la compra" },
+  { tipo: "categoria", idField: "categoriaId", textField: "categoria", required: false, label: "categoría" },
+  { tipo: "medioPago", idField: "medioPagoId", textField: "medioPago", required: false, label: "medio de pago" },
+  { tipo: "estadoLegalizacion", idField: "estadoLegalizacionId", textField: "estadoLegalizacion", required: false, label: "estado de legalización" },
+];
+
+// Mapea un registro de Prisma al shape que usa el front. "actual" (opcional)
+// trae el proveedor/usuario/maestros YA resueltos (ver hydrateConDatosActuales)
+// para mostrar su nombre ACTUAL en vez del texto guardado en el momento de la
+// compra — así, si luego se corrige un nombre en un catálogo, el cambio se ve
+// reflejado en los registros ya existentes sin tener que reeditarlos uno por
+// uno. Si la referencia no resuelve (dato histórico sin el *Id, o la fila del
+// catálogo fue eliminada), se cae al texto guardado tal cual — nunca se
+// pierde el dato.
+export function toClientRecord(r, actual = {}) {
   return {
     id: r.id,
     localSeq: r.localSeq,
     informe: r.informe,
     fechaSolicitud: r.fechaSolicitud,
     fechaEntrega: r.fechaEntrega,
-    area: r.area,
-    responsable: r.responsable,
+    area: actual.area ?? r.area,
+    areaId: r.areaId,
+    responsable: actual.responsableNombre ?? r.responsable,
     responsableUserId: r.responsableUserId,
-    estado: r.estado,
-    categoria: r.categoria,
+    estado: actual.estado ?? r.estado,
+    estadoId: r.estadoId,
+    categoria: actual.categoria ?? r.categoria,
+    categoriaId: r.categoriaId,
     descripcion: r.descripcion,
-    medioPago: r.medioPago,
+    medioPago: actual.medioPago ?? r.medioPago,
+    medioPagoId: r.medioPagoId,
     licitacion: r.licitacion,
-    estadoLegalizacion: r.estadoLegalizacion,
-    nit: r.nit,
-    proveedor: r.proveedor,
+    estadoLegalizacion: actual.estadoLegalizacion ?? r.estadoLegalizacion,
+    estadoLegalizacionId: r.estadoLegalizacionId,
+    nit: actual.proveedorNit ?? r.nit,
+    proveedor: actual.proveedorNombre ?? r.proveedor,
+    proveedorId: r.proveedorId,
     fe: r.fe,
     valorConIva: r.valorConIva,
     valorSinIva: r.valorSinIva,
@@ -37,9 +65,46 @@ export function toClientRecord(r) {
   };
 }
 
+// Resuelve, para un lote de registros, el valor ACTUAL de cada referencia
+// (proveedor por código, usuario responsable por id, y los 5 maestros
+// genéricos por id) — pocas consultas IN en vez de N+1. Úsalo antes de
+// mapear con toClientRecord cuando el resultado se le muestra al usuario
+// (listar, crear, editar); los snapshots "before"/"after" de auditoría NO lo
+// usan a propósito, para que el historial quede con el dato tal como era en
+// ese momento.
+async function hydrateConDatosActuales(rows) {
+  const proveedorIds = [...new Set(rows.map((r) => r.proveedorId).filter(Boolean))];
+  const userIds = [...new Set(rows.map((r) => r.responsableUserId).filter(Boolean))];
+  const maestroIds = [...new Set(
+    rows.flatMap((r) => MAESTRO_CAMPOS.map((c) => r[c.idField])).filter(Boolean)
+  )];
+  const [proveedores, usuarios, maestros] = await Promise.all([
+    proveedorIds.length ? prisma.proveedor.findMany({ where: { id: { in: proveedorIds } } }) : [],
+    userIds.length ? prisma.user.findMany({ where: { id: { in: userIds } } }) : [],
+    maestroIds.length ? prisma.maestro.findMany({ where: { id: { in: maestroIds } } }) : [],
+  ]);
+  const proveedorPorId = new Map(proveedores.map((p) => [p.id, p]));
+  const usuarioPorId = new Map(usuarios.map((u) => [u.id, u]));
+  const maestroPorId = new Map(maestros.map((m) => [m.id, m]));
+  return rows.map((r) => {
+    const p = r.proveedorId ? proveedorPorId.get(r.proveedorId) : null;
+    const u = r.responsableUserId ? usuarioPorId.get(r.responsableUserId) : null;
+    const actual = {
+      proveedorNombre: p?.nombre,
+      proveedorNit: p?.nit,
+      responsableNombre: u?.nombre,
+    };
+    for (const campo of MAESTRO_CAMPOS) {
+      const m = r[campo.idField] ? maestroPorId.get(r[campo.idField]) : null;
+      if (m && m.activo) actual[campo.textField] = m.valor;
+    }
+    return toClientRecord(r, actual);
+  });
+}
+
 export async function listRecords() {
   const rows = await prisma.record.findMany({ orderBy: { fechaSolicitud: "asc" } });
-  return rows.map(toClientRecord);
+  return hydrateConDatosActuales(rows);
 }
 
 export async function getMeta() {
@@ -74,17 +139,23 @@ const FIELD_SANITIZERS = {
   fechaSolicitud: (v) => v || null,
   fechaEntrega: (v) => v || null,
   area: textOrNull(100),
+  areaId: textOrNull(40),
   responsable: textOrNull(150),
   responsableUserId: textOrNull(40),
   estado: textOrNull(100),
+  estadoId: textOrNull(40),
   categoria: textOrNull(100),
+  categoriaId: textOrNull(40),
   descripcion: textOrNull(2000),
   medioPago: textOrNull(100),
+  medioPagoId: textOrNull(40),
   licitacion: textOrNull(100),
   estadoLegalizacion: textOrNull(100),
+  estadoLegalizacionId: textOrNull(40),
   // Sin dígito de verificación (se valida/normaliza en el formulario, no aquí).
   nit: textOrNull(20),
   proveedor: textOrNull(200),
+  proveedorId: textOrNull(40),
   fe: textOrNull(100),
   valorConIva: numOrNull,
   valorSinIva: numOrNull,
@@ -122,25 +193,29 @@ async function countOtrosConFe(fe, excludeId) {
   return prisma.record.count({ where: { fe, id: excludeId ? { not: excludeId } : undefined } });
 }
 
-// Un registro NUEVO siempre debe apuntar a un proveedor del catálogo (nit +
-// nombre) — no se permite texto libre al crear. Esto NO aplica a editar un
-// registro ya existente (ver updateRecord/patchRecord): los ~800 registros
-// históricos sin nit siguen siendo editables sin forzar una migración masiva.
-// Devuelve el nombre canónico del catálogo (nunca el que mandó el cliente),
-// así un desfase de mayúsculas/espacios no genera un proveedor "distinto".
+// Un registro NUEVO siempre debe apuntar a un proveedor del catálogo — no se
+// permite texto libre al crear. Esto NO aplica a editar un registro ya
+// existente (ver updateRecord/patchRecord): no se fuerza a re-seleccionar
+// proveedor en los ~800 registros históricos ya migrados.
+// La referencia real es Proveedor.id (Record.proveedorId); nit/proveedor
+// quedan como snapshot de texto (se reemplazan por el valor actual al listar,
+// ver hydrateConDatosActuales) — así un desfase de mayúsculas/espacios, o un
+// nit que todavía sea un placeholder "PENDIENTE-...", no generan inconsistencias.
 async function requireProveedorDelCatalogo(data) {
-  if (!data.nit || !data.proveedor) {
+  if (!data.proveedorId) {
     const err = new Error("Selecciona un proveedor del catálogo. Si no existe, pide a un administrador que lo agregue en Maestros → Proveedores.");
     err.status = 400;
     throw err;
   }
-  const proveedor = await prisma.proveedor.findUnique({ where: { nit: data.nit } });
+  const proveedor = await prisma.proveedor.findUnique({ where: { id: data.proveedorId } });
   if (!proveedor || !proveedor.activo) {
     const err = new Error("El proveedor seleccionado no existe o está inactivo en el catálogo. Pide a un administrador que lo agregue o reactive en Maestros → Proveedores.");
     err.status = 400;
     throw err;
   }
-  return proveedor.nombre;
+  data.nit = proveedor.nit;
+  data.proveedor = proveedor.nombre;
+  return proveedor;
 }
 
 // El responsable debe ser siempre un usuario real de la app, nunca texto
@@ -148,8 +223,6 @@ async function requireProveedorDelCatalogo(data) {
 // proveedor, esto se exige tanto al crear COMO al editar, porque los ~800
 // registros históricos ya quedaron migrados a un responsableUserId válido
 // (ver prisma/scripts de migración), así que no hay vacío que proteger.
-// Devuelve el nombre canónico (el nombre actual del usuario), nunca el que
-// mande el cliente.
 async function requireResponsableDelCatalogo(data) {
   if (!data.responsableUserId) {
     const err = new Error("Selecciona un responsable de la lista (debe ser un usuario de la aplicación). Si no aparece, pide a un administrador que lo agregue en Maestros → Responsable.");
@@ -162,18 +235,50 @@ async function requireResponsableDelCatalogo(data) {
     err.status = 400;
     throw err;
   }
-  return maestro.valor;
+  data.responsable = maestro.valor;
+  return maestro;
+}
+
+// Valida un campo respaldado por un Maestro genérico (ver MAESTRO_CAMPOS):
+// si trae id, debe existir, ser del tipo correcto y estar activo — nunca se
+// acepta el texto que mande el cliente, siempre se recalcula desde el
+// catálogo. Se exige tanto al crear como al editar (igual que responsable):
+// el backfill dejó prácticamente el 100% de los registros ya atados a un id
+// real, así que no hay vacío histórico que proteger (a diferencia de
+// proveedor). Si el campo no es obligatorio y no trae id, simplemente lo
+// deja vacío (permite "quitar" la categoría, por ejemplo).
+async function requireMaestroCampo(campo, data) {
+  const id = data[campo.idField];
+  if (!id) {
+    if (campo.required) {
+      const err = new Error(`Selecciona ${campo.tipo === "area" ? "un" : "un"} ${campo.label} del catálogo.`);
+      err.status = 400;
+      throw err;
+    }
+    data[campo.textField] = null;
+    return;
+  }
+  const maestro = await prisma.maestro.findUnique({ where: { id } });
+  if (!maestro || maestro.tipo !== campo.tipo || !maestro.activo) {
+    const err = new Error(`El valor de ${campo.label} no existe o está inactivo en el catálogo. Pide a un administrador que lo agregue o reactive en Maestros.`);
+    err.status = 400;
+    throw err;
+  }
+  data[campo.textField] = maestro.valor;
 }
 
 export async function createRecord(body, actor) {
   const data = sanitizeInput(body);
-  if (!data.fechaSolicitud || !data.area || !data.responsableUserId || !data.descripcion) {
-    const err = new Error("Completa fecha de solicitud, área, responsable y descripción.");
+  if (!data.fechaSolicitud || !data.responsableUserId || !data.descripcion) {
+    const err = new Error("Completa fecha de solicitud, responsable y descripción.");
     err.status = 400;
     throw err;
   }
-  data.proveedor = await requireProveedorDelCatalogo(data);
-  data.responsable = await requireResponsableDelCatalogo(data);
+  for (const campo of MAESTRO_CAMPOS) {
+    await requireMaestroCampo(campo, data);
+  }
+  const proveedor = await requireProveedorDelCatalogo(data);
+  const maestroResponsable = await requireResponsableDelCatalogo(data);
   const feDuplicados = await countOtrosConFe(data.fe, null);
   // Asigna el siguiente número autoincremental visible (localSeq) desde Meta,
   // en la misma transacción para evitar que dos creaciones simultáneas choquen.
@@ -187,7 +292,7 @@ export async function createRecord(body, actor) {
     });
     return tx.record.create({ data: { ...data, localSeq: seq } });
   });
-  const record = toClientRecord(row);
+  const record = toClientRecord(row, { proveedorNombre: proveedor.nombre, proveedorNit: proveedor.nit, responsableNombre: maestroResponsable.valor });
   await logCreate(actor, record).catch(() => {});
   if (feDuplicados > 0) {
     record.feWarning = `Ya existen ${feDuplicados} compra(s) registradas con el número de factura/referencia "${data.fe}".`;
@@ -201,11 +306,14 @@ export async function updateRecord(id, body, actor, options = {}) {
   const before = await prisma.record.findUnique({ where: { id } });
   const data = options.fields ? sanitizeFields(body, options.fields) : sanitizeInput(body);
   if ("responsableUserId" in data) {
-    data.responsable = await requireResponsableDelCatalogo(data);
+    await requireResponsableDelCatalogo(data);
+  }
+  for (const campo of MAESTRO_CAMPOS) {
+    if (campo.idField in data) await requireMaestroCampo(campo, data);
   }
   const feDuplicados = "fe" in data ? await countOtrosConFe(data.fe, id) : 0;
   const row = await prisma.record.update({ where: { id }, data });
-  const after = toClientRecord(row);
+  const [after] = await hydrateConDatosActuales([row]);
   await logUpdate(actor, before ? toClientRecord(before) : null, after, "editar").catch(() => {});
   if (feDuplicados > 0) {
     after.feWarning = `Ya existen ${feDuplicados} compra(s) registradas con el número de factura/referencia "${data.fe}".`;
@@ -235,7 +343,7 @@ export async function patchRecord(id, rawPartial, actor, options = {}) {
     }
   }
   const row = await prisma.record.update({ where: { id }, data: partial });
-  const after = toClientRecord(row);
+  const [after] = await hydrateConDatosActuales([row]);
   const action = Object.keys(partial).every((k) => k === "radicado") ? "radicar" : "editar";
   await logUpdate(actor, before ? toClientRecord(before) : null, after, action).catch(() => {});
   return after;

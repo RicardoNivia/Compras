@@ -7,7 +7,7 @@ import { requirePermission, apiError } from "@/lib/apiGuard";
  * /api/proveedores/{id}:
  *   patch:
  *     tags: [Proveedores]
- *     summary: Edita un proveedor — nombre, nit (si no está en uso) o activo/inactivo (requiere permiso "viewMaestros").
+ *     summary: Edita un proveedor — nombre, nit, descripción, contacto o activo/inactivo (requiere permiso "viewMaestros"). El código (referencia real usada por los registros) nunca cambia, así que nit/nombre se pueden corregir libremente aunque el proveedor esté en uso.
  *     parameters:
  *       - { name: id, in: path, required: true, schema: { type: string } }
  *     requestBody:
@@ -42,11 +42,6 @@ import { requirePermission, apiError } from "@/lib/apiGuard";
  *             schema: { $ref: '#/components/schemas/Error' }
  *       404:
  *         description: Proveedor no encontrado.
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/Error' }
- *       409:
- *         description: El nit ya está en uso en registros existentes, no se puede editar.
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }

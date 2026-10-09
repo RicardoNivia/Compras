@@ -13,6 +13,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // antes de que este maestro existiera) se muestra tal cual al abrir el
 // modal y no se toca a menos que el usuario decida cambiarlo.
 export default function ProveedorAutocomplete({ id, nombre, nit, proveedores, disabled, required, onChange }) {
+  // onChange recibe { nombre, nit, proveedorId }: proveedorId (Proveedor.id)
+  // es la referencia real que se guarda en el registro; nit/nombre son solo
+  // para mostrar — si luego se corrige el proveedor en el catálogo, la tabla
+  // de Registros refleja el cambio sola (ver hydrateConDatosActuales en
+  // backend/lib/records.js), sin tener que volver a elegirlo aquí.
   const [text, setText] = useState(nombre || "");
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
@@ -50,13 +55,13 @@ export default function ProveedorAutocomplete({ id, nombre, nit, proveedores, di
   function selectProveedor(p) {
     setText(p.nombre);
     setOpen(false);
-    onChange({ nombre: p.nombre, nit: p.nit });
+    onChange({ nombre: p.nombre, nit: p.nit, proveedorId: p.id });
   }
 
   function clear() {
     setText("");
     setOpen(false);
-    onChange({ nombre: "", nit: "" });
+    onChange({ nombre: "", nit: "", proveedorId: null });
   }
 
   function handleInputChange(value) {
