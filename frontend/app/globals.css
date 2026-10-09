@@ -792,6 +792,23 @@ table.records thead th.actions-col{ z-index:3; background:#FAFBFD; }
 table.records tbody tr:hover td.actions-cell{ background:var(--surface-2); }
 td.truncate{ max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 td.truncate.wide{ max-width:220px; }
+
+/* Descripción en Registros: texto truncado + burbuja con el texto completo al
+   pasar el mouse. El truncado vive en el <span> interno (no en el <td>) para
+   que la burbuja, al ser absoluta, no quede recortada por un overflow:hidden
+   en un ancestro. */
+.desc-tooltip-wrap{ position:relative; display:block; }
+.desc-text{ display:block; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.desc-tooltip-bubble{
+  display:none; position:absolute; z-index:50; left:0; top:calc(100% + 6px);
+  background: var(--ink); color: var(--page);
+  font-size:12.5px; line-height:1.45; padding:10px 12px; border-radius:10px;
+  box-shadow: 0 10px 24px rgba(24,39,75,.28);
+  max-width:360px; width:max-content; white-space:normal; word-break:break-word;
+}
+:root:not([data-theme="light"]) .desc-tooltip-bubble{ background:#eef2f7; color:#0b1220; }
+:root[data-theme="dark"] .desc-tooltip-bubble{ background:#eef2f7; color:#0b1220; }
+.desc-tooltip-wrap:hover .desc-tooltip-bubble{ display:block; }
 td.cell-fe{ min-width:110px; }
 .cell-flex{ display:flex; align-items:center; gap:4px; }
 .row-actions{ display:flex; align-items:center; gap:4px; white-space:nowrap; }

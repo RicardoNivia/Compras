@@ -480,7 +480,14 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                     <td>{r.responsable || "—"}</td>
                     <td><span className={`pill ${estadoPillClass(r.estado)}`}>{r.estado || "—"}</span></td>
                     <td className="truncate">{r.categoria || "—"}</td>
-                    <td className="truncate wide">{r.descripcion || "—"}</td>
+                    <td>
+                      {r.descripcion ? (
+                        <span className="desc-tooltip-wrap">
+                          <span className="desc-text">{r.descripcion}</span>
+                          <span className="desc-tooltip-bubble">{r.descripcion}</span>
+                        </span>
+                      ) : "—"}
+                    </td>
                     <td>{r.medioPago || "—"}</td>
                     <td className="truncate">{r.licitacion || "—"}</td>
                     <td><span className={`pill ${legalizacionPillClass(r.estadoLegalizacion)}`}>{r.estadoLegalizacion || "—"}</span></td>
