@@ -283,13 +283,13 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria }) {
         const ordenados = Array.from(groups.values())
           .sort((a, b) => b.veces - a.veces || (b.ultimaFecha || "").localeCompare(a.ultimaFecha || ""));
         const top = ordenados.slice(0, limit);
-        const codigos = top.filter((p) => p.proveedorId).map((p) => p.proveedorId);
-        const catalogo = codigos.length ? await prisma.proveedor.findMany({ where: { codigo: { in: codigos } } }) : [];
-        const catalogoPorCodigo = new Map(catalogo.map((c) => [c.codigo, c]));
+        const idsProveedor = top.filter((p) => p.proveedorId).map((p) => p.proveedorId);
+        const catalogo = idsProveedor.length ? await prisma.proveedor.findMany({ where: { id: { in: idsProveedor } } }) : [];
+        const catalogoPorId = new Map(catalogo.map((c) => [c.id, c]));
         return {
           encontrados: ordenados.length,
           proveedores: top.map((p) => {
-            const c = p.proveedorId ? catalogoPorCodigo.get(p.proveedorId) : null;
+            const c = p.proveedorId ? catalogoPorId.get(p.proveedorId) : null;
             return {
               nombre: p.nombre,
               nit: c?.nit || null,

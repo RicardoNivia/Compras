@@ -1,14 +1,29 @@
 import { prisma } from "@/lib/prisma";
 import { logCreate, logUpdate, logDelete } from "@/lib/audit";
 
+// Campos de Record respaldados por un Maestro genérico (area/estado/
+// categoria/medioPago/estadoLegalizacion) — a diferencia de proveedor
+// (modelo propio, Proveedor.id) y responsable (User.id), la referencia
+// real acá es el id de la fila en Maestro. idField guarda esa referencia;
+// textField es el snapshot de texto (se reemplaza por el valor ACTUAL del
+// maestro al listar, ver hydrateConDatosActuales). "required" solo aplica a
+// "area" — los demás son opcionales, igual que antes de este cambio.
+const MAESTRO_CAMPOS = [
+  { tipo: "area", idField: "areaId", textField: "area", required: true, label: "área" },
+  { tipo: "estado", idField: "estadoId", textField: "estado", required: false, label: "estado de la compra" },
+  { tipo: "categoria", idField: "categoriaId", textField: "categoria", required: false, label: "categoría" },
+  { tipo: "medioPago", idField: "medioPagoId", textField: "medioPago", required: false, label: "medio de pago" },
+  { tipo: "estadoLegalizacion", idField: "estadoLegalizacionId", textField: "estadoLegalizacion", required: false, label: "estado de legalización" },
+];
+
 // Mapea un registro de Prisma al shape que usa el front. "actual" (opcional)
-// trae el proveedor/usuario YA resueltos (ver hydrateConDatosActuales) para
-// mostrar su nombre/nit ACTUAL en vez del texto guardado en el momento de la
-// compra — así, si luego se corrige el nombre de un proveedor o de un
-// usuario, el cambio se ve reflejado en los registros ya existentes sin
-// tener que reeditarlos uno por uno. Si la referencia no resuelve (dato
-// histórico sin proveedorId/responsableUserId, o el proveedor/usuario fue
-// eliminado), se cae al texto guardado tal cual — nunca se pierde el dato.
+// trae el proveedor/usuario/maestros YA resueltos (ver hydrateConDatosActuales)
+// para mostrar su nombre ACTUAL en vez del texto guardado en el momento de la
+// compra — así, si luego se corrige un nombre en un catálogo, el cambio se ve
+// reflejado en los registros ya existentes sin tener que reeditarlos uno por
+// uno. Si la referencia no resuelve (dato histórico sin el *Id, o la fila del
+// catálogo fue eliminada), se cae al texto guardado tal cual — nunca se
+// pierde el dato.
 export function toClientRecord(r, actual = {}) {
   return {
     id: r.id,
@@ -16,15 +31,20 @@ export function toClientRecord(r, actual = {}) {
     informe: r.informe,
     fechaSolicitud: r.fechaSolicitud,
     fechaEntrega: r.fechaEntrega,
-    area: r.area,
+    area: actual.area ?? r.area,
+    areaId: r.areaId,
     responsable: actual.responsableNombre ?? r.responsable,
     responsableUserId: r.responsableUserId,
-    estado: r.estado,
-    categoria: r.categoria,
+    estado: actual.estado ?? r.estado,
+    estadoId: r.estadoId,
+    categoria: actual.categoria ?? r.categoria,
+    categoriaId: r.categoriaId,
     descripcion: r.descripcion,
-    medioPago: r.medioPago,
+    medioPago: actual.medioPago ?? r.medioPago,
+    medioPagoId: r.medioPagoId,
     licitacion: r.licitacion,
-    estadoLegalizacion: r.estadoLegalizacion,
+    estadoLegalizacion: actual.estadoLegalizacion ?? r.estadoLegalizacion,
+    estadoLegalizacionId: r.estadoLegalizacionId,
     nit: actual.proveedorNit ?? r.nit,
     proveedor: actual.proveedorNombre ?? r.proveedor,
     proveedorId: r.proveedorId,
@@ -45,30 +65,40 @@ export function toClientRecord(r, actual = {}) {
   };
 }
 
-// Resuelve, para un lote de registros, el nombre/nit ACTUAL del proveedor
-// (por proveedorId) y el nombre ACTUAL del usuario responsable (por
-// responsableUserId) — un solo IN por tabla en vez de N+1. Úsalo antes de
+// Resuelve, para un lote de registros, el valor ACTUAL de cada referencia
+// (proveedor por código, usuario responsable por id, y los 5 maestros
+// genéricos por id) — pocas consultas IN en vez de N+1. Úsalo antes de
 // mapear con toClientRecord cuando el resultado se le muestra al usuario
 // (listar, crear, editar); los snapshots "before"/"after" de auditoría NO lo
 // usan a propósito, para que el historial quede con el dato tal como era en
 // ese momento.
 async function hydrateConDatosActuales(rows) {
-  const codigos = [...new Set(rows.map((r) => r.proveedorId).filter((v) => v != null))];
+  const proveedorIds = [...new Set(rows.map((r) => r.proveedorId).filter(Boolean))];
   const userIds = [...new Set(rows.map((r) => r.responsableUserId).filter(Boolean))];
-  const [proveedores, usuarios] = await Promise.all([
-    codigos.length ? prisma.proveedor.findMany({ where: { codigo: { in: codigos } } }) : [],
+  const maestroIds = [...new Set(
+    rows.flatMap((r) => MAESTRO_CAMPOS.map((c) => r[c.idField])).filter(Boolean)
+  )];
+  const [proveedores, usuarios, maestros] = await Promise.all([
+    proveedorIds.length ? prisma.proveedor.findMany({ where: { id: { in: proveedorIds } } }) : [],
     userIds.length ? prisma.user.findMany({ where: { id: { in: userIds } } }) : [],
+    maestroIds.length ? prisma.maestro.findMany({ where: { id: { in: maestroIds } } }) : [],
   ]);
-  const proveedorPorCodigo = new Map(proveedores.map((p) => [p.codigo, p]));
+  const proveedorPorId = new Map(proveedores.map((p) => [p.id, p]));
   const usuarioPorId = new Map(usuarios.map((u) => [u.id, u]));
+  const maestroPorId = new Map(maestros.map((m) => [m.id, m]));
   return rows.map((r) => {
-    const p = r.proveedorId != null ? proveedorPorCodigo.get(r.proveedorId) : null;
+    const p = r.proveedorId ? proveedorPorId.get(r.proveedorId) : null;
     const u = r.responsableUserId ? usuarioPorId.get(r.responsableUserId) : null;
-    return toClientRecord(r, {
+    const actual = {
       proveedorNombre: p?.nombre,
       proveedorNit: p?.nit,
       responsableNombre: u?.nombre,
-    });
+    };
+    for (const campo of MAESTRO_CAMPOS) {
+      const m = r[campo.idField] ? maestroPorId.get(r[campo.idField]) : null;
+      if (m && m.activo) actual[campo.textField] = m.valor;
+    }
+    return toClientRecord(r, actual);
   });
 }
 
@@ -93,12 +123,6 @@ function numOrNull(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-function intOrNull(v) {
-  if (v === "" || v === null || v === undefined) return null;
-  const n = typeof v === "number" ? v : parseInt(v, 10);
-  return Number.isInteger(n) ? n : null;
-}
-
 // Tope de tamaño para campos de texto libre — evita que un payload gigante
 // (abuso de almacenamiento, por error o intencional) se guarde tal cual; no
 // es una medida contra inyección (Prisma ya parametriza las queries).
@@ -115,18 +139,23 @@ const FIELD_SANITIZERS = {
   fechaSolicitud: (v) => v || null,
   fechaEntrega: (v) => v || null,
   area: textOrNull(100),
+  areaId: textOrNull(40),
   responsable: textOrNull(150),
   responsableUserId: textOrNull(40),
   estado: textOrNull(100),
+  estadoId: textOrNull(40),
   categoria: textOrNull(100),
+  categoriaId: textOrNull(40),
   descripcion: textOrNull(2000),
   medioPago: textOrNull(100),
+  medioPagoId: textOrNull(40),
   licitacion: textOrNull(100),
   estadoLegalizacion: textOrNull(100),
+  estadoLegalizacionId: textOrNull(40),
   // Sin dígito de verificación (se valida/normaliza en el formulario, no aquí).
   nit: textOrNull(20),
   proveedor: textOrNull(200),
-  proveedorId: intOrNull,
+  proveedorId: textOrNull(40),
   fe: textOrNull(100),
   valorConIva: numOrNull,
   valorSinIva: numOrNull,
@@ -168,7 +197,7 @@ async function countOtrosConFe(fe, excludeId) {
 // permite texto libre al crear. Esto NO aplica a editar un registro ya
 // existente (ver updateRecord/patchRecord): no se fuerza a re-seleccionar
 // proveedor en los ~800 registros históricos ya migrados.
-// La referencia real es Proveedor.codigo (Record.proveedorId); nit/proveedor
+// La referencia real es Proveedor.id (Record.proveedorId); nit/proveedor
 // quedan como snapshot de texto (se reemplazan por el valor actual al listar,
 // ver hydrateConDatosActuales) — así un desfase de mayúsculas/espacios, o un
 // nit que todavía sea un placeholder "PENDIENTE-...", no generan inconsistencias.
@@ -178,7 +207,7 @@ async function requireProveedorDelCatalogo(data) {
     err.status = 400;
     throw err;
   }
-  const proveedor = await prisma.proveedor.findUnique({ where: { codigo: data.proveedorId } });
+  const proveedor = await prisma.proveedor.findUnique({ where: { id: data.proveedorId } });
   if (!proveedor || !proveedor.activo) {
     const err = new Error("El proveedor seleccionado no existe o está inactivo en el catálogo. Pide a un administrador que lo agregue o reactive en Maestros → Proveedores.");
     err.status = 400;
@@ -210,12 +239,43 @@ async function requireResponsableDelCatalogo(data) {
   return maestro;
 }
 
-export async function createRecord(body, actor) {
-  const data = sanitizeInput(body);
-  if (!data.fechaSolicitud || !data.area || !data.responsableUserId || !data.descripcion) {
-    const err = new Error("Completa fecha de solicitud, área, responsable y descripción.");
+// Valida un campo respaldado por un Maestro genérico (ver MAESTRO_CAMPOS):
+// si trae id, debe existir, ser del tipo correcto y estar activo — nunca se
+// acepta el texto que mande el cliente, siempre se recalcula desde el
+// catálogo. Se exige tanto al crear como al editar (igual que responsable):
+// el backfill dejó prácticamente el 100% de los registros ya atados a un id
+// real, así que no hay vacío histórico que proteger (a diferencia de
+// proveedor). Si el campo no es obligatorio y no trae id, simplemente lo
+// deja vacío (permite "quitar" la categoría, por ejemplo).
+async function requireMaestroCampo(campo, data) {
+  const id = data[campo.idField];
+  if (!id) {
+    if (campo.required) {
+      const err = new Error(`Selecciona ${campo.tipo === "area" ? "un" : "un"} ${campo.label} del catálogo.`);
+      err.status = 400;
+      throw err;
+    }
+    data[campo.textField] = null;
+    return;
+  }
+  const maestro = await prisma.maestro.findUnique({ where: { id } });
+  if (!maestro || maestro.tipo !== campo.tipo || !maestro.activo) {
+    const err = new Error(`El valor de ${campo.label} no existe o está inactivo en el catálogo. Pide a un administrador que lo agregue o reactive en Maestros.`);
     err.status = 400;
     throw err;
+  }
+  data[campo.textField] = maestro.valor;
+}
+
+export async function createRecord(body, actor) {
+  const data = sanitizeInput(body);
+  if (!data.fechaSolicitud || !data.responsableUserId || !data.descripcion) {
+    const err = new Error("Completa fecha de solicitud, responsable y descripción.");
+    err.status = 400;
+    throw err;
+  }
+  for (const campo of MAESTRO_CAMPOS) {
+    await requireMaestroCampo(campo, data);
   }
   const proveedor = await requireProveedorDelCatalogo(data);
   const maestroResponsable = await requireResponsableDelCatalogo(data);
@@ -245,9 +305,11 @@ export async function createRecord(body, actor) {
 export async function updateRecord(id, body, actor, options = {}) {
   const before = await prisma.record.findUnique({ where: { id } });
   const data = options.fields ? sanitizeFields(body, options.fields) : sanitizeInput(body);
-  let maestroResponsable = null;
   if ("responsableUserId" in data) {
-    maestroResponsable = await requireResponsableDelCatalogo(data);
+    await requireResponsableDelCatalogo(data);
+  }
+  for (const campo of MAESTRO_CAMPOS) {
+    if (campo.idField in data) await requireMaestroCampo(campo, data);
   }
   const feDuplicados = "fe" in data ? await countOtrosConFe(data.fe, id) : 0;
   const row = await prisma.record.update({ where: { id }, data });

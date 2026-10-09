@@ -28,8 +28,7 @@ import { getSessionUser } from "@/lib/auth-server";
  *                   items:
  *                     type: object
  *                     properties:
- *                       id: { type: string }
- *                       codigo: { type: integer, description: "Referencia real usada por Record.proveedorId — estable aunque cambien nit/nombre." }
+ *                       id: { type: string, description: "Referencia real usada por Record.proveedorId — estable aunque cambien nit/nombre." }
  *                       nit: { type: string }
  *                       nombre: { type: string }
  *                       descripcion: { type: string }

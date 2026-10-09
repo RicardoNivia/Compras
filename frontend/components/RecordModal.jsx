@@ -27,17 +27,22 @@ const emptyForm = {
   fechaSolicitud: "",
   fechaEntrega: "",
   area: "",
+  areaId: "",
   responsable: "",
   responsableUserId: "",
   estado: "Pendiente",
+  estadoId: "",
   categoria: "",
+  categoriaId: "",
   descripcion: "",
   medioPago: "",
+  medioPagoId: "",
   nit: "",
   proveedor: "",
   proveedorId: "",
   licitacion: "",
   estadoLegalizacion: "",
+  estadoLegalizacionId: "",
   fe: "",
   valorConIva: "",
   valorSinIva: "",
@@ -53,29 +58,45 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
   // editableFields null = todos los campos editables (admin, registro).
   // Con lista (p.ej. legalizar), los demás campos quedan solo-lectura.
   const isEditable = (field) => !editableFields || editableFields.includes(field);
-  const [form, setForm] = useState(() => (record ? { ...emptyForm, ...record } : emptyForm));
+  const [form, setForm] = useState(() => {
+    if (record) return { ...emptyForm, ...record };
+    // Nuevo registro: preselecciona el id del maestro "Pendiente" (estado por
+    // defecto histórico) si existe — si no, queda sin estado hasta que el
+    // usuario elija uno.
+    const pendienteId = maestros.find((m) => m.tipo === "estado" && m.valor === "Pendiente")?.id || "";
+    return { ...emptyForm, estadoId: pendienteId };
+  });
 
-  // Opciones del maestro para `tipo`, más el valor actual del registro si
-  // quedó inactivo/no está en el maestro (para no perderlo/cambiarlo sin que
-  // el usuario lo decida explícitamente al editar un registro viejo).
-  function optionsFor(tipo) {
-    const activeValues = new Set();
+  // Todo campo con maestro se guarda y referencia por id, nunca por texto
+  // (ver CLAUDE.md) — el valor del <select> es el id del Maestro; el texto
+  // (m.valor) solo se usa como label visible y como snapshot de respaldo en
+  // el form. "activeIds" sale de `maestros`, que el server ya filtra a solo
+  // activos — si el id guardado en el registro ya no está activo, se agrega
+  // como opción sintética (con el texto que ya tenía el registro) para no
+  // perder el dato ni forzar a elegir uno nuevo sin que el usuario lo decida.
+  function maestroOptions(tipo, idField, textField) {
+    const activeIds = new Set();
     const opts = [];
     for (const m of maestros) {
       if (m.tipo !== tipo) continue;
-      activeValues.add(m.valor);
-      opts.push({ value: m.valor, label: m.valor });
+      activeIds.add(m.id);
+      opts.push({ value: m.id, label: m.valor });
     }
-    const current = form[tipo];
-    if (current && !activeValues.has(current)) {
-      opts.push({ value: current, label: `${current} (inactivo)` });
+    const currentId = form[idField];
+    if (currentId && !activeIds.has(currentId)) {
+      opts.push({ value: currentId, label: `${form[textField] || "(valor)"} (inactivo)` });
     }
     return opts.sort((a, b) => a.label.localeCompare(b.label, "es"));
   }
 
-  // El responsable ya no es texto libre: el valor del <select> es el userId
-  // (ver backendlib/maestros.js), así que necesita su propia función en vez
-  // de reusar optionsFor (que trabaja sobre el texto "valor").
+  function updateMaestroCampo(idField, textField, id) {
+    const match = maestros.find((m) => m.id === id);
+    setForm((f) => ({ ...f, [idField]: id, [textField]: match ? match.valor : "" }));
+  }
+
+  // El responsable es un caso particular: se referencia por userId (no por
+  // el id del Maestro), porque la fila de Maestro(tipo="responsable") está
+  // atada a un usuario (ver backend/lib/maestros.js).
   function responsableOptions() {
     const activeIds = new Set();
     const opts = [];
@@ -214,7 +235,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
     e.preventDefault();
     setError("");
 
-    if (!form.fechaSolicitud || !form.area || !form.responsableUserId || !form.descripcion) {
+    if (!form.fechaSolicitud || !form.areaId || !form.responsableUserId || !form.descripcion) {
       setError("Completa fecha de solicitud, área, responsable y descripción.");
       return;
     }
@@ -337,15 +358,26 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
 
             <div className="field">
               <label htmlFor="f-estado">Estado de la compra</label>
-              <select id="f-estado" value={form.estado || ""} onChange={(e) => update("estado", e.target.value)} disabled={!isEditable("estado")}>
-                {optionsFor("estado").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              <select
+                id="f-estado"
+                value={form.estadoId || ""}
+                onChange={(e) => updateMaestroCampo("estadoId", "estado", e.target.value)}
+                disabled={!isEditable("estado")}
+              >
+                <option value="">—</option>
+                {maestroOptions("estado", "estadoId", "estado").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="field">
               <label htmlFor="f-medioPago">Medio de pago</label>
-              <select id="f-medioPago" value={form.medioPago || ""} onChange={(e) => update("medioPago", e.target.value)} disabled={!isEditable("medioPago")}>
+              <select
+                id="f-medioPago"
+                value={form.medioPagoId || ""}
+                onChange={(e) => updateMaestroCampo("medioPagoId", "medioPago", e.target.value)}
+                disabled={!isEditable("medioPago")}
+              >
                 <option value="">—</option>
-                {optionsFor("medioPago").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {maestroOptions("medioPago", "medioPagoId", "medioPago").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
 
@@ -374,12 +406,12 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
               <label htmlFor="f-area">Área *</label>
               <select
                 id="f-area" required
-                value={form.area || ""}
-                onChange={(e) => update("area", e.target.value)}
+                value={form.areaId || ""}
+                onChange={(e) => updateMaestroCampo("areaId", "area", e.target.value)}
                 disabled={!isEditable("area")}
               >
                 <option value="">Selecciona un área…</option>
-                {optionsFor("area").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {maestroOptions("area", "areaId", "area").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
 
@@ -402,17 +434,15 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
 
             <div className="field">
               <label htmlFor="f-categoria">Categoría</label>
-              <input
-                id="f-categoria" list="categorias-list"
-                value={form.categoria || ""}
-                onChange={(e) => update("categoria", e.target.value)}
+              <select
+                id="f-categoria"
+                value={form.categoriaId || ""}
+                onChange={(e) => updateMaestroCampo("categoriaId", "categoria", e.target.value)}
                 disabled={!isEditable("categoria")}
-                placeholder="Escribe para buscar…"
-                spellCheck lang="es"
-              />
-              <datalist id="categorias-list">
-                {optionsFor("categoria").map((o) => <option key={o.value} value={o.value} />)}
-              </datalist>
+              >
+                <option value="">—</option>
+                {maestroOptions("categoria", "categoriaId", "categoria").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
             </div>
             <div className="field full">
               <label htmlFor="f-proveedor">Proveedor{!isEdit && " *"}</label>
@@ -538,12 +568,12 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
               <label htmlFor="f-estadoLegalizacion">Estado legalización</label>
               <select
                 id="f-estadoLegalizacion"
-                value={form.estadoLegalizacion || ""}
-                onChange={(e) => update("estadoLegalizacion", e.target.value)}
+                value={form.estadoLegalizacionId || ""}
+                onChange={(e) => updateMaestroCampo("estadoLegalizacionId", "estadoLegalizacion", e.target.value)}
                 disabled={!isEditable("estadoLegalizacion")}
               >
                 <option value="">—</option>
-                {optionsFor("estadoLegalizacion").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {maestroOptions("estadoLegalizacion", "estadoLegalizacionId", "estadoLegalizacion").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="field">

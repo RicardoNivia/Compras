@@ -14,6 +14,17 @@ export const TIPO_LABELS = {
   estadoLegalizacion: "Estado legalización",
 };
 
+// tipo -> campo de Record que guarda la referencia real (el id de esta fila
+// de Maestro) — "responsable" no tiene equivalente acá porque Record
+// referencia directo al User (responsableUserId), no a la fila de Maestro.
+const CAMPO_ID_POR_TIPO = {
+  area: "areaId",
+  estado: "estadoId",
+  categoria: "categoriaId",
+  medioPago: "medioPagoId",
+  estadoLegalizacion: "estadoLegalizacionId",
+};
+
 function badRequest(message) {
   const err = new Error(message);
   err.status = 400;
@@ -43,20 +54,42 @@ async function resolveResponsableUser(userId) {
   return user;
 }
 
-export async function isValueInUse(tipo, valor) {
-  const count = await prisma.record.count({ where: { [tipo]: valor } });
-  return count > 0;
+// "En uso" se mide por REFERENCIA, no por texto: para los maestros genéricos
+// (area/estado/categoria/medioPago/estadoLegalizacion) un registro cuenta si
+// su campo "<tipo>Id" apunta al id de esta fila; para "responsable", si algún
+// registro tiene ese mismo userId en responsableUserId. Por eso renombrar el
+// "valor" de un maestro (salvo responsable, que es un caso distinto) nunca
+// rompe nada: el id nunca cambia, así que ya no hace falta bloquear la
+// edición cuando está en uso — solo bloquear eliminar.
+export async function isMaestroInUse(maestro) {
+  if (maestro.tipo === "responsable") {
+    if (!maestro.userId) return false;
+    return (await prisma.record.count({ where: { responsableUserId: maestro.userId } })) > 0;
+  }
+  const idField = CAMPO_ID_POR_TIPO[maestro.tipo];
+  if (!idField) return false;
+  return (await prisma.record.count({ where: { [idField]: maestro.id } })) > 0;
 }
 
-// Devuelve, por tipo, el conjunto de valores realmente usados hoy en registros
+// Devuelve, por tipo, el conjunto de ids realmente usados hoy en registros
 // (una sola consulta por tipo en vez de N+1 por fila).
-async function usedValuesByTipo(tipo) {
+async function usedIdsByTipo(tipo) {
+  if (tipo === "responsable") {
+    const rows = await prisma.record.findMany({
+      where: { responsableUserId: { not: null } },
+      select: { responsableUserId: true },
+      distinct: ["responsableUserId"],
+    });
+    return new Set(rows.map((r) => r.responsableUserId));
+  }
+  const idField = CAMPO_ID_POR_TIPO[tipo];
+  if (!idField) return new Set();
   const rows = await prisma.record.findMany({
-    where: { [tipo]: { not: null } },
-    select: { [tipo]: true },
-    distinct: [tipo],
+    where: { [idField]: { not: null } },
+    select: { [idField]: true },
+    distinct: [idField],
   });
-  return new Set(rows.map((r) => r[tipo]).filter((v) => v !== null && v !== ""));
+  return new Set(rows.map((r) => r[idField]));
 }
 
 export async function listMaestros({ tipo, onlyActive } = {}) {
@@ -71,8 +104,10 @@ export async function listMaestros({ tipo, onlyActive } = {}) {
   const usedCache = new Map();
   const out = [];
   for (const row of rows) {
-    if (!usedCache.has(row.tipo)) usedCache.set(row.tipo, await usedValuesByTipo(row.tipo));
-    out.push(toClientMaestro(row, usedCache.get(row.tipo).has(row.valor)));
+    if (!usedCache.has(row.tipo)) usedCache.set(row.tipo, await usedIdsByTipo(row.tipo));
+    const idsUsados = usedCache.get(row.tipo);
+    const enUso = row.tipo === "responsable" ? (row.userId ? idsUsados.has(row.userId) : false) : idsUsados.has(row.id);
+    out.push(toClientMaestro(row, enUso));
   }
   return out;
 }
@@ -113,13 +148,17 @@ export async function updateMaestro(id, body, actor) {
     throw err;
   }
 
+  const enUsoAntes = await isMaestroInUse(current);
   const data = {};
   if (body.activo !== undefined) data.activo = !!body.activo;
 
   if (current.tipo === "responsable") {
-    // Igual que crear: no se acepta texto libre, solo cambiar a otro usuario.
+    // Caso distinto al resto: reasignar a otro usuario SÍ se bloquea si está
+    // en uso, porque Record referencia directo al User (responsableUserId),
+    // no a esta fila — cambiar el usuario aquí no actualizaría los registros
+    // ya atados al usuario anterior, dejaría la info desalineada.
     if (body.userId !== undefined && body.userId !== current.userId) {
-      if (await isValueInUse(current.tipo, current.valor)) {
+      if (enUsoAntes) {
         const err = new Error("No se puede editar: este valor ya está en uso en registros existentes.");
         err.status = 409;
         throw err;
@@ -129,22 +168,19 @@ export async function updateMaestro(id, body, actor) {
       data.valor = user.nombre;
     }
   } else if (body.valor !== undefined) {
+    // El valor se puede renombrar libremente, en uso o no — la referencia
+    // real es el id de esta fila (Record.<tipo>Id), que nunca cambia. Como
+    // los registros leen el valor ACTUAL del maestro al listar (ver
+    // hydrateConDatosActuales en lib/records.js), el cambio se refleja solo.
     const valor = String(body.valor).trim();
     if (!valor) throw badRequest("El valor es obligatorio.");
-    if (valor !== current.valor) {
-      if (await isValueInUse(current.tipo, current.valor)) {
-        const err = new Error("No se puede editar: este valor ya está en uso en registros existentes.");
-        err.status = 409;
-        throw err;
-      }
-      data.valor = valor;
-    }
+    data.valor = valor;
   }
 
   try {
     const row = await prisma.maestro.update({ where: { id }, data });
-    const after = toClientMaestro(row, await isValueInUse(row.tipo, row.valor));
-    await logMaestroUpdate(actor, toClientMaestro(current, false), after).catch(() => {});
+    const after = toClientMaestro(row, await isMaestroInUse(row));
+    await logMaestroUpdate(actor, toClientMaestro(current, enUsoAntes), after).catch(() => {});
     return after;
   } catch (err) {
     if (err.code === "P2002") throw badRequest("Ya existe ese valor para este maestro.");
@@ -159,7 +195,7 @@ export async function deleteMaestro(id, actor) {
     err.status = 404;
     throw err;
   }
-  if (await isValueInUse(current.tipo, current.valor)) {
+  if (await isMaestroInUse(current)) {
     const err = new Error("No se puede eliminar: este valor ya está en uso en registros existentes.");
     err.status = 409;
     throw err;

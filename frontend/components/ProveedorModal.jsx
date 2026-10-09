@@ -66,9 +66,9 @@ export default function ProveedorModal({ proveedor, onClose, onSaved }) {
                 placeholder="Sin dígito de verificación"
                 spellCheck={false}
               />
-              {isEdit && proveedor.codigo != null && (
+              {isEdit && (
                 <span className="card-sub" style={{ margin: 0 }}>
-                  Código interno #{proveedor.codigo} — la referencia real en los registros, nunca cambia aunque corrijas el nit o el nombre.
+                  Puedes corregir el nit o el nombre aunque esté en uso — la referencia real en los registros es interna y nunca cambia.
                 </span>
               )}
             </div>

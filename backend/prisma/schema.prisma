@@ -14,18 +14,23 @@ model Record {
   informe             String?
   fechaSolicitud      String?
   fechaEntrega        String?
-  area                String?
+  area                String?  // snapshot — al listar se reemplaza por Maestro.valor ACTUAL si areaId resuelve (ver hydrateConDatosActuales)
+  areaId              String?  // id del Maestro (tipo="area") — referencia real; sin FK, se valida al guardar
   responsable         String?  // nombre del responsable — snapshot al guardar; al listar se reemplaza por el nombre ACTUAL del usuario si responsableUserId resuelve (ver hydrateConDatosActuales en lib/records.js)
   responsableUserId   String?  // id del User atado como responsable — referencia real; sin FK (igual que proveedorId): se valida al guardar, nunca se borra en cascada
-  estado              String?
-  categoria           String?
+  estado              String?  // snapshot — ver areaId
+  estadoId            String?  // id del Maestro (tipo="estado")
+  categoria           String?  // snapshot — ver areaId
+  categoriaId          String? // id del Maestro (tipo="categoria")
   descripcion         String?
-  medioPago           String?
+  medioPago           String?  // snapshot — ver areaId
+  medioPagoId         String?  // id del Maestro (tipo="medioPago")
   licitacion          String?
-  estadoLegalizacion  String?
+  estadoLegalizacion  String?  // snapshot — ver areaId
+  estadoLegalizacionId String? // id del Maestro (tipo="estadoLegalizacion")
   nit                 String?  // NIT del proveedor — snapshot al guardar, para historial/export; al listar se reemplaza por el valor ACTUAL del catálogo si proveedorId resuelve (ver hydrateConDatosActuales en lib/records.js)
   proveedor           String?  // nombre del proveedor — mismo criterio: snapshot que se reemplaza por el nombre actual cuando proveedorId resuelve
-  proveedorId         Int?     // código del Proveedor (ver Proveedor.codigo) — referencia real; sin FK (igual que responsableUserId): se valida al guardar, nunca se borra en cascada
+  proveedorId         String?  // id del Proveedor — referencia real; sin FK (igual que responsableUserId): se valida al guardar, nunca se borra en cascada
   fe                  String?  // número de factura/referencia — puede repetirse (p.ej. una misma factura cubre varias compras); la duplicidad solo se advierte a nivel de aplicación, no se bloquea en la BD
   valorConIva         Float?
   valorSinIva         Float?
@@ -135,7 +140,6 @@ model Maestro {
 // registros con cascada explícita (ver lib/proveedores.js), no por join.
 model Proveedor {
   id                 String   @id @default(cuid())
-  codigo             Int      @unique @default(autoincrement()) // referencia real usada por Record.proveedorId — estable aunque cambien nit/nombre
   nit                String   @unique // sin dígito de verificación
   nombre             String
   descripcion        String   // obligatoria — qué vende/para qué sirve este proveedor (Nova la usa para sugerirlo)
