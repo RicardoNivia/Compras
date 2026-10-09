@@ -45,6 +45,14 @@ function ToggleSwitch({ checked, onChange, disabled, title }) {
 
 export default function MaestrosView({ initialMaestros, initialProveedores }) {
   const [maestros, setMaestros] = useState(initialMaestros || []);
+  // useState solo toma el valor inicial en el primer montaje: si el usuario
+  // navega a esta página por el menú lateral (navegación cliente, sin recarga
+  // completa), React reutiliza la instancia del componente y nunca vuelve a
+  // leer initialMaestros, aunque el servidor ya tenga datos distintos (p.ej.
+  // justo después de una migración de datos) — por eso se resincroniza acá.
+  useEffect(() => {
+    setMaestros(initialMaestros || []);
+  }, [initialMaestros]);
   const [tab, setTab] = useState(TIPOS_MAESTRO[0]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);

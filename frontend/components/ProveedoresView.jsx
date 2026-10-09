@@ -20,6 +20,11 @@ function ToggleSwitch({ checked, onChange, disabled, title }) {
 
 export default function ProveedoresView({ initialProveedores }) {
   const [proveedores, setProveedores] = useState(initialProveedores || []);
+  // Resincroniza si el servidor manda datos nuevos tras una navegación
+  // cliente (ver el mismo comentario en MaestrosView.jsx).
+  useEffect(() => {
+    setProveedores(initialProveedores || []);
+  }, [initialProveedores]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
