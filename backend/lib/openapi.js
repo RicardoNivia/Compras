@@ -81,6 +81,7 @@ const options = {
       { name: "Alertas", description: "Solicitudes atrasadas, riesgo de presupuesto y de tiempos." },
       { name: "Presupuesto", description: "Presupuesto por área/año (solo admin)." },
       { name: "Maestros", description: "Listas de opciones de los formularios (solo admin)." },
+      { name: "Proveedores", description: "Catálogo de proveedores (nit + nombre) para el autocompletar del formulario de registros (solo admin para escribir)." },
       { name: "Permisos", description: "Matriz de permisos por rol (solo admin)." },
       { name: "Informes", description: "Informes automáticos por correo (solo admin)." },
     ],

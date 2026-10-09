@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { FIELD_LABELS, MAESTRO_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS } from "@/lib/auditLabels";
+import { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS } from "@/lib/auditLabels";
 
-export { FIELD_LABELS, MAESTRO_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, ACTION_LABELS } from "@/lib/auditLabels";
+export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, ACTION_LABELS } from "@/lib/auditLabels";
 
 // Nombre corto del tipo de maestro para el resumen del log — copia local
 // (sin importar lib/maestros.js) para no crear una dependencia circular
@@ -99,6 +99,29 @@ export async function logMaestroUpdate(actor, before, after) {
 export async function logMaestroDelete(actor, maestro) {
   const changes = diffFields(maestro, null, MAESTRO_FIELD_LABELS);
   await writeLog({ action: "eliminar", entityType: "maestro", recordId: maestro.id, recordInfo: maestroSummary(maestro), actor, changes });
+}
+
+// ---------- Proveedores ----------
+
+function proveedorSummary(p) {
+  if (!p) return null;
+  return `${p.nombre} (NIT ${p.nit})`;
+}
+
+export async function logProveedorCreate(actor, proveedor) {
+  const changes = diffFields(null, proveedor, PROVEEDOR_FIELD_LABELS);
+  await writeLog({ action: "crear", entityType: "proveedor", recordId: proveedor.id, recordInfo: proveedorSummary(proveedor), actor, changes });
+}
+
+export async function logProveedorUpdate(actor, before, after) {
+  const changes = diffFields(before, after, PROVEEDOR_FIELD_LABELS);
+  if (!changes.length) return;
+  await writeLog({ action: "editar", entityType: "proveedor", recordId: after.id, recordInfo: proveedorSummary(after), actor, changes });
+}
+
+export async function logProveedorDelete(actor, proveedor) {
+  const changes = diffFields(proveedor, null, PROVEEDOR_FIELD_LABELS);
+  await writeLog({ action: "eliminar", entityType: "proveedor", recordId: proveedor.id, recordInfo: proveedorSummary(proveedor), actor, changes });
 }
 
 // ---------- Usuarios ----------

@@ -2,9 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import MaestroModal from "@/components/MaestroModal";
+import ProveedoresView from "@/components/ProveedoresView";
 import { TIPOS_MAESTRO, TIPO_LABELS } from "@/lib/maestrosTipos";
 import { updateMaestroApi, deleteMaestroApi } from "@/lib/api";
 import { IconPlus, IconEdit, IconTrash, IconSearch, IconBuilding, IconUsers, IconFlag, IconMoney, IconFile, IconLayers } from "@/components/icons";
+
+// "proveedores" no es un tipo de Maestro (Record.proveedor/nit no son FK a
+// este catálogo) sino un modelo propio (ver backend/lib/proveedores.js), pero
+// comparte la misma pantalla de administración por simplicidad de navegación.
+const PROVEEDORES_TAB = "proveedores";
 
 const EN_USO_TITLE = "No se puede editar ni eliminar: este valor ya está en uso en uno o más registros. Puedes inactivarlo para que deje de ofrecerse en el formulario.";
 
@@ -37,8 +43,16 @@ function ToggleSwitch({ checked, onChange, disabled, title }) {
   );
 }
 
-export default function MaestrosView({ initialMaestros }) {
+export default function MaestrosView({ initialMaestros, initialProveedores }) {
   const [maestros, setMaestros] = useState(initialMaestros || []);
+  // useState solo toma el valor inicial en el primer montaje: si el usuario
+  // navega a esta página por el menú lateral (navegación cliente, sin recarga
+  // completa), React reutiliza la instancia del componente y nunca vuelve a
+  // leer initialMaestros, aunque el servidor ya tenga datos distintos (p.ej.
+  // justo después de una migración de datos) — por eso se resincroniza acá.
+  useEffect(() => {
+    setMaestros(initialMaestros || []);
+  }, [initialMaestros]);
   const [tab, setTab] = useState(TIPOS_MAESTRO[0]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -135,9 +149,20 @@ export default function MaestrosView({ initialMaestros }) {
               </button>
             );
           })}
+          <button
+            type="button"
+            className={`maestros-nav-item${tab === PROVEEDORES_TAB ? " active" : ""}`}
+            onClick={() => setTab(PROVEEDORES_TAB)}
+          >
+            <span className="ic"><IconBuilding size={16} /></span>
+            Proveedores
+          </button>
         </nav>
       </aside>
 
+      {tab === PROVEEDORES_TAB ? (
+        <ProveedoresView initialProveedores={initialProveedores} />
+      ) : (
       <section className="maestros-main">
         <div className="maestros-toolbar">
           <div className="maestros-search-wrap">
@@ -250,8 +275,9 @@ export default function MaestrosView({ initialMaestros }) {
           <span className="count-note">{rows.length} registro(s)</span>
         </div>
       </section>
+      )}
 
-      {modalOpen && (
+      {tab !== PROVEEDORES_TAB && modalOpen && (
         <MaestroModal
           tipo={tab}
           maestro={editing}

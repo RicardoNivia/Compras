@@ -8,6 +8,7 @@ export const FIELD_LABELS = {
   fechaEntrega: "Fecha entrega",
   area: "Área",
   responsable: "Responsable",
+  responsableUserId: "Usuario responsable (id)",
   estado: "Estado",
   categoria: "Categoría",
   descripcion: "Descripción",
@@ -30,6 +31,16 @@ export const FIELD_LABELS = {
 export const MAESTRO_FIELD_LABELS = {
   tipo: "Tipo",
   valor: "Valor",
+  activo: "Activo",
+};
+
+export const PROVEEDOR_FIELD_LABELS = {
+  nit: "Nit",
+  nombre: "Nombre",
+  descripcion: "Descripción",
+  telefono: "Teléfono de contacto",
+  correo: "Correo de contacto",
+  documentacionAlDia: "Documentación al día",
   activo: "Activo",
 };
 

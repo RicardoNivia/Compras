@@ -63,7 +63,7 @@ function sortValue(r, key) {
   return v;
 }
 
-export default function RegistrosView({ records, setRecords, onFilteredChange, currentUser, maestros, presupuestos = [] }) {
+export default function RegistrosView({ records, setRecords, onFilteredChange, currentUser, maestros, proveedores = [], presupuestos = [] }) {
   const role = currentUser?.role;
   const permissions = currentUser?.permissions;
   const allowCreate = permissions?.createRecord ?? canCreateRecord(role);
@@ -568,6 +568,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
           allowDelete={allowDelete}
           editableFields={modalRecord ? editableFields : null}
           maestros={maestros}
+          proveedores={proveedores}
           presupuestos={presupuestos}
         />
       )}

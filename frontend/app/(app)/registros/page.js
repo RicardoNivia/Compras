@@ -11,13 +11,15 @@ export default async function RegistrosPage() {
   if (!user) redirect("/login");
 
   const seePresupuesto = user.permissions?.viewPresupuesto ?? canViewPresupuesto(user.role);
-  const [recordsRes, maestrosRes, presupuestosRes] = await Promise.all([
+  const [recordsRes, maestrosRes, proveedoresRes, presupuestosRes] = await Promise.all([
     backendFetch("/api/records"),
     backendFetch("/api/maestros?onlyActive=1"),
+    backendFetch("/api/proveedores?onlyActive=1"),
     seePresupuesto ? backendFetch("/api/presupuestos") : Promise.resolve(null),
   ]);
   const { records } = await recordsRes.json();
   const { maestros } = await maestrosRes.json();
+  const { proveedores } = await proveedoresRes.json();
   const presupuestos = presupuestosRes ? (await presupuestosRes.json()).presupuestos : [];
 
   return (
@@ -26,6 +28,7 @@ export default async function RegistrosPage() {
       initialRecords={records}
       currentUser={user}
       maestros={maestros}
+      proveedores={proveedores}
       presupuestos={presupuestos}
     />
   );
