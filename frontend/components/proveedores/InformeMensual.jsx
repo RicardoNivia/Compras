@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchInformeMensual } from "@/lib/api";
 import { saveBlob } from "@/lib/exportHelpers";
+import { usePantallaNova } from "@/lib/novaPantalla";
 
 const COLOR = { activo: "var(--good)", pendiente: "var(--warning)", inactivo: "var(--critical)" };
 const PDF = { navy: [12, 39, 72], blue: [27, 95, 184], ink: [11, 34, 57], muted: [100, 125, 151], activo: [11, 107, 46], pendiente: [217, 119, 6], inactivo: [185, 28, 28], nuevo: [27, 95, 184], act: [79, 151, 232] };
@@ -104,6 +105,11 @@ export default function InformeMensual({ initial = null }) {
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(!initial);
   const [exportando, setExportando] = useState("");
+  usePantallaNova(
+    data
+      ? `Pantalla Informe mensual de proveedores, mes ${data.titulo}: ${data.kpis.nuevos} proveedores nuevos, ${data.kpis.actualizados} actualizados, ${data.kpis.cambios} cambios hechos en la app, ${data.kpis.pasadosAprobado} pasados a Actualizado; ${data.excepciones.length} excepciones con fecha en el mes. Situación actual: ${data.situacion.registrados} registrados, ${data.situacion.aprobados} aprobados, ${data.situacion.aptos} aptos para orden de compra, ${data.situacion.pendientes} pendientes, ${data.situacion.inactivos} inactivos. Muestra tendencia de 6 meses, estado y movimiento por área, listas del mes y botones Excel y PDF.`
+      : "Pantalla Informe mensual de proveedores (cargando)."
+  );
 
   useEffect(() => {
     if (initial && anio === initial.anio && mes === initial.mes) return;

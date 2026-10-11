@@ -8,6 +8,7 @@ import PieChartSvg from "@/components/charts/PieChartSvg";
 import GaugeSvg from "@/components/charts/GaugeSvg";
 import ExplicarProveedoresIA from "@/components/proveedores/ExplicarProveedoresIA";
 import { saveBlob } from "@/lib/exportHelpers";
+import { usePantallaNova } from "@/lib/novaPantalla";
 import { fmtCOP } from "@/lib/format";
 
 const entero = (v) => String(Math.round(v));
@@ -20,6 +21,9 @@ const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
 // y explicar con IA (alertas, notificaciones y sugerencias).
 export default function IndicadoresProveedores({ data }) {
   const { estados, clasificacion, criticidad } = data;
+  usePantallaNova(
+    `Pantalla Indicadores de proveedores, ciclo ${data.anio}: ${data.enCiclo} proveedores en el ciclo de ${data.total}, ${data.pctActualizado}% actualizados (${estados.actualizado} actualizados, ${estados.desactualizado} desactualizados, ${estados.en_proceso + estados.en_aprobacion} en trámite), ${data.criticos.pendientes} de ${data.criticos.total} críticos pendientes, ${data.checklistIncompleto} con checklist incompleto, ${data.diasParaCorte} días para el corte. Clasificación: Actualización ${clasificacion.actualizacion}, Nuevos ${clasificacion.nuevo}, Excepciones ${clasificacion.excepcion}, Inactivos ${clasificacion.inactivo}, Por registrar ${clasificacion.por_registrar || 0}. Gráficos: avance del ciclo, actualizaciones por mes, estado por área, clasificación, criticidad. Botones: Explicar con Nova, Excel, PDF.`
+  );
   const [exportando, setExportando] = useState("");
   const [errorExport, setErrorExport] = useState("");
 

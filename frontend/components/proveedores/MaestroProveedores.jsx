@@ -9,6 +9,7 @@ import BuscarConNova from "@/components/proveedores/BuscarConNova";
 import ProveedorDetalleModal from "@/components/proveedores/ProveedorDetalleModal";
 import ProveedorFormModal from "@/components/proveedores/ProveedorFormModal";
 import InformeMensualModal from "@/components/proveedores/InformeMensualModal";
+import { usePantallaNova } from "@/lib/novaPantalla";
 
 const VACIO = { q: "", clasificacion: [], estado: [], checklist: "", criticidad: "", areaId: "" };
 const PAGE_SIZES = [25, 50, 100];
@@ -194,6 +195,10 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
   const conMotivo = ["excepciones", "inactivos", "por_registrar"].includes(pestana);
   const seleccionable = canEdit && (esChecklist || conEstado);
   const todosMarcados = visibles.filter((r) => r.ciclo).length > 0 && visibles.filter((r) => r.ciclo).every((r) => seleccion.has(r.id));
+  const hayFiltros = JSON.stringify(filters) !== JSON.stringify(VACIO);
+  usePantallaNova(
+    `Pantalla Gestión de proveedores (ciclo ${data.anio}, corte en ${data.diasParaCorte} días). Pestaña activa: ${actual.label} con ${filas.length} proveedores${conToggle && soloIncompletos[pestana] ? " (solo con checklist incompleto)" : ""}. Conteos por pestaña: ${PESTANAS.map((p) => `${p.label} ${conteos[p.key]}`).join(", ")}. Filtros activos: ${hayFiltros ? "sí" : "ninguno"}.${seleccion.size ? ` Seleccionados: ${seleccion.size}.` : ""}`
+  );
   const columnas = 6 + (esChecklist ? 12 : conEstado ? 4 : 2) + (seleccionable ? 1 : 0);
 
   function alternarSeleccion(id) {
