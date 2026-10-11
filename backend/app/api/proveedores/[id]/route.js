@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { updateProveedor, deleteProveedor } from "@/lib/proveedores";
+import { getProveedorDetalle } from "@/lib/proveedoresCiclo";
 import { requirePermission, apiError } from "@/lib/apiGuard";
 
 /**
@@ -22,7 +23,6 @@ import { requirePermission, apiError } from "@/lib/apiGuard";
  *               descripcion: { type: string }
  *               telefono: { type: string }
  *               correo: { type: string }
- *               documentacionAlDia: { type: boolean }
  *               activo: { type: boolean }
  *     responses:
  *       200:
@@ -47,7 +47,7 @@ import { requirePermission, apiError } from "@/lib/apiGuard";
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function PATCH(request, { params }) {
-  const { user, denied } = await requirePermission("viewMaestros");
+  const { user, denied } = await requirePermission("editProveedores");
   if (denied) return denied;
   try {
     const body = await request.json();
@@ -89,11 +89,28 @@ export async function PATCH(request, { params }) {
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function DELETE(_request, { params }) {
-  const { user, denied } = await requirePermission("viewMaestros");
+  const { user, denied } = await requirePermission("editProveedores");
   if (denied) return denied;
   try {
     await deleteProveedor(params.id, user);
     return NextResponse.json({ ok: true });
+  } catch (err) {
+    return apiError(err);
+  }
+}
+
+/**
+ * @openapi
+ * /api/proveedores/{id}:
+ *   get:
+ *     tags: [Proveedores]
+ *     summary: Ficha del proveedor — datos, estado y checklist del ciclo vigente, alerta y histórico por ciclo (requiere permiso "viewProveedores").
+ */
+export async function GET(_request, { params }) {
+  const { denied } = await requirePermission("viewProveedores");
+  if (denied) return denied;
+  try {
+    return NextResponse.json(await getProveedorDetalle(params.id));
   } catch (err) {
     return apiError(err);
   }

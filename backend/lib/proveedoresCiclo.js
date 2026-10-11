@@ -1,0 +1,517 @@
+import { prisma } from "@/lib/prisma";
+import {
+  logCicloEstado, logCicloDocumento, logCicloIniciado, logProveedorUpdate, logConfigProveedoresUpdate,
+} from "@/lib/audit";
+import {
+  CONFIG_PROVEEDORES_DEFAULT, ESTADO_CICLO_LABELS, CLAVES_CHECKLIST, CLASIFICACION_LABELS,
+  anioCicloVigente, inicioCiclo, finCicloFecha, diasParaCorte, clasificacionEn, estadoInicial,
+  checklistDe, alertaCompras, puedeCambiarEstado, validarConfig,
+} from "@/lib/proveedoresCicloReglas";
+
+function badRequest(message) {
+  const err = new Error(message);
+  err.status = 400;
+  return err;
+}
+
+function notFound(message = "Proveedor no encontrado.") {
+  const err = new Error(message);
+  err.status = 404;
+  return err;
+}
+
+// ---------- Configuración ----------
+
+export async function getConfigProveedores() {
+  const row = await prisma.configProveedores.findFirst();
+  if (row) return { diaCorte: row.diaCorte, mesCorte: row.mesCorte, diasAviso: row.diasAviso };
+  return { ...CONFIG_PROVEEDORES_DEFAULT };
+}
+
+export async function updateConfigProveedores(body, actor) {
+  const next = {
+    diaCorte: Number(body.diaCorte),
+    mesCorte: Number(body.mesCorte),
+    diasAviso: Number(body.diasAviso),
+  };
+  const error = validarConfig(next);
+  if (error) throw badRequest(error);
+
+  const before = await getConfigProveedores();
+  const existing = await prisma.configProveedores.findFirst();
+  if (existing) await prisma.configProveedores.update({ where: { id: existing.id }, data: next });
+  else await prisma.configProveedores.create({ data: next });
+
+  await logConfigProveedoresUpdate(actor, before, next).catch(() => {});
+  return next;
+}
+
+// ---------- Ciclo vigente y su inicio (1 de abril) ----------
+
+// Crea la fila de ciclo de un proveedor si todavía no existe. Devuelve null si
+// el proveedor no entra al ciclo (excepción, inactivo o creado después del ciclo).
+async function getOrCreateCiclo(proveedor, anio, tx = prisma) {
+  const clasificacion = clasificacionEn(proveedor, anio);
+  if (clasificacion !== "actualizacion" && clasificacion !== "nuevo") return null;
+  return tx.proveedorCiclo.upsert({
+    where: { proveedorId_anio: { proveedorId: proveedor.id, anio } },
+    update: {},
+    create: { proveedorId: proveedor.id, anio, clasificacion, estado: estadoInicial(clasificacion) },
+  });
+}
+
+// Se ejecuta en cada lectura del módulo: si el ciclo vigente aún no se inició,
+// crea el estado de todos los proveedores que entran y lo marca como iniciado.
+// Es idempotente (CicloProveedorIniciado.anio es único).
+export async function asegurarCicloVigente(now = new Date()) {
+  const cfg = await getConfigProveedores();
+  const anio = anioCicloVigente(now, cfg);
+  const ya = await prisma.cicloProveedorIniciado.findUnique({ where: { anio } });
+  if (ya) return anio;
+
+  const proveedores = await prisma.proveedor.findMany();
+  let cantidad = 0;
+  await prisma.$transaction(async (tx) => {
+    const marca = await tx.cicloProveedorIniciado.findUnique({ where: { anio } });
+    if (marca) return;
+    for (const p of proveedores) {
+      const fila = await getOrCreateCiclo(p, anio, tx);
+      if (fila && fila.estado === "desactualizado") cantidad++;
+    }
+    await tx.cicloProveedorIniciado.create({ data: { anio, cantidad } });
+  });
+  await logCicloIniciado(anio, cantidad).catch(() => {});
+  return anio;
+}
+
+// ---------- Vistas de proveedor ----------
+
+async function cargarProveedorCompleto(id, anio) {
+  const row = await prisma.proveedor.findUnique({
+    where: { id },
+    include: { ciclos: { include: { documentos: true }, orderBy: { anio: "desc" } } },
+  });
+  return row;
+}
+
+// Solo las marcas explícitas: un requisito sin marca usa su valor automático (ver checklistDe).
+function documentosDe(ciclo) {
+  const docs = {};
+  for (const d of ciclo?.documentos || []) docs[d.clave] = d.cumple;
+  return docs;
+}
+
+function filaCiclo(ciclo) {
+  if (!ciclo) return null;
+  return {
+    anio: ciclo.anio,
+    clasificacion: ciclo.clasificacion,
+    clasificacionLabel: CLASIFICACION_LABELS[ciclo.clasificacion] || ciclo.clasificacion,
+    estado: ciclo.estado,
+    estadoLabel: ESTADO_CICLO_LABELS[ciclo.estado] || ciclo.estado,
+    aprobadoPorNombre: ciclo.aprobadoPorNombre,
+    aprobadoAt: ciclo.aprobadoAt,
+    documentos: documentosDe(ciclo),
+  };
+}
+
+function toClienteProveedor(p) {
+  return {
+    id: p.id,
+    nit: p.nit,
+    nombre: p.nombre,
+    descripcion: p.descripcion,
+    telefono: p.telefono,
+    correo: p.correo,
+    internacional: p.internacional,
+    activo: p.activo,
+    inactivoMotivo: p.inactivoMotivo,
+    criticidad: p.criticidad,
+    areaId: p.areaId,
+    area: p.area,
+    servicio: p.servicio,
+    clasificacionMonto: p.clasificacionMonto,
+    revision: p.revision,
+    observacion: p.observacion,
+    fechaInvitacion: p.fechaInvitacion,
+    esExcepcion: p.esExcepcion,
+    motivoExcepcionId: p.motivoExcepcionId,
+    motivoExcepcion: p.motivoExcepcion,
+    justificacionExcepcion: p.justificacionExcepcion,
+    radicaFacturas: p.radicaFacturas,
+    fechaActualizacion: p.fechaActualizacion,
+    createdAt: p.createdAt,
+  };
+}
+
+// Un proveedor con su estado del ciclo vigente, checklist y alerta de Compras.
+function resumenProveedor(p, anio, ciclo) {
+  const fila = filaCiclo(ciclo);
+  const manuales = fila ? fila.documentos : {};
+  const checklist = checklistDe(p, manuales);
+  const clasificacion = clasificacionEn(p, anio);
+  return {
+    ...toClienteProveedor(p),
+    clasificacion,
+    clasificacionLabel: CLASIFICACION_LABELS[clasificacion] || clasificacion,
+    ciclo: fila,
+    checklist,
+    alerta: alertaCompras(p, ciclo ? { ...fila, anio } : null, checklist),
+  };
+}
+
+export async function getProveedorDetalle(id) {
+  const anio = await asegurarCicloVigente();
+  const p = await cargarProveedorCompleto(id, anio);
+  if (!p) throw notFound();
+  const cicloVigente = p.ciclos.find((c) => c.anio === anio) || null;
+  const resumen = resumenProveedor(p, anio, cicloVigente);
+  const historial = p.ciclos.filter((c) => c.anio !== anio).map(filaCiclo);
+  const diasSinGestion = cicloVigente ? Math.floor((Date.now() - new Date(cicloVigente.updatedAt).getTime()) / 86400000) : null;
+  return { anio, ...resumen, diasSinGestion, historial, fechaCorte: finCicloFecha(anio, await getConfigProveedores()), inicioCiclo: inicioCiclo(anio, await getConfigProveedores()) };
+}
+
+// ---------- Listado del maestro (con filtros combinables) ----------
+
+export async function listMaestroProveedores(filtros = {}) {
+  const anio = await asegurarCicloVigente();
+  const rows = await prisma.proveedor.findMany({
+    orderBy: { nombre: "asc" },
+    include: { ciclos: { where: { anio }, include: { documentos: true } } },
+  });
+
+  const todos = rows.map((p) => resumenProveedor(p, anio, p.ciclos[0] || null));
+
+  const q = String(filtros.q || "").trim().toLowerCase();
+  const clasif = filtros.clasificacion ? [].concat(filtros.clasificacion) : [];
+  const estados = filtros.estado ? [].concat(filtros.estado) : [];
+  const checklist = filtros.checklist || "";
+  const criticidad = filtros.criticidad || "";
+  const areaId = filtros.areaId || "";
+
+  const filtrados = todos.filter((r) => {
+    if (clasif.length && !clasif.includes(r.clasificacion)) return false;
+    if (estados.length && !(r.ciclo && estados.includes(r.ciclo.estado))) return false;
+    if (checklist === "completo" && r.checklist.completos !== r.checklist.total) return false;
+    if (checklist === "incompleto" && r.checklist.completos === r.checklist.total) return false;
+    if (criticidad && r.criticidad !== criticidad) return false;
+    if (areaId && r.areaId !== areaId) return false;
+    if (q && !`${r.nombre} ${r.nit}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const conteos = {
+    clasificacion: { actualizacion: 0, nuevo: 0, excepcion: 0, inactivo: 0, por_registrar: 0 },
+    estado: { desactualizado: 0, en_proceso: 0, en_aprobacion: 0, actualizado: 0 },
+  };
+  for (const r of todos) {
+    if (conteos.clasificacion[r.clasificacion] !== undefined) conteos.clasificacion[r.clasificacion]++;
+    if (r.ciclo && conteos.estado[r.ciclo.estado] !== undefined) conteos.estado[r.ciclo.estado]++;
+  }
+
+  return { anio, diasParaCorte: diasParaCorte(new Date(), await getConfigProveedores()), total: todos.length, conteos, rows: filtrados };
+}
+
+// ---------- Cambios sobre el ciclo ----------
+
+async function cicloVigenteDe(proveedorId, anio) {
+  const p = await cargarProveedorCompleto(proveedorId, anio);
+  if (!p) throw notFound();
+  const ciclo = await getOrCreateCiclo(p, anio);
+  if (!ciclo) throw badRequest("Este proveedor no participa en el ciclo de actualización (excepción, inactivo o posterior al ciclo).");
+  return { p, ciclo: await prisma.proveedorCiclo.findUnique({ where: { id: ciclo.id }, include: { documentos: true } }) };
+}
+
+export async function cambiarEstadoCiclo(proveedorId, { estado }, actor) {
+  const anio = await asegurarCicloVigente();
+  const { p, ciclo } = await cicloVigenteDe(proveedorId, anio);
+  const checklist = checklistDe(p, documentosDe(ciclo));
+  const check = puedeCambiarEstado(ciclo.estado, estado, checklist.completos === checklist.total);
+  if (!check.ok) throw badRequest(check.motivo);
+
+  const antes = filaCiclo(ciclo);
+  const data = { estado };
+  if (estado === "actualizado") {
+    data.aprobadoPorUserId = actor?.id || null;
+    data.aprobadoPorNombre = actor?.nombre || null;
+    data.aprobadoAt = new Date();
+  } else {
+    // Al salir de "actualizado" ya no hay aprobación vigente.
+    data.aprobadoPorUserId = null;
+    data.aprobadoPorNombre = null;
+    data.aprobadoAt = null;
+  }
+  const actualizado = await prisma.proveedorCiclo.update({ where: { id: ciclo.id }, data, include: { documentos: true } });
+  if (estado === "actualizado") await prisma.proveedor.update({ where: { id: p.id }, data: { fechaActualizacion: new Date() } });
+  await logCicloEstado(actor, p, anio, { estado: antes.estado }, { estado }).catch(() => {});
+  return { anio, ...resumenProveedor(p, anio, actualizado) };
+}
+
+export async function setDocumentoCiclo(proveedorId, { clave, cumple }, actor) {
+  if (!CLAVES_CHECKLIST.includes(clave)) throw badRequest("Requisito inválido.");
+  const anio = await asegurarCicloVigente();
+  const { p, ciclo } = await cicloVigenteDe(proveedorId, anio);
+  const previo = await prisma.proveedorCicloDocumento.findUnique({ where: { cicloId_clave: { cicloId: ciclo.id, clave } } });
+  const valor = !!cumple;
+  await prisma.proveedorCicloDocumento.upsert({
+    where: { cicloId_clave: { cicloId: ciclo.id, clave } },
+    update: { cumple: valor, verificadoPorUserId: valor ? actor?.id || null : null, verificadoPorNombre: valor ? actor?.nombre || null : null, verificadoAt: valor ? new Date() : null },
+    create: { cicloId: ciclo.id, clave, cumple: valor, verificadoPorUserId: valor ? actor?.id || null : null, verificadoPorNombre: valor ? actor?.nombre || null : null, verificadoAt: valor ? new Date() : null },
+  });
+  await logCicloDocumento(actor, p, anio, clave, !!previo?.cumple, valor).catch(() => {});
+  const actualizado = await prisma.proveedorCiclo.findUnique({ where: { id: ciclo.id }, include: { documentos: true } });
+  return { anio, ...resumenProveedor(p, anio, actualizado) };
+}
+
+// Excepciones e inactivos. Nunca borran el histórico: solo cambian la clasificación.
+export async function cambiarClasificacion(proveedorId, { accion, motivoExcepcionId, justificacion, inactivoMotivo, radica }, actor) {
+  const anio = await asegurarCicloVigente();
+  const antes = await prisma.proveedor.findUnique({ where: { id: proveedorId } });
+  if (!antes) throw notFound();
+  const before = toClienteProveedor(antes);
+  let data;
+
+  if (accion === "excepcion") {
+    const motivo = motivoExcepcionId
+      ? await prisma.maestro.findFirst({ where: { id: motivoExcepcionId, tipo: "motivoExcepcion", activo: true } })
+      : null;
+    if (!motivo) throw badRequest("Elige un motivo de excepción válido (Maestros › Proveedores).");
+    data = {
+      esExcepcion: true,
+      motivoExcepcionId: motivo.id,
+      motivoExcepcion: motivo.valor,
+      justificacionExcepcion: String(justificacion || "").trim() || null,
+      fechaExcepcion: new Date(),
+    };
+  } else if (accion === "radicar") {
+    if (!antes.esExcepcion) throw badRequest("Solo las excepciones radican facturas.");
+    data = { radicaFacturas: !!radica, radicaFacturasAt: radica ? new Date() : null };
+  } else if (accion === "quitar-excepcion") {
+    data = { esExcepcion: false, motivoExcepcionId: null, motivoExcepcion: null, justificacionExcepcion: null };
+  } else if (accion === "inactivar") {
+    const motivo = String(inactivoMotivo || "").trim();
+    if (!motivo) throw badRequest("Indica el motivo de inactivación.");
+    data = { activo: false, inactivoMotivo: motivo };
+  } else if (accion === "reactivar") {
+    data = { activo: true, inactivoMotivo: null };
+  } else {
+    throw badRequest("Acción inválida.");
+  }
+
+  const row = await prisma.proveedor.update({ where: { id: proveedorId }, data });
+  // Al quitar una excepción o reactivar, el proveedor entra al ciclo vigente.
+  if (accion === "quitar-excepcion" || accion === "reactivar") await getOrCreateCiclo(row, anio);
+
+  await logProveedorUpdate(actor, before, toClienteProveedor(row)).catch(() => {});
+  return getProveedorDetalle(proveedorId);
+}
+
+// ---------- Indicadores ----------
+
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+// Mes (aaaa-mm) en hora de Colombia, igual que las reglas de corte.
+function claveMes(fecha) {
+  const d = new Date(new Date(fecha).getTime() - 5 * 60 * 60 * 1000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export async function indicadoresCiclo() {
+  const anio = await asegurarCicloVigente();
+  const cfg = await getConfigProveedores();
+  const inicio = inicioCiclo(anio, cfg);
+  const proveedores = await prisma.proveedor.findMany({
+    include: { ciclos: { where: { anio }, include: { documentos: true } } },
+  });
+
+  const clasificacion = { actualizacion: 0, nuevo: 0, excepcion: 0, inactivo: 0, por_registrar: 0 };
+  const estados = { desactualizado: 0, en_proceso: 0, en_aprobacion: 0, actualizado: 0 };
+  const criticidad = { Critico: 0, "No crítico": 0, "Sin definir": 0 };
+  const mapa = { actualizado: 0, en_aprobacion: 0, en_proceso: 0, desactualizado: 0, nuevo: 0, excepcion: 0, inactivo: 0 };
+  const areas = new Map();
+  const mesesActualizados = new Map();
+  const atencion = [];
+  const conAlerta = new Map();
+  let criticos = 0;
+  let criticosPendientes = 0;
+  let checklistIncompleto = 0;
+
+  for (const p of proveedores) {
+    const ciclo = p.ciclos[0] || null;
+    const cls = clasificacionEn(p, anio);
+    if (clasificacion[cls] !== undefined) clasificacion[cls]++;
+
+    const fila = filaCiclo(ciclo);
+    const checklist = checklistDe(p, fila ? fila.documentos : {});
+    const alerta = alertaCompras(p, ciclo ? { ...fila, anio } : null, checklist);
+    if (alerta.nivel === "aviso" || alerta.nivel === "inactivo") conAlerta.set(p.id, p);
+
+    if (cls === "por_registrar") continue;
+    if (cls === "excepcion" || cls === "inactivo") {
+      mapa[cls]++;
+      continue;
+    }
+
+    criticidad[p.criticidad || "Sin definir"] = (criticidad[p.criticidad || "Sin definir"] || 0) + 1;
+    if (cls === "nuevo") mapa.nuevo++;
+    if (!ciclo) continue;
+
+    mapa[ciclo.estado]++;
+    estados[ciclo.estado]++;
+    if (checklist.completos < checklist.total) checklistIncompleto++;
+
+    if (ciclo.estado === "actualizado" && ciclo.aprobadoAt && new Date(ciclo.aprobadoAt) >= inicio) {
+      const k = claveMes(ciclo.aprobadoAt);
+      mesesActualizados.set(k, (mesesActualizados.get(k) || 0) + 1);
+    }
+
+    if (cls === "actualizacion") {
+      const area = p.area || "Sin área";
+      const a = areas.get(area) || { area, actualizado: 0, aprobacion: 0, sinActualizar: 0 };
+      if (ciclo.estado === "actualizado") a.actualizado++;
+      else if (ciclo.estado === "en_aprobacion" || ciclo.estado === "en_proceso") a.aprobacion++;
+      else a.sinActualizar++;
+      areas.set(area, a);
+
+      if (p.criticidad === "Critico") {
+        criticos++;
+        if (ciclo.estado !== "actualizado") {
+          criticosPendientes++;
+          atencion.push({ id: p.id, nombre: p.nombre, nit: p.nit, area: p.area, estado: ciclo.estado, estadoLabel: ESTADO_CICLO_LABELS[ciclo.estado] });
+        }
+      }
+    }
+  }
+
+  // Meses del ciclo (abr → mar con el corte por defecto), con 0 donde no hubo actualizaciones.
+  const porMes = [];
+  const base = new Date(inicio.getTime() - 5 * 60 * 60 * 1000);
+  const ahora = claveMes(new Date());
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + i, 1));
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    porMes.push({ key, label: MESES_CORTOS[d.getUTCMonth()], value: mesesActualizados.get(key) || 0, highlighted: key === ahora });
+  }
+
+  // Compras del ciclo hechas con proveedores que hoy tienen alerta (desactualizados o inactivos).
+  let comprasConAlerta = { proveedores: 0, registros: 0, valor: 0, top: [] };
+  if (conAlerta.size) {
+    const desde = new Date(inicio.getTime() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const grupos = await prisma.record.groupBy({
+      by: ["proveedorId"],
+      where: { proveedorId: { in: [...conAlerta.keys()] }, fechaSolicitud: { gte: desde } },
+      _count: { _all: true },
+      _sum: { valorConIva: true },
+    });
+    const top = grupos
+      .map((g) => ({ nombre: conAlerta.get(g.proveedorId)?.nombre || "—", registros: g._count._all, valor: g._sum.valorConIva || 0 }))
+      .sort((a, b) => b.valor - a.valor);
+    comprasConAlerta = {
+      proveedores: grupos.length,
+      registros: grupos.reduce((s, g) => s + g._count._all, 0),
+      valor: grupos.reduce((s, g) => s + (g._sum.valorConIva || 0), 0),
+      top: top.slice(0, 5),
+    };
+  }
+
+  // Los proveedores que entran al próximo ciclo: activos, no excepción y ya creados.
+  const proximoCiclo = proveedores.filter((p) => {
+    const c = clasificacionEn(p, anio + 1);
+    return c === "actualizacion" || c === "nuevo";
+  }).length;
+
+  const enCiclo = estados.desactualizado + estados.en_proceso + estados.en_aprobacion + estados.actualizado;
+
+  return {
+    anio,
+    diasParaCorte: diasParaCorte(new Date(), cfg),
+    total: proveedores.length,
+    enCiclo,
+    pctActualizado: enCiclo ? Math.round((estados.actualizado / enCiclo) * 100) : 0,
+    clasificacion,
+    estados,
+    mapa,
+    criticidad,
+    checklistIncompleto,
+    porMes,
+    areas: [...areas.values()].sort((a, b) => (b.actualizado + b.aprobacion + b.sinActualizar) - (a.actualizado + a.aprobacion + a.sinActualizar)),
+    criticos: { total: criticos, pendientes: criticosPendientes },
+    atencion: atencion.slice(0, 10),
+    comprasConAlerta,
+    proximoCiclo: { anio: anio + 1, desactualizados: proximoCiclo, fecha: finCicloFecha(anio, cfg) },
+  };
+}
+
+// Mapa proveedorId → alerta del ciclo vigente, para la tabla de Registros.
+export async function alertasPorProveedor() {
+  const anio = await asegurarCicloVigente();
+  const rows = await prisma.proveedor.findMany({ include: { ciclos: { where: { anio }, include: { documentos: true } } } });
+  const out = {};
+  for (const p of rows) {
+    const ciclo = p.ciclos[0] || null;
+    const fila = filaCiclo(ciclo);
+    const checklist = checklistDe(p, fila ? fila.documentos : {});
+    const alerta = alertaCompras(p, ciclo ? { ...fila, anio } : null, checklist);
+    if (alerta.nivel !== "ok") out[p.id] = { nivel: alerta.nivel, titulo: alerta.titulo };
+  }
+  return out;
+}
+
+// ---------- Acciones masivas (varios proveedores a la vez) ----------
+
+function idsDe(ids) {
+  const lista = [...new Set((Array.isArray(ids) ? ids : []).filter((x) => typeof x === "string" && x))].slice(0, 500);
+  if (!lista.length) throw badRequest("Selecciona al menos un proveedor.");
+  return lista;
+}
+
+// "Marcar todos los requisitos" (cumple=true) o "Restablecer" (cumple=false: se borran las marcas
+// y cada requisito vuelve a su valor automático). Una sola entrada de auditoría por proveedor.
+export async function setChecklistMasivo(ids, cumple, actor) {
+  const lista = idsDe(ids);
+  const anio = await asegurarCicloVigente();
+  let actualizados = 0;
+  const omitidos = [];
+  for (const id of lista) {
+    try {
+      const { p, ciclo } = await cicloVigenteDe(id, anio);
+      const antes = checklistDe(p, documentosDe(ciclo)).completos;
+      if (cumple) {
+        const verificado = { verificadoPorUserId: actor?.id || null, verificadoPorNombre: actor?.nombre || null, verificadoAt: new Date() };
+        for (const clave of CLAVES_CHECKLIST) {
+          await prisma.proveedorCicloDocumento.upsert({
+            where: { cicloId_clave: { cicloId: ciclo.id, clave } },
+            update: { cumple: true, ...verificado },
+            create: { cicloId: ciclo.id, clave, cumple: true, ...verificado },
+          });
+        }
+      } else {
+        await prisma.proveedorCicloDocumento.deleteMany({ where: { cicloId: ciclo.id } });
+      }
+      const despuesCiclo = await prisma.proveedorCiclo.findUnique({ where: { id: ciclo.id }, include: { documentos: true } });
+      const despues = checklistDe(p, documentosDe(despuesCiclo)).completos;
+      await logCicloDocumento(actor, p, anio, "checklist", `${antes}/6`, `${despues}/6`).catch(() => {});
+      actualizados++;
+    } catch (err) {
+      omitidos.push({ id, motivo: err.message });
+    }
+  }
+  return { actualizados, omitidos };
+}
+
+// Cambia el estado del ciclo de varios proveedores. "actualizado" solo aplica a los que ya
+// tienen el checklist completo; el resto se reporta en "omitidos" con su motivo.
+export async function cambiarEstadoMasivo(ids, estado, actor) {
+  const lista = idsDe(ids);
+  let actualizados = 0;
+  const omitidos = [];
+  for (const id of lista) {
+    try {
+      await cambiarEstadoCiclo(id, { estado }, actor);
+      actualizados++;
+    } catch (err) {
+      omitidos.push({ id, motivo: err.message });
+    }
+  }
+  return { actualizados, omitidos };
+}

@@ -88,6 +88,9 @@ export default function DetailModal({ record, onClose }) {
 
           <Item label="Valor cotizado">{fmtPesos(record.valorCot)}</Item>
           <Item label="Radicado">{record.radicado ? "Sí" : "No"}</Item>
+          <Item label="Calificación">
+            {record.calificacion ? "★".repeat(record.calificacion.estrellas) + "☆".repeat(5 - record.calificacion.estrellas) : "Sin calificar"}
+          </Item>
 
           {record.moneda === "USD" && (
             <>

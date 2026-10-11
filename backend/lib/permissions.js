@@ -24,6 +24,8 @@ export const FEATURES = [
   { key: "deleteRecord", label: "Eliminar registro de compra", section: "Registros", defaultRoles: [ROLES.ADMIN] },
   { key: "toggleRadicado", label: "Marcar radicado", section: "Registros", defaultRoles: [ROLES.ADMIN, ROLES.RADICAR] },
   { key: "viewMaestros", label: "Ver y configurar Maestros", section: "Maestros", defaultRoles: [ROLES.ADMIN] },
+  { key: "viewProveedores", label: "Ver Proveedores (maestro, ciclo e indicadores)", section: "Proveedores", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.PROVEEDORES] },
+  { key: "editProveedores", label: "Editar proveedores (estados, checklist, excepciones)", section: "Proveedores", defaultRoles: [ROLES.ADMIN, ROLES.PROVEEDORES] },
   { key: "viewPresupuesto", label: "Ver y configurar Presupuesto", section: "Presupuesto", defaultRoles: [ROLES.ADMIN] },
   { key: "viewUsuarios", label: "Administrar Usuarios", section: "Usuarios", defaultRoles: [ROLES.ADMIN] },
   { key: "viewAuditoria", label: "Ver Auditoría", section: "Auditoría", defaultRoles: [ROLES.ADMIN] },

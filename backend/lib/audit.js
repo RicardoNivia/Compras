@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS } from "@/lib/auditLabels";
+import { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS } from "@/lib/auditLabels";
 
-export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, ACTION_LABELS, ENTITY_LABELS } from "@/lib/auditLabels";
+export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, ACTION_LABELS, ENTITY_LABELS } from "@/lib/auditLabels";
 
 // Nombre corto del tipo de maestro para el resumen del log — copia local
 // (sin importar lib/maestros.js) para no crear una dependencia circular
@@ -122,6 +122,28 @@ export async function logProveedorUpdate(actor, before, after) {
 export async function logProveedorDelete(actor, proveedor) {
   const changes = diffFields(proveedor, null, PROVEEDOR_FIELD_LABELS);
   await writeLog({ action: "eliminar", entityType: "proveedor", recordId: proveedor.id, recordInfo: proveedorSummary(proveedor), actor, changes });
+}
+
+// ---------- Procesos y checklist de proveedores ----------
+// Mismo entityType "proveedor" que arriba — son cambios sobre el mismo
+// proveedor, solo que a su historial de procesos o a su checklist.
+
+export async function logProcesoCreate(actor, proceso, proveedorNombre) {
+  const changes = diffFields(null, proceso, PROVEEDOR_PROCESO_FIELD_LABELS);
+  await writeLog({ action: "crear", entityType: "proveedor", recordId: proceso.proveedorId, recordInfo: `${proceso.proceso} — ${proveedorNombre}`, actor, changes });
+}
+
+export async function logProcesoUpdate(actor, before, after, proveedorNombre) {
+  const changes = diffFields(before, after, PROVEEDOR_PROCESO_FIELD_LABELS);
+  if (!changes.length) return;
+  const action = changes.length === 1 && changes[0].field === "radicado" ? "radicar" : "editar";
+  await writeLog({ action, entityType: "proveedor", recordId: after.proveedorId, recordInfo: `${after.proceso} — ${proveedorNombre}`, actor, changes });
+}
+
+export async function logChecklistUpdate(actor, before, after, proveedorNombre) {
+  const changes = diffFields(before, after, PROVEEDOR_CHECKLIST_FIELD_LABELS);
+  if (!changes.length) return;
+  await writeLog({ action: "editar", entityType: "proveedor", recordId: after.proveedorId, recordInfo: `Checklist — ${proveedorNombre}`, actor, changes });
 }
 
 // ---------- Usuarios ----------
@@ -294,6 +316,27 @@ export async function listAuditLogs({ from, to, userId, recordId, action, entity
   };
 }
 
+// ---------- Calificación de proveedor ----------
+
+function calificacionSummary(c) {
+  if (!c) return null;
+  const estrellas = "★".repeat(c.estrellas || 0) + "☆".repeat(5 - (c.estrellas || 0));
+  return `${c.proveedor || "Proveedor"} — ${estrellas}`;
+}
+
+export async function logCalificacionUpsert(actor, before, after) {
+  const changes = diffFields(before, after, CALIFICACION_FIELD_LABELS);
+  if (!changes.length) return;
+  await writeLog({
+    action: before ? "editar" : "crear",
+    entityType: "calificacion",
+    recordId: after.recordId,
+    recordInfo: calificacionSummary(after),
+    actor,
+    changes,
+  });
+}
+
 // ---------- Agente IA (chat) ----------
 // Segunda capa de validación del chat (ver lib/agentModeration.js): cuando el
 // moderador detecta que una respuesta ya generada violó las reglas (habló
@@ -321,4 +364,41 @@ export async function listAuditActors() {
     orderBy: { userNombre: "asc" },
   });
   return rows.map((r) => ({ id: r.userId, nombre: r.userNombre, email: r.userEmail }));
+}
+
+// ---------- Ciclo anual de proveedores ----------
+// El histórico del ciclo (estado, checklist y configuración) se audita con el
+// mismo entityType "proveedor" o "cicloProveedor"/"configProveedores" según el caso.
+
+export async function logCicloEstado(actor, proveedor, anio, before, after) {
+  const changes = diffFields(before, after, CICLO_PROVEEDOR_FIELD_LABELS);
+  if (!changes.length) return;
+  await writeLog({ action: "editar", entityType: "cicloProveedor", recordId: proveedor.id, recordInfo: `Ciclo ${anio} — ${proveedorSummary(proveedor)}`, actor, changes });
+}
+
+export async function logCicloDocumento(actor, proveedor, anio, clave, before, after) {
+  const label = CICLO_PROVEEDOR_FIELD_LABELS[clave] || clave;
+  const changes = [{ field: clave, label, before: before ?? null, after: after ?? null }];
+  await writeLog({ action: "editar", entityType: "cicloProveedor", recordId: proveedor.id, recordInfo: `Checklist ${anio} — ${proveedorSummary(proveedor)}`, actor, changes });
+}
+
+export async function logCicloIniciado(anio, cantidad) {
+  await writeLog({
+    action: "crear",
+    entityType: "cicloProveedor",
+    recordId: `ciclo-${anio}`,
+    recordInfo: `Inicio del ciclo ${anio} · ${cantidad} proveedores desactualizados`,
+    actor: null,
+    changes: [],
+  });
+}
+
+export async function logProveedorClasificacion(actor, proveedor, accion, detalle) {
+  await writeLog({ action: "editar", entityType: "proveedor", recordId: proveedor.id, recordInfo: `${accion} — ${proveedorSummary(proveedor)}`, actor, changes: detalle ? [{ field: "clasificacion", label: "Clasificación", before: null, after: detalle }] : [] });
+}
+
+export async function logConfigProveedoresUpdate(actor, before, after) {
+  const changes = diffFields(before, after, CONFIG_PROVEEDORES_FIELD_LABELS);
+  if (!changes.length) return;
+  await writeLog({ action: "editar", entityType: "configProveedores", recordId: "config", recordInfo: "Ciclo de actualización de proveedores", actor, changes });
 }

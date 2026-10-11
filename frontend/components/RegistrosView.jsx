@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import RecordModal from "@/components/RecordModal";
+import RatingModal from "@/components/RatingModal";
 import { TimelineButton } from "@/components/RecordTimelineModal";
 import { fmtCOP } from "@/lib/format";
 import { getDiasInfo } from "@/lib/diasInfo";
 import { patchRecordApi, deleteRecordApi, searchFiltersWithAiApi } from "@/lib/api";
 import { canCreateRecord, canEditRecord, canDeleteRecord, canToggleRadicado, getEditableFields } from "@/lib/roles";
-import { IconPlus, IconEdit, IconTrash, IconCheck, IconAlert, IconSpark, IconSearch } from "@/components/icons";
+import { IconPlus, IconEdit, IconTrash, IconCheck, IconAlert, IconSpark, IconSearch, IconStar } from "@/components/icons";
 
 const PAGE_SIZES = [25, 50, 100, 250];
 
@@ -63,7 +64,7 @@ function sortValue(r, key) {
   return v;
 }
 
-export default function RegistrosView({ records, setRecords, onFilteredChange, currentUser, maestros, proveedores = [], presupuestos = [] }) {
+export default function RegistrosView({ records, setRecords, onFilteredChange, currentUser, maestros, proveedores = [], alertasProveedores = {}, presupuestos = [] }) {
   const role = currentUser?.role;
   const permissions = currentUser?.permissions;
   const allowCreate = permissions?.createRecord ?? canCreateRecord(role);
@@ -116,6 +117,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
   const [page, setPage] = useState(1);
 
   const [modalRecord, setModalRecord] = useState(undefined); // undefined = closed, null = new
+  const [ratingRecord, setRatingRecord] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
@@ -309,6 +311,11 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
     setModalRecord(undefined);
   }
 
+  function handleRated(recordId, calificacion) {
+    setRecords((prev) => prev.map((x) => (x.id === recordId ? { ...x, calificacion: { estrellas: calificacion.estrellas } } : x)));
+    setRatingRecord(null);
+  }
+
   return (
     <div>
       <div className="toolbar" id="registros-toolbar" style={{ flexDirection: "column", alignItems: "stretch" }}>
@@ -499,6 +506,14 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                           <span className="desc-tooltip-bubble">{r.proveedor}</span>
                         </span>
                       ) : "—"}
+                      {r.proveedorId && alertasProveedores[r.proveedorId] && (
+                        <span
+                          className={`prov-alert-icon prov-alert-${alertasProveedores[r.proveedorId].nivel}`}
+                          title={alertasProveedores[r.proveedorId].titulo}
+                          role="img"
+                          aria-label={`Alerta del proveedor: ${alertasProveedores[r.proveedorId].titulo}`}
+                        >⚠</span>
+                      )}
                     </td>
                     <td className="mono cell-fe">{r.fe || "—"}</td>
                     <td className="num">{fmtCOP(r.valorConIva)}</td>
@@ -548,6 +563,23 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                               <IconEdit size={13} />
                             </button>
                           )}
+                          {allowEdit && (
+                            <button
+                              type="button"
+                              className={`icon-action-btn rate${r.calificacion ? " checked" : ""}`}
+                              onClick={() => setRatingRecord(r)}
+                              title={
+                                !r.proveedorId
+                                  ? "Este registro no tiene un proveedor del catálogo asociado"
+                                  : r.calificacion
+                                    ? `Calificado con ${r.calificacion.estrellas} estrella(s) — click para editar`
+                                    : "Calificar proveedor"
+                              }
+                              disabled={!r.proveedorId}
+                            >
+                              <IconStar size={13} filled={!!r.calificacion} />
+                            </button>
+                          )}
                           {allowDelete && (
                             <button type="button" className="icon-action-btn delete" onClick={() => setConfirmDeleteId(r.id)} title="Eliminar">
                               <IconTrash size={13} />
@@ -591,6 +623,14 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
           maestros={maestros}
           proveedores={proveedores}
           presupuestos={presupuestos}
+        />
+      )}
+
+      {ratingRecord && (
+        <RatingModal
+          record={ratingRecord}
+          onClose={() => setRatingRecord(null)}
+          onSaved={handleRated}
         />
       )}
 

@@ -13,6 +13,12 @@ The repo is split into two independent Next.js apps, sibling folders at the repo
 
 The seed data in `backend/prisma/seed-data.json` is **example data only**, not the real business dataset (~479 records in the original). See "Loading real data" below.
 
+## Conventions
+
+- **Every feature that creates, edits, deletes, or otherwise manages state must be audited.** Any new mutating endpoint/lib (not just `records`/`maestros`/`users`/`proveedores`/`presupuestos`/`permissions`/`reports`, which already do this) needs a corresponding `logXCreate`/`logXUpdate`/`logXDelete` (or equivalent) call in `backend/lib/audit.js`, a field-label map in `backend/lib/auditLabels.js` (+ its `frontend/lib/auditLabels.js` copy) for the diff, and an `entityType` entry in `ENTITY_LABELS` — following the exact pattern already used for `record`/`maestro`/`proveedor`/`user`/`presupuesto`/`permiso`/`informe`/`calificacion`. Audit calls are fire-and-forget (`.catch(() => {})`) so a logging failure never blocks the actual write. Do this as part of building the feature, not as an afterthought.
+
+- **Every table must be paginated.** Any new or modified table that lists rows (records, proveedores, usuarios, auditoría, informes, etc.) needs client- or server-side pagination, in the same format as the Registros table (`RegistrosView.jsx`): a `table-footer` with a `Tamaño` selector (`PAGE_SIZES`, default 25 / 50 / 100), `page-btns` with Anterior / Siguiente, a `count-note` with "Página X de Y" and a total count. Reset to page 1 whenever a filter, search or tab changes, and clamp the current page when the result set shrinks. Long text cells (names, descriptions) must truncate with the `desc-tooltip-wrap` / `desc-text` / `desc-tooltip-bubble` hover pattern instead of wrapping, and rows stay single-line and compact. Short summary lists capped at a few rows (e.g. top-5) may skip pagination only if they link to the full paginated table.
+
 ## Commands
 
 ```bash

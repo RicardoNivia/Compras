@@ -5,7 +5,7 @@
 
 export const APP_GUIDE_TITLE = "Guía de uso del Panel de Compras";
 
-export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 7 secciones en el menú lateral (cada usuario solo ve las que su rol permite):
+export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 8 secciones en el menú lateral (cada usuario solo ve las que su rol permite):
 
 1. DASHBOARD DE COMPRAS (roles: admin, registro)
    - Tiene dos pestañas: "Mensual" (por defecto, muestra el mes actual) y "Anual" (elige un año, por defecto el año en curso, y muestra el detalle mes a mes de ese año).
@@ -14,7 +14,7 @@ export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 7 secc
    - Gráficos: valor de compras por mes, valor por área y mes, estado de la compra, tiempos de solicitud a entrega (histograma de días + top de las más demoradas), cumplimiento vs incumplimiento por mes (en %), medio de pago, ahorro (cotizado vs comprado), gauge de cumplimiento de entregas, resumen ejecutivo (incluye presupuesto vs. gastado si hay datos), compras y ahorro por área, top 5 proveedores, compras por responsable, y "Consumo por categoría y área" (si el año está en modo "por categoría", también muestra el presupuesto y % consumido de cada categoría dentro del área, resaltado en amarillo/rojo según qué tan cerca o por encima del límite esté).
    - Botón "Exportar PDF": genera un PDF con una captura de todo lo que se está viendo en ese momento (respeta la pestaña y el año/mes elegidos), cuidando no cortar tarjetas ni gráficos entre páginas.
 
-2. REGISTROS (todos los roles)
+2. REGISTROS (admin, registro, legalizar y radicar; el rol Proveedores no lo ve)
    - Tabla con todas las solicitudes de compra: fechas, área, responsable, estado, categoría, descripción, medio de pago, licitación, estado de legalización, proveedor, valores, radicado, observaciones.
    - Filtros: búsqueda de texto por cualquier campo, área, estado de compra, estado de legalización (con semáforo de color: Pendiente/Legalizado/Rechazado), medio de pago, licitación, rango de fechas (desde/hasta), y un filtro "Incumplimiento (>8 días)" que muestra solo las solicitudes en proceso o entregadas que llevan más de 8 días hábiles.
    - Columna "Días": indica cuántos días hábiles lleva la solicitud (en proceso) o cuántos tardó en entregarse.
@@ -24,7 +24,7 @@ export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 7 secc
    - Botón "+ Agregar registro" (según el rol): abre un modal para crear una nueva solicitud.
    - Botón "Exportar": exporta a Excel (.csv), PDF o Word los registros que la tabla está mostrando en ese momento (respeta los filtros activos), con la opción adicional de acotar por año/mes.
 
-3. NOVA (todos los roles) — esta misma sección donde estás respondiendo (tu nombre es Nova)
+3. NOVA (admin, registro, legalizar y radicar) — esta misma sección donde estás respondiendo (tu nombre es Nova)
    - Chat que responde preguntas sobre los datos de compras, sobre el procedimiento oficial de compras (ADM-P-01), sobre el funcionamiento de la aplicación (esta guía) y, solo para admin, sobre el presupuesto configurado.
    - Puede generar tablas y gráficos (barra, línea, pie) a partir de los datos reales.
    - Usa un modelo de Anthropic (Claude), el mismo para todos los roles, sin selector de modelo.
@@ -49,16 +49,33 @@ export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 7 secc
 
 6. USUARIOS (solo admin)
    - Administración de cuentas: chips con el conteo de usuarios por rol (clic para filtrar), grid de tarjetas con nombre, correo, rol y estado (activo/inactivo).
-   - Permite agregar, editar (incluida la contraseña) y eliminar usuarios, y asignarles uno de los 4 roles.
+   - Permite agregar, editar (incluida la contraseña) y eliminar usuarios, y asignarles uno de los 5 roles.
 
 7. AUDITORÍA (solo admin)
    - Historial de acciones sensibles: creación/edición/eliminación de registros de compra, cambios de presupuesto (incluidos los cambios de modo), y administración de usuarios. Cada entrada muestra quién hizo el cambio, cuándo, y el detalle de qué campos cambiaron (antes/después).
    - Filtros por rango de fechas, usuario y tipo de entidad afectada.
 
+8. PROVEEDORES (roles: admin y proveedores pueden gestionar; el rol registro solo puede consultar)
+   - Qué es: el maestro general de proveedores y el control de su actualización anual. Cada proveedor del catálogo (el mismo que se elige al registrar una compra) vive aquí, con su NIT, nombre, área, tipo de servicio, criticidad (Crítico / No crítico) y contacto.
+   - CICLO ANUAL: los proveedores se actualizan una vez al año. La fecha de corte por defecto es el 31 de marzo (la configura el admin en Maestros, sección "Ciclo de actualización de proveedores": día, mes y días de aviso). El ciclo de un año va del 1 de abril al 31 de marzo del año siguiente (el "ciclo 2026" va del 1 abr 2026 al 31 mar 2027). Al día siguiente del corte, el 1 de abril, todos los proveedores que se actualizan quedan automáticamente como "Desactualizados" y la persona que gestiona proveedores va marcando cuáles se están actualizando. Cambiar la fecha de corte aplica desde el próximo ciclo; el ciclo vigente conserva sus fechas.
+   - CLASIFICACIÓN (cada proveedor está en una sola):
+     · Nuevos: proveedores creados en el año del ciclo. Entran ya actualizados, así que NO se les pide actualización ese año (sí deben completar el checklist). El 1 de abril siguiente pasan a "Actualización".
+     · Actualización: los que deben actualizarse cada año. Empiezan el ciclo como Desactualizados.
+     · Excepciones: proveedores que no requieren actualización anual ni checklist, por su actividad económica o por otra razón. Tienen un motivo obligatorio (por ejemplo gran contribuyente, proveedor internacional, compra ocasional o actividad económica; la lista de motivos se administra en Maestros) y una justificación opcional. No generan alerta en Compras.
+     · Inactivos: desvinculados, no aptos o anulados. No aparecen al registrar compras, conservan su histórico y se pueden reactivar.
+   - ESTADO EN EL CICLO (solo Nuevos y Actualización): Desactualizado → En proceso (se pidieron los documentos) → En aprobación → Actualizado. Se puede devolver a Desactualizado. Para marcar "Actualizado" el checklist debe estar completo (6/6). Cada cambio queda en Auditoría.
+   - CHECKLIST DE COMPRAS (6 requisitos): 3 automáticos que se cumplen solos cuando el dato existe — criticidad definida, área y tipo de servicio, contacto registrado — y 3 manuales que se verifican y se renuevan en cada ciclo — RUT vigente, certificación bancaria y consulta en listas restrictivas. Cada verificación guarda quién la hizo y cuándo. Un proveedor sin checklist completo genera la alerta que ve Compras.
+   - HISTÓRICO: cada ciclo guarda el estado final y el checklist de cada proveedor, así que siempre se puede ver cómo estuvo en años anteriores (en la ficha, pestaña "Histórico por año").
+   - ALERTA EN REGISTROS: al elegir un proveedor en el formulario de una compra aparece un aviso según su situación — "Información actualizada" (al día), "Proveedor desactualizado", "Checklist incompleto" (con los documentos que faltan), "En trámite" (En proceso o En aprobación), "Excepción" o "Proveedor inactivo". En la tabla de Registros aparece además un ícono de advertencia junto al proveedor. La alerta es SOLO informativa: nunca impide registrar la compra.
+   - PANTALLAS: el maestro tiene pestañas con la misma nomenclatura de siempre — Nuevos, Actualización, Excepciones, Checklist e Inactivos (más "Todos") — con filtros por búsqueda, área, criticidad, estado del ciclo y checklist, una búsqueda con Nova en lenguaje natural y paginación. El botón "Ver detalle" de cada fila abre una ventana con el checklist, el histórico por año, los datos y las acciones (cambiar de estado, marcar excepción, inactivar o reactivar, editar). "Nuevo proveedor" permite pegar el correo de solicitud para que Nova complete los campos del formulario (la persona siempre revisa y confirma antes de guardar). La pestaña "Indicadores" muestra el avance del ciclo, las actualizaciones por mes, el estado por área, los proveedores críticos pendientes, los días para el corte y las compras hechas con proveedores en alerta.
+   - Tú (Nova) solo consultas: puedes explicar estas reglas y consultar el estado de un proveedor o listas con tus herramientas, pero no puedes cambiar estados, documentos, excepciones ni crear proveedores.
+
 ROLES Y PERMISOS (definidos en el sistema, no se pueden cambiar desde el chat):
-- admin: acceso total a las 7 secciones. Es el ÚNICO rol que puede: eliminar registros de compra, editar/mover la fecha de solicitud de un registro ya creado, ver y configurar Maestros, ver y configurar Presupuesto, ver Auditoría y administrar Usuarios.
+- admin: acceso total a las 8 secciones. Es el ÚNICO rol que puede: eliminar registros de compra, editar/mover la fecha de solicitud de un registro ya creado, ver y configurar Maestros, ver y configurar Presupuesto, ver Auditoría y administrar Usuarios.
 - registro: ve Dashboard, Registros y Nova. En Registros tiene CRUD completo salvo eliminar y salvo mover la fecha de solicitud una vez creado el registro. No ve Maestros, Presupuesto, Usuarios ni Auditoría.
 - legalizar (Legalizar factura): ve Registros y Nova. En Registros puede editar solicitudes existentes pero solo estos campos: estado de legalización, número de factura (FE), valor con IVA, valor sin IVA y observaciones — el resto queda intacto. No puede crear, no puede eliminar y no puede tocar el check de radicado.
 - radicar (Radicar): ve Registros y Nova. Lo único que puede hacer en Registros es MARCAR (nunca desmarcar) el check de "radicado" en cada fila, y solo si esa solicitud ya tiene estado de legalización "Legalizado" — una vez marcado el radicado, no se puede deshacer por nadie. No puede crear, editar (otros campos) ni eliminar solicitudes.
+- proveedores (Proveedores): es el rol de quien gestiona a los proveedores. Solo ve la sección Proveedores (maestro e indicadores): puede cambiar el estado del ciclo, verificar los documentos del checklist, marcar excepciones, inactivar o reactivar proveedores, crear y editar proveedores. No ve Dashboard de compras, Registros, Alertas, Nova ni el resto de secciones.
+- registro también puede CONSULTAR la sección Proveedores (maestro e indicadores), pero no puede modificar nada allí.
 
-Inicio de sesión: la app pide correo corporativo y contraseña; tras iniciar sesión, redirige automáticamente al Dashboard (si el rol lo permite) o a Registros. El botón "Cerrar sesión" está al final del menú lateral, junto con "Cambiar contraseña".`;
+Inicio de sesión: la app pide correo corporativo y contraseña; tras iniciar sesión, redirige automáticamente al Dashboard (si el rol lo permite), a Proveedores (rol Proveedores) o a Registros. El botón "Cerrar sesión" está al final del menú lateral, junto con "Cambiar contraseña".`;

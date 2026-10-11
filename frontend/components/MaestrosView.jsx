@@ -2,15 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import MaestroModal from "@/components/MaestroModal";
-import ProveedoresView from "@/components/ProveedoresView";
 import { TIPOS_MAESTRO, TIPO_LABELS } from "@/lib/maestrosTipos";
 import { updateMaestroApi, deleteMaestroApi } from "@/lib/api";
-import { IconPlus, IconEdit, IconTrash, IconSearch, IconBuilding, IconUsers, IconFlag, IconMoney, IconFile, IconLayers } from "@/components/icons";
+import { IconPlus, IconEdit, IconTrash, IconSearch, IconBuilding, IconUsers, IconFlag, IconMoney, IconFile, IconLayers, IconStar } from "@/components/icons";
 
-// "proveedores" no es un tipo de Maestro (Record.proveedor/nit no son FK a
-// este catálogo) sino un modelo propio (ver backend/lib/proveedores.js), pero
-// comparte la misma pantalla de administración por simplicidad de navegación.
-const PROVEEDORES_TAB = "proveedores";
+// Proveedores tiene su propio menú ("Proveedores", ver app/(app)/proveedores)
+// — ya no vive aquí, para separar el catálogo de Maestros genérico de la
+// gestión completa de proveedores (directorio, procesos, checklist).
 
 const EN_USO_TITLE = "No se puede editar ni eliminar: este valor ya está en uso en uno o más registros. Puedes inactivarlo para que deje de ofrecerse en el formulario.";
 
@@ -21,6 +19,8 @@ const TIPO_ICONS = {
   categoria: IconLayers,
   medioPago: IconMoney,
   estadoLegalizacion: IconFile,
+  causaCalificacion: IconStar,
+  motivoExcepcion: IconFlag,
 };
 
 const COLUMN_LABELS = {
@@ -30,6 +30,8 @@ const COLUMN_LABELS = {
   categoria: "Nombre de la categoría",
   medioPago: "Nombre del medio de pago",
   estadoLegalizacion: "Nombre del estado de legalización",
+  causaCalificacion: "Causa de calificación",
+  motivoExcepcion: "Motivo de excepción de proveedor",
 };
 
 const PAGE_SIZE = 8;
@@ -43,7 +45,7 @@ function ToggleSwitch({ checked, onChange, disabled, title }) {
   );
 }
 
-export default function MaestrosView({ initialMaestros, initialProveedores }) {
+export default function MaestrosView({ initialMaestros }) {
   const [maestros, setMaestros] = useState(initialMaestros || []);
   // useState solo toma el valor inicial en el primer montaje: si el usuario
   // navega a esta página por el menú lateral (navegación cliente, sin recarga
@@ -149,20 +151,9 @@ export default function MaestrosView({ initialMaestros, initialProveedores }) {
               </button>
             );
           })}
-          <button
-            type="button"
-            className={`maestros-nav-item${tab === PROVEEDORES_TAB ? " active" : ""}`}
-            onClick={() => setTab(PROVEEDORES_TAB)}
-          >
-            <span className="ic"><IconBuilding size={16} /></span>
-            Proveedores
-          </button>
         </nav>
       </aside>
 
-      {tab === PROVEEDORES_TAB ? (
-        <ProveedoresView initialProveedores={initialProveedores} />
-      ) : (
       <section className="maestros-main">
         <div className="maestros-toolbar">
           <div className="maestros-search-wrap">
@@ -185,6 +176,7 @@ export default function MaestrosView({ initialMaestros, initialProveedores }) {
           <thead>
             <tr>
               <th>{COLUMN_LABELS[tab]}</th>
+              {tab === "causaCalificacion" && <th className="col-estrellas">Aplica a estrellas</th>}
               <th className="col-activo">Activo</th>
               <th className="col-acciones"></th>
             </tr>
@@ -192,7 +184,7 @@ export default function MaestrosView({ initialMaestros, initialProveedores }) {
           <tbody>
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={3}>
+                <td colSpan={tab === "causaCalificacion" ? 4 : 3}>
                   <div className="empty">No hay opciones de {TIPO_LABELS[tab].toLowerCase()} que coincidan.</div>
                 </td>
               </tr>
@@ -203,6 +195,7 @@ export default function MaestrosView({ initialMaestros, initialProveedores }) {
               return (
                 <tr key={m.id}>
                   <td>{m.valor}</td>
+                  {tab === "causaCalificacion" && <td>{"★".repeat(m.aplicaEstrellas || 0)}</td>}
                   <td>
                     <ToggleSwitch
                       checked={m.activo}
@@ -277,9 +270,8 @@ export default function MaestrosView({ initialMaestros, initialProveedores }) {
           <span className="count-note">{rows.length} registro(s)</span>
         </div>
       </section>
-      )}
 
-      {tab !== PROVEEDORES_TAB && modalOpen && (
+      {modalOpen && (
         <MaestroModal
           tipo={tab}
           maestro={editing}

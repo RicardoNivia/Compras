@@ -13,7 +13,8 @@ const PAD_B = 34;
 
 // Gráfico de barras vertical simple: valor total por mes.
 // data: [{ key, label, value, highlighted }]
-export default function BarChartSvg({ data }) {
+// formatValue: cómo mostrar cada valor (por defecto pesos; pasa (v) => String(v) para conteos).
+export default function BarChartSvg({ data, formatValue = fmtCOP }) {
   const [tooltip, setTooltip] = useState(null);
 
   if (!data || data.length === 0) {
@@ -40,7 +41,7 @@ export default function BarChartSvg({ data }) {
             <g key={i}>
               <line className="gridline" x1={PAD_L} x2={W - PAD_R} y1={y} y2={y} />
               <text className="axis-label" x={PAD_L - 6} y={y + 3} textAnchor="end">
-                {fmtCOP(v)}
+                {formatValue(v)}
               </text>
             </g>
           );
@@ -62,12 +63,12 @@ export default function BarChartSvg({ data }) {
                 fill={color} opacity={opacity} rx="3"
                 onMouseMove={(e) => setTooltip({
                   visible: true, x: e.clientX, y: e.clientY,
-                  title: d.label, lines: [fmtCOP(d.value)],
+                  title: d.label, lines: [formatValue(d.value)],
                 })}
                 onMouseLeave={() => setTooltip(null)}
               />
               <text className="bar-total-label" x={x + barW / 2} y={y - 6} textAnchor="middle">
-                {fmtCOP(d.value)}
+                {formatValue(d.value)}
               </text>
               <text className="axis-label" x={x + barW / 2} y={H - PAD_B + 16} textAnchor="middle">
                 {d.label}

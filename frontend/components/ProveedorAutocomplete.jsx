@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // Un registro viejo cuyo proveedor no está en el catálogo (dato histórico,
 // antes de que este maestro existiera) se muestra tal cual al abrir el
 // modal y no se toca a menos que el usuario decida cambiarlo.
-export default function ProveedorAutocomplete({ id, nombre, nit, proveedores, disabled, required, onChange }) {
+export default function ProveedorAutocomplete({ id, nombre, nit, proveedorId, proveedores, disabled, required, onChange }) {
   // onChange recibe { nombre, nit, proveedorId }: proveedorId (Proveedor.id)
   // es la referencia real que se guarda en el registro; nit/nombre son solo
   // para mostrar — si luego se corrige el proveedor en el catálogo, la tabla
@@ -94,6 +94,10 @@ export default function ProveedorAutocomplete({ id, nombre, nit, proveedores, di
 
   const sinCoincidencias = open && text.trim() && matches.length === 0;
 
+  // Alerta del ciclo de actualización (ver backend/lib/proveedoresCicloReglas.js
+  // #alertaCompras) — solo informativa, nunca bloquea registrar la compra.
+  const seleccionado = proveedorId ? proveedores.find((p) => p.id === proveedorId) : null;
+
   return (
     <div className="autocomplete-wrap" ref={wrapRef}>
       <input
@@ -110,12 +114,20 @@ export default function ProveedorAutocomplete({ id, nombre, nit, proveedores, di
         lang="es"
       />
       {nit && <span className="autocomplete-nit-tag">Nit {nit}</span>}
+      {seleccionado?.alerta && (
+        <span
+          className={`autocomplete-info-badge ${seleccionado.alerta.nivel === "ok" ? "ok" : "warn"}`}
+          title={seleccionado.alerta.detalle || ""}
+        >
+          {seleccionado.alerta.titulo}
+        </span>
+      )}
       {open && !disabled && (
         <div className="autocomplete-menu">
           {matches.length === 0 ? (
             <div className="autocomplete-empty">
               {sinCoincidencias
-                ? "No existe en el catálogo. Pide a un administrador que lo agregue en Maestros → Proveedores."
+                ? "No existe en el catálogo. Pide al equipo de Proveedores que lo registre."
                 : "Escribe para buscar en el catálogo de proveedores."}
             </div>
           ) : (

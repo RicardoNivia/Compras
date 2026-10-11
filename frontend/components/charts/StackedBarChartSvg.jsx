@@ -15,7 +15,8 @@ const SERIES_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(
 
 // Barras apiladas por mes. data: [{ key, label, segments: [{ name, value }] }]
 // seriesNames: orden fijo de las series (para colores consistentes).
-export default function StackedBarChartSvg({ data, seriesNames }) {
+// formatValue: por defecto valores compactos de dinero; pasa (v) => String(v) para conteos.
+export default function StackedBarChartSvg({ data, seriesNames, formatValue = fmtCompact }) {
   const [tooltip, setTooltip] = useState(null);
 
   if (!data || data.length === 0) {
@@ -42,7 +43,7 @@ export default function StackedBarChartSvg({ data, seriesNames }) {
             <g key={i}>
               <line className="gridline" x1={PAD_L} x2={W - PAD_R} y1={y} y2={y} />
               <text className="axis-label" x={PAD_L - 6} y={y + 3} textAnchor="end">
-                {fmtCompact(v)}
+                {formatValue(v)}
               </text>
             </g>
           );
@@ -69,7 +70,7 @@ export default function StackedBarChartSvg({ data, seriesNames }) {
                     fill={color}
                     onMouseMove={(e) => setTooltip({
                       visible: true, x: e.clientX, y: e.clientY,
-                      title: `${d.label} · ${seg.name}`, lines: [fmtCompact(seg.value)],
+                      title: `${d.label} · ${seg.name}`, lines: [formatValue(seg.value)],
                     })}
                     onMouseLeave={() => setTooltip(null)}
                   />

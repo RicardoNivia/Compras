@@ -34,7 +34,6 @@ import { getSessionUser } from "@/lib/auth-server";
  *                       descripcion: { type: string }
  *                       telefono: { type: string, nullable: true }
  *                       correo: { type: string, nullable: true }
- *                       documentacionAlDia: { type: boolean, description: "Ej. RUT/cámara de comercio vigentes. Por defecto false." }
  *                       activo: { type: boolean }
  *                       enUso: { type: boolean, description: "Si el código está usado hoy en algún registro." }
  *                       createdAt: { type: string, format: date-time }
@@ -58,7 +57,7 @@ export async function GET(request) {
  * /api/proveedores:
  *   post:
  *     tags: [Proveedores]
- *     summary: Crea un proveedor (requiere permiso "viewMaestros").
+ *     summary: Crea un proveedor (requiere permiso "editProveedores").
  *     requestBody:
  *       required: true
  *       content:
@@ -72,7 +71,6 @@ export async function GET(request) {
  *               descripcion: { type: string, description: "Qué vende/para qué sirve este proveedor." }
  *               telefono: { type: string, description: "Opcional." }
  *               correo: { type: string, description: "Opcional." }
- *               documentacionAlDia: { type: boolean, default: false }
  *               activo: { type: boolean, default: true }
  *     responses:
  *       201:
@@ -92,7 +90,7 @@ export async function GET(request) {
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function POST(request) {
-  const { user, denied } = await requirePermission("viewMaestros");
+  const { user, denied } = await requirePermission("editProveedores");
   if (denied) return denied;
   try {
     const body = await request.json();
