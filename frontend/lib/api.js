@@ -289,11 +289,11 @@ export async function setPermissionApi(role, feature, allowed) {
 // se puede mostrar en vivo, así que el backend corre esto como trabajo en
 // segundo plano (mismo patrón que Informes automáticos) en vez de streaming;
 // aquí se hace polling hasta tener el texto final.
-export async function sendAgentChatApi({ message, conversationId, section, widget }) {
+export async function sendAgentChatApi({ message, conversationId, section, widget, contexto }) {
   const res = await fetch("/api/agent/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, conversationId, section, widget }),
+    body: JSON.stringify({ message, conversationId, section, widget, contexto }),
   });
   const { jobId, conversationId: newConversationId } = await handle(res);
   const result = await pollJob(jobId, { jobsPath: "/api/agent/chat/jobs" });

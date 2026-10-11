@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { leerPantallaNova } from "@/lib/novaPantalla";
 import { sendAgentChatApi } from "@/lib/api";
 import { canViewAgenteIA } from "@/lib/roles";
 import { ALL_NAV_ITEMS } from "@/components/Sidebar";
@@ -24,6 +25,11 @@ const SUGGESTIONS = [
 // MISMA lista de secciones que pinta el Sidebar — basta con el prefijo del
 // pathname porque algunas secciones tienen subrutas (ej. "/registros/123").
 function sectionLabelFor(pathname) {
+  // Subpantallas de Proveedores y la configuración del ciclo (el menú solo tiene una entrada).
+  if (pathname?.startsWith("/proveedores/indicadores")) return "Indicadores de proveedores";
+  if (pathname?.startsWith("/proveedores/informe")) return "Informe mensual de proveedores";
+  if (pathname?.startsWith("/proveedores")) return "Gestión de proveedores";
+  if (pathname?.startsWith("/ciclo-proveedores")) return "Ciclo de proveedores";
   const item = ALL_NAV_ITEMS.find((i) => i.href !== "/agente-ia" && pathname?.startsWith(i.href));
   return item?.label || null;
 }
@@ -99,7 +105,7 @@ export default function FloatingAgentChat({ user }) {
 
     try {
       const { text: reply, conversationId: newConvId } = await sendAgentChatApi({
-        message, conversationId, section, widget: true,
+        message, conversationId, section, widget: true, contexto: leerPantallaNova(),
       });
       if (newConvId && newConvId !== conversationId) setConversationId(newConvId);
       setMessages((prev) => {
