@@ -102,14 +102,19 @@ export function tieneNitProvisional(p) {
   return /^PEND/i.test(String(p.nit || ""));
 }
 
-// Clasificación de un proveedor dentro del ciclo `anio`.
-export function clasificacionEn(p, anio) {
+// Clasificación de un proveedor dentro del ciclo `anio` (del día siguiente al corte del año `anio`
+// hasta el corte del año siguiente: el ciclo 2026 va del 1 abr 2026 al 31 mar 2027).
+//   · Nuevo: creado DENTRO del periodo del ciclo. Entra actualizado; en el ciclo siguiente pasa a Actualización.
+//     Un proveedor creado entre enero y marzo (antes del corte) sigue siendo Nuevo de ese ciclo, no queda sin estado.
+//   · Actualización: creado antes de que empezara el ciclo.
+//   · No aplica: creado después de que terminó el ciclo (solo se ve al mirar ciclos pasados).
+export function clasificacionEn(p, anio, cfg = CONFIG_PROVEEDORES_DEFAULT) {
   if (!p.activo) return "inactivo";
   if (p.esExcepcion) return "excepcion";
   if (tieneNitProvisional(p)) return "por_registrar";
-  const anioAlta = partesBogota(p.createdAt).y;
-  if (anioAlta > anio) return "no_aplica";
-  if (anioAlta === anio) return "nuevo";
+  const alta = new Date(p.createdAt).getTime();
+  if (alta > finCorte(anio + 1, cfg)) return "no_aplica";
+  if (alta > finCorte(anio, cfg)) return "nuevo";
   return "actualizacion";
 }
 

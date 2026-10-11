@@ -225,7 +225,7 @@ export function construirPlan(rutaArchivo) {
       plan.conteos.excepcion++;
     } else if (!p.activo) {
       plan.conteos.inactivo++;
-    } else if (enNue.length && p.createdAt.getUTCFullYear() === CICLO_ANIO) {
+    } else if (enNue.length && p.createdAt >= INICIO_CICLO) {
       const f = enNue[0];
       // Un nuevo entra actualizado solo si ya está aprobado; si no, queda en el estado real de la hoja.
       const estado = /aprobad/.test(norm(f.estado)) ? "actualizado" : estadoCicloDe(f.estado, null);

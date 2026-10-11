@@ -1,6 +1,25 @@
 import { NextResponse } from "next/server";
 import { requirePermission, apiError } from "@/lib/apiGuard";
 import { getConfigProveedores, updateConfigProveedores } from "@/lib/proveedoresCiclo";
+import { anioCicloVigente, inicioCiclo, finCicloFecha, diasParaCorte } from "@/lib/proveedoresCicloReglas";
+
+// Hora y fecha DEL SERVIDOR (nunca del navegador) y el ciclo que de ahí resulta, en hora de Colombia.
+async function configConReloj() {
+  const cfg = await getConfigProveedores();
+  const ahora = new Date();
+  const anio = anioCicloVigente(ahora, cfg);
+  const fmt = (d) => d.toLocaleString("es-CO", { timeZone: "America/Bogota", dateStyle: "short", timeStyle: "short", hour12: false });
+  const dia = (d) => d.toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short", year: "numeric" });
+  return {
+    ...cfg,
+    ahoraServidor: ahora.toISOString(),
+    ahoraColombia: fmt(ahora),
+    cicloVigente: anio,
+    inicioCiclo: dia(inicioCiclo(anio, cfg)),
+    finCiclo: dia(finCicloFecha(anio, cfg)),
+    diasParaCorte: diasParaCorte(ahora, cfg),
+  };
+}
 
 /**
  * @openapi
@@ -16,7 +35,7 @@ export async function GET() {
   const { denied } = await requirePermission("viewProveedores");
   if (denied) return denied;
   try {
-    return NextResponse.json(await getConfigProveedores());
+    return NextResponse.json(await configConReloj());
   } catch (err) {
     return apiError(err);
   }
@@ -27,7 +46,8 @@ export async function PUT(request) {
   if (denied) return denied;
   try {
     const body = await request.json().catch(() => ({}));
-    return NextResponse.json(await updateConfigProveedores(body, user));
+    await updateConfigProveedores(body, user);
+    return NextResponse.json(await configConReloj());
   } catch (err) {
     return apiError(err);
   }
