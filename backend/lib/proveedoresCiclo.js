@@ -22,10 +22,14 @@ function notFound(message = "Proveedor no encontrado.") {
 
 // ---------- Configuración ----------
 
+// Última configuración leída: las clasificaciones usan el corte vigente sin pasar la config por cada función.
+let cfgActual = { ...CONFIG_PROVEEDORES_DEFAULT };
+const clasif = (p, anio) => clasificacionEn(p, anio, cfgActual);
+
 export async function getConfigProveedores() {
   const row = await prisma.configProveedores.findFirst();
-  if (row) return { diaCorte: row.diaCorte, mesCorte: row.mesCorte, diasAviso: row.diasAviso };
-  return { ...CONFIG_PROVEEDORES_DEFAULT };
+  cfgActual = row ? { diaCorte: row.diaCorte, mesCorte: row.mesCorte, diasAviso: row.diasAviso } : { ...CONFIG_PROVEEDORES_DEFAULT };
+  return { ...cfgActual };
 }
 
 export async function updateConfigProveedores(body, actor) {
@@ -51,7 +55,7 @@ export async function updateConfigProveedores(body, actor) {
 // Crea la fila de ciclo de un proveedor si todavía no existe. Devuelve null si
 // el proveedor no entra al ciclo (excepción, inactivo o creado después del ciclo).
 async function getOrCreateCiclo(proveedor, anio, tx = prisma) {
-  const clasificacion = clasificacionEn(proveedor, anio);
+  const clasificacion = clasif(proveedor, anio);
   if (clasificacion !== "actualizacion" && clasificacion !== "nuevo") return null;
   return tx.proveedorCiclo.upsert({
     where: { proveedorId_anio: { proveedorId: proveedor.id, anio } },
@@ -149,7 +153,7 @@ function resumenProveedor(p, anio, ciclo) {
   const fila = filaCiclo(ciclo);
   const manuales = fila ? fila.documentos : {};
   const checklist = checklistDe(p, manuales);
-  const clasificacion = clasificacionEn(p, anio);
+  const clasificacion = clasif(p, anio);
   return {
     ...toClienteProveedor(p),
     clasificacion,
@@ -338,7 +342,7 @@ export async function indicadoresCiclo() {
 
   for (const p of proveedores) {
     const ciclo = p.ciclos[0] || null;
-    const cls = clasificacionEn(p, anio);
+    const cls = clasif(p, anio);
     if (clasificacion[cls] !== undefined) clasificacion[cls]++;
 
     const fila = filaCiclo(ciclo);
@@ -416,7 +420,7 @@ export async function indicadoresCiclo() {
 
   // Los proveedores que entran al próximo ciclo: activos, no excepción y ya creados.
   const proximoCiclo = proveedores.filter((p) => {
-    const c = clasificacionEn(p, anio + 1);
+    const c = clasif(p, anio + 1);
     return c === "actualizacion" || c === "nuevo";
   }).length;
 

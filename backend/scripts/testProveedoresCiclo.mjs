@@ -28,7 +28,16 @@ const base = { activo: true, esExcepcion: false, createdAt: bogota("2019-05-01")
 assert.equal(clasificacionEn(base, 2026), "actualizacion");
 assert.equal(clasificacionEn({ ...base, createdAt: bogota("2026-06-10") }, 2026), "nuevo");
 assert.equal(clasificacionEn({ ...base, createdAt: bogota("2026-06-10") }, 2027), "actualizacion");
-assert.equal(clasificacionEn({ ...base, createdAt: bogota("2027-01-05") }, 2026), "no_aplica");
+// Creado entre enero y marzo (antes del corte) sigue siendo Nuevo del ciclo en curso: no queda sin estado.
+assert.equal(clasificacionEn({ ...base, createdAt: bogota("2027-01-05") }, 2026), "nuevo");
+assert.equal(clasificacionEn({ ...base, createdAt: bogota("2027-03-31") }, 2026), "nuevo");
+assert.equal(clasificacionEn({ ...base, createdAt: new Date("2027-04-01T00:30:00-05:00") }, 2026), "no_aplica");
+assert.equal(clasificacionEn({ ...base, createdAt: new Date("2027-04-01T00:30:00-05:00") }, 2027), "nuevo");
+// Creado antes de empezar el ciclo (enero a marzo de 2026) ya es de Actualización en el ciclo 2026.
+assert.equal(clasificacionEn({ ...base, createdAt: bogota("2026-02-10") }, 2026), "actualizacion");
+assert.equal(clasificacionEn({ ...base, createdAt: new Date("2026-03-31T23:00:00-05:00") }, 2026), "actualizacion");
+// Un proveedor creado en el ciclo 2026 pasa a Actualización en el ciclo 2027.
+assert.equal(clasificacionEn({ ...base, createdAt: bogota("2027-01-05") }, 2027), "actualizacion");
 assert.equal(clasificacionEn({ ...base, esExcepcion: true }, 2026), "excepcion");
 assert.equal(clasificacionEn({ ...base, activo: false }, 2026), "inactivo");
 

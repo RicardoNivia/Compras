@@ -38,6 +38,12 @@ export default function ConfigCicloProveedores({ initial }) {
         <h2 id="cfg-prov-t">Ciclo de actualización de proveedores</h2>
         <span className="muted">Al día siguiente del corte, todos los proveedores de Actualización pasan a Desactualizado.</span>
       </div>
+      <div className="prov-reloj" aria-label="Hora del servidor y ciclo vigente">
+        <div><span className="muted">Hora y fecha del servidor (Colombia)</span><strong className="mono">{config.ahoraColombia}</strong></div>
+        <div><span className="muted">Ciclo vigente</span><strong>{config.cicloVigente} · {config.inicioCiclo} → {config.finCiclo}</strong></div>
+        <div><span className="muted">Días para el corte</span><strong className="mono">{config.diasParaCorte}</strong></div>
+      </div>
+      <p className="prov-note">La validación del ciclo usa siempre el reloj del servidor, no el del navegador ni el de tu equipo.</p>
       <form onSubmit={guardar} className="prov-config-form">
         <label>Día de corte
           <input type="number" min={1} max={31} value={config.diaCorte} onChange={(e) => setConfig({ ...config, diaCorte: e.target.value })} />

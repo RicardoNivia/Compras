@@ -1940,3 +1940,6 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 .prov-ia-list .pill{ flex:none; margin-top:1px; }
 .prov-ia-notes li{ padding:8px 12px; background:var(--surface-2); border-radius:10px; border-left:3px solid var(--accent); }
 .prov-toolbar-ind{ display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; align-items:center; margin-bottom:12px; }
+.prov-reloj{ display:flex; flex-wrap:wrap; gap:12px 32px; padding:14px 16px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; }
+.prov-reloj > div{ display:flex; flex-direction:column; gap:2px; font-size:13px; }
+.prov-reloj strong{ font-size:15px; }
