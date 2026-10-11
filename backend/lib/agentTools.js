@@ -2,6 +2,7 @@ import { listRecords } from "@/lib/records";
 import { listPresupuestos } from "@/lib/presupuestos";
 import { listAuditLogs } from "@/lib/audit";
 import { buildAggregates } from "@/lib/reportContent";
+import { listMaestroProveedores, getProveedorDetalle, indicadoresCiclo } from "@/lib/proveedoresCiclo";
 import { prisma } from "@/lib/prisma";
 
 // Herramientas ("tool use" de Anthropic) que el Agente IA del chat puede
@@ -117,7 +118,7 @@ function buildAuditoriaResumen(logs) {
 // las herramientas de presupuesto/auditoría ni siquiera se le ofrecen al
 // modelo si el rol no tiene ese permiso, en vez de ofrecerlas y rechazarlas
 // después — así nunca "sabe" que existen si no puede usarlas.
-export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria }) {
+export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion }) {
   const tools = [
     {
       name: "resumen_compras",
@@ -182,6 +183,40 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria }) {
     },
   ];
 
+  if (canSeeProveedoresGestion) {
+    tools.push({
+      name: "estado_gestion_proveedor",
+      description: "Estado de GESTIÓN de un proveedor (módulo Proveedores): clasificación en el ciclo de actualización del año vigente (Actualización, Nuevo, Excepción o Inactivo), estado del ciclo (Desactualizado, En proceso, En aprobación, Actualizado), checklist de documentos (6 requisitos y cuántos cumple), alerta que ve Compras y el histórico de ciclos anteriores. Úsala cuando pregunten si un proveedor está actualizado, qué le falta o cómo va su ciclo.",
+      input_schema: {
+        type: "object",
+        required: ["busqueda"],
+        properties: {
+          busqueda: { type: "string", description: "Nombre (parcial) o nit del proveedor." },
+        },
+      },
+    });
+    tools.push({
+      name: "resumen_ciclo_proveedores",
+      description: "Resumen EXACTO del ciclo de actualización de proveedores: total y avance (% actualizado), conteos por clasificación (Actualización, Nuevo, Excepción, Inactivo, Por registrar) y por estado del ciclo, criticidad, avance por área, críticos pendientes, checklist incompleto, actualizaciones por mes, compras hechas con proveedores en alerta y cuántos quedarán desactualizados el próximo ciclo. Úsala para cualquier pregunta de totales, porcentajes o panorama general de proveedores.",
+      input_schema: { type: "object", properties: {} },
+    });
+    tools.push({
+      name: "buscar_proveedores_gestion",
+      description: "Lista proveedores del módulo de Proveedores filtrados por clasificación, estado del ciclo, criticidad, área o checklist — úsala para preguntas como \"¿cuántos proveedores críticos siguen desactualizados?\", \"proveedores en aprobación del área Infraestructura\" o \"proveedores con checklist incompleto\". Devuelve el conteo exacto y el detalle de los primeros.",
+      input_schema: {
+        type: "object",
+        properties: {
+          clasificacion: { type: "string", description: "\"actualizacion\" | \"nuevo\" | \"excepcion\" | \"inactivo\" (opcional)." },
+          estado: { type: "string", description: "\"desactualizado\" | \"en_proceso\" | \"en_aprobacion\" | \"actualizado\" (opcional, solo aplica a Actualización y Nuevo)." },
+          criticidad: { type: "string", description: "\"Critico\" | \"No crítico\" (opcional)." },
+          area: { type: "string", description: "Nombre exacto del área (opcional)." },
+          checklist: { type: "string", description: "\"completo\" | \"incompleto\" (opcional)." },
+          limit: { type: "integer", description: "Máximo de proveedores a listar en detalle (opcional, por defecto 10, máximo 30) — el conteo total siempre es exacto." },
+        },
+      },
+    });
+  }
+
   if (canSeePresupuesto) {
     tools.push({
       name: "resumen_presupuesto",
@@ -219,7 +254,7 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria }) {
 // Fábrica del ejecutor: "records"/"presupuestos" se cargan como mucho una vez
 // por request de chat (memoizados aquí), sin importar cuántas veces el modelo
 // llame a una herramienta que los necesite en la misma conversación-turno.
-export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria }) {
+export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion }) {
   let recordsPromise = null;
   const getRecords = () => (recordsPromise ??= listRecords());
 
@@ -313,7 +348,62 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria }) {
           proveedores: matches.slice(0, 10).map((p) => ({
             nit: p.nit, nombre: p.nombre, descripcion: p.descripcion,
             telefono: p.telefono || null, correo: p.correo || null,
-            documentacionAlDia: p.documentacionAlDia, activo: p.activo,
+            activo: p.activo,
+          })),
+        };
+      }
+      case "estado_gestion_proveedor": {
+        if (!canSeeProveedoresGestion) return { error: "No autorizado para consultar Gestión de Proveedores." };
+        const qDigits = norm(args.busqueda).replace(/[^0-9]/g, "");
+        const match = await prisma.proveedor.findFirst({
+          where: { OR: [{ nombre: { contains: args.busqueda || "", mode: "insensitive" } }, ...(qDigits ? [{ nit: { contains: qDigits } }] : [])] },
+        });
+        if (!match) return { encontrado: false, nota: "No hay ningún proveedor con ese nombre/nit en el catálogo." };
+        const d = await getProveedorDetalle(match.id);
+        return {
+          encontrado: true,
+          nit: d.nit,
+          nombre: d.nombre,
+          anioCiclo: d.anio,
+          clasificacion: d.clasificacionLabel,
+          estadoCiclo: d.ciclo?.estadoLabel || null,
+          criticidad: d.criticidad || "Sin definir",
+          checklist: { completos: d.checklist.completos, total: d.checklist.total, faltan: d.checklist.faltan },
+          alerta: d.alerta,
+          historial: d.historial.map((h) => ({ anio: h.anio, clasificacion: h.clasificacionLabel, estado: h.estadoLabel })),
+        };
+      }
+      case "resumen_ciclo_proveedores": {
+        if (!canSeeProveedoresGestion) return { error: "No autorizado para consultar Gestión de Proveedores." };
+        const r = await indicadoresCiclo();
+        return {
+          cicloAnio: r.anio, diasParaElCorte: r.diasParaCorte, totalProveedores: r.total, proveedoresEnElCiclo: r.enCiclo,
+          porcentajeActualizado: r.pctActualizado, clasificacion: r.clasificacion, estadosDelCiclo: r.estados,
+          criticidad: r.criticidad, checklistIncompleto: r.checklistIncompleto, criticos: r.criticos,
+          criticosPendientes: r.atencion, avancePorArea: r.areas,
+          actualizadosPorMes: r.porMes.map((m) => ({ mes: m.label, actualizados: m.value })),
+          comprasConProveedorEnAlerta: r.comprasConAlerta,
+          cicloSiguiente: { anio: r.proximoCiclo.anio, quedaranDesactualizados: r.proximoCiclo.desactualizados },
+        };
+      }
+      case "buscar_proveedores_gestion": {
+        if (!canSeeProveedoresGestion) return { error: "No autorizado para consultar Gestión de Proveedores." };
+        const limit = Math.max(1, Math.min(30, Number(args.limit) || 10));
+        const data = await listMaestroProveedores({
+          clasificacion: args.clasificacion,
+          estado: args.estado,
+          criticidad: args.criticidad,
+          checklist: args.checklist,
+        });
+        const rows = args.area ? data.rows.filter((r) => r.area === args.area) : data.rows;
+        return {
+          anioCiclo: data.anio,
+          totalCoincidencias: rows.length,
+          proveedoresDevueltos: Math.min(limit, rows.length),
+          proveedores: rows.slice(0, limit).map((p) => ({
+            nit: p.nit, nombre: p.nombre, clasificacion: p.clasificacionLabel,
+            estadoCiclo: p.ciclo?.estadoLabel || null, criticidad: p.criticidad || "Sin definir", area: p.area,
+            checklistCompletos: p.checklist.completos, checklistTotal: p.checklist.total, alerta: p.alerta.titulo,
           })),
         };
       }

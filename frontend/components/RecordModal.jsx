@@ -450,6 +450,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 id="f-proveedor"
                 nombre={form.proveedor || ""}
                 nit={form.nit || ""}
+                proveedorId={form.proveedorId || ""}
                 proveedores={proveedores}
                 disabled={!isEditable("proveedor")}
                 required={!isEdit}

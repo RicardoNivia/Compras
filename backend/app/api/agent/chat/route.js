@@ -20,12 +20,17 @@ const MAX_HISTORY_MESSAGES = 20;
 // miles de tokens que se repetiría en cada mensaje de cada conversación —
 // cachearlo (idéntico entre usuarios con el mismo combo de permisos) evita
 // pagar ese costo de nuevo en cada llamada.
-function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria) {
+const NUMEROS_TEXTO = ["", "UNA", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO"];
+
+function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion) {
   const sourceList = [
     "Los datos transaccionales de compras (registros de solicitudes) — se consultan con las herramientas \"resumen_compras\" (cifras exactas/agregadas) y \"buscar_registros\" (registros puntuales).",
     `El texto de referencia de "${PROCUREMENT_POLICY_TITLE}" — el procedimiento oficial de compras de la compañía (roles y responsabilidades, plazos, umbrales de cuadro comparativo, debida diligencia, aprobaciones por monto, flujo de actividades, etc.), entregado completo más abajo.`,
     `La "${APP_GUIDE_TITLE}" — cómo funciona esta aplicación (secciones, qué hace cada una, y qué puede hacer cada rol dentro de ella), entregada completa más abajo. Úsala cuando te pregunten cómo usar la app, qué hay en cada sección, o qué puede o no puede hacer un usuario según su rol.`,
   ];
+  if (canSeeProveedoresGestion) {
+    sourceList.push(`El módulo de Proveedores (maestro de proveedores y su ciclo anual de actualización: clasificación Nuevo / Actualización / Excepción / Inactivo, estado del ciclo, checklist de 6 documentos, histórico por año y la alerta que ve Compras). Las reglas y pantallas están explicadas en la sección 8 de la guía (C) — úsala para EXPLICAR cómo funciona. Para totales y panorama general usa "resumen_ciclo_proveedores" (cifras exactas del ciclo). Para datos concretos usa "estado_gestion_proveedor" (un proveedor puntual: su clasificación, estado, checklist, alerta e histórico) y "buscar_proveedores_gestion" (listas y conteos filtrados por clasificación, estado, criticidad, área o checklist). Esto es distinto del catálogo básico de "datos_proveedor" (solo nit/nombre/contacto) — úsalo cuando pregunten por el ESTADO de gestión, no solo el contacto. Explica las reglas con la guía, nunca inventes cifras: los números siempre salen de las herramientas.`);
+  }
   if (canSeePresupuesto) {
     sourceList.push(`El presupuesto configurado por área y año y cuánto lleva gastado cada una — se consulta con la herramienta "resumen_presupuesto". Solo disponible para quien tenga este permiso.`);
   }
@@ -33,13 +38,14 @@ function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria) {
     sourceList.push(`El registro de auditoría (quién hizo qué, cuándo, sobre qué — registros de compra, maestros, usuarios, presupuestos o permisos — y qué campos cambiaron) — se consulta con la herramienta "registro_auditoria". Solo disponible para quien tenga este permiso.`);
   }
   const restricciones = [];
+  if (!canSeeProveedoresGestion) restricciones.push("gestión de proveedores");
   if (!canSeePresupuesto) restricciones.push("presupuesto");
   if (!canSeeAuditoria) restricciones.push("auditoría");
 
   const letras = "ABCDEFGH";
   const fuentesTexto = sourceList.map((s, i) => `${letras[i]}) ${s}`).join("\n");
-  const fuentes = `Tienes acceso a ${sourceList.length === 3 ? "TRES" : sourceList.length === 4 ? "CUATRO" : "CINCO"} fuentes de información:
-${fuentesTexto}${restricciones.length ? `\nEl tema de ${restricciones.join(" y de ")} es exclusivo de quien tenga ese permiso: si te preguntan por eso, aclara que esa información no está disponible para su rol (y no verás esas herramientas en tu lista).` : ""}`;
+  const fuentes = `Tienes acceso a ${NUMEROS_TEXTO[sourceList.length] || sourceList.length} fuentes de información:
+${fuentesTexto}${restricciones.length ? `\nEl tema de ${restricciones.join(", de ")} es exclusivo de quien tenga ese permiso: si te preguntan por eso, aclara que esa información no está disponible para su rol (y no verás esas herramientas en tu lista).` : ""}`;
 
   return `Eres "Nova", el asistente de IA del Panel de Compras de Sinco.
 
@@ -158,6 +164,7 @@ export async function POST(request) {
 
   const canSeePresupuesto = await isRoleAllowed(user.role, "viewPresupuesto");
   const canSeeAuditoria = await isRoleAllowed(user.role, "viewAuditoria");
+  const canSeeProveedoresGestion = await isRoleAllowed(user.role, "viewProveedores");
 
   const body = await request.json().catch(() => ({}));
   const message = (body.message || "").toString().trim();
@@ -204,10 +211,10 @@ export async function POST(request) {
   const jobId = createJob(async () => {
     let fullText = "";
     try {
-      const tools = buildToolDefs({ canSeePresupuesto, canSeeAuditoria });
-      const executeTool = buildToolExecutor({ canSeePresupuesto, canSeeAuditoria });
+      const tools = buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion });
+      const executeTool = buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion });
       for await (const chunk of streamChatCascade({
-        staticPrefix: buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria),
+        staticPrefix: buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion),
         systemInstruction: buildDynamicInstructionSuffix(user, section),
         contents,
         tools,

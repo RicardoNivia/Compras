@@ -73,6 +73,22 @@ export async function deleteRecordApi(id) {
   return handle(res);
 }
 
+// Calificación del proveedor para un registro (ver RatingModal.jsx) — estilo
+// Uber/Rappi: 1 a 5 estrellas, causas obligatorias si es menor a 5.
+export async function fetchCalificacionApi(recordId) {
+  const res = await fetch(`/api/records/${recordId}/calificacion`, { cache: "no-store" });
+  return handle(res);
+}
+
+export async function saveCalificacionApi(recordId, data) {
+  const res = await fetch(`/api/records/${recordId}/calificacion`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handle(res);
+}
+
 export async function changePasswordApi(currentPassword, newPassword) {
   const res = await fetch("/api/auth/change-password", {
     method: "POST",
@@ -119,35 +135,106 @@ export async function fetchUsuariosDisponiblesApi() {
   return handle(res);
 }
 
-export async function fetchProveedores(onlyActive, search) {
-  const qs = new URLSearchParams();
-  if (onlyActive) qs.set("onlyActive", "1");
-  if (search) qs.set("search", search);
-  const suffix = qs.toString();
-  const res = await fetch(`/api/proveedores${suffix ? `?${suffix}` : ""}`, { cache: "no-store" });
+// ---------- Proveedores (módulo de ciclo anual) ----------
+
+async function jsonFetch(url, method, body) {
+  const res = await fetch(url, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+  });
   return handle(res);
+}
+
+function queryString(params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (Array.isArray(v)) v.forEach((x) => { if (x) qs.append(k, String(x)); });
+    else if (v !== undefined && v !== null && v !== "") qs.set(k, String(v));
+  });
+  const s = qs.toString();
+  return s ? `?${s}` : "";
+}
+
+// Catálogo plano (autocompletar de Registros). Incluye la alerta del ciclo.
+export async function fetchProveedores(onlyActive, search) {
+  return jsonFetch(`/api/proveedores${queryString({ onlyActive: onlyActive ? "1" : "", search })}`, "GET");
+}
+
+export async function fetchProveedorDetalle(id) {
+  return jsonFetch(`/api/proveedores/${id}`, "GET");
 }
 
 export async function createProveedorApi(data) {
-  const res = await fetch("/api/proveedores", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  return handle(res);
+  return jsonFetch("/api/proveedores", "POST", data);
 }
 
 export async function updateProveedorApi(id, data) {
-  const res = await fetch(`/api/proveedores/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  return handle(res);
+  return jsonFetch(`/api/proveedores/${id}`, "PATCH", data);
 }
 
 export async function deleteProveedorApi(id) {
-  const res = await fetch(`/api/proveedores/${id}`, { method: "DELETE" });
+  return jsonFetch(`/api/proveedores/${id}`, "DELETE");
+}
+
+export async function fetchMaestroProveedores(filters = {}) {
+  return jsonFetch(`/api/proveedores/maestro${queryString(filters)}`, "GET");
+}
+
+export async function fetchIndicadoresProveedores() {
+  return jsonFetch("/api/proveedores/indicadores", "GET");
+}
+
+export async function fetchInformeMensual(anio, mes) {
+  return jsonFetch(`/api/proveedores/informe${queryString({ anio, mes })}`, "GET");
+}
+
+// Acción sobre varios proveedores: { ids, tipo: "checklist", cumple } o { ids, tipo: "estado", estado }.
+export async function accionMasivaProveedoresApi(body) {
+  return jsonFetch("/api/proveedores/masivo", "PATCH", body);
+}
+
+// Análisis con IA del ciclo de proveedores: { resumen, alertas: [{ nivel, texto }], notificaciones, sugerencias }.
+export async function reviewProveedoresApi() {
+  return jsonFetch("/api/agent/review-proveedores", "POST");
+}
+
+export async function fetchAlertasProveedores() {
+  return jsonFetch("/api/proveedores/alertas", "GET");
+}
+
+export async function fetchConfigProveedores() {
+  return jsonFetch("/api/proveedores/config", "GET");
+}
+
+export async function updateConfigProveedoresApi(data) {
+  return jsonFetch("/api/proveedores/config", "PUT", data);
+}
+
+export async function cambiarEstadoCicloApi(id, estado) {
+  return jsonFetch(`/api/proveedores/${id}/ciclo/estado`, "PATCH", { estado });
+}
+
+export async function setDocumentoCicloApi(id, clave, cumple) {
+  return jsonFetch(`/api/proveedores/${id}/ciclo/documentos`, "PATCH", { clave, cumple });
+}
+
+export async function cambiarClasificacionApi(id, data) {
+  return jsonFetch(`/api/proveedores/${id}/clasificacion`, "PATCH", data);
+}
+
+// Búsqueda en lenguaje natural (Nova) para cualquier tabla de proveedores.
+export async function directorioSearchFiltersWithAiApi(query, options) {
+  return jsonFetch("/api/agent/proveedor-search-filters", "POST", { query, options });
+}
+
+export async function parseProveedorTextoApi(texto) {
+  const res = await fetch("/api/agent/proveedor-parse-texto", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ texto }),
+  });
   return handle(res);
 }
 

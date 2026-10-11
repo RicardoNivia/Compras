@@ -3,7 +3,7 @@ import { backendFetch } from "@/lib/backendFetch";
 import { getSessionUser } from "@/lib/auth";
 import { canViewDashboard, canViewPresupuesto } from "@/lib/roles";
 import AppShell from "@/components/AppShell";
-import DashboardView from "@/components/DashboardView";
+import DashboardTabs from "@/components/DashboardTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export default async function DashboardPage() {
 
   return (
     <AppShell user={user} title="Dashboard de compras" subtitle={`${records.length} registros`}>
-      <DashboardView records={records} presupuestos={presupuestos} />
+      <DashboardTabs records={records} presupuestos={presupuestos} />
     </AppShell>
   );
 }

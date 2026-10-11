@@ -42,8 +42,32 @@ model Record {
   radicado            Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+  calificacion        CalificacionProveedor?
 
   @@map("records")
+}
+
+// Calificación del proveedor para una compra puntual (estilo Uber/Rappi: 1 a
+// 5 estrellas). Una sola calificación por registro (se puede editar/volver a
+// calificar, ver lib/calificaciones.js — upsert por recordId). Si estrellas
+// es menor a 5, "causasIds" es obligatorio (al menos una causa del maestro
+// tipo="causaCalificacion" cuyo aplicaEstrellas coincida con las estrellas
+// dadas, ver Maestro.aplicaEstrellas más abajo).
+model CalificacionProveedor {
+  id                   Int       @id @default(autoincrement())
+  recordId             String    @unique
+  record               Record    @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  proveedorId          String?   // snapshot del Proveedor calificado al momento de calificar — sin FK, igual convención que Record.proveedorId
+  proveedor            String?   // snapshot del nombre, igual convención que Record.proveedor
+  estrellas            Int       // 1..5
+  causasIds            String?   // JSON: string[] de ids de Maestro (tipo="causaCalificacion") — null/"[]" si estrellas = 5
+  comentario           String?
+  calificadoPorUserId  String?
+  calificadoPorNombre  String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@map("calificaciones_proveedor")
 }
 
 // Auditoría de acciones sobre registros (crear / editar / eliminar / radicar).
@@ -119,16 +143,18 @@ model Message {
 }
 
 // Opciones administrables para los desplegables del formulario de registros.
-// tipo: "area" | "responsable" | "estado" | "categoria" | "medioPago" | "estadoLegalizacion"
-// (coincide 1:1 con el nombre del campo correspondiente en Record).
+// tipo: "area" | "responsable" | "estado" | "categoria" | "medioPago" | "estadoLegalizacion" | "causaCalificacion"
+// (los primeros 6 coinciden 1:1 con el nombre del campo correspondiente en Record;
+// "causaCalificacion" es independiente, ver CalificacionProveedor).
 model Maestro {
-  id        String   @id @default(cuid())
-  tipo      String
-  valor     String
-  userId    String?  // solo para tipo="responsable": id del User al que está atado este valor (sin FK, igual que el resto de este modelo — ver lib/maestros.js). null para los demás tipos.
-  activo    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  tipo            String
+  valor           String
+  userId          String?  // solo para tipo="responsable": id del User al que está atado este valor (sin FK, igual que el resto de este modelo — ver lib/maestros.js). null para los demás tipos.
+  aplicaEstrellas Int?     // solo para tipo="causaCalificacion": a qué cantidad de estrellas (1..4) aplica esta causa — null para los demás tipos.
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([tipo, valor])
   @@map("maestros")
@@ -145,12 +171,149 @@ model Proveedor {
   descripcion        String   // obligatoria — qué vende/para qué sirve este proveedor (Nova la usa para sugerirlo)
   telefono           String?  // opcional — solo para que Nova (Agente IA) pueda citarlo, no se usa en validaciones
   correo             String?  // opcional — ídem
-  documentacionAlDia Boolean  @default(false) // ej. RUT/cámara de comercio vigentes — informativo, no bloquea nada
+  internacional      Boolean  @default(false) // proveedor internacional (ADM-P-01) — legaliza por invoice, no aplica RUT/declaración de renta. Solo informativo.
+  ultimaEvaluacionCriticoFecha     DateTime? // evaluación anual de proveedores críticos (ADM-P-01) — la ejecutan compras+líderes de área fuera de esta app; aquí solo se refleja el resultado
+  ultimaEvaluacionCriticoResultado String?
   activo             Boolean  @default(true)
+  inactivoMotivo     String?  // texto libre — solo si activo=false (desvinculado, no apto, anulado…)
+  // Clasificación del maestro (no cambia por año). El estado de cada ciclo vive en ProveedorCiclo.
+  criticidad         String?  // "Critico" | "No crítico" | null = sin definir
+  areaId             String?  // id del Maestro (tipo="area") — referencia real, igual convención que Record
+  area               String?  // snapshot del nombre de área
+  servicio           String?  // tipo de servicio (texto libre)
+  esExcepcion        Boolean  @default(false) // no entra al ciclo de actualización ni al checklist
+  motivoExcepcionId  String?  // id del Maestro (tipo="motivoExcepcion")
+  motivoExcepcion    String?  // snapshot del nombre del motivo
+  justificacionExcepcion String?
+  fechaExcepcion     DateTime? // cuándo se marcó (o figura en el Excel) como excepción — para el informe mensual
+  radicaFacturas     Boolean  @default(false) // solo excepciones: ya está radicando facturas
+  radicaFacturasAt   DateTime?
+  fechaActualizacion DateTime? // última vez que quedó Actualizado (o fecha del Excel) — para el informe mensual
+  clasificacionMonto String?  // clasificación por monto: Adquisición de Bajo Impacto, Operación de Alto Costo, Grandes Contribuyentes…
+  revision           String?  // quién revisa: SRM, Financiero…
+  observacion        String?
+  fechaInvitacion    DateTime? // cuándo se invitó a actualizarse (Excel)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  ciclos             ProveedorCiclo[]
+  procesos           ProveedorProceso[] // LEGADO: historial importado del Excel anterior, ya no lo usa la UI
+  checklist          ProveedorChecklist? // LEGADO: reemplazado por ProveedorCicloDocumento
 
   @@map("proveedores")
+}
+
+// Estado de un proveedor dentro de un ciclo de actualización. El ciclo N va
+// del 1 abr N al 31 mar N+1 (corte configurable en ConfigProveedores). Se
+// crea una fila por proveedor y ciclo: es el histórico anual.
+model ProveedorCiclo {
+  id                  Int       @id @default(autoincrement())
+  proveedorId         String
+  proveedor           Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+  anio                Int       // año en que inicia el ciclo (2026 = 1 abr 2026 → 31 mar 2027)
+  clasificacion       String    // "actualizacion" | "nuevo" (nuevo = creado en ese año, entra actualizado)
+  estado              String    // "desactualizado" | "en_proceso" | "en_aprobacion" | "actualizado"
+  aprobadoPorUserId   String?
+  aprobadoPorNombre   String?   // snapshot
+  aprobadoAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  documentos          ProveedorCicloDocumento[]
+
+  @@unique([proveedorId, anio])
+  @@map("proveedor_ciclos")
+}
+
+// Documentos manuales del checklist por ciclo. Los 3 automáticos (criticidad,
+// área y servicio, teléfono de contacto) se derivan del propio proveedor y no se guardan.
+model ProveedorCicloDocumento {
+  id                  Int            @id @default(autoincrement())
+  cicloId             Int
+  ciclo               ProveedorCiclo @relation(fields: [cicloId], references: [id], onDelete: Cascade)
+  clave               String         // "rutVigente" | "certBancaria" | "listasRestr"
+  cumple              Boolean        @default(false)
+  verificadoPorUserId String?
+  verificadoPorNombre String?
+  verificadoAt        DateTime?
+  updatedAt           DateTime       @updatedAt
+
+  @@unique([cicloId, clave])
+  @@map("proveedor_ciclo_documentos")
+}
+
+// Configuración del ciclo de actualización (fila única, editable desde Maestros).
+model ConfigProveedores {
+  id        Int      @id @default(autoincrement())
+  diaCorte  Int      @default(31)
+  mesCorte  Int      @default(3)
+  diasAviso Int      @default(30)
+  updatedAt DateTime @updatedAt
+
+  @@map("config_proveedores")
+}
+
+// Marca de inicio de cada ciclo: garantiza que el 1 de abril se ejecute una sola vez.
+model CicloProveedorIniciado {
+  id          Int      @id @default(autoincrement())
+  anio        Int      @unique
+  iniciadoAt  DateTime @default(now())
+  cantidad    Int      @default(0)
+
+  @@map("ciclos_proveedor_iniciados")
+}
+
+// Historial de procesos de gestión del proveedor (migrado desde el Excel de
+// "Gestión de Proveedores" de Sincosoft — ver plan de integración). Un mismo
+// proveedor puede tener varias filas por proceso a lo largo del tiempo; la
+// más reciente por "proceso" es la que se usa para calcular infoActualizada
+// (ver lib/proveedoresProcesos.js).
+model ProveedorProceso {
+  id            String    @id @default(cuid())
+  proveedorId   String
+  proveedor     Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+  proceso       String    // "actualizacion" | "nuevo" | "excepcion"
+  estado        String?   // snapshot — "Aprobado" | "Pendiente" | "En revisión" | etc (texto tal cual del origen)
+  estadoId      String?   // id del Maestro (tipo="estadoProveedor") — referencia real, igual convención que Record
+  fecha         DateTime?
+  revision      String?   // ej. "SRM", "Financiero" — quién/qué revisó
+  contacto      String?
+  observacion   String?
+  criticidad    String?   // "Critico" | "No crítico"
+  clasificacion String?   // clasificación por monto
+  area          String?   // snapshot
+  areaId        String?   // id del Maestro (tipo="area") — mismo maestro que usa Record
+  servicio      String?   // snapshot
+  servicioId    String?   // id del Maestro (tipo="tipoServicio")
+  viaExcepcionCorreo Boolean @default(false) // vinculación liviana por correo (ADM-P-01: proveedores del CEO, almacenes de cadena, tiquetes, universidades, ferias, licencias/suscripciones extranjeras, entidades certificadoras) — exime de checklist completo, no se marca como "desactualizado" por eso
+  radicado      Boolean   @default(false) // solo aplica a proceso="excepcion"
+  radicadoAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([proveedorId])
+  @@index([proceso])
+  @@map("proveedor_procesos")
+}
+
+// Checklist de compras — 3 de los 6 requisitos son manuales (los otros 3:
+// criticidad/área/contacto se derivan en vivo del ProveedorProceso más
+// reciente, ver lib/proveedoresProcesos.js#checklistDe).
+model ProveedorChecklist {
+  proveedorId  String    @id
+  proveedor    Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+  // Los 3 de abajo son 100% manuales. criticidad/área/contacto se derivan
+  // automáticamente del proceso más reciente (ver checklistDerivadosDe en
+  // lib/proveedoresProcesos.js) — los *Override de abajo permiten forzarlos a
+  // mano cuando el dato automático todavía no aplica (igual que en la página
+  // original de Gestión de Proveedores, donde los 6 ítems son clicables).
+  rutVigente         Boolean  @default(false)
+  certBancaria       Boolean  @default(false)
+  listasRestr        Boolean  @default(false)
+  criticidadOverride Boolean  @default(false)
+  areaOverride       Boolean  @default(false)
+  contactoOverride   Boolean  @default(false)
+  updatedAt          DateTime @updatedAt
+
+  @@map("proveedor_checklists")
 }
 
 // El modo (por área o por categoría) es una configuración GENERAL por año,

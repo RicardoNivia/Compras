@@ -250,11 +250,32 @@ export function IconMail(props) {
   );
 }
 
+export function IconStar({ filled, ...props }) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M8.5 1.8l2 4.1 4.5.6-3.3 3.2.8 4.5-4-2.1-4 2.1.8-4.5-3.3-3.2 4.5-.6z"
+        stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"
+        fill={filled ? "currentColor" : "none"}
+      />
+    </Svg>
+  );
+}
+
 export function IconFlag(props) {
   return (
     <Svg {...props}>
       <path d="M3 1.5v13.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
       <path d="M3 2.2c2-1 4 1 6 0s4-1 4 0v6c-2-1-4 1-6 0s-4-1-4 0Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconEye(props) {
+  return (
+    <Svg {...props} viewBox="0 0 16 16">
+      <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
     </Svg>
   );
 }

@@ -37,7 +37,14 @@ export const FIELD_LABELS = {
 export const MAESTRO_FIELD_LABELS = {
   tipo: "Tipo",
   valor: "Valor",
+  aplicaEstrellas: "Aplica a estrellas",
   activo: "Activo",
+};
+
+export const CALIFICACION_FIELD_LABELS = {
+  estrellas: "Estrellas",
+  causasIds: "Causas",
+  comentario: "Comentario",
 };
 
 export const PROVEEDOR_FIELD_LABELS = {
@@ -46,8 +53,56 @@ export const PROVEEDOR_FIELD_LABELS = {
   descripcion: "Descripción",
   telefono: "Teléfono de contacto",
   correo: "Correo de contacto",
-  documentacionAlDia: "Documentación al día",
+  internacional: "Proveedor internacional",
+  ultimaEvaluacionCriticoFecha: "Fecha evaluación anual (crítico)",
+  ultimaEvaluacionCriticoResultado: "Resultado evaluación anual (crítico)",
   activo: "Activo",
+  inactivoMotivo: "Motivo de inactivo",
+  criticidad: "Criticidad",
+  area: "Área",
+  servicio: "Tipo de servicio",
+  esExcepcion: "Excepción",
+  motivoExcepcion: "Motivo de excepción",
+  justificacionExcepcion: "Justificación de excepción",
+  radicaFacturas: "Radicación de facturas",
+  clasificacionMonto: "Clasificación por monto",
+  revision: "Revisión",
+  observacion: "Observación",
+};
+
+export const CICLO_PROVEEDOR_FIELD_LABELS = {
+  clasificacion: "Clasificación",
+  estado: "Estado en el ciclo",
+  rutVigente: "RUT vigente",
+  certBancaria: "Certificación bancaria",
+  listasRestr: "Consulta en listas restrictivas",
+  criticidadDefinida: "Criticidad definida",
+  areaAsignada: "Área y tipo de servicio",
+  contactoRegistrado: "Contacto registrado",
+  checklist: "Checklist (requisitos cumplidos)",
+};
+
+export const CONFIG_PROVEEDORES_FIELD_LABELS = {
+  diaCorte: "Día de corte",
+  mesCorte: "Mes de corte",
+  diasAviso: "Días de aviso antes del corte",
+};
+
+export const PROVEEDOR_PROCESO_FIELD_LABELS = {
+  estado: "Estado",
+  observacion: "Observación",
+  criticidad: "Criticidad",
+  area: "Área",
+  servicio: "Tipo de servicio",
+  contacto: "Contacto",
+  viaExcepcionCorreo: "Vinculación por excepción de correo",
+  radicado: "Radicación de facturas",
+};
+
+export const PROVEEDOR_CHECKLIST_FIELD_LABELS = {
+  rutVigente: "RUT vigente",
+  certBancaria: "Certificación bancaria",
+  listasRestr: "Consulta en listas restrictivas",
 };
 
 export const USER_FIELD_LABELS = {
@@ -97,4 +152,7 @@ export const ENTITY_LABELS = {
   permiso: "Permiso",
   informe: "Informe automático",
   "agente-ia": "Agente IA",
+  calificacion: "Calificación de proveedor",
+  cicloProveedor: "Ciclo de proveedor",
+  configProveedores: "Configuración de proveedores",
 };

@@ -1,19 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TIPO_LABELS } from "@/lib/maestrosTipos";
+import { TIPO_LABELS, ESTRELLAS_CON_CAUSA } from "@/lib/maestrosTipos";
 import { createMaestroApi, updateMaestroApi, fetchUsuariosDisponiblesApi } from "@/lib/api";
 
 const ES_RESPONSABLE = "responsable";
+const ES_CAUSA_CALIFICACION = "causaCalificacion";
 
 export default function MaestroModal({ tipo, maestro, onClose, onSaved }) {
   const isEdit = !!maestro;
   const esResponsable = tipo === ES_RESPONSABLE;
+  const esCausaCalificacion = tipo === ES_CAUSA_CALIFICACION;
   // Si el valor ya está en uso en registros, no se puede renombrar (rompería
   // la referencia por texto).
   const valorLocked = isEdit && maestro.enUso;
   const [valor, setValor] = useState(maestro?.valor || "");
   const [userId, setUserId] = useState(maestro?.userId || "");
+  const [aplicaEstrellas, setAplicaEstrellas] = useState(maestro?.aplicaEstrellas ? String(maestro.aplicaEstrellas) : "");
   const [usuarios, setUsuarios] = useState([]);
   const [loadingUsuarios, setLoadingUsuarios] = useState(esResponsable);
   const [activo, setActivo] = useState(maestro ? maestro.activo : true);
@@ -46,9 +49,18 @@ export default function MaestroModal({ tipo, maestro, onClose, onSaved }) {
       return;
     }
 
+    if (esCausaCalificacion && !aplicaEstrellas) {
+      setError("Selecciona a cuántas estrellas aplica esta causa.");
+      return;
+    }
+
     setSaving(true);
     try {
-      const payload = esResponsable ? { userId, activo } : { valor, activo };
+      const payload = esResponsable
+        ? { userId, activo }
+        : esCausaCalificacion
+        ? { valor, activo, aplicaEstrellas: Number(aplicaEstrellas) }
+        : { valor, activo };
       let saved;
       if (isEdit) {
         saved = await updateMaestroApi(maestro.id, payload);
@@ -116,6 +128,25 @@ export default function MaestroModal({ tipo, maestro, onClose, onSaved }) {
                     onChange={(e) => setValor(e.target.value)}
                   />
                 )}
+              </div>
+            )}
+
+            {esCausaCalificacion && (
+              <div className="field">
+                <label htmlFor="m-estrellas">Aplica a estrellas *</label>
+                <select
+                  id="m-estrellas" required
+                  value={aplicaEstrellas}
+                  onChange={(e) => setAplicaEstrellas(e.target.value)}
+                >
+                  <option value="">Selecciona…</option>
+                  {ESTRELLAS_CON_CAUSA.map((n) => (
+                    <option key={n} value={n}>{"★".repeat(n)} ({n} estrella{n === 1 ? "" : "s"})</option>
+                  ))}
+                </select>
+                <span className="card-sub" style={{ margin: 0 }}>
+                  Esta causa solo se ofrecerá al calificar con esta cantidad exacta de estrellas.
+                </span>
               </div>
             )}
 

@@ -3,6 +3,7 @@ export const ROLES = {
   REGISTRO: "registro",
   LEGALIZAR: "legalizar",
   RADICAR: "radicar",
+  PROVEEDORES: "proveedores",
 };
 
 export const ROLE_LABELS = {
@@ -10,6 +11,7 @@ export const ROLE_LABELS = {
   [ROLES.REGISTRO]: "Registro",
   [ROLES.LEGALIZAR]: "Legalizar factura",
   [ROLES.RADICAR]: "Radicar",
+  [ROLES.PROVEEDORES]: "Proveedores",
 };
 
 export const ROLE_LIST = Object.values(ROLES);
@@ -21,6 +23,7 @@ export const ROLE_COLOR_VARS = {
   [ROLES.REGISTRO]: "--secondary",
   [ROLES.LEGALIZAR]: "--warning",
   [ROLES.RADICAR]: "--good",
+  [ROLES.PROVEEDORES]: "--muted",
 };
 
 export const ROLE_ICONS = {
@@ -28,7 +31,12 @@ export const ROLE_ICONS = {
   [ROLES.REGISTRO]: "◧",
   [ROLES.LEGALIZAR]: "▤",
   [ROLES.RADICAR]: "✓",
+  [ROLES.PROVEEDORES]: "◎",
 };
+
+// Roles que trabajan en Compras (Registros, Dashboard de compras, Alertas, Nova).
+// El rol Proveedores NO entra aquí: solo ve su módulo de proveedores.
+export const ROLES_COMPRAS = [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR];
 
 // admin: acceso total — el único que puede eliminar registros y el único que
 //   puede editar/mover la fecha de solicitud de un registro ya creado.
@@ -42,7 +50,7 @@ export const ROLE_ICONS = {
 // Dashboard y Agente IA son visibles para cualquier rol autenticado.
 
 export function canViewDashboard(role) {
-  return ROLE_LIST.includes(role);
+  return ROLES_COMPRAS.includes(role);
 }
 
 export function canViewUsuarios(role) {
@@ -50,7 +58,7 @@ export function canViewUsuarios(role) {
 }
 
 export function canViewAgenteIA(role) {
-  return ROLE_LIST.includes(role);
+  return ROLES_COMPRAS.includes(role);
 }
 
 export function canViewAuditoria(role) {
@@ -59,6 +67,20 @@ export function canViewAuditoria(role) {
 
 export function canViewMaestros(role) {
   return role === ROLES.ADMIN;
+}
+
+// Módulo de proveedores: maestro, tablero del ciclo e indicadores.
+export function canViewRegistros(role) {
+  return ROLES_COMPRAS.includes(role);
+}
+
+export function canViewProveedores(role) {
+  return role === ROLES.ADMIN || role === ROLES.REGISTRO || role === ROLES.PROVEEDORES;
+}
+
+// Cambiar estados, documentos, excepciones e inactivos de proveedores.
+export function canEditProveedores(role) {
+  return role === ROLES.ADMIN || role === ROLES.PROVEEDORES;
 }
 
 export function canViewPresupuesto(role) {
@@ -70,7 +92,7 @@ export function canViewReportes(role) {
 }
 
 export function canViewAlertas(role) {
-  return ROLE_LIST.includes(role);
+  return ROLES_COMPRAS.includes(role);
 }
 
 export function canCreateRecord(role) {

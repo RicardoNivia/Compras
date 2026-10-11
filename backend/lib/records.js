@@ -62,6 +62,11 @@ export function toClientRecord(r, actual = {}) {
     // incluye) — distinta de "fechaSolicitud", que el usuario puede editar o
     // dejar con una fecha pasada.
     fechaRegistro: r.createdAt,
+    // Resumen de la calificación del proveedor para este registro (ver
+    // lib/calificaciones.js) — null si todavía no se ha calificado. Solo las
+    // estrellas, no el detalle de causas (eso se pide aparte, GET
+    // /api/records/[id]/calificacion, cuando se abre el modal de calificar).
+    calificacion: actual.calificacionEstrellas != null ? { estrellas: actual.calificacionEstrellas } : null,
   };
 }
 
@@ -78,14 +83,17 @@ async function hydrateConDatosActuales(rows) {
   const maestroIds = [...new Set(
     rows.flatMap((r) => MAESTRO_CAMPOS.map((c) => r[c.idField])).filter(Boolean)
   )];
-  const [proveedores, usuarios, maestros] = await Promise.all([
+  const recordIds = rows.map((r) => r.id);
+  const [proveedores, usuarios, maestros, calificaciones] = await Promise.all([
     proveedorIds.length ? prisma.proveedor.findMany({ where: { id: { in: proveedorIds } } }) : [],
     userIds.length ? prisma.user.findMany({ where: { id: { in: userIds } } }) : [],
     maestroIds.length ? prisma.maestro.findMany({ where: { id: { in: maestroIds } } }) : [],
+    recordIds.length ? prisma.calificacionProveedor.findMany({ where: { recordId: { in: recordIds } }, select: { recordId: true, estrellas: true } }) : [],
   ]);
   const proveedorPorId = new Map(proveedores.map((p) => [p.id, p]));
   const usuarioPorId = new Map(usuarios.map((u) => [u.id, u]));
   const maestroPorId = new Map(maestros.map((m) => [m.id, m]));
+  const calificacionPorRecordId = new Map(calificaciones.map((c) => [c.recordId, c.estrellas]));
   return rows.map((r) => {
     const p = r.proveedorId ? proveedorPorId.get(r.proveedorId) : null;
     const u = r.responsableUserId ? usuarioPorId.get(r.responsableUserId) : null;
@@ -93,6 +101,7 @@ async function hydrateConDatosActuales(rows) {
       proveedorNombre: p?.nombre,
       proveedorNit: p?.nit,
       responsableNombre: u?.nombre,
+      calificacionEstrellas: calificacionPorRecordId.get(r.id),
     };
     for (const campo of MAESTRO_CAMPOS) {
       const m = r[campo.idField] ? maestroPorId.get(r[campo.idField]) : null;
