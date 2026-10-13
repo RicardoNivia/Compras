@@ -33,7 +33,7 @@ export default function ConfigCicloProveedores({ initial }) {
   }
 
   return (
-    <section className="prov-panel" aria-labelledby="cfg-prov-t" style={{ marginTop: 20 }}>
+    <section className="prov-panel" aria-labelledby="cfg-prov-t">
       <div className="prov-panel-head">
         <h2 id="cfg-prov-t">Ciclo de actualización de proveedores</h2>
         <span className="muted">Al día siguiente del corte, todos los proveedores de Actualización pasan a Desactualizado.</span>

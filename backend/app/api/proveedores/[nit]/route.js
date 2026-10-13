@@ -5,12 +5,12 @@ import { requirePermission, apiError } from "@/lib/apiGuard";
 
 /**
  * @openapi
- * /api/proveedores/{id}:
+ * /api/proveedores/{nit}:
  *   patch:
  *     tags: [Proveedores]
- *     summary: Edita un proveedor — nombre, nit, descripción, contacto o activo/inactivo (requiere permiso "viewMaestros"). El código (referencia real usada por los registros) nunca cambia, así que nit/nombre se pueden corregir libremente aunque el proveedor esté en uso.
+ *     summary: Edita un proveedor por NIT (llave primaria) — datos, maestros (tipo, clasificación por monto, tipo de servicio, área) y excepción (requiere "editProveedores"). Si se envía un nit distinto, el cambio se propaga a registros, ciclos y calificaciones (ON UPDATE CASCADE).
  *     parameters:
- *       - { name: id, in: path, required: true, schema: { type: string } }
+ *       - { name: nit, in: path, required: true, schema: { type: string } }
  *     requestBody:
  *       required: true
  *       content:
@@ -23,7 +23,13 @@ import { requirePermission, apiError } from "@/lib/apiGuard";
  *               descripcion: { type: string }
  *               telefono: { type: string }
  *               correo: { type: string }
- *               activo: { type: boolean }
+ *               tipoProveedorId: { type: string }
+ *               clasificacionMontoId: { type: string }
+ *               tipoServicioId: { type: string }
+ *               areaId: { type: string }
+ *               esExcepcion: { type: boolean }
+ *               motivoExcepcionId: { type: string }
+ *               justificacionExcepcion: { type: string }
  *     responses:
  *       200:
  *         description: Proveedor actualizado.
@@ -51,7 +57,7 @@ export async function PATCH(request, { params }) {
   if (denied) return denied;
   try {
     const body = await request.json();
-    const proveedor = await updateProveedor(params.id, body, user);
+    const proveedor = await updateProveedor(params.nit, body, user);
     return NextResponse.json(proveedor);
   } catch (err) {
     return apiError(err);
@@ -60,12 +66,12 @@ export async function PATCH(request, { params }) {
 
 /**
  * @openapi
- * /api/proveedores/{id}:
+ * /api/proveedores/{nit}:
  *   delete:
  *     tags: [Proveedores]
  *     summary: Elimina un proveedor, si no está en uso en ningún registro (requiere permiso "viewMaestros").
  *     parameters:
- *       - { name: id, in: path, required: true, schema: { type: string } }
+ *       - { name: nit, in: path, required: true, schema: { type: string } }
  *     responses:
  *       200:
  *         description: Proveedor eliminado.
@@ -92,7 +98,7 @@ export async function DELETE(_request, { params }) {
   const { user, denied } = await requirePermission("editProveedores");
   if (denied) return denied;
   try {
-    await deleteProveedor(params.id, user);
+    await deleteProveedor(params.nit, user);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return apiError(err);
@@ -101,7 +107,7 @@ export async function DELETE(_request, { params }) {
 
 /**
  * @openapi
- * /api/proveedores/{id}:
+ * /api/proveedores/{nit}:
  *   get:
  *     tags: [Proveedores]
  *     summary: Ficha del proveedor — datos, estado y checklist del ciclo vigente, alerta y histórico por ciclo (requiere permiso "viewProveedores").
@@ -110,7 +116,7 @@ export async function GET(_request, { params }) {
   const { denied } = await requirePermission("viewProveedores");
   if (denied) return denied;
   try {
-    return NextResponse.json(await getProveedorDetalle(params.id));
+    return NextResponse.json(await getProveedorDetalle(params.nit));
   } catch (err) {
     return apiError(err);
   }

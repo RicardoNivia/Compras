@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
 import { requirePermission, apiError } from "@/lib/apiGuard";
-import { setDocumentoCiclo } from "@/lib/proveedoresCiclo";
+import { cambiarEstadoCiclo } from "@/lib/proveedoresCiclo";
 
 /**
  * @openapi
- * /api/proveedores/{id}/ciclo/documentos:
+ * /api/proveedores/{nit}/ciclo/estado:
  *   patch:
  *     tags: [Proveedores]
- *     summary: Marca o desmarca un documento manual del checklist (RUT, certificación bancaria, listas restrictivas) en el ciclo vigente (requiere permiso "editProveedores").
+ *     summary: Mueve al proveedor de estado en el ciclo vigente (requiere permiso "editProveedores"). "actualizado" exige el checklist completo.
  */
 export async function PATCH(request, { params }) {
   const { user, denied } = await requirePermission("editProveedores");
   if (denied) return denied;
   try {
     const body = await request.json().catch(() => ({}));
-    return NextResponse.json(await setDocumentoCiclo(params.id, { clave: body.clave, cumple: body.cumple }, user));
+    return NextResponse.json(await cambiarEstadoCiclo(params.nit, { estado: body.estado }, user));
   } catch (err) {
     return apiError(err);
   }

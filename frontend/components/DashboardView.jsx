@@ -1075,9 +1075,30 @@ export default function DashboardView({ records, presupuestos = [] }) {
                   return (
                     <tr key={p.record.id} className="clickable" onClick={() => setDetailRecord(p.record)}>
                       <td className="rank">{i + 1}</td>
-                      <td>{p.record.descripcion || "—"}</td>
-                      <td>{p.record.area || "—"}</td>
-                      <td>{p.record.responsable || "—"}</td>
+                      <td className="truncate">
+                        {p.record.descripcion ? (
+                          <span className="desc-tooltip-wrap">
+                            <span className="desc-text desc-text-ancha">{p.record.descripcion}</span>
+                            <span className="desc-tooltip-bubble">{p.record.descripcion}</span>
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="truncate">
+                        {p.record.area ? (
+                          <span className="desc-tooltip-wrap">
+                            <span className="desc-text">{p.record.area}</span>
+                            <span className="desc-tooltip-bubble">{p.record.area}</span>
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="truncate">
+                        {p.record.responsable ? (
+                          <span className="desc-tooltip-wrap">
+                            <span className="desc-text">{p.record.responsable}</span>
+                            <span className="desc-tooltip-bubble">{p.record.responsable}</span>
+                          </span>
+                        ) : "—"}
+                      </td>
                       <td>{fmtDateDisplay(p.record.fechaSolicitud)}</td>
                       <td><span className={`pill ${severity}`}>{p.dias} d.</span></td>
                       <td>{p.record.estado || "—"}</td>

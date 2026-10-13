@@ -2,15 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import MaestroModal from "@/components/MaestroModal";
-import { TIPOS_MAESTRO, TIPO_LABELS } from "@/lib/maestrosTipos";
+import ConfigCicloProveedores from "@/components/proveedores/ConfigCicloProveedores";
+import { TIPOS_MAESTRO, TIPO_LABELS, MODULO_POR_TIPO } from "@/lib/maestrosTipos";
 import { updateMaestroApi, deleteMaestroApi } from "@/lib/api";
-import { IconPlus, IconEdit, IconTrash, IconSearch, IconBuilding, IconUsers, IconFlag, IconMoney, IconFile, IconLayers, IconStar } from "@/components/icons";
+import { IconPlus, IconEdit, IconTrash, IconSearch, IconBuilding, IconUsers, IconFlag, IconMoney, IconFile, IconLayers, IconStar, IconClock } from "@/components/icons";
 
-// Proveedores tiene su propio menú ("Proveedores", ver app/(app)/proveedores)
-// — ya no vive aquí, para separar el catálogo de Maestros genérico de la
-// gestión completa de proveedores (directorio, procesos, checklist).
+// Maestros de Compras y de Proveedores en una sola sección, agrupados por módulo.
+// El Ciclo de proveedores (fecha de corte) vive aquí, dentro del grupo Proveedores.
+// Un valor EN USO (en cualquiera de los dos módulos) no se puede renombrar ni
+// eliminar; sí se puede inactivar para que deje de ofrecerse en los formularios.
 
-const EN_USO_TITLE = "No se puede editar ni eliminar: este valor ya está en uso en uno o más registros. Puedes inactivarlo para que deje de ofrecerse en el formulario.";
+const CICLO = "cicloProveedores";
+const MODULOS = ["Compras", "Proveedores"];
 
 const TIPO_ICONS = {
   area: IconBuilding,
@@ -20,7 +23,11 @@ const TIPO_ICONS = {
   medioPago: IconMoney,
   estadoLegalizacion: IconFile,
   causaCalificacion: IconStar,
-  motivoExcepcion: IconFlag,
+  areaProveedor: IconBuilding,
+  tipoProveedor: IconFlag,
+  clasificacionMonto: IconMoney,
+  tipoServicio: IconLayers,
+  motivoExcepcion: IconFile,
 };
 
 const COLUMN_LABELS = {
@@ -31,10 +38,19 @@ const COLUMN_LABELS = {
   medioPago: "Nombre del medio de pago",
   estadoLegalizacion: "Nombre del estado de legalización",
   causaCalificacion: "Causa de calificación",
-  motivoExcepcion: "Motivo de excepción de proveedor",
+  areaProveedor: "Área de proveedor",
+  tipoProveedor: "Tipo de proveedor",
+  clasificacionMonto: "Clasificación por monto",
+  tipoServicio: "Tipo de servicio",
+  motivoExcepcion: "Motivo de excepción",
 };
 
-const PAGE_SIZE = 8;
+const PAGE_SIZES = [25, 50, 100];
+
+function enUsoTitle(m) {
+  const donde = m.usadoEn?.length ? m.usadoEn.join(" y ") : "registros existentes";
+  return `No se puede editar ni eliminar: está en uso en ${donde}. Puedes inactivarlo para que deje de ofrecerse en los formularios.`;
+}
 
 function ToggleSwitch({ checked, onChange, disabled, title }) {
   return (
@@ -45,7 +61,8 @@ function ToggleSwitch({ checked, onChange, disabled, title }) {
   );
 }
 
-export default function MaestrosView({ initialMaestros }) {
+// modulos: { Compras: bool, Proveedores: bool } — qué grupos puede administrar el usuario.
+export default function MaestrosView({ initialMaestros, modulos = { Compras: true, Proveedores: false }, cicloConfig = null, initialSeccion = null }) {
   const [maestros, setMaestros] = useState(initialMaestros || []);
   // useState solo toma el valor inicial en el primer montaje: si el usuario
   // navega a esta página por el menú lateral (navegación cliente, sin recarga
@@ -55,9 +72,18 @@ export default function MaestrosView({ initialMaestros }) {
   useEffect(() => {
     setMaestros(initialMaestros || []);
   }, [initialMaestros]);
-  const [tab, setTab] = useState(TIPOS_MAESTRO[0]);
+
+  const grupos = useMemo(() => MODULOS.filter((mod) => modulos[mod]).map((mod) => ({
+    modulo: mod,
+    tipos: TIPOS_MAESTRO.filter((t) => MODULO_POR_TIPO[t] === mod),
+    ciclo: mod === "Proveedores" && !!cicloConfig,
+  })), [modulos, cicloConfig]);
+  const seccionesValidas = grupos.flatMap((g) => [...g.tipos, ...(g.ciclo ? [CICLO] : [])]);
+
+  const [tab, setTab] = useState(() => (initialSeccion && seccionesValidas.includes(initialSeccion) ? initialSeccion : seccionesValidas[0]));
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null); // null = crear, objeto = editar
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -67,7 +93,8 @@ export default function MaestrosView({ initialMaestros }) {
 
   useEffect(() => {
     setPage(1);
-  }, [tab, search]);
+    setError("");
+  }, [tab, search, pageSize]);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -77,12 +104,12 @@ export default function MaestrosView({ initialMaestros }) {
       .sort((a, b) => a.valor.localeCompare(b.valor, "es"));
   }, [maestros, tab, search]);
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pageRows = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return rows.slice(start, start + PAGE_SIZE);
-  }, [rows, currentPage]);
+    const start = (currentPage - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, currentPage, pageSize]);
 
   function openCreate() {
     setEditing(null);
@@ -132,146 +159,169 @@ export default function MaestrosView({ initialMaestros }) {
     }
   }
 
+  const esCiclo = tab === CICLO;
+  const colSpan = tab === "causaCalificacion" ? 5 : 4;
+
   return (
     <div className="maestros-shell">
       <aside className="maestros-nav">
-        <div className="maestros-nav-head">Configuraciones del formulario<br />del libro de obra</div>
-        <nav>
-          {TIPOS_MAESTRO.map((t) => {
-            const Icon = TIPO_ICONS[t];
-            return (
-              <button
-                key={t}
-                type="button"
-                className={`maestros-nav-item${tab === t ? " active" : ""}`}
-                onClick={() => setTab(t)}
-              >
-                <span className="ic"><Icon size={16} /></span>
-                {TIPO_LABELS[t]}
-              </button>
-            );
-          })}
-        </nav>
+        {grupos.map((g) => (
+          <div key={g.modulo} className="maestros-nav-group">
+            <div className="maestros-nav-head">Maestros de {g.modulo}</div>
+            <nav aria-label={`Maestros de ${g.modulo}`}>
+              {g.tipos.map((t) => {
+                const Icon = TIPO_ICONS[t] || IconLayers;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    className={`maestros-nav-item${tab === t ? " active" : ""}`}
+                    onClick={() => setTab(t)}
+                  >
+                    <span className="ic"><Icon size={16} /></span>
+                    {TIPO_LABELS[t]}
+                  </button>
+                );
+              })}
+              {g.ciclo && (
+                <button
+                  type="button"
+                  className={`maestros-nav-item${esCiclo ? " active" : ""}`}
+                  onClick={() => setTab(CICLO)}
+                >
+                  <span className="ic"><IconClock size={16} /></span>
+                  Ciclo de proveedores
+                </button>
+              )}
+            </nav>
+          </div>
+        ))}
       </aside>
 
       <section className="maestros-main">
-        <div className="maestros-toolbar">
-          <div className="maestros-search-wrap">
-            <input
-              type="search" placeholder="Buscar por nombre"
-              value={search} onChange={(e) => setSearch(e.target.value)}
-              aria-label="Buscar"
-            />
-            <span className="ic"><IconSearch size={14} /></span>
-          </div>
-          <div className="spacer" />
-          <button type="button" className="btn btn-primary" onClick={openCreate}>
-            <IconPlus size={13} /> Crear nuevo
-          </button>
-        </div>
+        {esCiclo ? (
+          <ConfigCicloProveedores initial={cicloConfig} />
+        ) : (
+          <>
+            <div className="maestros-toolbar">
+              <div className="maestros-search-wrap">
+                <input
+                  type="search" placeholder="Buscar por nombre"
+                  value={search} onChange={(e) => setSearch(e.target.value)}
+                  aria-label="Buscar"
+                />
+                <span className="ic"><IconSearch size={14} /></span>
+              </div>
+              <div className="spacer" />
+              <button type="button" className="btn btn-primary" onClick={openCreate}>
+                <IconPlus size={13} /> Crear nuevo
+              </button>
+            </div>
 
-        {error && <div className="modal-error" style={{ marginBottom: 10 }}>{error}</div>}
+            {error && <div className="modal-error" style={{ marginBottom: 10 }}>{error}</div>}
 
-        <table className="maestros-table">
-          <thead>
-            <tr>
-              <th>{COLUMN_LABELS[tab]}</th>
-              {tab === "causaCalificacion" && <th className="col-estrellas">Aplica a estrellas</th>}
-              <th className="col-activo">Activo</th>
-              <th className="col-acciones"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {pageRows.length === 0 && (
-              <tr>
-                <td colSpan={tab === "causaCalificacion" ? 4 : 3}>
-                  <div className="empty">No hay opciones de {TIPO_LABELS[tab].toLowerCase()} que coincidan.</div>
-                </td>
-              </tr>
-            )}
-            {pageRows.map((m) => {
-              const locked = m.enUso;
-              const confirming = confirmDeleteId === m.id;
-              return (
-                <tr key={m.id}>
-                  <td>{m.valor}</td>
-                  {tab === "causaCalificacion" && <td>{"★".repeat(m.aplicaEstrellas || 0)}</td>}
-                  <td>
-                    <ToggleSwitch
-                      checked={m.activo}
-                      onChange={() => toggleActivo(m)}
-                      disabled={togglingId === m.id}
-                      title={m.activo ? "Inactivar" : "Activar"}
-                    />
-                  </td>
-                  <td className="acciones">
-                    {confirming ? (
-                      <div className="confirm-del">
-                        <span>¿Eliminar?</span>
-                        <button
-                          type="button" className="btn btn-danger-solid small"
-                          onClick={() => handleDelete(m.id)} disabled={deletingId === m.id}
-                        >
-                          {deletingId === m.id ? <span className="spinner" /> : "Sí"}
-                        </button>
-                        <button type="button" className="btn small" onClick={() => setConfirmDeleteId(null)} disabled={deletingId === m.id}>No</button>
-                      </div>
-                    ) : (
-                      <>
-                        {tab !== "responsable" && (
-                          <button
-                            type="button"
-                            className="icon-action-btn edit"
-                            onClick={() => openEdit(m)}
-                            title={locked ? EN_USO_TITLE : "Editar"}
-                            disabled={locked}
-                          >
-                            <IconEdit size={13} />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="icon-action-btn delete"
-                          onClick={() => setConfirmDeleteId(m.id)}
-                          title={locked ? EN_USO_TITLE : "Eliminar"}
-                          disabled={locked}
-                        >
-                          <IconTrash size={13} />
-                        </button>
-                      </>
-                    )}
-                  </td>
+            <table className="maestros-table">
+              <thead>
+                <tr>
+                  <th>{COLUMN_LABELS[tab]}</th>
+                  {tab === "causaCalificacion" && <th className="col-estrellas">Aplica a estrellas</th>}
+                  <th className="col-uso">En uso</th>
+                  <th className="col-activo">Activo</th>
+                  <th className="col-acciones"></th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {pageRows.length === 0 && (
+                  <tr>
+                    <td colSpan={colSpan}>
+                      <div className="empty">No hay opciones de {(TIPO_LABELS[tab] || "").toLowerCase()} que coincidan.</div>
+                    </td>
+                  </tr>
+                )}
+                {pageRows.map((m) => {
+                  const locked = m.enUso;
+                  const confirming = confirmDeleteId === m.id;
+                  return (
+                    <tr key={m.id}>
+                      <td className="truncate">
+                        <span className="desc-tooltip-wrap">
+                          <span className="desc-text">{m.valor}</span>
+                          <span className="desc-tooltip-bubble">{m.valor}</span>
+                        </span>
+                      </td>
+                      {tab === "causaCalificacion" && <td>{"★".repeat(m.aplicaEstrellas || 0)}</td>}
+                      <td>{m.enUso ? <span className="pill accent" title={enUsoTitle(m)}>{m.usadoEn?.join(" · ") || "Sí"}</span> : <span className="muted">No</span>}</td>
+                      <td>
+                        <ToggleSwitch
+                          checked={m.activo}
+                          onChange={() => toggleActivo(m)}
+                          disabled={togglingId === m.id}
+                          title={m.activo ? "Inactivar" : "Activar"}
+                        />
+                      </td>
+                      <td className="acciones">
+                        {confirming ? (
+                          <div className="confirm-del">
+                            <span>¿Eliminar?</span>
+                            <button
+                              type="button" className="btn btn-danger-solid small"
+                              onClick={() => handleDelete(m.id)} disabled={deletingId === m.id}
+                            >
+                              {deletingId === m.id ? <span className="spinner" /> : "Sí"}
+                            </button>
+                            <button type="button" className="btn small" onClick={() => setConfirmDeleteId(null)} disabled={deletingId === m.id}>No</button>
+                          </div>
+                        ) : (
+                          <>
+                            {tab !== "responsable" && (
+                              <button
+                                type="button"
+                                className="icon-action-btn edit"
+                                onClick={() => openEdit(m)}
+                                title={locked ? enUsoTitle(m) : "Editar"}
+                                disabled={locked}
+                              >
+                                <IconEdit size={13} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="icon-action-btn delete"
+                              onClick={() => setConfirmDeleteId(m.id)}
+                              title={locked ? enUsoTitle(m) : "Eliminar"}
+                              disabled={locked}
+                            >
+                              <IconTrash size={13} />
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
 
-        <div className="maestros-pagination">
-          {totalPages > 1 && (
-            <>
-              <button
-                type="button" className="maestros-page-btn"
-                disabled={currentPage <= 1} onClick={() => setPage((p) => p - 1)}
-                aria-label="Página anterior"
-              >
-                ‹
-              </button>
-              <span className="maestros-page-num">Página {currentPage} de {totalPages}</span>
-              <button
-                type="button" className="maestros-page-btn"
-                disabled={currentPage >= totalPages} onClick={() => setPage((p) => p + 1)}
-                aria-label="Página siguiente"
-              >
-                ›
-              </button>
-            </>
-          )}
-          <span className="count-note">{rows.length} registro(s)</span>
-        </div>
+            <div className="table-footer">
+              <div className="field" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <label htmlFor="maestros-pagesize" style={{ marginBottom: 0 }}>Tamaño</label>
+                <select id="maestros-pagesize" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                  {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div className="page-btns">
+                <button type="button" className="btn small" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Anterior</button>
+                <button type="button" className="btn small" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Siguiente</button>
+              </div>
+              <span className="count-note">Página {currentPage} de {totalPages}</span>
+              <div className="spacer" />
+              <span className="count-note">{rows.length} registro(s)</span>
+            </div>
+          </>
+        )}
       </section>
 
-      {modalOpen && (
+      {modalOpen && !esCiclo && (
         <MaestroModal
           tipo={tab}
           maestro={editing}

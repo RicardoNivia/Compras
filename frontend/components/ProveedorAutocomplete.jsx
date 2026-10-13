@@ -12,8 +12,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // Un registro viejo cuyo proveedor no está en el catálogo (dato histórico,
 // antes de que este maestro existiera) se muestra tal cual al abrir el
 // modal y no se toca a menos que el usuario decida cambiarlo.
-export default function ProveedorAutocomplete({ id, nombre, nit, proveedorId, proveedores, disabled, required, onChange }) {
-  // onChange recibe { nombre, nit, proveedorId }: proveedorId (Proveedor.id)
+export default function ProveedorAutocomplete({ id, nombre, nit, proveedorNit, proveedores, disabled, required, onChange }) {
+  // onChange recibe { nombre, nit, proveedorNit }: proveedorNit (NIT, llave primaria del Proveedor)
   // es la referencia real que se guarda en el registro; nit/nombre son solo
   // para mostrar — si luego se corrige el proveedor en el catálogo, la tabla
   // de Registros refleja el cambio sola (ver hydrateConDatosActuales en
@@ -55,13 +55,13 @@ export default function ProveedorAutocomplete({ id, nombre, nit, proveedorId, pr
   function selectProveedor(p) {
     setText(p.nombre);
     setOpen(false);
-    onChange({ nombre: p.nombre, nit: p.nit, proveedorId: p.id });
+    onChange({ nombre: p.nombre, nit: p.nit, proveedorNit: p.nit });
   }
 
   function clear() {
     setText("");
     setOpen(false);
-    onChange({ nombre: "", nit: "", proveedorId: null });
+    onChange({ nombre: "", nit: "", proveedorNit: null });
   }
 
   function handleInputChange(value) {
@@ -96,7 +96,7 @@ export default function ProveedorAutocomplete({ id, nombre, nit, proveedorId, pr
 
   // Alerta del ciclo de actualización (ver backend/lib/proveedoresCicloReglas.js
   // #alertaCompras) — solo informativa, nunca bloquea registrar la compra.
-  const seleccionado = proveedorId ? proveedores.find((p) => p.id === proveedorId) : null;
+  const seleccionado = proveedorNit ? proveedores.find((p) => p.nit === proveedorNit) : null;
 
   return (
     <div className="autocomplete-wrap" ref={wrapRef}>

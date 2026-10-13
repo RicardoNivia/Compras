@@ -29,7 +29,8 @@ function sectionLabelFor(pathname) {
   if (pathname?.startsWith("/proveedores/indicadores")) return "Indicadores de proveedores";
   if (pathname?.startsWith("/proveedores/informe")) return "Informe mensual de proveedores";
   if (pathname?.startsWith("/proveedores")) return "Gestión de proveedores";
-  if (pathname?.startsWith("/ciclo-proveedores")) return "Ciclo de proveedores";
+  // El ciclo de proveedores vive dentro de Maestros (/maestros?seccion=cicloProveedores).
+  if (pathname?.startsWith("/ciclo-proveedores")) return "Maestros";
   const item = ALL_NAV_ITEMS.find((i) => i.href !== "/agente-ia" && pathname?.startsWith(i.href));
   return item?.label || null;
 }

@@ -22,6 +22,70 @@ function norm(v) {
   return (v || "").toString().trim().toLowerCase();
 }
 
+// Texto sin tildes ni mayúsculas, para comparar nombres de maestros y búsquedas libres.
+function normTxt(v) {
+  return String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function contiene(valor, buscado) {
+  return !buscado || normTxt(valor).includes(normTxt(buscado));
+}
+
+function fechaISO(d) {
+  return d ? new Date(d).toISOString().slice(0, 10) : null;
+}
+
+function enRango(fecha, desde, hasta) {
+  if (!desde && !hasta) return true;
+  const d = fechaISO(fecha);
+  if (!d) return false;
+  return (!desde || d >= desde) && (!hasta || d <= hasta);
+}
+
+// Ficha de un proveedor con TODOS sus campos de gestión, para responder cualquier pregunta sobre ellos.
+function proveedorParaChat(p) {
+  return {
+    nit: p.nit,
+    nombre: p.nombre,
+    descripcion: p.descripcion,
+    tipoCriticidad: p.criticidad || "Sin definir",
+    clasificacionPorMonto: p.clasificacionMonto || null,
+    area: p.area || null,
+    tipoServicio: p.servicio || null,
+    excepcion: !!p.esExcepcion,
+    motivoExcepcion: p.esExcepcion ? p.motivoExcepcion || null : null,
+    justificacionExcepcion: p.esExcepcion ? p.justificacionExcepcion || null : null,
+    activo: p.activo,
+    motivoInactivo: p.activo ? null : p.inactivoMotivo || null,
+    clasificacionCiclo: p.clasificacionLabel || null,
+    estadoCiclo: p.ciclo?.estadoLabel || null,
+    fechaUltimaActualizacion: p.esExcepcion ? "No aplica (excepción)" : fechaISO(p.fechaActualizacion),
+    fechaRegistro: fechaISO(p.createdAt),
+    registradoPor: p.creadoPorNombre || null,
+    telefono: p.telefono || null,
+    correo: p.correo || null,
+    observacion: p.observacion || null,
+    checklist: p.checklist ? `${p.checklist.completos}/${p.checklist.total}` : null,
+    checklistFaltan: p.checklist?.faltan || [],
+    alertaCompras: p.alerta?.titulo || null,
+  };
+}
+
+// Campos por los que buscar_proveedores_gestion puede agrupar y contar.
+const AGRUPACIONES_PROVEEDOR = {
+  area: (p) => p.area || "Sin área",
+  tipoServicio: (p) => p.servicio || "Sin tipo de servicio",
+  clasificacionMonto: (p) => p.clasificacionMonto || "Sin clasificación",
+  criticidad: (p) => p.criticidad || "Sin definir",
+  clasificacion: (p) => p.clasificacionLabel || p.clasificacion,
+  estadoCiclo: (p) => p.ciclo?.estadoLabel || "Sin estado en el ciclo",
+  excepcion: (p) => (p.esExcepcion ? "Excepción" : "No es excepción"),
+  motivoExcepcion: (p) => (p.esExcepcion ? p.motivoExcepcion || "Sin motivo" : "No es excepción"),
+  activo: (p) => (p.activo ? "Activo" : "Inactivo"),
+  mesUltimaActualizacion: (p) => (p.fechaActualizacion ? fechaISO(p.fechaActualizacion).slice(0, 7) : "Sin fecha"),
+  mesRegistro: (p) => (p.createdAt ? fechaISO(p.createdAt).slice(0, 7) : "Sin fecha"),
+};
+
 function matchesFilters(r, f) {
   if (f.area && norm(r.area) !== norm(f.area)) return false;
   if (f.estado && norm(r.estado) !== norm(f.estado)) return false;
@@ -172,12 +236,12 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
     },
     {
       name: "datos_proveedor",
-      description: "Busca en el catálogo de Proveedores (Maestros → Proveedores) por nombre o nit y devuelve nit, nombre, teléfono y correo registrados — úsala cuando pregunten por el contacto de un proveedor específico. Si no aparece, dilo así — puede que exista en el historial de compras pero todavía no esté cargado en este catálogo.",
+      description: "Busca en el catálogo de Proveedores por nombre, NIT o descripción y devuelve su ficha: NIT (llave del proveedor), nombre, descripción, contacto (teléfono/correo), tipo (criticidad), clasificación por monto, área, tipo de servicio, si es excepción, si está activo, fecha de registro y de última actualización. Úsala para preguntas sobre UN proveedor puntual (contacto, a qué se dedica, cómo está clasificado). Si no aparece, dilo así — puede que exista en el historial de compras pero no esté en el catálogo.",
       input_schema: {
         type: "object",
         required: ["busqueda"],
         properties: {
-          busqueda: { type: "string", description: "Nombre (parcial) o nit del proveedor a buscar." },
+          busqueda: { type: "string", description: "Nombre (parcial), NIT o palabra de la descripción del proveedor." },
         },
       },
     },
@@ -186,32 +250,44 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
   if (canSeeProveedoresGestion) {
     tools.push({
       name: "estado_gestion_proveedor",
-      description: "Estado de GESTIÓN de un proveedor (módulo Proveedores): clasificación en el ciclo de actualización del año vigente (Actualización, Nuevo, Excepción o Inactivo), estado del ciclo (Desactualizado, En proceso, En aprobación, Actualizado), checklist de documentos (6 requisitos y cuántos cumple), alerta que ve Compras y el histórico de ciclos anteriores. Úsala cuando pregunten si un proveedor está actualizado, qué le falta o cómo va su ciclo.",
+      description: "Ficha COMPLETA de gestión de un proveedor (módulo Proveedores): NIT, tipo (criticidad), clasificación por monto, área, tipo de servicio, excepción y su motivo, activo/inactivo, fecha de registro y de última actualización (base del ciclo), clasificación en el ciclo vigente (Actualización, Nuevo, Excepción, Inactivo, Por registrar), estado del ciclo (Desactualizado, En proceso, En aprobación, Actualizado), checklist de 6 documentos y qué le falta, alerta que ve Compras e histórico de ciclos. Úsala cuando pregunten por un proveedor puntual: si está actualizado, qué le falta, cómo está clasificado, desde cuándo, etc.",
       input_schema: {
         type: "object",
         required: ["busqueda"],
         properties: {
-          busqueda: { type: "string", description: "Nombre (parcial) o nit del proveedor." },
+          busqueda: { type: "string", description: "Nombre (parcial) o NIT del proveedor." },
         },
       },
     });
     tools.push({
       name: "resumen_ciclo_proveedores",
-      description: "Resumen EXACTO del ciclo de actualización de proveedores: total y avance (% actualizado), conteos por clasificación (Actualización, Nuevo, Excepción, Inactivo, Por registrar) y por estado del ciclo, criticidad, avance por área, críticos pendientes, checklist incompleto, actualizaciones por mes, compras hechas con proveedores en alerta y cuántos quedarán desactualizados el próximo ciclo. Úsala para cualquier pregunta de totales, porcentajes o panorama general de proveedores.",
+      description: "Resumen EXACTO del ciclo de actualización de proveedores: total y avance (% actualizado), conteos por clasificación (Actualización, Nuevo, Excepción, Inactivo, Por registrar) y por estado del ciclo, criticidad, avance por área, críticos pendientes, checklist incompleto, actualizaciones por mes, compras hechas con proveedores en alerta y cuántos quedarán desactualizados el próximo ciclo. Úsala para el panorama general del ciclo. Para conteos por otros campos (tipo de servicio, clasificación por monto, motivo de excepción…) usa buscar_proveedores_gestion con agruparPor.",
       input_schema: { type: "object", properties: {} },
     });
     tools.push({
       name: "buscar_proveedores_gestion",
-      description: "Lista proveedores del módulo de Proveedores filtrados por clasificación, estado del ciclo, criticidad, área o checklist — úsala para preguntas como \"¿cuántos proveedores críticos siguen desactualizados?\", \"proveedores en aprobación del área Infraestructura\" o \"proveedores con checklist incompleto\". Devuelve el conteo exacto y el detalle de los primeros.",
+      description: "Consulta el maestro de proveedores con CUALQUIER combinación de campos y devuelve el conteo exacto, una agrupación opcional y el detalle de los primeros. Sirve para preguntas como: \"¿cuántos proveedores críticos siguen desactualizados?\", \"proveedores de tipo de servicio Ferias\", \"¿cuántos proveedores hay por clasificación por monto?\", \"excepciones por motivo\", \"proveedores del área Mercadeo que son excepción\", \"¿quiénes se actualizaron en septiembre?\", \"proveedores registrados este año\", \"proveedores sin fecha de actualización\", \"inactivos y su motivo\". Todos los filtros de texto son parciales y sin distinguir tildes ni mayúsculas. Cada proveedor trae: NIT, nombre, descripción, tipo (criticidad), clasificación por monto, área, tipo de servicio, excepción y motivo, activo, clasificación y estado en el ciclo, fecha de última actualización, fecha de registro, contacto, checklist y alerta.",
       input_schema: {
         type: "object",
         properties: {
-          clasificacion: { type: "string", description: "\"actualizacion\" | \"nuevo\" | \"excepcion\" | \"inactivo\" (opcional)." },
-          estado: { type: "string", description: "\"desactualizado\" | \"en_proceso\" | \"en_aprobacion\" | \"actualizado\" (opcional, solo aplica a Actualización y Nuevo)." },
-          criticidad: { type: "string", description: "\"Critico\" | \"No crítico\" (opcional)." },
-          area: { type: "string", description: "Nombre exacto del área (opcional)." },
+          texto: { type: "string", description: "Busca en nombre, NIT, descripción u observación (opcional)." },
+          clasificacion: { type: "string", description: "Clasificación en el ciclo: \"actualizacion\" | \"nuevo\" | \"excepcion\" | \"inactivo\" | \"por_registrar\" (opcional)." },
+          estado: { type: "string", description: "Estado del ciclo: \"desactualizado\" | \"en_proceso\" | \"en_aprobacion\" | \"actualizado\" (opcional, solo aplica a Actualización y Nuevo)." },
+          criticidad: { type: "string", description: "Tipo (criticidad): \"Crítico\" | \"No crítico\" | \"sin_definir\" (opcional)." },
+          clasificacionMonto: { type: "string", description: "Clasificación por monto, texto parcial (ej. \"bajo impacto\", \"alto costo\", \"grandes contribuyentes\", \"internacional\") (opcional)." },
+          tipoServicio: { type: "string", description: "Tipo de servicio, texto parcial (ej. \"ferias\", \"transporte\", \"licencias\") (opcional)." },
+          area: { type: "string", description: "Área del proveedor, texto parcial (ej. \"mercadeo\") (opcional). Es el área de Proveedores, distinta del área de Compras." },
+          excepcion: { type: "boolean", description: "true = solo excepciones; false = solo las que no son excepción (opcional)." },
+          motivoExcepcion: { type: "string", description: "Motivo de excepción, texto parcial (ej. \"gran contribuyente\", \"compra ocasional\") (opcional)." },
+          activo: { type: "boolean", description: "true = solo activos; false = solo inactivos (opcional)." },
           checklist: { type: "string", description: "\"completo\" | \"incompleto\" (opcional)." },
-          limit: { type: "integer", description: "Máximo de proveedores a listar en detalle (opcional, por defecto 10, máximo 30) — el conteo total siempre es exacto." },
+          actualizadoDesde: { type: "string", description: "Fecha de última actualización desde, YYYY-MM-DD (opcional)." },
+          actualizadoHasta: { type: "string", description: "Fecha de última actualización hasta, YYYY-MM-DD (opcional)." },
+          sinFechaActualizacion: { type: "boolean", description: "true = solo los que no tienen fecha de última actualización (opcional)." },
+          registradoDesde: { type: "string", description: "Fecha de registro desde, YYYY-MM-DD (opcional)." },
+          registradoHasta: { type: "string", description: "Fecha de registro hasta, YYYY-MM-DD (opcional)." },
+          agruparPor: { type: "string", enum: Object.keys(AGRUPACIONES_PROVEEDOR), description: "Agrupa los resultados y cuenta cuántos hay en cada grupo (opcional). Úsalo para \"¿cuántos hay por…?\"." },
+          limit: { type: "integer", description: "Máximo de proveedores a listar en detalle (opcional, por defecto 15, máximo 50) — el conteo y la agrupación siempre son sobre el 100%." },
         },
       },
     });
@@ -299,14 +375,14 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
         if (matches.length === 0) {
           return { encontrados: 0, proveedores: [], nota: "No hay compras previas que coincidan con esa descripción." };
         }
-        // Agrupa por proveedorId cuando existe (referencia real al
+        // Agrupa por proveedorNit cuando existe (referencia real al
         // catálogo); si el registro es viejo y no quedó atado a ninguno,
         // agrupa por nombre normalizado (mejor esfuerzo).
         const groups = new Map();
         for (const r of matches) {
           if (!r.proveedor) continue;
-          const key = r.proveedorId ? `id:${r.proveedorId}` : `nombre:${norm(r.proveedor)}`;
-          const g = groups.get(key) || { nombre: r.proveedor, proveedorId: r.proveedorId || null, veces: 0, ultimaFecha: null, ultimoValor: null };
+          const key = r.proveedorNit ? `nit:${r.proveedorNit}` : `nombre:${norm(r.proveedor)}`;
+          const g = groups.get(key) || { nombre: r.proveedor, proveedorNit: r.proveedorNit || null, veces: 0, ultimaFecha: null, ultimoValor: null };
           g.veces += 1;
           if (!g.ultimaFecha || (r.fechaSolicitud && r.fechaSolicitud > g.ultimaFecha)) {
             g.ultimaFecha = r.fechaSolicitud;
@@ -318,13 +394,13 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
         const ordenados = Array.from(groups.values())
           .sort((a, b) => b.veces - a.veces || (b.ultimaFecha || "").localeCompare(a.ultimaFecha || ""));
         const top = ordenados.slice(0, limit);
-        const idsProveedor = top.filter((p) => p.proveedorId).map((p) => p.proveedorId);
-        const catalogo = idsProveedor.length ? await prisma.proveedor.findMany({ where: { id: { in: idsProveedor } } }) : [];
-        const catalogoPorId = new Map(catalogo.map((c) => [c.id, c]));
+        const nitsProveedor = top.filter((p) => p.proveedorNit).map((p) => p.proveedorNit);
+        const catalogo = nitsProveedor.length ? await prisma.proveedor.findMany({ where: { nit: { in: nitsProveedor } } }) : [];
+        const catalogoPorNit = new Map(catalogo.map((c) => [c.nit, c]));
         return {
           encontrados: ordenados.length,
           proveedores: top.map((p) => {
-            const c = p.proveedorId ? catalogoPorId.get(p.proveedorId) : null;
+            const c = p.proveedorNit ? catalogoPorNit.get(p.proveedorNit) : null;
             return {
               nombre: p.nombre,
               nit: c?.nit || null,
@@ -339,37 +415,40 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
         };
       }
       case "datos_proveedor": {
-        const q = norm(args.busqueda);
-        const qDigits = q.replace(/[^0-9]/g, "");
-        const all = await prisma.proveedor.findMany();
-        const matches = all.filter((p) => norm(p.nombre).includes(q) || (qDigits && p.nit.includes(qDigits)));
+        const q = normTxt(args.busqueda);
+        const qNit = q.toUpperCase().replace(/[^A-Z0-9]/g, "");
+        const all = await prisma.proveedor.findMany({ orderBy: { nombre: "asc" } });
+        const matches = all.filter((p) => normTxt(p.nombre).includes(q) || (qNit && p.nit.includes(qNit)) || normTxt(p.descripcion).includes(q));
         return {
           encontrados: matches.length,
           proveedores: matches.slice(0, 10).map((p) => ({
             nit: p.nit, nombre: p.nombre, descripcion: p.descripcion,
             telefono: p.telefono || null, correo: p.correo || null,
-            activo: p.activo,
+            tipoCriticidad: p.criticidad || "Sin definir", clasificacionPorMonto: p.clasificacionMonto || null,
+            area: p.area || null, tipoServicio: p.servicio || null,
+            excepcion: p.esExcepcion, activo: p.activo,
+            fechaRegistro: fechaISO(p.createdAt), fechaUltimaActualizacion: p.esExcepcion ? "No aplica (excepción)" : fechaISO(p.fechaActualizacion),
           })),
         };
       }
       case "estado_gestion_proveedor": {
         if (!canSeeProveedoresGestion) return { error: "No autorizado para consultar Gestión de Proveedores." };
-        const qDigits = norm(args.busqueda).replace(/[^0-9]/g, "");
-        const match = await prisma.proveedor.findFirst({
-          where: { OR: [{ nombre: { contains: args.busqueda || "", mode: "insensitive" } }, ...(qDigits ? [{ nit: { contains: qDigits } }] : [])] },
+        const busqueda = String(args.busqueda || "").trim();
+        const qNit = busqueda.toUpperCase().replace(/[^A-Z0-9]/g, "");
+        const candidatos = await prisma.proveedor.findMany({
+          where: { OR: [{ nombre: { contains: busqueda, mode: "insensitive" } }, ...(qNit ? [{ nit: { contains: qNit } }] : [])] },
+          select: { nit: true, nombre: true },
+          take: 10,
         });
-        if (!match) return { encontrado: false, nota: "No hay ningún proveedor con ese nombre/nit en el catálogo." };
-        const d = await getProveedorDetalle(match.id);
+        if (!candidatos.length) return { encontrado: false, nota: "No hay ningún proveedor con ese nombre/NIT en el catálogo." };
+        // El NIT es la llave primaria del proveedor.
+        const exacto = candidatos.find((c) => c.nit === qNit) || candidatos[0];
+        const d = await getProveedorDetalle(exacto.nit);
         return {
           encontrado: true,
-          nit: d.nit,
-          nombre: d.nombre,
+          otrasCoincidencias: candidatos.filter((c) => c.nit !== exacto.nit).map((c) => `${c.nombre} (NIT ${c.nit})`),
           anioCiclo: d.anio,
-          clasificacion: d.clasificacionLabel,
-          estadoCiclo: d.ciclo?.estadoLabel || null,
-          criticidad: d.criticidad || "Sin definir",
-          checklist: { completos: d.checklist.completos, total: d.checklist.total, faltan: d.checklist.faltan },
-          alerta: d.alerta,
+          ...proveedorParaChat(d),
           historial: d.historial.map((h) => ({ anio: h.anio, clasificacion: h.clasificacionLabel, estado: h.estadoLabel })),
         };
       }
@@ -388,23 +467,43 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
       }
       case "buscar_proveedores_gestion": {
         if (!canSeeProveedoresGestion) return { error: "No autorizado para consultar Gestión de Proveedores." };
-        const limit = Math.max(1, Math.min(30, Number(args.limit) || 10));
+        const limit = Math.max(1, Math.min(50, Number(args.limit) || 15));
         const data = await listMaestroProveedores({
           clasificacion: args.clasificacion,
           estado: args.estado,
           criticidad: args.criticidad,
           checklist: args.checklist,
+          excepcion: args.excepcion === true ? "si" : args.excepcion === false ? "no" : "",
         });
-        const rows = args.area ? data.rows.filter((r) => r.area === args.area) : data.rows;
+        const rows = data.rows.filter((p) =>
+          contiene(`${p.nombre} ${p.nit} ${p.descripcion || ""} ${p.observacion || ""}`, args.texto)
+          && contiene(p.area, args.area)
+          && contiene(p.servicio, args.tipoServicio)
+          && contiene(p.clasificacionMonto, args.clasificacionMonto)
+          && (!args.motivoExcepcion || (p.esExcepcion && contiene(p.motivoExcepcion, args.motivoExcepcion)))
+          && (typeof args.activo !== "boolean" || p.activo === args.activo)
+          && enRango(p.fechaActualizacion, args.actualizadoDesde, args.actualizadoHasta)
+          && (!args.sinFechaActualizacion || !p.fechaActualizacion)
+          && enRango(p.createdAt, args.registradoDesde, args.registradoHasta));
+
+        let agrupado = null;
+        const agrupar = AGRUPACIONES_PROVEEDOR[args.agruparPor];
+        if (agrupar) {
+          const conteo = new Map();
+          for (const p of rows) {
+            const k = agrupar(p);
+            conteo.set(k, (conteo.get(k) || 0) + 1);
+          }
+          agrupado = [...conteo.entries()].sort((a, b) => b[1] - a[1]).map(([grupo, cantidad]) => ({ grupo, cantidad }));
+        }
         return {
           anioCiclo: data.anio,
+          totalEnElMaestro: data.total,
           totalCoincidencias: rows.length,
+          ...(agrupado ? { agrupadoPor: args.agruparPor, grupos: agrupado } : {}),
           proveedoresDevueltos: Math.min(limit, rows.length),
-          proveedores: rows.slice(0, limit).map((p) => ({
-            nit: p.nit, nombre: p.nombre, clasificacion: p.clasificacionLabel,
-            estadoCiclo: p.ciclo?.estadoLabel || null, criticidad: p.criticidad || "Sin definir", area: p.area,
-            checklistCompletos: p.checklist.completos, checklistTotal: p.checklist.total, alerta: p.alerta.titulo,
-          })),
+          proveedores: rows.slice(0, limit).map(proveedorParaChat),
+          nota: rows.length > limit ? `Solo se detallan ${limit} de ${rows.length}; los conteos son sobre el total.` : undefined,
         };
       }
       case "resumen_presupuesto": {

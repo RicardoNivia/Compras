@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   anioCicloVigente, inicioCiclo, finCicloFecha, diasParaCorte, clasificacionEn,
   checklistDe, alertaCompras, puedeCambiarEstado, validarConfig,
+  estadoInicial, actualizadoEnCiclo, esCritico, claveCriticidad,
 } from "../lib/proveedoresCicloReglas.js";
 
 const cfg = { diaCorte: 31, mesCorte: 3, diasAviso: 30 };
@@ -41,6 +42,27 @@ assert.equal(clasificacionEn({ ...base, createdAt: bogota("2027-01-05") }, 2027)
 assert.equal(clasificacionEn({ ...base, esExcepcion: true }, 2026), "excepcion");
 assert.equal(clasificacionEn({ ...base, activo: false }, 2026), "inactivo");
 
+// El estado del ciclo sale de la fecha de ÚLTIMA ACTUALIZACIÓN, no de la de registro.
+const viejo = { ...base, createdAt: bogota("2019-05-01") };
+assert.equal(estadoInicial({ ...viejo, fechaActualizacion: null }, 2026), "desactualizado");
+assert.equal(estadoInicial({ ...viejo, fechaActualizacion: bogota("2026-08-01") }, 2026), "actualizado");
+assert.equal(estadoInicial({ ...viejo, fechaActualizacion: bogota("2026-03-15") }, 2026), "desactualizado");
+assert.equal(estadoInicial({ ...viejo, fechaActualizacion: bogota("2026-08-01") }, 2027), "desactualizado");
+// Registrado dentro del ciclo pero sin actualización registrada: la fecha de registro no cuenta.
+assert.equal(estadoInicial({ ...base, createdAt: bogota("2026-06-10"), fechaActualizacion: null }, 2026), "desactualizado");
+assert.equal(actualizadoEnCiclo({ fechaActualizacion: new Date("2027-03-31T23:00:00-05:00") }, 2026), true);
+assert.equal(actualizadoEnCiclo({ fechaActualizacion: new Date("2027-04-01T00:30:00-05:00") }, 2026), false);
+// Excepción: no participa del ciclo sin importar sus fechas.
+assert.equal(clasificacionEn({ ...base, esExcepcion: true, createdAt: bogota("2026-06-10"), fechaActualizacion: null }, 2026), "excepcion");
+assert.equal(clasificacionEn({ ...base, esExcepcion: true, createdAt: null, fechaActualizacion: null }, 2026), "excepcion");
+
+// Criticidad por valor del maestro (sin tildes ni mayúsculas).
+assert.equal(esCritico("Crítico"), true);
+assert.equal(esCritico("CRITICO"), true);
+assert.equal(esCritico("No crítico"), false);
+assert.equal(esCritico("NO CRITICO"), false);
+assert.equal(claveCriticidad(null), "sin_definir");
+
 // NIT provisional: no participa en el ciclo.
 assert.equal(clasificacionEn({ ...base, nit: "PENDIENTE-000001" }, 2026), "por_registrar");
 assert.equal(alertaCompras({ activo: true, esExcepcion: false, nit: "PENDIENTE-000001" }, null, { completos: 0, total: 6, faltan: [] }).titulo, "Proveedor sin NIT");
@@ -49,7 +71,7 @@ assert.equal(alertaCompras({ activo: true, esExcepcion: false, nit: "PENDIENTE-0
 const completo = { criticidad: "Critico", areaId: "a1", servicio: "Ferias", telefono: "3001234567" };
 assert.equal(checklistDe(completo, {}).completos, 3);
 assert.equal(checklistDe(completo, { rutVigente: true, certBancaria: true, listasRestr: true }).completos, 6);
-assert.equal(checklistDe({ criticidad: "Sin definir", area: "Mercadeo", servicio: "x" }, {}).completos, 1);
+assert.equal(checklistDe({ criticidad: null, area: "Mercadeo", servicio: "x" }, {}).completos, 1);
 
 // Los 3 automáticos también se pueden marcar a mano: la marca explícita gana sobre el valor derivado.
 assert.equal(checklistDe(completo, { criticidadDefinida: false }).completos, 2);

@@ -14,7 +14,13 @@
     "db:seed": "node prisma/seed.mjs",
     "db:importar": "node prisma/importar-registros.mjs",
     "db:migrar-sqlite": "node prisma/migrar-sqlite-a-postgres.mjs",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "proveedores:validar": "node scripts/proveedores/migrarProveedoresExcel.mjs validar",
+    "proveedores:simular": "node scripts/proveedores/migrarProveedoresExcel.mjs simular",
+    "proveedores:maestros": "node scripts/proveedores/migrarProveedoresExcel.mjs maestros",
+    "proveedores:migrar": "node scripts/proveedores/migrarProveedoresExcel.mjs aplicar",
+    "proveedores:integridad": "node scripts/proveedores/verificarIntegridadProveedores.mjs",
+    "proveedores:test-ciclo": "node scripts/testProveedoresCiclo.mjs"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"

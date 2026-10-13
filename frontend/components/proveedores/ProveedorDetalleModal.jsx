@@ -4,7 +4,7 @@ import ProveedorDetalle from "@/components/proveedores/ProveedorDetalle";
 
 // Ventana modal con la ficha del proveedor (checklist, histórico, datos y acciones).
 // Se abre con el botón "Ver detalle" de cada fila del maestro.
-export default function ProveedorDetalleModal({ proveedorId, areas, motivos, canEdit, onClose, onChanged }) {
+export default function ProveedorDetalleModal({ proveedorNit, catalogos, canEdit, onClose, onChanged }) {
   return (
     <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal prov-modal" role="dialog" aria-modal="true" aria-label="Detalle del proveedor">
@@ -14,9 +14,8 @@ export default function ProveedorDetalleModal({ proveedorId, areas, motivos, can
         </div>
         <div className="prov-modal-body">
           <ProveedorDetalle
-            proveedorId={proveedorId}
-            areas={areas}
-            motivos={motivos}
+            proveedorNit={proveedorNit}
+            catalogos={catalogos}
             canEdit={canEdit}
             onChanged={onChanged}
           />

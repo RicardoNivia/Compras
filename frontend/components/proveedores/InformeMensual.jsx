@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchInformeMensual } from "@/lib/api";
+import { fetchInformeMensual, reviewInformeProveedoresApi } from "@/lib/api";
 import { saveBlob } from "@/lib/exportHelpers";
 import { usePantallaNova } from "@/lib/novaPantalla";
+import ExplicarProveedoresIA from "@/components/proveedores/ExplicarProveedoresIA";
 
 const COLOR = { activo: "var(--good)", pendiente: "var(--warning)", inactivo: "var(--critical)" };
 const PDF = { navy: [12, 39, 72], blue: [27, 95, 184], ink: [11, 34, 57], muted: [100, 125, 151], activo: [11, 107, 46], pendiente: [217, 119, 6], inactivo: [185, 28, 28], nuevo: [27, 95, 184], act: [79, 151, 232] };
@@ -272,6 +273,13 @@ export default function InformeMensual({ initial = null }) {
         </div>
         {cargando && <span className="spinner" aria-label="Cargando" />}
         <div className="spacer" />
+        <ExplicarProveedoresIA
+          clave={`${data.anio}-${data.mes}`}
+          analizar={() => reviewInformeProveedoresApi(data.anio, data.mes)}
+          titulo={`Análisis del informe de ${data.titulo}`}
+          subtitulo="Resumen, alertas y sugerencias sobre el movimiento de proveedores del mes"
+          cargando="Analizando el informe del mes…"
+        />
         <button type="button" className="btn" onClick={exportarExcel} disabled={!!exportando}>{exportando === "excel" ? <span className="spinner" /> : null} Excel</button>
         <button type="button" className="btn btn-primary" onClick={exportarPdf} disabled={!!exportando}>{exportando === "pdf" ? <span className="spinner" /> : null} Descargar PDF</button>
       </div>

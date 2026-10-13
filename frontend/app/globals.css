@@ -773,8 +773,21 @@ th.check-col, td.check-col{ text-align:center; }
 }
 .rating-star-btn:hover{ transform: scale(1.1); }
 .rating-star-btn.filled{ color: var(--warning); }
-.rating-causas-list{ display:flex; flex-direction:column; gap:6px; }
-.rating-causa-item{ display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
+.rating-causas-list{ display:flex; flex-direction:column; gap:6px; margin-top:2px; }
+/* Cada causa es una fila clicable; no hereda el estilo de etiqueta (.field label) ni de input de texto. */
+.field .rating-causa-item{
+  display:flex; align-items:center; gap:10px; width:100%; margin:0; padding:9px 12px;
+  border:1px solid var(--border); border-radius:10px; background:var(--surface); cursor:pointer;
+  font-size:13.5px; font-weight:500; color:var(--ink); text-transform:none; letter-spacing:0; line-height:1.35;
+  transition:border-color .12s ease, background .12s ease;
+}
+.field .rating-causa-item:hover{ border-color:var(--accent); }
+.field .rating-causa-item:has(input:checked){ border-color:var(--accent); background:var(--accent-wash); }
+.field .rating-causa-item input[type="checkbox"]{
+  flex:none; width:18px; height:18px; min-width:0; margin:0; padding:0; border:0; box-shadow:none; background:none;
+  accent-color:var(--accent); cursor:pointer;
+}
+.field .rating-causa-item span{ flex:1; min-width:0; }
 
 .btn-check{
   appearance:none; width:24px; height:24px; border-radius:8px;
@@ -1122,6 +1135,10 @@ table.maestros-table thead th{
 }
 table.maestros-table thead th.col-activo{ width:120px; }
 table.maestros-table thead th.col-acciones{ width:90px; text-align:right; }
+table.maestros-table thead th.col-uso{ width:170px; }
+table.maestros-table td.truncate{ max-width:420px; }
+.maestros-nav-group + .maestros-nav-group{ margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+.maestros-main .table-footer{ margin-top:14px; }
 table.maestros-table tbody tr{ border-bottom:1px solid var(--border); }
 table.maestros-table tbody tr:nth-child(even){ background: var(--surface-2); }
 table.maestros-table tbody td{ padding:12px 16px; vertical-align:middle; }
@@ -1695,6 +1712,35 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 .prov-nav-link:hover{ color:var(--ink); }
 .prov-nav-link.is-active{ color:var(--ink); border-bottom-color:var(--accent); }
 .prov-note{ margin:6px 0; color:var(--muted); font-size:13px; }
+/* Validación del NIT en tiempo real (ProveedorFormModal) */
+.prov-nit-ayuda{ display:block; margin-top:4px; font-size:12px; line-height:1.35; }
+.prov-nit-ayuda.muted{ color:var(--muted); }
+.prov-nit-ayuda.good{ color:var(--good); }
+.prov-nit-ayuda.bad{ color:var(--critical); font-weight:600; }
+.field input[aria-invalid="true"]{ border-color:var(--critical); }
+/* Formulario de proveedor (crear / editar) por secciones */
+.prov-form-modal .modal-body.prov-form{ display:flex; flex-direction:column; gap:14px; max-height:70vh; }
+.prov-form-section{ margin:0; padding:14px 16px 12px; border:1px solid var(--border); border-radius:12px; background:var(--surface); min-width:0; }
+.prov-form-section legend{ padding:0 6px; font-family:"Nunito",sans-serif; font-weight:800; font-size:12.5px; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em; }
+.prov-form-grid{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:12px 14px; }
+/* Las opciones largas (tipo de servicio, clasificación) no deben ensanchar la columna fuera del modal. */
+.prov-form-grid > .field{ min-width:0; }
+.prov-form-grid .field select,
+.prov-form-grid .field input,
+.prov-form-grid .field textarea{ width:100%; max-width:100%; min-width:0; box-sizing:border-box; text-overflow:ellipsis; }
+.prov-form-grid .span-2{ grid-column:1 / -1; }
+.prov-form-hint{ display:block; margin:6px 0 0; font-size:12px; color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0; }
+.field label .prov-form-hint{ display:inline; margin:0 0 0 4px; }
+.prov-form-resumen{ display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px; padding:10px 12px; border-radius:12px; background:var(--accent-wash); }
+.prov-form-resumen div{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.prov-form-resumen span{ font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+.prov-form-resumen strong{ font-size:13px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.prov-excepcion-card{ margin-top:12px; padding:12px 14px; border:1px dashed var(--border); border-radius:10px; display:flex; flex-direction:column; gap:12px; }
+.prov-excepcion-card.on{ border-style:solid; border-color:var(--accent); background:var(--accent-wash); }
+.prov-excepcion-card .prov-toggle-row > span{ display:flex; flex-direction:column; }
+@media (max-width: 640px){
+  .prov-form-grid{ grid-template-columns:minmax(0, 1fr); }
+}
 
 .prov-row-docs{ display:flex; align-items:center; gap:8px; font-size:13px; }
 .prov-progress{ flex:1; height:8px; border-radius:999px; background:var(--grid); overflow:hidden; min-width:60px; }
@@ -1943,3 +1989,30 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 .prov-reloj{ display:flex; flex-wrap:wrap; gap:12px 32px; padding:14px 16px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; }
 .prov-reloj > div{ display:flex; flex-direction:column; gap:2px; font-size:13px; }
 .prov-reloj strong{ font-size:15px; }
+
+/* Proveedores: barra de filtros compacta (2 líneas) para dar más foco a la tabla */
+.prov-maestro .toolbar.prov-filtros{ flex-direction:column; align-items:stretch; gap:8px; padding:10px 12px; margin-bottom:10px; }
+.prov-filtros-fila{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.prov-filtros-modo{ padding:3px; }
+.prov-filtros-modo .dash-tab{ padding:5px 12px; font-size:12.5px; }
+.prov-maestro .prov-filtros-buscar{ flex:1 1 260px; max-width:380px; min-height:34px; padding:6px 12px; }
+.prov-filtros-selects{ display:flex; flex-wrap:wrap; gap:6px; }
+.prov-maestro .prov-filtros-selects select{
+  width:auto !important; max-width:220px; min-height:32px; padding:4px 26px 4px 10px;
+  font-size:12.5px; border-radius:8px; text-overflow:ellipsis;
+}
+.prov-maestro .prov-filtros-selects select.activo{ border-color:var(--accent); color:var(--accent); background-color:var(--accent-wash); font-weight:600; }
+.prov-maestro > .dash-tabs{ margin-bottom:8px !important; }
+.prov-maestro .dash-tabs .dash-tab{ padding:6px 12px; }
+.prov-maestro .prov-toggle-row{ margin:0 0 8px; }
+
+/* Formulario de proveedor: campos obligatorios que faltan al intentar guardar */
+.field.faltante label{ color:var(--critical); }
+.field.faltante input, .field.faltante select, .field.faltante textarea,
+.field select[aria-invalid="true"], .field textarea[aria-invalid="true"]{
+  border-color:var(--critical) !important;
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--critical) 18%, transparent);
+  background-color:color-mix(in srgb, var(--critical) 5%, var(--surface));
+}
+.campo-error{ display:block; margin-top:4px; font-size:12px; font-weight:600; color:var(--critical); }
+.desc-text.desc-text-ancha{ max-width:min(520px, 45vw); }

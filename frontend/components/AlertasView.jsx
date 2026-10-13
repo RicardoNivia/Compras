@@ -181,7 +181,7 @@ function SolicitudesPendientes({ items }) {
               {pageItems.map((r) => (
                 <tr key={r.id}>
                   <td className="mono">{r.localSeq ? `#${r.localSeq}` : "—"}</td>
-                  <td className="truncate wide" title={r.descripcion || ""}>{r.descripcion || "—"}</td>
+                  <td className="truncate wide">{r.descripcion ? <span className="desc-tooltip-wrap"><span className="desc-text desc-text-ancha">{r.descripcion}</span><span className="desc-tooltip-bubble">{r.descripcion}</span></span> : "—"}</td>
                   <td>{r.area || "—"}</td>
                   <td>{r.responsable || "—"}</td>
                   <td style={{ whiteSpace: "nowrap" }}>{fmtDateDisplay(r.fechaSolicitud)}</td>
@@ -233,7 +233,7 @@ function RiesgoTiempos({ items }) {
               {pageItems.map((r) => (
                 <tr key={r.id}>
                   <td className="mono">{r.localSeq ? `#${r.localSeq}` : "—"}</td>
-                  <td className="truncate wide" title={r.descripcion || ""}>{r.descripcion || "—"}</td>
+                  <td className="truncate wide">{r.descripcion ? <span className="desc-tooltip-wrap"><span className="desc-text desc-text-ancha">{r.descripcion}</span><span className="desc-tooltip-bubble">{r.descripcion}</span></span> : "—"}</td>
                   <td>{r.area || "—"}</td>
                   <td>{r.proveedor || "—"}</td>
                   <td><span className={`pill ${diasPillClass(r.diasHabiles)}`}><IconClock size={11} /> {r.diasHabiles}</span></td>
@@ -327,7 +327,7 @@ function NoRadicadas({ items }) {
               {pageItems.map((r) => (
                 <tr key={r.id}>
                   <td className="mono">{r.localSeq ? `#${r.localSeq}` : "—"}</td>
-                  <td className="truncate wide" title={r.descripcion || ""}>{r.descripcion || "—"}</td>
+                  <td className="truncate wide">{r.descripcion ? <span className="desc-tooltip-wrap"><span className="desc-text desc-text-ancha">{r.descripcion}</span><span className="desc-tooltip-bubble">{r.descripcion}</span></span> : "—"}</td>
                   <td>{r.area || "—"}</td>
                   <td>{r.responsable || "—"}</td>
                   <td>{r.proveedor || "—"}</td>

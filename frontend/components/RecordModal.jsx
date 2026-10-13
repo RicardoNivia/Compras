@@ -39,7 +39,7 @@ const emptyForm = {
   medioPagoId: "",
   nit: "",
   proveedor: "",
-  proveedorId: "",
+  proveedorNit: "",
   licitacion: "",
   estadoLegalizacion: "",
   estadoLegalizacionId: "",
@@ -237,10 +237,6 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
 
     if (!form.fechaSolicitud || !form.areaId || !form.responsableUserId || !form.descripcion) {
       setError("Completa fecha de solicitud, área, responsable y descripción.");
-      return;
-    }
-    if (!isEdit && !form.proveedorId) {
-      setError("Selecciona un proveedor del catálogo. Si no existe, pide a un administrador que lo agregue en Maestros → Proveedores.");
       return;
     }
     setSaving(true);
@@ -445,16 +441,15 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
               </select>
             </div>
             <div className="field full">
-              <label htmlFor="f-proveedor">Proveedor{!isEdit && " *"}</label>
+              <label htmlFor="f-proveedor">Proveedor <span className="muted">(opcional)</span></label>
               <ProveedorAutocomplete
                 id="f-proveedor"
                 nombre={form.proveedor || ""}
                 nit={form.nit || ""}
-                proveedorId={form.proveedorId || ""}
+                proveedorNit={form.proveedorNit || ""}
                 proveedores={proveedores}
                 disabled={!isEditable("proveedor")}
-                required={!isEdit}
-                onChange={({ nombre, nit, proveedorId }) => setForm((f) => ({ ...f, proveedor: nombre, nit, proveedorId }))}
+                onChange={({ nombre, nit, proveedorNit }) => setForm((f) => ({ ...f, proveedor: nombre, nit, proveedorNit }))}
               />
             </div>
 

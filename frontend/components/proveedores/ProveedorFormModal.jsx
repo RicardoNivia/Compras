@@ -1,23 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { createProveedorApi, updateProveedorApi, parseProveedorTextoApi, cambiarClasificacionApi, cambiarEstadoCicloApi } from "@/lib/api";
-import { CLASIFICACIONES_MONTO, REVISIONES, ESTADOS_CICLO } from "@/lib/proveedoresOpciones";
+import { createProveedorApi, updateProveedorApi, parseProveedorTextoApi, cambiarClasificacionApi, cambiarEstadoCicloApi, verificarNitApi } from "@/lib/api";
+import { REVISIONES, ESTADOS_CICLO, maestroPorTexto, normalizeNit, nitValido } from "@/lib/proveedoresOpciones";
 import ProveedorAccionesModal from "@/components/proveedores/ProveedorAccionesModal";
 import { IconSpark } from "@/components/icons";
 
-// Crear o editar un proveedor. Al crear, se puede pegar el correo de solicitud
-// y Nova precarga los campos: el usuario siempre revisa y confirma. Nunca se
-// guarda nada automáticamente.
-export default function ProveedorFormModal({ proveedor, areas = [], onClose, onSaved, onClasificado }) {
+// Campos obligatorios del formulario (en el orden en que aparecen).
+const CAMPOS_OBLIGATORIOS = {
+  nit: { id: "pf-nit", label: "NIT" },
+  nombre: { id: "pf-nombre", label: "Razón social" },
+  descripcion: { id: "pf-descripcion", label: "Descripción" },
+  motivo: { id: "pf-motivo", label: "Motivo de excepción" },
+};
+const ORDEN_OBLIGATORIOS = Object.keys(CAMPOS_OBLIGATORIOS);
+
+function CampoObligatorio({ visible }) {
+  return visible ? <span className="campo-error" role="alert">Campo obligatorio</span> : null;
+}
+
+// Opciones de un maestro: las activas, más el valor actual aunque esté inactivo.
+function opciones(lista, actualId) {
+  return lista.filter((m) => m.activo !== false || m.id === actualId);
+}
+
+// Crear o editar un proveedor. El NIT es la llave primaria: se valida en tiempo real
+// contra el catálogo y no se puede guardar si ya existe (al crear o al cambiarlo).
+// Tipo, clasificación por monto, tipo de servicio, área y motivo de excepción son maestros.
+// Al crear, se puede pegar el correo de solicitud y Nova precarga los campos.
+export default function ProveedorFormModal({ proveedor, catalogos = {}, onClose, onSaved, onClasificado }) {
+  const { areas = [], tipos = [], clasificaciones = [], servicios = [], motivos = [] } = catalogos;
   const [inactivando, setInactivando] = useState(false);
   const [reactivando, setReactivando] = useState(false);
   const editando = !!proveedor;
-  const [pasteOpen, setPasteOpen] = useState(!editando);
+  // Por defecto se muestra el llenado manual; "Pegar el correo de solicitud" abre la opción con Nova.
+  const [pasteOpen, setPasteOpen] = useState(false);
   const [texto, setTexto] = useState("");
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState("");
+  const [novaNota, setNovaNota] = useState("");
 
   const [nombre, setNombre] = useState(proveedor?.nombre || "");
   const [nit, setNit] = useState(proveedor?.nit || "");
@@ -25,16 +47,53 @@ export default function ProveedorFormModal({ proveedor, areas = [], onClose, onS
   const [telefono, setTelefono] = useState(proveedor?.telefono || "");
   const [correo, setCorreo] = useState(proveedor?.correo || "");
   const [areaId, setAreaId] = useState(proveedor?.areaId || "");
-  const [servicio, setServicio] = useState(proveedor?.servicio || "");
-  const [criticidad, setCriticidad] = useState(proveedor?.criticidad || "");
-  const [clasificacionMonto, setClasificacionMonto] = useState(proveedor?.clasificacionMonto || "");
+  const [tipoServicioId, setTipoServicioId] = useState(proveedor?.tipoServicioId || "");
+  const [tipoProveedorId, setTipoProveedorId] = useState(proveedor?.tipoProveedorId || "");
+  const [clasificacionMontoId, setClasificacionMontoId] = useState(proveedor?.clasificacionMontoId || "");
   const [revision, setRevision] = useState(proveedor?.revision || "");
   const [observacion, setObservacion] = useState(proveedor?.observacion || "");
+  const [esExcepcion, setEsExcepcion] = useState(!!proveedor?.esExcepcion);
+  const [motivoExcepcionId, setMotivoExcepcionId] = useState(proveedor?.motivoExcepcionId || "");
+  const [justificacion, setJustificacion] = useState(proveedor?.justificacionExcepcion || "");
   const estadoActual = proveedor?.ciclo?.estado || "";
   const [estado, setEstado] = useState(estadoActual);
 
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
+  // Validación del NIT en tiempo real: { estado: "vacio"|"invalido"|"verificando"|"libre"|"existe"|"error", proveedor }
+  const [nitCheck, setNitCheck] = useState({ estado: editando ? "libre" : "vacio" });
+  const consulta = useRef(0);
+  const nitOriginal = proveedor?.nit || "";
+  const nitNormalizado = normalizeNit(nit);
+  const nitSinCambio = editando && nitNormalizado === nitOriginal;
+
+  useEffect(() => {
+    if (nitSinCambio) { setNitCheck({ estado: "libre" }); return undefined; }
+    if (!nitNormalizado) { setNitCheck({ estado: "vacio" }); return undefined; }
+    if (!nitValido(nitNormalizado)) { setNitCheck({ estado: "invalido" }); return undefined; }
+    setNitCheck({ estado: "verificando" });
+    const n = ++consulta.current;
+    const t = setTimeout(async () => {
+      try {
+        const res = await verificarNitApi(nitNormalizado, nitOriginal || undefined);
+        if (n !== consulta.current) return;
+        setNitCheck(res.existe ? { estado: "existe", proveedor: res.proveedor } : { estado: "libre" });
+      } catch {
+        if (n === consulta.current) setNitCheck({ estado: "error" });
+      }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [nitNormalizado, nitSinCambio, nitOriginal]);
+
+
+  // Validación al intentar guardar: los obligatorios que falten se resaltan en rojo.
+  const [intentado, setIntentado] = useState(false);
+  const faltantes = {
+    nit: ["vacio", "invalido", "existe"].includes(nitCheck.estado),
+    nombre: !nombre.trim(),
+    descripcion: !descripcion.trim(),
+    motivo: esExcepcion && !motivoExcepcionId,
+  };
+  const marcar = (campo) => intentado && faltantes[campo];
+  const claseCampo = (campo, extra = "") => `field${extra ? ` ${extra}` : ""}${marcar(campo) ? " faltante" : ""}`;
 
   async function handleParse() {
     if (!texto.trim() || parsing) return;
@@ -42,13 +101,22 @@ export default function ProveedorFormModal({ proveedor, areas = [], onClose, onS
     setParseError("");
     try {
       const { campos } = await parseProveedorTextoApi(texto);
+      const notas = [];
       if (campos.nombre) setNombre(campos.nombre);
-      if (campos.nit) setNit(campos.nit);
+      if (campos.nit) setNit(normalizeNit(campos.nit));
       if (campos.telefono) setTelefono(campos.telefono);
       if (campos.correo) setCorreo(campos.correo);
-      if (campos.servicio) setServicio(campos.servicio);
       if (campos.descripcion) setDescripcion(campos.descripcion);
-      if (campos.criticidad) setCriticidad(campos.criticidad);
+      if (campos.criticidad) {
+        const t = maestroPorTexto(tipos, campos.criticidad) || tipos.find((m) => /no/i.test(m.valor) === /no/i.test(campos.criticidad));
+        if (t) setTipoProveedorId(t.id);
+      }
+      if (campos.servicio) {
+        const sv = maestroPorTexto(servicios, campos.servicio);
+        if (sv) setTipoServicioId(sv.id);
+        else notas.push(`Nova sugirió el tipo de servicio «${campos.servicio}», que no existe en Maestros: elige uno de la lista o créalo en Maestros › Tipo de servicio.`);
+      }
+      setNovaNota(notas.join(" "));
       setPasteOpen(false);
     } catch (err) {
       setParseError(err.message || "No se pudo interpretar el texto.");
@@ -62,7 +130,7 @@ export default function ProveedorFormModal({ proveedor, areas = [], onClose, onS
     setReactivando(true);
     setError("");
     try {
-      await cambiarClasificacionApi(proveedor.id, { accion: "reactivar" });
+      await cambiarClasificacionApi(proveedor.nit, { accion: "reactivar" });
       onClasificado?.();
     } catch (err) {
       setError(err.message || "No se pudo reactivar el proveedor.");
@@ -71,31 +139,49 @@ export default function ProveedorFormModal({ proveedor, areas = [], onClose, onS
     }
   }
 
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
-    if (!nombre.trim()) { setError("El nombre del proveedor es obligatorio."); return; }
-    if (!descripcion.trim()) { setError("La descripción es obligatoria: qué vende o para qué sirve."); return; }
+    setIntentado(true);
+    // Campos obligatorios: se marcan en rojo y se lleva el foco al primero que falte.
+    const primero = ORDEN_OBLIGATORIOS.find((c) => faltantes[c]);
+    if (primero) {
+      const nombres = ORDEN_OBLIGATORIOS.filter((c) => faltantes[c]).map((c) => CAMPOS_OBLIGATORIOS[c].label);
+      setError(nitCheck.estado === "existe"
+        ? `Ya existe un proveedor con el NIT ${nitNormalizado}: ${nitCheck.proveedor?.nombre}.`
+        : `Completa los campos marcados en rojo: ${nombres.join(", ")}.`);
+      const el = document.getElementById(CAMPOS_OBLIGATORIOS[primero].id);
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      el?.focus({ preventScroll: true });
+      return;
+    }
+    if (nitCheck.estado === "verificando") { setError("Espera un momento: se está verificando el NIT."); return; }
 
     const data = {
       nombre: nombre.trim(),
-      nit: nit.trim() || (editando ? undefined : `PEND${Date.now()}`),
+      nit: nitNormalizado,
       descripcion: descripcion.trim(),
       telefono: telefono.trim() || null,
       correo: correo.trim() || null,
       areaId: areaId || null,
-      servicio: servicio.trim() || null,
-      criticidad: criticidad || null,
-      clasificacionMonto: clasificacionMonto || null,
+      tipoServicioId: tipoServicioId || null,
+      tipoProveedorId: tipoProveedorId || null,
+      clasificacionMontoId: clasificacionMontoId || null,
       revision: revision || null,
       observacion: observacion.trim() || null,
+      esExcepcion,
+      motivoExcepcionId: esExcepcion ? motivoExcepcionId : null,
+      justificacionExcepcion: esExcepcion ? justificacion.trim() || null : null,
     };
 
     setSaving(true);
     try {
-      const saved = editando ? await updateProveedorApi(proveedor.id, data) : await createProveedorApi(data);
+      const saved = editando ? await updateProveedorApi(proveedor.nit, data) : await createProveedorApi(data);
       // El estado del ciclo se guarda aparte (valida el checklist completo para "Actualizado").
-      if (editando && estadoActual && estado && estado !== estadoActual) await cambiarEstadoCicloApi(proveedor.id, estado);
+      if (editando && !esExcepcion && estadoActual && estado && estado !== estadoActual) await cambiarEstadoCicloApi(saved.nit, estado);
       onSaved(saved);
     } catch (err) {
       setError(err.message || "No se pudo guardar el proveedor.");
@@ -104,9 +190,18 @@ export default function ProveedorFormModal({ proveedor, areas = [], onClose, onS
     }
   }
 
+  const nitAyuda = {
+    vacio: { cls: intentado ? "bad" : "muted", txt: "Obligatorio. Es la llave del proveedor, sin dígito de verificación (si lo escribes con -DV, se quita solo)." },
+    invalido: { cls: "bad", txt: "NIT inválido: solo el número, sin dígito de verificación (5 a 20 caracteres; se aceptan NIT extranjeros)." },
+    verificando: { cls: "muted", txt: "Verificando si el NIT ya existe…" },
+    libre: { cls: "good", txt: nitSinCambio ? "NIT actual del proveedor." : "✓ NIT disponible: no está registrado." },
+    existe: { cls: "bad", txt: `✕ Este NIT ya está registrado: ${nitCheck.proveedor?.nombre || ""}${nitCheck.proveedor && !nitCheck.proveedor.activo ? " (inactivo)" : ""}. No se puede registrar de nuevo.` },
+    error: { cls: "bad", txt: "No se pudo verificar el NIT. Se validará al guardar." },
+  }[nitCheck.estado];
+
   return (
     <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal" style={{ maxWidth: 560 }}>
+      <div className="modal prov-form-modal" style={{ maxWidth: 680 }}>
         <div className="modal-head">
           <h3>{editando ? "Editar proveedor" : "Registrar proveedor"}</h3>
           <button type="button" className="btn-ghost icon-btn" onClick={onClose} aria-label="Cerrar">✕</button>
@@ -138,89 +233,154 @@ export default function ProveedorFormModal({ proveedor, areas = [], onClose, onS
         )}
 
         {!pasteOpen && (
-          <form onSubmit={handleSubmit}>
-            <div className="modal-body" style={{ gridTemplateColumns: "1fr 1fr" }}>
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="modal-body prov-form">
               {editando && (
-                <dl className="prov-kv prov-form-info" style={{ gridColumn: "1 / -1" }}>
-                  {proveedor.fechaInvitacion && <><dt>Fecha invitación</dt><dd>{new Date(proveedor.fechaInvitacion).toLocaleDateString("es-CO")}</dd></>}
-                  {proveedor.fechaActualizacion && <><dt>Fecha</dt><dd>{new Date(proveedor.fechaActualizacion).toLocaleDateString("es-CO")}</dd></>}
-                  <dt>Auditoría</dt><dd>{proveedor.alerta && proveedor.alerta.nivel !== "ok" ? proveedor.alerta.titulo : "Sin alertas"}</dd>
-                </dl>
+                <div className="prov-form-resumen">
+                  <div><span>Registrado</span><strong>{proveedor.createdAt ? new Date(proveedor.createdAt).toLocaleDateString("es-CO") : "—"}</strong></div>
+                  <div><span>Última actualización</span><strong>{proveedor.esExcepcion ? "No aplica" : proveedor.fechaActualizacion ? new Date(proveedor.fechaActualizacion).toLocaleDateString("es-CO") : "Sin registrar"}</strong></div>
+                  {proveedor.fechaInvitacion && <div><span>Invitación</span><strong>{new Date(proveedor.fechaInvitacion).toLocaleDateString("es-CO")}</strong></div>}
+                  <div><span>Alerta</span><strong>{proveedor.alerta && proveedor.alerta.nivel !== "ok" ? proveedor.alerta.titulo : "Sin alertas"}</strong></div>
+                </div>
               )}
               {!editando && (
-                <div className="field" style={{ gridColumn: "1 / -1" }}>
-                  <button type="button" className="btn small" onClick={() => setPasteOpen(true)} style={{ width: "fit-content" }}>
-                    <IconSpark size={12} /> Pegar otro texto
-                  </button>
-                </div>
+                <button type="button" className="btn small" onClick={() => setPasteOpen(true)} style={{ width: "fit-content" }}>
+                  <IconSpark size={12} /> Pegar el correo de solicitud y completar con Nova
+                </button>
               )}
-              <div className="field" style={{ gridColumn: "1 / -1" }}>
-                <label htmlFor="pf-nombre">Nombre del proveedor *</label>
-                <input id="pf-nombre" required value={nombre} onChange={(e) => setNombre(e.target.value)} />
-              </div>
-              <div className="field">
-                <label htmlFor="pf-nit">NIT</label>
-                <input id="pf-nit" value={nit} onChange={(e) => setNit(e.target.value)} placeholder="Si aún no lo tienes, se completa después" />
-              </div>
-              <div className="field">
-                <label htmlFor="pf-criticidad">Criticidad</label>
-                <select id="pf-criticidad" value={criticidad} onChange={(e) => setCriticidad(e.target.value)}>
-                  <option value="">Sin definir</option>
-                  <option value="Critico">Crítico</option>
-                  <option value="No crítico">No crítico</option>
-                </select>
-              </div>
-              <div className="field" style={{ gridColumn: "1 / -1" }}>
-                <label htmlFor="pf-descripcion">Descripción * <span className="muted">(qué vende o para qué sirve)</span></label>
-                <input id="pf-descripcion" required value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
-              </div>
-              <div className="field">
-                <label htmlFor="pf-area">Área</label>
-                <select id="pf-area" value={areaId} onChange={(e) => setAreaId(e.target.value)}>
-                  <option value="">Sin área</option>
-                  {areas.map((a) => <option key={a.id} value={a.id}>{a.valor}</option>)}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="pf-servicio">Tipo de servicio</label>
-                <input id="pf-servicio" value={servicio} onChange={(e) => setServicio(e.target.value)} />
-              </div>
-              <div className="field">
-                <label htmlFor="pf-telefono">Contacto (teléfono)</label>
-                <input id="pf-telefono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-              </div>
-              {editando && estadoActual && (
-                <div className="field">
-                  <label htmlFor="pf-estado">Estado</label>
-                  <select id="pf-estado" value={estado} onChange={(e) => setEstado(e.target.value)}>
-                    {ESTADOS_CICLO.map((e) => <option key={e.key} value={e.key}>{e.label}</option>)}
-                  </select>
+              {novaNota && <p className="prov-note">{novaNota}</p>}
+
+              <fieldset className="prov-form-section">
+                <legend>Identificación</legend>
+                <div className="prov-form-grid">
+                  <div className={claseCampo("nit")}>
+                    <label htmlFor="pf-nit">NIT *</label>
+                    <input
+                      id="pf-nit" required autoComplete="off" autoFocus={!editando}
+                      value={nit}
+                      onChange={(e) => setNit(e.target.value)}
+                      aria-invalid={nitCheck.estado === "existe" || nitCheck.estado === "invalido" || marcar("nit")}
+                      aria-describedby="pf-nit-ayuda"
+                      placeholder="Sin dígito de verificación"
+                      className="mono"
+                    />
+                    <span id="pf-nit-ayuda" className={`prov-nit-ayuda ${nitAyuda.cls}`} role="status" aria-live="polite">{nitAyuda.txt}</span>
+                  </div>
+                  <div className={claseCampo("nombre")}>
+                    <label htmlFor="pf-nombre">Razón social *</label>
+                    <input id="pf-nombre" required value={nombre} onChange={(e) => setNombre(e.target.value)} aria-invalid={marcar("nombre")} />
+                    <CampoObligatorio visible={marcar("nombre")} />
+                  </div>
+                  <div className={claseCampo("descripcion", "span-2")}>
+                    <label htmlFor="pf-descripcion">Descripción * <span className="prov-form-hint">qué vende o para qué sirve</span></label>
+                    <input id="pf-descripcion" required value={descripcion} onChange={(e) => setDescripcion(e.target.value)} aria-invalid={marcar("descripcion")} />
+                    <CampoObligatorio visible={marcar("descripcion")} />
+                  </div>
                 </div>
-              )}
-              <div className="field">
-                <label htmlFor="pf-clasif">Clasificación por monto</label>
-                <select id="pf-clasif" value={clasificacionMonto} onChange={(e) => setClasificacionMonto(e.target.value)}>
-                  <option value="">Sin definir</option>
-                  {CLASIFICACIONES_MONTO.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="pf-revision">Revisión</label>
-                <select id="pf-revision" value={revision} onChange={(e) => setRevision(e.target.value)}>
-                  <option value="">Sin definir</option>
-                  {REVISIONES.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="pf-correo">Correo de contacto</label>
-                <input id="pf-correo" type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} />
-              </div>
-              <div className="field" style={{ gridColumn: "1 / -1" }}>
-                <label htmlFor="pf-obs">Observación</label>
-                <textarea id="pf-obs" rows={3} value={observacion} onChange={(e) => setObservacion(e.target.value)} />
-              </div>
+              </fieldset>
+
+              <fieldset className="prov-form-section">
+                <legend>Clasificación</legend>
+                <div className="prov-form-grid">
+                  <div className="field">
+                    <label htmlFor="pf-tipo">Tipo (criticidad)</label>
+                    <select id="pf-tipo" value={tipoProveedorId} onChange={(e) => setTipoProveedorId(e.target.value)}>
+                      <option value="">Sin definir</option>
+                      {opciones(tipos, proveedor?.tipoProveedorId).map((m) => <option key={m.id} value={m.id}>{m.valor}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="pf-clasif">Clasificación por monto</label>
+                    <select id="pf-clasif" value={clasificacionMontoId} onChange={(e) => setClasificacionMontoId(e.target.value)}>
+                      <option value="">Sin definir</option>
+                      {opciones(clasificaciones, proveedor?.clasificacionMontoId).map((m) => <option key={m.id} value={m.id}>{m.valor}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="pf-area">Área</label>
+                    <select id="pf-area" value={areaId} onChange={(e) => setAreaId(e.target.value)}>
+                      <option value="">Sin área</option>
+                      {opciones(areas, proveedor?.areaId).map((a) => <option key={a.id} value={a.id}>{a.valor}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="pf-servicio">Tipo de servicio</label>
+                    <select id="pf-servicio" value={tipoServicioId} onChange={(e) => setTipoServicioId(e.target.value)}>
+                      <option value="">Sin definir</option>
+                      {opciones(servicios, proveedor?.tipoServicioId).map((m) => <option key={m.id} value={m.id}>{m.valor}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <p className="prov-form-hint">Las opciones se administran en Maestros › Proveedores.</p>
+              </fieldset>
+
+              <fieldset className="prov-form-section">
+                <legend>Contacto</legend>
+                <div className="prov-form-grid">
+                  <div className="field">
+                    <label htmlFor="pf-telefono">Teléfono</label>
+                    <input id="pf-telefono" inputMode="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="pf-correo">Correo</label>
+                    <input id="pf-correo" type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} />
+                  </div>
+                </div>
+              </fieldset>
+
+              <fieldset className="prov-form-section">
+                <legend>Gestión y ciclo</legend>
+                <div className="prov-form-grid">
+                  <div className="field">
+                    <label htmlFor="pf-revision">Revisión</label>
+                    <select id="pf-revision" value={revision} onChange={(e) => setRevision(e.target.value)}>
+                      <option value="">Sin definir</option>
+                      {REVISIONES.map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                  {editando && estadoActual && !esExcepcion ? (
+                    <div className="field">
+                      <label htmlFor="pf-estado">Estado en el ciclo</label>
+                      <select id="pf-estado" value={estado} onChange={(e) => setEstado(e.target.value)}>
+                        {ESTADOS_CICLO.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
+                      </select>
+                    </div>
+                  ) : <div />}
+                  <div className="field span-2">
+                    <label htmlFor="pf-obs">Observación</label>
+                    <textarea id="pf-obs" rows={2} value={observacion} onChange={(e) => setObservacion(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className={`prov-excepcion-card${esExcepcion ? " on" : ""}`}>
+                  <label className="prov-toggle-row" style={{ margin: 0 }}>
+                    <input type="checkbox" role="switch" className="prov-switch" checked={esExcepcion} onChange={(e) => setEsExcepcion(e.target.checked)} />
+                    <span>
+                      <strong>Marcar como excepción</strong>
+                      <span className="prov-form-hint">No participa en el ciclo de actualización ni depende de fechas de registro o actualización.</span>
+                    </span>
+                  </label>
+                  {esExcepcion && (
+                    <div className="prov-form-grid">
+                      <div className={claseCampo("motivo")}>
+                        <label htmlFor="pf-motivo">Motivo *</label>
+                        <select id="pf-motivo" value={motivoExcepcionId} onChange={(e) => setMotivoExcepcionId(e.target.value)} required aria-invalid={marcar("motivo")}>
+                          <option value="">Elige un motivo</option>
+                          {opciones(motivos, proveedor?.motivoExcepcionId).map((m) => <option key={m.id} value={m.id}>{m.valor}</option>)}
+                        </select>
+                        <CampoObligatorio visible={marcar("motivo")} />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="pf-justif">Justificación</label>
+                        <input id="pf-justif" value={justificacion} onChange={(e) => setJustificacion(e.target.value)} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </fieldset>
+
               {editando && (
-                <div className="prov-estado-box" style={{ gridColumn: "1 / -1" }}>
+                <div className="prov-estado-box">
                   <div>
                     <strong>{proveedor.activo ? "Proveedor activo" : "Proveedor inactivo"}</strong>
                     <p className="muted" style={{ margin: "2px 0 0", fontSize: 13 }}>
@@ -234,13 +394,14 @@ export default function ProveedorFormModal({ proveedor, areas = [], onClose, onS
                   )}
                 </div>
               )}
-              {error && <div className="modal-error" style={{ gridColumn: "1 / -1" }}>{error}</div>}
+              {error && <div className="modal-error" role="alert">{error}</div>}
             </div>
             <div className="modal-foot">
+              {nitCheck.estado === "existe" && <span className="prov-nit-ayuda bad" style={{ margin: 0 }}>NIT duplicado: no se puede guardar.</span>}
               <div className="spacer" />
               <button type="button" className="btn" onClick={onClose}>Cancelar</button>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? <span className="spinner" /> : null} {editando ? "Guardar cambios" : "Registrar"}
+              <button type="submit" className="btn btn-primary" disabled={saving || nitCheck.estado === "existe" || nitCheck.estado === "verificando"} title={nitCheck.estado === "existe" ? "Este NIT ya está registrado" : undefined}>
+                {saving ? <span className="spinner" /> : null} {editando ? "Guardar cambios" : "Registrar proveedor"}
               </button>
             </div>
           </form>

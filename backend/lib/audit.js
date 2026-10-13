@@ -110,18 +110,18 @@ function proveedorSummary(p) {
 
 export async function logProveedorCreate(actor, proveedor) {
   const changes = diffFields(null, proveedor, PROVEEDOR_FIELD_LABELS);
-  await writeLog({ action: "crear", entityType: "proveedor", recordId: proveedor.id, recordInfo: proveedorSummary(proveedor), actor, changes });
+  await writeLog({ action: "crear", entityType: "proveedor", recordId: proveedor.nit, recordInfo: proveedorSummary(proveedor), actor, changes });
 }
 
 export async function logProveedorUpdate(actor, before, after) {
   const changes = diffFields(before, after, PROVEEDOR_FIELD_LABELS);
   if (!changes.length) return;
-  await writeLog({ action: "editar", entityType: "proveedor", recordId: after.id, recordInfo: proveedorSummary(after), actor, changes });
+  await writeLog({ action: "editar", entityType: "proveedor", recordId: after.nit, recordInfo: proveedorSummary(after), actor, changes });
 }
 
 export async function logProveedorDelete(actor, proveedor) {
   const changes = diffFields(proveedor, null, PROVEEDOR_FIELD_LABELS);
-  await writeLog({ action: "eliminar", entityType: "proveedor", recordId: proveedor.id, recordInfo: proveedorSummary(proveedor), actor, changes });
+  await writeLog({ action: "eliminar", entityType: "proveedor", recordId: proveedor.nit, recordInfo: proveedorSummary(proveedor), actor, changes });
 }
 
 // ---------- Procesos y checklist de proveedores ----------
@@ -130,20 +130,20 @@ export async function logProveedorDelete(actor, proveedor) {
 
 export async function logProcesoCreate(actor, proceso, proveedorNombre) {
   const changes = diffFields(null, proceso, PROVEEDOR_PROCESO_FIELD_LABELS);
-  await writeLog({ action: "crear", entityType: "proveedor", recordId: proceso.proveedorId, recordInfo: `${proceso.proceso} — ${proveedorNombre}`, actor, changes });
+  await writeLog({ action: "crear", entityType: "proveedor", recordId: proceso.proveedorNit, recordInfo: `${proceso.proceso} — ${proveedorNombre}`, actor, changes });
 }
 
 export async function logProcesoUpdate(actor, before, after, proveedorNombre) {
   const changes = diffFields(before, after, PROVEEDOR_PROCESO_FIELD_LABELS);
   if (!changes.length) return;
   const action = changes.length === 1 && changes[0].field === "radicado" ? "radicar" : "editar";
-  await writeLog({ action, entityType: "proveedor", recordId: after.proveedorId, recordInfo: `${after.proceso} — ${proveedorNombre}`, actor, changes });
+  await writeLog({ action, entityType: "proveedor", recordId: after.proveedorNit, recordInfo: `${after.proceso} — ${proveedorNombre}`, actor, changes });
 }
 
 export async function logChecklistUpdate(actor, before, after, proveedorNombre) {
   const changes = diffFields(before, after, PROVEEDOR_CHECKLIST_FIELD_LABELS);
   if (!changes.length) return;
-  await writeLog({ action: "editar", entityType: "proveedor", recordId: after.proveedorId, recordInfo: `Checklist — ${proveedorNombre}`, actor, changes });
+  await writeLog({ action: "editar", entityType: "proveedor", recordId: after.proveedorNit, recordInfo: `Checklist — ${proveedorNombre}`, actor, changes });
 }
 
 // ---------- Usuarios ----------
@@ -373,13 +373,13 @@ export async function listAuditActors() {
 export async function logCicloEstado(actor, proveedor, anio, before, after) {
   const changes = diffFields(before, after, CICLO_PROVEEDOR_FIELD_LABELS);
   if (!changes.length) return;
-  await writeLog({ action: "editar", entityType: "cicloProveedor", recordId: proveedor.id, recordInfo: `Ciclo ${anio} — ${proveedorSummary(proveedor)}`, actor, changes });
+  await writeLog({ action: "editar", entityType: "cicloProveedor", recordId: proveedor.nit, recordInfo: `Ciclo ${anio} — ${proveedorSummary(proveedor)}`, actor, changes });
 }
 
 export async function logCicloDocumento(actor, proveedor, anio, clave, before, after) {
   const label = CICLO_PROVEEDOR_FIELD_LABELS[clave] || clave;
   const changes = [{ field: clave, label, before: before ?? null, after: after ?? null }];
-  await writeLog({ action: "editar", entityType: "cicloProveedor", recordId: proveedor.id, recordInfo: `Checklist ${anio} — ${proveedorSummary(proveedor)}`, actor, changes });
+  await writeLog({ action: "editar", entityType: "cicloProveedor", recordId: proveedor.nit, recordInfo: `Checklist ${anio} — ${proveedorSummary(proveedor)}`, actor, changes });
 }
 
 export async function logCicloIniciado(anio, cantidad) {
@@ -394,7 +394,7 @@ export async function logCicloIniciado(anio, cantidad) {
 }
 
 export async function logProveedorClasificacion(actor, proveedor, accion, detalle) {
-  await writeLog({ action: "editar", entityType: "proveedor", recordId: proveedor.id, recordInfo: `${accion} — ${proveedorSummary(proveedor)}`, actor, changes: detalle ? [{ field: "clasificacion", label: "Clasificación", before: null, after: detalle }] : [] });
+  await writeLog({ action: "editar", entityType: "proveedor", recordId: proveedor.nit, recordInfo: `${accion} — ${proveedorSummary(proveedor)}`, actor, changes: detalle ? [{ field: "clasificacion", label: "Clasificación", before: null, after: detalle }] : [] });
 }
 
 export async function logConfigProveedoresUpdate(actor, before, after) {

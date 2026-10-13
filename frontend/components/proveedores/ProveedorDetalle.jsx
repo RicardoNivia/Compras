@@ -3,17 +3,9 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  fetchProveedorDetalle, cambiarEstadoCicloApi, setDocumentoCicloApi, cambiarClasificacionApi,
+  fetchProveedorDetalle, setDocumentoCicloApi,
 } from "@/lib/api";
 import ProveedorFormModal from "@/components/proveedores/ProveedorFormModal";
-import ProveedorAccionesModal from "@/components/proveedores/ProveedorAccionesModal";
-
-const SIGUIENTE = {
-  desactualizado: { estado: "en_proceso", label: "Solicitar documentos" },
-  en_proceso: { estado: "en_aprobacion", label: "Enviar a aprobación" },
-  en_aprobacion: { estado: "actualizado", label: "Marcar actualizado" },
-  actualizado: null,
-};
 
 const TABS = [
   { key: "checklist", label: "Checklist" },
@@ -22,14 +14,18 @@ const TABS = [
 ];
 
 // Ficha del proveedor dentro del maestro: estado del ciclo, checklist,
-// acciones y el histórico anual. Todo cambio pasa por la API, que valida reglas.
-export default function ProveedorDetalle({ proveedorId, areas = [], motivos = [], canEdit, onChanged }) {
+// el histórico anual (solo consulta: los estados se cambian desde la tabla y la
+// excepción desde el formulario de edición). Todo cambio pasa por la API.
+// El proveedor se identifica por su NIT (llave primaria); si se corrige el NIT
+// al editar, la ficha sigue al NIT nuevo.
+export default function ProveedorDetalle({ proveedorNit, catalogos = {}, canEdit, onChanged }) {
+  const [nitActual, setNitActual] = useState(proveedorNit);
+  useEffect(() => { setNitActual(proveedorNit); }, [proveedorNit]);
   const [detalle, setDetalle] = useState(null);
   const [tab, setTab] = useState("checklist");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [editando, setEditando] = useState(false);
-  const [accion, setAccion] = useState(null);
 
   async function cargar(id) {
     try {
@@ -41,16 +37,16 @@ export default function ProveedorDetalle({ proveedorId, areas = [], motivos = []
   }
 
   useEffect(() => {
-    if (proveedorId) cargar(proveedorId);
+    if (nitActual) cargar(nitActual);
     else setDetalle(null);
-  }, [proveedorId]);
+  }, [nitActual]);
 
   async function ejecutar(fn) {
     setBusy(true);
     setError("");
     try {
       await fn();
-      await cargar(proveedorId);
+      await cargar(nitActual);
       onChanged?.();
     } catch (err) {
       setError(err.message || "No se pudo guardar el cambio.");
@@ -59,10 +55,10 @@ export default function ProveedorDetalle({ proveedorId, areas = [], motivos = []
     }
   }
 
-  if (!proveedorId) {
+  if (!nitActual) {
     return (
       <aside className="prov-detail prov-detail-empty" aria-label="Detalle del proveedor">
-        <p className="muted">Elige un proveedor de la lista para ver su checklist, su histórico y sus acciones.</p>
+        <p className="muted">Elige un proveedor de la lista para ver su checklist y su histórico.</p>
       </aside>
     );
   }
@@ -74,9 +70,6 @@ export default function ProveedorDetalle({ proveedorId, areas = [], motivos = []
     );
   }
 
-  const siguiente = detalle.ciclo ? SIGUIENTE[detalle.ciclo.estado] : null;
-  const puedeActualizar = detalle.checklist.completos === detalle.checklist.total;
-  const enCiclo = detalle.clasificacion === "actualizacion" || detalle.clasificacion === "nuevo";
   const alertaNivel = detalle.alerta?.nivel || "ok";
 
   return (
@@ -93,32 +86,6 @@ export default function ProveedorDetalle({ proveedorId, areas = [], motivos = []
       </div>
 
       {error && <div className="modal-error">{error}</div>}
-
-      {canEdit && (
-        <div className="prov-actions">
-          {enCiclo && detalle.ciclo && siguiente && (
-            <button
-              type="button" className="btn btn-primary small" disabled={busy || (siguiente.estado === "actualizado" && !puedeActualizar)}
-              title={siguiente.estado === "actualizado" && !puedeActualizar ? "El checklist debe estar completo (6/6)" : undefined}
-              onClick={() => ejecutar(() => cambiarEstadoCicloApi(proveedorId, siguiente.estado))}
-            >
-              {siguiente.label}
-            </button>
-          )}
-          {enCiclo && detalle.ciclo && detalle.ciclo.estado !== "desactualizado" && (
-            <button type="button" className="btn small" disabled={busy} onClick={() => ejecutar(() => cambiarEstadoCicloApi(proveedorId, "desactualizado"))}>
-              Devolver a desactualizado
-            </button>
-          )}
-          {detalle.esExcepcion ? (
-            <button type="button" className="btn small" disabled={busy} onClick={() => ejecutar(() => cambiarClasificacionApi(proveedorId, { accion: "quitar-excepcion" }))}>
-              Quitar excepción
-            </button>
-          ) : detalle.activo ? (
-            <button type="button" className="btn small" onClick={() => setAccion("excepcion")}>Marcar excepción</button>
-          ) : null}
-        </div>
-      )}
 
       <div role="tablist" aria-label="Secciones del proveedor" className="prov-tabs">
         {TABS.map((t) => (
@@ -143,7 +110,7 @@ export default function ProveedorDetalle({ proveedorId, areas = [], motivos = []
                       checked={it.cumple}
                       disabled={!canEdit || busy}
                       aria-label={it.label}
-                      onChange={(e) => ejecutar(() => setDocumentoCicloApi(proveedorId, it.clave, e.target.checked))}
+                      onChange={(e) => ejecutar(() => setDocumentoCicloApi(nitActual, it.clave, e.target.checked))}
                     />
                     <span>{it.label}</span>
                     <span className="prov-check-tag">
@@ -180,17 +147,22 @@ export default function ProveedorDetalle({ proveedorId, areas = [], motivos = []
       {tab === "datos" && (
         <section aria-label="Datos del proveedor">
           <dl className="prov-kv">
+            <dt>NIT</dt><dd className="mono">{detalle.nit}</dd>
             <dt>Clasificación</dt><dd>{detalle.clasificacionLabel}</dd>
-            <dt>Criticidad</dt><dd>{detalle.criticidad || "Sin definir"}</dd>
+            <dt>Tipo (criticidad)</dt><dd>{detalle.criticidad || "Sin definir"}</dd>
+            <dt>Clasificación por monto</dt><dd>{detalle.clasificacionMonto || "—"}</dd>
             <dt>Área</dt><dd>{detalle.area || "—"}</dd>
-            <dt>Servicio</dt><dd>{detalle.servicio || "—"}</dd>
+            <dt>Tipo de servicio</dt><dd>{detalle.servicio || "—"}</dd>
+            <dt>Excepción</dt><dd>{detalle.esExcepcion ? "Sí — no participa en el ciclo" : "No"}</dd>
+            <dt>Última actualización</dt><dd className="mono">{detalle.esExcepcion ? "No aplica" : detalle.fechaActualizacion ? new Date(detalle.fechaActualizacion).toLocaleDateString("es-CO") : "Sin registrar"}</dd>
             <dt>Teléfono</dt><dd className="mono">{detalle.telefono || "—"}</dd>
             <dt>Correo</dt><dd>{detalle.correo || "—"}</dd>
             <dt>Descripción</dt><dd>{detalle.descripcion}</dd>
             {detalle.esExcepcion && <><dt>Motivo de excepción</dt><dd>{detalle.motivoExcepcion}</dd></>}
             {detalle.esExcepcion && detalle.justificacionExcepcion && <><dt>Justificación</dt><dd>{detalle.justificacionExcepcion}</dd></>}
             {!detalle.activo && <><dt>Motivo de inactivo</dt><dd>{detalle.inactivoMotivo || "—"}</dd></>}
-            <dt>Alta en el sistema</dt><dd className="mono">{new Date(detalle.createdAt).toLocaleDateString("es-CO")}</dd>
+            <dt>Fecha de registro</dt><dd className="mono">{new Date(detalle.createdAt).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" })}</dd>
+            <dt>Registrado por</dt><dd>{detalle.creadoPorNombre || "—"}</dd>
           </dl>
         </section>
       )}
@@ -198,19 +170,9 @@ export default function ProveedorDetalle({ proveedorId, areas = [], motivos = []
       {editando && createPortal(
         <ProveedorFormModal
           proveedor={detalle}
-          areas={areas}
+          catalogos={catalogos}
           onClose={() => setEditando(false)}
-          onSaved={() => { setEditando(false); cargar(proveedorId); onChanged?.(); }}
-        />,
-        document.body
-      )}
-      {accion && createPortal(
-        <ProveedorAccionesModal
-          proveedor={detalle}
-          accion={accion}
-          motivos={motivos}
-          onClose={() => setAccion(null)}
-          onDone={() => { setAccion(null); cargar(proveedorId); onChanged?.(); }}
+          onSaved={(saved) => { setEditando(false); setNitActual(saved.nit); cargar(saved.nit); onChanged?.(); }}
         />,
         document.body
       )}

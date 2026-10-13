@@ -47,7 +47,7 @@ export function toClientRecord(r, actual = {}) {
     estadoLegalizacionId: r.estadoLegalizacionId,
     nit: actual.proveedorNit ?? r.nit,
     proveedor: actual.proveedorNombre ?? r.proveedor,
-    proveedorId: r.proveedorId,
+    proveedorNit: r.proveedorNit,
     fe: r.fe,
     valorConIva: r.valorConIva,
     valorSinIva: r.valorSinIva,
@@ -78,24 +78,24 @@ export function toClientRecord(r, actual = {}) {
 // usan a propósito, para que el historial quede con el dato tal como era en
 // ese momento.
 async function hydrateConDatosActuales(rows) {
-  const proveedorIds = [...new Set(rows.map((r) => r.proveedorId).filter(Boolean))];
+  const proveedorNits = [...new Set(rows.map((r) => r.proveedorNit).filter(Boolean))];
   const userIds = [...new Set(rows.map((r) => r.responsableUserId).filter(Boolean))];
   const maestroIds = [...new Set(
     rows.flatMap((r) => MAESTRO_CAMPOS.map((c) => r[c.idField])).filter(Boolean)
   )];
   const recordIds = rows.map((r) => r.id);
   const [proveedores, usuarios, maestros, calificaciones] = await Promise.all([
-    proveedorIds.length ? prisma.proveedor.findMany({ where: { id: { in: proveedorIds } } }) : [],
+    proveedorNits.length ? prisma.proveedor.findMany({ where: { nit: { in: proveedorNits } } }) : [],
     userIds.length ? prisma.user.findMany({ where: { id: { in: userIds } } }) : [],
     maestroIds.length ? prisma.maestro.findMany({ where: { id: { in: maestroIds } } }) : [],
     recordIds.length ? prisma.calificacionProveedor.findMany({ where: { recordId: { in: recordIds } }, select: { recordId: true, estrellas: true } }) : [],
   ]);
-  const proveedorPorId = new Map(proveedores.map((p) => [p.id, p]));
+  const proveedorPorNit = new Map(proveedores.map((p) => [p.nit, p]));
   const usuarioPorId = new Map(usuarios.map((u) => [u.id, u]));
   const maestroPorId = new Map(maestros.map((m) => [m.id, m]));
   const calificacionPorRecordId = new Map(calificaciones.map((c) => [c.recordId, c.estrellas]));
   return rows.map((r) => {
-    const p = r.proveedorId ? proveedorPorId.get(r.proveedorId) : null;
+    const p = r.proveedorNit ? proveedorPorNit.get(r.proveedorNit) : null;
     const u = r.responsableUserId ? usuarioPorId.get(r.responsableUserId) : null;
     const actual = {
       proveedorNombre: p?.nombre,
@@ -164,7 +164,7 @@ const FIELD_SANITIZERS = {
   // Sin dígito de verificación (se valida/normaliza en el formulario, no aquí).
   nit: textOrNull(20),
   proveedor: textOrNull(200),
-  proveedorId: textOrNull(40),
+  proveedorNit: textOrNull(40),
   fe: textOrNull(100),
   valorConIva: numOrNull,
   valorSinIva: numOrNull,
@@ -202,21 +202,20 @@ async function countOtrosConFe(fe, excludeId) {
   return prisma.record.count({ where: { fe, id: excludeId ? { not: excludeId } : undefined } });
 }
 
-// Un registro NUEVO siempre debe apuntar a un proveedor del catálogo — no se
-// permite texto libre al crear. Esto NO aplica a editar un registro ya
-// existente (ver updateRecord/patchRecord): no se fuerza a re-seleccionar
-// proveedor en los ~800 registros históricos ya migrados.
-// La referencia real es Proveedor.id (Record.proveedorId); nit/proveedor
+// El proveedor es OPCIONAL al guardar un registro. Si se envía, debe ser un
+// proveedor activo del catálogo (nunca texto libre); si no, el registro queda
+// sin proveedor (proveedorNit, nit y proveedor en null) — ver createRecord.
+// La referencia real es el NIT del proveedor (Record.proveedorNit, FK a Proveedor.nit); nit/proveedor
 // quedan como snapshot de texto (se reemplazan por el valor actual al listar,
 // ver hydrateConDatosActuales) — así un desfase de mayúsculas/espacios, o un
 // nit que todavía sea un placeholder "PENDIENTE-...", no generan inconsistencias.
 async function requireProveedorDelCatalogo(data) {
-  if (!data.proveedorId) {
+  if (!data.proveedorNit) {
     const err = new Error("Selecciona un proveedor del catálogo. Si no existe, pide a un administrador que lo agregue en Maestros → Proveedores.");
     err.status = 400;
     throw err;
   }
-  const proveedor = await prisma.proveedor.findUnique({ where: { id: data.proveedorId } });
+  const proveedor = await prisma.proveedor.findUnique({ where: { nit: data.proveedorNit } });
   if (!proveedor || !proveedor.activo) {
     const err = new Error("El proveedor seleccionado no existe o está inactivo en el catálogo. Pide a un administrador que lo agregue o reactive en Maestros → Proveedores.");
     err.status = 400;
@@ -286,7 +285,10 @@ export async function createRecord(body, actor) {
   for (const campo of MAESTRO_CAMPOS) {
     await requireMaestroCampo(campo, data);
   }
-  const proveedor = await requireProveedorDelCatalogo(data);
+  // Proveedor opcional: si viene se valida contra el catálogo; si no, queda vacío (sin texto libre).
+  let proveedor = null;
+  if (data.proveedorNit) proveedor = await requireProveedorDelCatalogo(data);
+  else Object.assign(data, { proveedorNit: null, nit: null, proveedor: null });
   const maestroResponsable = await requireResponsableDelCatalogo(data);
   const feDuplicados = await countOtrosConFe(data.fe, null);
   // Asigna el siguiente número autoincremental visible (localSeq) desde Meta,
@@ -301,7 +303,7 @@ export async function createRecord(body, actor) {
     });
     return tx.record.create({ data: { ...data, localSeq: seq } });
   });
-  const record = toClientRecord(row, { proveedorNombre: proveedor.nombre, proveedorNit: proveedor.nit, responsableNombre: maestroResponsable.valor });
+  const record = toClientRecord(row, { proveedorNombre: proveedor?.nombre, proveedorNit: proveedor?.nit, responsableNombre: maestroResponsable.valor });
   await logCreate(actor, record).catch(() => {});
   if (feDuplicados > 0) {
     record.feWarning = `Ya existen ${feDuplicados} compra(s) registradas con el número de factura/referencia "${data.fe}".`;
@@ -316,6 +318,15 @@ export async function updateRecord(id, body, actor, options = {}) {
   const data = options.fields ? sanitizeFields(body, options.fields) : sanitizeInput(body);
   if ("responsableUserId" in data) {
     await requireResponsableDelCatalogo(data);
+  }
+  // Si cambia el proveedor, el NIT debe existir en el catálogo (FK a Proveedor.nit);
+  // el snapshot nit/nombre se recalcula del catálogo. Mantener el mismo proveedor
+  // aunque hoy esté inactivo no se bloquea.
+  if (data.proveedorNit && data.proveedorNit !== before?.proveedorNit) {
+    await requireProveedorDelCatalogo(data);
+  } else if (data.proveedorNit) {
+    const p = await prisma.proveedor.findUnique({ where: { nit: data.proveedorNit } });
+    if (p) { data.nit = p.nit; data.proveedor = p.nombre; }
   }
   for (const campo of MAESTRO_CAMPOS) {
     if (campo.idField in data) await requireMaestroCampo(campo, data);
