@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canEditProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, ROLE_LABELS } from "@/lib/roles";
-import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail, IconBell, IconSearch, IconBuilding, IconClock } from "@/components/icons";
+import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, ROLE_LABELS } from "@/lib/roles";
+import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail, IconBell, IconSearch, IconBuilding } from "@/components/icons";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 import CommandPalette from "@/components/CommandPalette";
 
@@ -18,7 +18,6 @@ export const ALL_NAV_ITEMS = [
   { key: "agente-ia", href: "/agente-ia", label: "Nova", Icon: IconSpark, feature: "viewAgenteIA", show: canViewAgenteIA },
   { key: "proveedores", href: "/proveedores", label: "Proveedores", Icon: IconBuilding, feature: "viewProveedores", show: canViewProveedores },
   { key: "maestros", href: "/maestros", label: "Maestros", Icon: IconLayers, feature: "viewMaestros", show: canViewMaestros },
-  { key: "ciclo-proveedores", href: "/ciclo-proveedores", label: "Ciclo de proveedores", Icon: IconClock, feature: "editProveedores", show: canEditProveedores },
   { key: "presupuesto", href: "/presupuesto", label: "Presupuesto", Icon: IconMoney, feature: "viewPresupuesto", show: canViewPresupuesto },
   { key: "informes", href: "/informes", label: "Informes", Icon: IconMail, feature: "viewReportes", show: canViewReportes },
   { key: "usuarios", href: "/usuarios", label: "Usuarios", Icon: IconUsers, feature: "viewUsuarios", show: canViewUsuarios },

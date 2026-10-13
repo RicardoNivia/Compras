@@ -135,7 +135,7 @@ export default function RatingModal({ record, onClose, onSaved }) {
                             checked={causasIds.includes(c.id)}
                             onChange={() => toggleCausa(c.id)}
                           />
-                          {c.valor}
+                          <span>{c.valor}</span>
                         </label>
                       ))}
                     </div>

@@ -4,7 +4,7 @@ import { cambiarClasificacion } from "@/lib/proveedoresCiclo";
 
 /**
  * @openapi
- * /api/proveedores/{id}/clasificacion:
+ * /api/proveedores/{nit}/clasificacion:
  *   patch:
  *     tags: [Proveedores]
  *     summary: Marca o quita excepción, o inactiva o reactiva al proveedor (requiere permiso "editProveedores"). Nunca borra el histórico de ciclos.
@@ -25,7 +25,7 @@ export async function PATCH(request, { params }) {
   if (denied) return denied;
   try {
     const body = await request.json().catch(() => ({}));
-    return NextResponse.json(await cambiarClasificacion(params.id, body, user));
+    return NextResponse.json(await cambiarClasificacion(params.nit, body, user));
   } catch (err) {
     return apiError(err);
   }

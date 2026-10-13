@@ -12,7 +12,7 @@ export function toClientCalificacion(c) {
   return {
     id: c.id,
     recordId: c.recordId,
-    proveedorId: c.proveedorId,
+    proveedorNit: c.proveedorNit,
     proveedor: c.proveedor,
     estrellas: c.estrellas,
     causasIds: c.causasIds ? JSON.parse(c.causasIds) : [],
@@ -41,7 +41,7 @@ export async function upsertCalificacion(recordId, body, actor) {
     err.status = 404;
     throw err;
   }
-  if (!record.proveedorId) {
+  if (!record.proveedorNit) {
     throw badRequest("Este registro no tiene un proveedor asociado del catálogo, no se puede calificar.");
   }
 
@@ -74,7 +74,7 @@ export async function upsertCalificacion(recordId, body, actor) {
 
   const data = {
     recordId,
-    proveedorId: record.proveedorId,
+    proveedorNit: record.proveedorNit,
     proveedor: record.proveedor,
     estrellas,
     causasIds: causasIds.length ? JSON.stringify(causasIds) : null,

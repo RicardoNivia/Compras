@@ -18,11 +18,43 @@ export const ESTADO_CICLO_LABELS = {
   actualizado: "Actualizado",
 };
 
-export const CRITICIDADES = ["Critico", "No crítico"];
-
-// Opciones de los selectores de la ficha, tomadas de los valores reales del Excel de Gestión de Proveedores.
-export const CLASIFICACIONES_MONTO = ["Adquisición de Bajo Impacto", "Operación de Alto Costo", "Grandes Contribuyentes o excepciones", "Proveedor Internacional"];
+// Tipo (criticidad), clasificación por monto y tipo de servicio son maestros
+// (Maestros › tipoProveedor / clasificacionMonto / tipoServicio). La criticidad
+// se reconoce por el texto del maestro sin tildes ni mayúsculas, así un
+// "Crítico" / "CRITICO" / "Critico" cuenta igual.
 export const REVISIONES = ["SRM", "Financiero"];
+
+// Normaliza un NIT (llave primaria). Reglas (mismas que scripts/proveedores/mapeoProveedores.json):
+//   · "PENDIENTE-…" (proveedor sin registro formal) se conserva tal cual.
+//   · NIT colombiano con dígito de verificación ("900.123.456-7") → sin el DV ("900123456").
+//   · Resto (incluye NIT/tax id extranjeros: RFC, CIF, EIN…) → mayúsculas, solo letras y dígitos.
+export function normalizeNit(v) {
+  const s = String(v ?? "").trim().toUpperCase();
+  if (/^PEND/.test(s)) return s;
+  const conDv = s.match(/^(\d{1,3}(?:[.\s]?\d{3}){1,3})\s*-\s*\d$/);
+  if (conDv) return conDv[1].replace(/[^0-9]/g, "");
+  return s.replace(/[^A-Z0-9]/g, "");
+}
+
+export function nitValido(nit) {
+  return /^[A-Z0-9]{5,20}$/.test(nit) && /\d/.test(nit);
+}
+
+
+function sinTildes(v) {
+  return String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+export function esCritico(criticidad) {
+  const t = sinTildes(criticidad);
+  return /critic/.test(t) && !/no ?critic/.test(t);
+}
+
+// "critico" | "no_critico" | "sin_definir" — para conteos e indicadores.
+export function claveCriticidad(criticidad) {
+  if (!criticidad) return "sin_definir";
+  return esCritico(criticidad) ? "critico" : "no_critico";
+}
 
 export const CLASIFICACIONES = ["actualizacion", "nuevo", "excepcion", "inactivo", "por_registrar", "no_aplica"];
 
@@ -104,10 +136,11 @@ export function tieneNitProvisional(p) {
 
 // Clasificación de un proveedor dentro del ciclo `anio` (del día siguiente al corte del año `anio`
 // hasta el corte del año siguiente: el ciclo 2026 va del 1 abr 2026 al 31 mar 2027).
-//   · Nuevo: creado DENTRO del periodo del ciclo. Entra actualizado; en el ciclo siguiente pasa a Actualización.
-//     Un proveedor creado entre enero y marzo (antes del corte) sigue siendo Nuevo de ese ciclo, no queda sin estado.
-//   · Actualización: creado antes de que empezara el ciclo.
-//   · No aplica: creado después de que terminó el ciclo (solo se ve al mirar ciclos pasados).
+//   · Excepción / Inactivo / Por registrar: no participan en el ciclo, sin importar ninguna fecha.
+//   · Nuevo: dado de alta DENTRO del periodo del ciclo (solo es la etiqueta; el estado sale de la
+//     fecha de última actualización, ver estadoInicial).
+//   · Actualización: ya existía cuando empezó el ciclo.
+//   · No aplica: dado de alta después de que terminó el ciclo (solo se ve al mirar ciclos pasados).
 export function clasificacionEn(p, anio, cfg = CONFIG_PROVEEDORES_DEFAULT) {
   if (!p.activo) return "inactivo";
   if (p.esExcepcion) return "excepcion";
@@ -118,16 +151,26 @@ export function clasificacionEn(p, anio, cfg = CONFIG_PROVEEDORES_DEFAULT) {
   return "actualizacion";
 }
 
-// Un proveedor "nuevo" entra ya actualizado; los de Actualización empiezan desactualizados.
-export function estadoInicial(clasificacion) {
-  return clasificacion === "nuevo" ? "actualizado" : "desactualizado";
+// ¿La última actualización del proveedor cae dentro del periodo del ciclo `anio`?
+// El ciclo se calcula SIEMPRE con fechaActualizacion (fecha de la última
+// actualización), nunca con la fecha de registro (createdAt).
+export function actualizadoEnCiclo(p, anio, cfg = CONFIG_PROVEEDORES_DEFAULT) {
+  if (!p.fechaActualizacion) return false;
+  const t = new Date(p.fechaActualizacion).getTime();
+  return t > finCorte(anio, cfg) && t <= finCorte(anio + 1, cfg);
+}
+
+// Estado con el que un proveedor entra al ciclo: Actualizado si su última
+// actualización cae dentro del ciclo; si no, Desactualizado.
+export function estadoInicial(p, anio, cfg = CONFIG_PROVEEDORES_DEFAULT) {
+  return actualizadoEnCiclo(p, anio, cfg) ? "actualizado" : "desactualizado";
 }
 
 // docs: solo las marcas explícitas guardadas para el ciclo ({ clave: true|false }).
 export function checklistDe(p, docs = {}) {
   const auto = {
-    criticidadDefinida: !!p.criticidad && p.criticidad !== "Sin definir",
-    areaAsignada: !!(p.areaId || p.area) && !!p.servicio,
+    criticidadDefinida: !!(p.tipoProveedorId || p.criticidad),
+    areaAsignada: !!(p.areaId || p.area) && !!(p.tipoServicioId || p.servicio),
     contactoRegistrado: !!p.telefono,
   };
   const items = CHECKLIST_ITEMS.map((i) => {

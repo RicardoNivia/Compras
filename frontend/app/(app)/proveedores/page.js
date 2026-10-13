@@ -5,6 +5,7 @@ import { canViewProveedores, canEditProveedores } from "@/lib/roles";
 import AppShell from "@/components/AppShell";
 import ProveedoresNav from "@/components/proveedores/ProveedoresNav";
 import MaestroProveedores from "@/components/proveedores/MaestroProveedores";
+import { cargarCatalogosProveedor } from "@/lib/catalogosProveedor";
 
 export const dynamic = "force-dynamic";
 
@@ -14,19 +15,16 @@ export default async function ProveedoresPage() {
   if (!(user.permissions?.viewProveedores ?? canViewProveedores(user.role))) redirect("/registros");
   const canEdit = user.permissions?.editProveedores ?? canEditProveedores(user.role);
 
-  const [maestroRes, areasRes, motivosRes] = await Promise.all([
+  const [maestroRes, catalogos] = await Promise.all([
     backendFetch("/api/proveedores/maestro"),
-    backendFetch("/api/maestros?tipo=area&onlyActive=1"),
-    backendFetch("/api/maestros?tipo=motivoExcepcion&onlyActive=1"),
+    cargarCatalogosProveedor(),
   ]);
   const initial = await maestroRes.json();
-  const { maestros: areas } = await areasRes.json();
-  const { maestros: motivos } = await motivosRes.json();
 
   return (
     <AppShell user={user} title="Proveedores" subtitle="Gestión de proveedores · estado del ciclo de actualización">
       <ProveedoresNav active="maestro" />
-      <MaestroProveedores initial={initial} areas={areas} motivos={motivos} canEdit={canEdit} />
+      <MaestroProveedores initial={initial} catalogos={catalogos} canEdit={canEdit} />
     </AppShell>
   );
 }

@@ -21,7 +21,7 @@ export default function ProveedorAccionesModal({ proveedor, accion, motivos = []
       const body = esExcepcion
         ? { accion, motivoExcepcionId: motivoId, justificacion }
         : { accion, inactivoMotivo };
-      const detalle = await cambiarClasificacionApi(proveedor.id, body);
+      const detalle = await cambiarClasificacionApi(proveedor.nit, body);
       onDone(detalle);
     } catch (err) {
       setError(err.message || "No se pudo guardar el cambio.");

@@ -5,7 +5,7 @@ import {
 import {
   CONFIG_PROVEEDORES_DEFAULT, ESTADO_CICLO_LABELS, CLAVES_CHECKLIST, CLASIFICACION_LABELS,
   anioCicloVigente, inicioCiclo, finCicloFecha, diasParaCorte, clasificacionEn, estadoInicial,
-  checklistDe, alertaCompras, puedeCambiarEstado, validarConfig,
+  checklistDe, alertaCompras, puedeCambiarEstado, validarConfig, esCritico, claveCriticidad,
 } from "@/lib/proveedoresCicloReglas";
 
 function badRequest(message) {
@@ -54,14 +54,27 @@ export async function updateConfigProveedores(body, actor) {
 
 // Crea la fila de ciclo de un proveedor si todavía no existe. Devuelve null si
 // el proveedor no entra al ciclo (excepción, inactivo o creado después del ciclo).
+// El estado inicial sale de la fecha de ÚLTIMA ACTUALIZACIÓN (ver estadoInicial).
 async function getOrCreateCiclo(proveedor, anio, tx = prisma) {
   const clasificacion = clasif(proveedor, anio);
   if (clasificacion !== "actualizacion" && clasificacion !== "nuevo") return null;
+  const estado = estadoInicial(proveedor, anio, cfgActual);
   return tx.proveedorCiclo.upsert({
-    where: { proveedorId_anio: { proveedorId: proveedor.id, anio } },
+    where: { proveedorNit_anio: { proveedorNit: proveedor.nit, anio } },
     update: {},
-    create: { proveedorId: proveedor.id, anio, clasificacion, estado: estadoInicial(clasificacion) },
+    create: {
+      proveedorNit: proveedor.nit, anio, clasificacion, estado,
+      aprobadoAt: estado === "actualizado" ? proveedor.fechaActualizacion : null,
+      aprobadoPorNombre: estado === "actualizado" ? "Última actualización registrada" : null,
+    },
   });
+}
+
+// Asegura el estado del ciclo vigente de un proveedor recién creado, reactivado o
+// al que se le quitó la excepción (no hace nada si no participa en el ciclo).
+export async function asegurarCicloDe(proveedor) {
+  const anio = await asegurarCicloVigente();
+  return getOrCreateCiclo(proveedor, anio);
 }
 
 // Se ejecuta en cada lectura del módulo: si el ciclo vigente aún no se inició,
@@ -90,9 +103,9 @@ export async function asegurarCicloVigente(now = new Date()) {
 
 // ---------- Vistas de proveedor ----------
 
-async function cargarProveedorCompleto(id, anio) {
+async function cargarProveedorCompleto(nit) {
   const row = await prisma.proveedor.findUnique({
-    where: { id },
+    where: { nit },
     include: { ciclos: { include: { documentos: true }, orderBy: { anio: "desc" } } },
   });
   return row;
@@ -121,7 +134,7 @@ function filaCiclo(ciclo) {
 
 function toClienteProveedor(p) {
   return {
-    id: p.id,
+    id: p.nit, // la llave primaria es el NIT
     nit: p.nit,
     nombre: p.nombre,
     descripcion: p.descripcion,
@@ -130,14 +143,18 @@ function toClienteProveedor(p) {
     internacional: p.internacional,
     activo: p.activo,
     inactivoMotivo: p.inactivoMotivo,
+    tipoProveedorId: p.tipoProveedorId,
     criticidad: p.criticidad,
     areaId: p.areaId,
     area: p.area,
+    tipoServicioId: p.tipoServicioId,
     servicio: p.servicio,
+    clasificacionMontoId: p.clasificacionMontoId,
     clasificacionMonto: p.clasificacionMonto,
     revision: p.revision,
     observacion: p.observacion,
     fechaInvitacion: p.fechaInvitacion,
+    creadoPorNombre: p.creadoPorNombre,
     esExcepcion: p.esExcepcion,
     motivoExcepcionId: p.motivoExcepcionId,
     motivoExcepcion: p.motivoExcepcion,
@@ -164,9 +181,9 @@ function resumenProveedor(p, anio, ciclo) {
   };
 }
 
-export async function getProveedorDetalle(id) {
+export async function getProveedorDetalle(nit) {
   const anio = await asegurarCicloVigente();
-  const p = await cargarProveedorCompleto(id, anio);
+  const p = await cargarProveedorCompleto(nit);
   if (!p) throw notFound();
   const cicloVigente = p.ciclos.find((c) => c.anio === anio) || null;
   const resumen = resumenProveedor(p, anio, cicloVigente);
@@ -190,16 +207,26 @@ export async function listMaestroProveedores(filtros = {}) {
   const clasif = filtros.clasificacion ? [].concat(filtros.clasificacion) : [];
   const estados = filtros.estado ? [].concat(filtros.estado) : [];
   const checklist = filtros.checklist || "";
-  const criticidad = filtros.criticidad || "";
+  // Acepta la clave (critico / no_critico / sin_definir) o el texto del maestro ("Crítico", "No crítico"…).
+  const criticidad = !filtros.criticidad ? "" : ["critico", "no_critico", "sin_definir"].includes(filtros.criticidad) ? filtros.criticidad : claveCriticidad(filtros.criticidad);
+  const tipoProveedorId = filtros.tipoProveedorId || "";
+  const clasificacionMontoId = filtros.clasificacionMontoId || "";
+  const tipoServicioId = filtros.tipoServicioId || "";
   const areaId = filtros.areaId || "";
+  const excepcion = filtros.excepcion || "";
 
   const filtrados = todos.filter((r) => {
     if (clasif.length && !clasif.includes(r.clasificacion)) return false;
     if (estados.length && !(r.ciclo && estados.includes(r.ciclo.estado))) return false;
     if (checklist === "completo" && r.checklist.completos !== r.checklist.total) return false;
     if (checklist === "incompleto" && r.checklist.completos === r.checklist.total) return false;
-    if (criticidad && r.criticidad !== criticidad) return false;
+    if (criticidad && claveCriticidad(r.criticidad) !== criticidad) return false;
+    if (tipoProveedorId && r.tipoProveedorId !== tipoProveedorId) return false;
+    if (clasificacionMontoId && r.clasificacionMontoId !== clasificacionMontoId) return false;
+    if (tipoServicioId && r.tipoServicioId !== tipoServicioId) return false;
     if (areaId && r.areaId !== areaId) return false;
+    if (excepcion === "si" && !r.esExcepcion) return false;
+    if (excepcion === "no" && r.esExcepcion) return false;
     if (q && !`${r.nombre} ${r.nit}`.toLowerCase().includes(q)) return false;
     return true;
   });
@@ -218,17 +245,17 @@ export async function listMaestroProveedores(filtros = {}) {
 
 // ---------- Cambios sobre el ciclo ----------
 
-async function cicloVigenteDe(proveedorId, anio) {
-  const p = await cargarProveedorCompleto(proveedorId, anio);
+async function cicloVigenteDe(nit, anio) {
+  const p = await cargarProveedorCompleto(nit);
   if (!p) throw notFound();
   const ciclo = await getOrCreateCiclo(p, anio);
   if (!ciclo) throw badRequest("Este proveedor no participa en el ciclo de actualización (excepción, inactivo o posterior al ciclo).");
   return { p, ciclo: await prisma.proveedorCiclo.findUnique({ where: { id: ciclo.id }, include: { documentos: true } }) };
 }
 
-export async function cambiarEstadoCiclo(proveedorId, { estado }, actor) {
+export async function cambiarEstadoCiclo(nit, { estado }, actor) {
   const anio = await asegurarCicloVigente();
-  const { p, ciclo } = await cicloVigenteDe(proveedorId, anio);
+  const { p, ciclo } = await cicloVigenteDe(nit, anio);
   const checklist = checklistDe(p, documentosDe(ciclo));
   const check = puedeCambiarEstado(ciclo.estado, estado, checklist.completos === checklist.total);
   if (!check.ok) throw badRequest(check.motivo);
@@ -246,15 +273,16 @@ export async function cambiarEstadoCiclo(proveedorId, { estado }, actor) {
     data.aprobadoAt = null;
   }
   const actualizado = await prisma.proveedorCiclo.update({ where: { id: ciclo.id }, data, include: { documentos: true } });
-  if (estado === "actualizado") await prisma.proveedor.update({ where: { id: p.id }, data: { fechaActualizacion: new Date() } });
+  // La fecha de última actualización es la base del cálculo del ciclo.
+  if (estado === "actualizado") await prisma.proveedor.update({ where: { nit: p.nit }, data: { fechaActualizacion: data.aprobadoAt } });
   await logCicloEstado(actor, p, anio, { estado: antes.estado }, { estado }).catch(() => {});
   return { anio, ...resumenProveedor(p, anio, actualizado) };
 }
 
-export async function setDocumentoCiclo(proveedorId, { clave, cumple }, actor) {
+export async function setDocumentoCiclo(nit, { clave, cumple }, actor) {
   if (!CLAVES_CHECKLIST.includes(clave)) throw badRequest("Requisito inválido.");
   const anio = await asegurarCicloVigente();
-  const { p, ciclo } = await cicloVigenteDe(proveedorId, anio);
+  const { p, ciclo } = await cicloVigenteDe(nit, anio);
   const previo = await prisma.proveedorCicloDocumento.findUnique({ where: { cicloId_clave: { cicloId: ciclo.id, clave } } });
   const valor = !!cumple;
   await prisma.proveedorCicloDocumento.upsert({
@@ -268,9 +296,9 @@ export async function setDocumentoCiclo(proveedorId, { clave, cumple }, actor) {
 }
 
 // Excepciones e inactivos. Nunca borran el histórico: solo cambian la clasificación.
-export async function cambiarClasificacion(proveedorId, { accion, motivoExcepcionId, justificacion, inactivoMotivo, radica }, actor) {
+export async function cambiarClasificacion(nit, { accion, motivoExcepcionId, justificacion, inactivoMotivo, radica }, actor) {
   const anio = await asegurarCicloVigente();
-  const antes = await prisma.proveedor.findUnique({ where: { id: proveedorId } });
+  const antes = await prisma.proveedor.findUnique({ where: { nit } });
   if (!antes) throw notFound();
   const before = toClienteProveedor(antes);
   let data;
@@ -291,7 +319,7 @@ export async function cambiarClasificacion(proveedorId, { accion, motivoExcepcio
     if (!antes.esExcepcion) throw badRequest("Solo las excepciones radican facturas.");
     data = { radicaFacturas: !!radica, radicaFacturasAt: radica ? new Date() : null };
   } else if (accion === "quitar-excepcion") {
-    data = { esExcepcion: false, motivoExcepcionId: null, motivoExcepcion: null, justificacionExcepcion: null };
+    data = { esExcepcion: false, motivoExcepcionId: null, motivoExcepcion: null, justificacionExcepcion: null, fechaExcepcion: null, radicaFacturas: false, radicaFacturasAt: null };
   } else if (accion === "inactivar") {
     const motivo = String(inactivoMotivo || "").trim();
     if (!motivo) throw badRequest("Indica el motivo de inactivación.");
@@ -302,15 +330,18 @@ export async function cambiarClasificacion(proveedorId, { accion, motivoExcepcio
     throw badRequest("Acción inválida.");
   }
 
-  const row = await prisma.proveedor.update({ where: { id: proveedorId }, data });
+  const row = await prisma.proveedor.update({ where: { nit }, data });
   // Al quitar una excepción o reactivar, el proveedor entra al ciclo vigente.
   if (accion === "quitar-excepcion" || accion === "reactivar") await getOrCreateCiclo(row, anio);
 
   await logProveedorUpdate(actor, before, toClienteProveedor(row)).catch(() => {});
-  return getProveedorDetalle(proveedorId);
+  return getProveedorDetalle(nit);
 }
 
 // ---------- Indicadores ----------
+
+// Claves de salida del indicador de criticidad (las que pinta IndicadoresProveedores).
+const CRITICIDAD_INDICADOR = { critico: "Critico", no_critico: "No crítico", sin_definir: "Sin definir" };
 
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
@@ -348,7 +379,7 @@ export async function indicadoresCiclo() {
     const fila = filaCiclo(ciclo);
     const checklist = checklistDe(p, fila ? fila.documentos : {});
     const alerta = alertaCompras(p, ciclo ? { ...fila, anio } : null, checklist);
-    if (alerta.nivel === "aviso" || alerta.nivel === "inactivo") conAlerta.set(p.id, p);
+    if (alerta.nivel === "aviso" || alerta.nivel === "inactivo") conAlerta.set(p.nit, p);
 
     if (cls === "por_registrar") continue;
     if (cls === "excepcion" || cls === "inactivo") {
@@ -356,7 +387,7 @@ export async function indicadoresCiclo() {
       continue;
     }
 
-    criticidad[p.criticidad || "Sin definir"] = (criticidad[p.criticidad || "Sin definir"] || 0) + 1;
+    criticidad[CRITICIDAD_INDICADOR[claveCriticidad(p.criticidad)]]++;
     if (cls === "nuevo") mapa.nuevo++;
     if (!ciclo) continue;
 
@@ -377,11 +408,11 @@ export async function indicadoresCiclo() {
       else a.sinActualizar++;
       areas.set(area, a);
 
-      if (p.criticidad === "Critico") {
+      if (esCritico(p.criticidad)) {
         criticos++;
         if (ciclo.estado !== "actualizado") {
           criticosPendientes++;
-          atencion.push({ id: p.id, nombre: p.nombre, nit: p.nit, area: p.area, estado: ciclo.estado, estadoLabel: ESTADO_CICLO_LABELS[ciclo.estado] });
+          atencion.push({ id: p.nit, nombre: p.nombre, nit: p.nit, area: p.area, estado: ciclo.estado, estadoLabel: ESTADO_CICLO_LABELS[ciclo.estado] });
         }
       }
     }
@@ -402,13 +433,13 @@ export async function indicadoresCiclo() {
   if (conAlerta.size) {
     const desde = new Date(inicio.getTime() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const grupos = await prisma.record.groupBy({
-      by: ["proveedorId"],
-      where: { proveedorId: { in: [...conAlerta.keys()] }, fechaSolicitud: { gte: desde } },
+      by: ["proveedorNit"],
+      where: { proveedorNit: { in: [...conAlerta.keys()] }, fechaSolicitud: { gte: desde } },
       _count: { _all: true },
       _sum: { valorConIva: true },
     });
     const top = grupos
-      .map((g) => ({ nombre: conAlerta.get(g.proveedorId)?.nombre || "—", registros: g._count._all, valor: g._sum.valorConIva || 0 }))
+      .map((g) => ({ nombre: conAlerta.get(g.proveedorNit)?.nombre || "—", registros: g._count._all, valor: g._sum.valorConIva || 0 }))
       .sort((a, b) => b.valor - a.valor);
     comprasConAlerta = {
       proveedores: grupos.length,
@@ -446,7 +477,7 @@ export async function indicadoresCiclo() {
   };
 }
 
-// Mapa proveedorId → alerta del ciclo vigente, para la tabla de Registros.
+// Mapa NIT → alerta del ciclo vigente, para la tabla de Registros (Record.proveedorNit).
 export async function alertasPorProveedor() {
   const anio = await asegurarCicloVigente();
   const rows = await prisma.proveedor.findMany({ include: { ciclos: { where: { anio }, include: { documentos: true } } } });
@@ -456,13 +487,14 @@ export async function alertasPorProveedor() {
     const fila = filaCiclo(ciclo);
     const checklist = checklistDe(p, fila ? fila.documentos : {});
     const alerta = alertaCompras(p, ciclo ? { ...fila, anio } : null, checklist);
-    if (alerta.nivel !== "ok") out[p.id] = { nivel: alerta.nivel, titulo: alerta.titulo };
+    if (alerta.nivel !== "ok") out[p.nit] = { nivel: alerta.nivel, titulo: alerta.titulo };
   }
   return out;
 }
 
 // ---------- Acciones masivas (varios proveedores a la vez) ----------
 
+// Lista de NIT seleccionados (la llave primaria del proveedor).
 function idsDe(ids) {
   const lista = [...new Set((Array.isArray(ids) ? ids : []).filter((x) => typeof x === "string" && x))].slice(0, 500);
   if (!lista.length) throw badRequest("Selecciona al menos un proveedor.");

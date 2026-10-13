@@ -68,7 +68,7 @@ export async function informeMensual({ anio, mes } = {}) {
     const st = !p.activo ? "inactivo" : p.esExcepcion || aprobado ? "activo" : "pendiente";
     const estado = !p.activo ? "Inactivo" : p.esExcepcion ? "Excepción" : ciclo ? ESTADO_CICLO_LABELS[ciclo.estado] : "—";
     return {
-      id: p.id,
+      id: p.nit,
       nombre: p.nombre,
       nit: p.nit,
       fecha: partes(p[fechaCampo]).fecha,

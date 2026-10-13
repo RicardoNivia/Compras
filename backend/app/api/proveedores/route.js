@@ -28,14 +28,18 @@ import { getSessionUser } from "@/lib/auth-server";
  *                   items:
  *                     type: object
  *                     properties:
- *                       id: { type: string, description: "Referencia real usada por Record.proveedorId — estable aunque cambien nit/nombre." }
- *                       nit: { type: string }
+ *                       nit: { type: string, description: "Llave primaria del proveedor; Record.proveedorNit la referencia (FK ON UPDATE CASCADE)." }
  *                       nombre: { type: string }
  *                       descripcion: { type: string }
  *                       telefono: { type: string, nullable: true }
  *                       correo: { type: string, nullable: true }
  *                       activo: { type: boolean }
- *                       enUso: { type: boolean, description: "Si el código está usado hoy en algún registro." }
+ *                       enUso: { type: boolean, description: "Si el NIT está usado hoy en algún registro." }
+ *                       tipoProveedorId: { type: string, nullable: true }
+ *                       clasificacionMontoId: { type: string, nullable: true }
+ *                       tipoServicioId: { type: string, nullable: true }
+ *                       esExcepcion: { type: boolean }
+ *                       fechaActualizacion: { type: string, format: date-time, nullable: true }
  *                       createdAt: { type: string, format: date-time }
  */
 export async function GET(request) {

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { listMaestros, createMaestro } from "@/lib/maestros";
+import { listMaestros, createMaestro, MODULO_POR_TIPO } from "@/lib/maestros";
 import { requirePermission, apiError } from "@/lib/apiGuard";
+import { getSessionUser } from "@/lib/auth-server";
+import { ROLES_COMPRAS } from "@/lib/roles";
 
 // Sin chequeo de rol más allá de estar autenticado (lo garantiza el
 // middleware): cualquier rol que pueda editar registros necesita leer estas
@@ -12,7 +14,7 @@ import { requirePermission, apiError } from "@/lib/apiGuard";
  *     tags: [Maestros]
  *     summary: Lista los valores de las listas maestras (área, responsable, estado, categoría, medio de pago, estado de legalización) — cualquier usuario autenticado.
  *     parameters:
- *       - { name: tipo, in: query, schema: { type: string, enum: [area, responsable, estado, categoria, medioPago, estadoLegalizacion] } }
+ *       - { name: tipo, in: query, schema: { type: string, enum: [area, responsable, estado, categoria, medioPago, estadoLegalizacion, causaCalificacion, areaProveedor, tipoProveedor, clasificacionMonto, tipoServicio, motivoExcepcion] } }
  *       - { name: onlyActive, in: query, schema: { type: string, enum: ["1"] }, description: "\"1\" para devolver solo los activos." }
  *     responses:
  *       200:
@@ -44,8 +46,13 @@ export async function GET(request) {
   const tipo = searchParams.get("tipo") || undefined;
   const onlyActive = searchParams.get("onlyActive") === "1";
   try {
+    const user = await getSessionUser();
     const maestros = await listMaestros({ tipo, onlyActive });
-    return NextResponse.json({ maestros });
+    // El rol Proveedores solo ve los maestros de su módulo (los de Compras son de los roles de Compras).
+    const visibles = user && !ROLES_COMPRAS.includes(user.role)
+      ? maestros.filter((m) => MODULO_POR_TIPO[m.tipo] === "Proveedores")
+      : maestros;
+    return NextResponse.json({ maestros: visibles });
   } catch (err) {
     return apiError(err);
   }
@@ -65,7 +72,7 @@ export async function GET(request) {
  *             type: object
  *             required: [tipo, valor]
  *             properties:
- *               tipo: { type: string, enum: [area, responsable, estado, categoria, medioPago, estadoLegalizacion] }
+ *               tipo: { type: string, enum: [area, responsable, estado, categoria, medioPago, estadoLegalizacion, causaCalificacion, areaProveedor, tipoProveedor, clasificacionMonto, tipoServicio, motivoExcepcion] }
  *               valor: { type: string }
  *               activo: { type: boolean, default: true }
  *     responses:

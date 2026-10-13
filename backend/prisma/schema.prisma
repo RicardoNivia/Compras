@@ -17,7 +17,7 @@ model Record {
   area                String?  // snapshot — al listar se reemplaza por Maestro.valor ACTUAL si areaId resuelve (ver hydrateConDatosActuales)
   areaId              String?  // id del Maestro (tipo="area") — referencia real; sin FK, se valida al guardar
   responsable         String?  // nombre del responsable — snapshot al guardar; al listar se reemplaza por el nombre ACTUAL del usuario si responsableUserId resuelve (ver hydrateConDatosActuales en lib/records.js)
-  responsableUserId   String?  // id del User atado como responsable — referencia real; sin FK (igual que proveedorId): se valida al guardar, nunca se borra en cascada
+  responsableUserId   String?  // id del User atado como responsable — referencia real; sin FK (igual que el resto de referencias a User): se valida al guardar, nunca se borra en cascada
   estado              String?  // snapshot — ver areaId
   estadoId            String?  // id del Maestro (tipo="estado")
   categoria           String?  // snapshot — ver areaId
@@ -28,9 +28,10 @@ model Record {
   licitacion          String?
   estadoLegalizacion  String?  // snapshot — ver areaId
   estadoLegalizacionId String? // id del Maestro (tipo="estadoLegalizacion")
-  nit                 String?  // NIT del proveedor — snapshot al guardar, para historial/export; al listar se reemplaza por el valor ACTUAL del catálogo si proveedorId resuelve (ver hydrateConDatosActuales en lib/records.js)
-  proveedor           String?  // nombre del proveedor — mismo criterio: snapshot que se reemplaza por el nombre actual cuando proveedorId resuelve
-  proveedorId         String?  // id del Proveedor — referencia real; sin FK (igual que responsableUserId): se valida al guardar, nunca se borra en cascada
+  nit                 String?  // NIT del proveedor — snapshot al guardar, para historial/export; se mantiene igual a proveedorNit (ver lib/records.js)
+  proveedor           String?  // nombre del proveedor — mismo criterio: snapshot que se reemplaza por el nombre actual cuando proveedorNit resuelve
+  proveedorNit        String?  // NIT del Proveedor (llave primaria del catálogo) — referencia real con FK: si cambia el NIT se propaga solo (ON UPDATE CASCADE); no se puede borrar un proveedor con registros (RESTRICT)
+  proveedorRef        Proveedor? @relation(fields: [proveedorNit], references: [nit], onUpdate: Cascade, onDelete: Restrict)
   fe                  String?  // número de factura/referencia — puede repetirse (p.ej. una misma factura cubre varias compras); la duplicidad solo se advierte a nivel de aplicación, no se bloquea en la BD
   valorConIva         Float?
   valorSinIva         Float?
@@ -44,6 +45,7 @@ model Record {
   updatedAt           DateTime @updatedAt
   calificacion        CalificacionProveedor?
 
+  @@index([proveedorNit])
   @@map("records")
 }
 
@@ -57,7 +59,7 @@ model CalificacionProveedor {
   id                   Int       @id @default(autoincrement())
   recordId             String    @unique
   record               Record    @relation(fields: [recordId], references: [id], onDelete: Cascade)
-  proveedorId          String?   // snapshot del Proveedor calificado al momento de calificar — sin FK, igual convención que Record.proveedorId
+  proveedorNit         String?   // snapshot del NIT del Proveedor calificado — sin FK; se actualiza si el NIT cambia (ver lib/proveedores.js#cambiarNit)
   proveedor            String?   // snapshot del nombre, igual convención que Record.proveedor
   estrellas            Int       // 1..5
   causasIds            String?   // JSON: string[] de ids de Maestro (tipo="causaCalificacion") — null/"[]" si estrellas = 5
@@ -144,6 +146,8 @@ model Message {
 
 // Opciones administrables para los desplegables del formulario de registros.
 // tipo: "area" | "responsable" | "estado" | "categoria" | "medioPago" | "estadoLegalizacion" | "causaCalificacion"
+//       | "motivoExcepcion" | "tipoProveedor" | "clasificacionMonto" | "tipoServicio" (estos 4 los usa Proveedor;
+//       | "areaProveedor" (área de Proveedores, distinta de "area" de Compras — ver lib/maestros.js#MODULO_POR_TIPO)
 // (los primeros 6 coinciden 1:1 con el nombre del campo correspondiente en Record;
 // "causaCalificacion" es independiente, ver CalificacionProveedor).
 model Maestro {
@@ -160,13 +164,14 @@ model Maestro {
   @@map("maestros")
 }
 
-// Catálogo de proveedores para el autocompletar del formulario de registros.
-// Los registros guardan una copia de nit y nombre (texto, sin FK) — igual que
-// el resto de maestros — así un cambio en el catálogo se propaga a los
-// registros con cascada explícita (ver lib/proveedores.js), no por join.
+// Catálogo de proveedores. La llave primaria es el NIT (sin dígito de
+// verificación, solo dígitos; "PENDIENTE-…" para los que aún no tienen NIT
+// formal). Todas las relaciones (registros, ciclos, procesos, checklist)
+// apuntan al NIT con FK ON UPDATE CASCADE, así corregir un NIT se propaga
+// solo. Tipo, clasificación por monto, tipo de servicio, área y motivo de
+// excepción son maestros referenciados por id (el texto es solo snapshot).
 model Proveedor {
-  id                 String   @id @default(cuid())
-  nit                String   @unique // sin dígito de verificación
+  nit                String   @id // llave primaria — sin dígito de verificación
   nombre             String
   descripcion        String   // obligatoria — qué vende/para qué sirve este proveedor (Nova la usa para sugerirlo)
   telefono           String?  // opcional — solo para que Nova (Agente IA) pueda citarlo, no se usa en validaciones
@@ -177,28 +182,38 @@ model Proveedor {
   activo             Boolean  @default(true)
   inactivoMotivo     String?  // texto libre — solo si activo=false (desvinculado, no apto, anulado…)
   // Clasificación del maestro (no cambia por año). El estado de cada ciclo vive en ProveedorCiclo.
-  criticidad         String?  // "Critico" | "No crítico" | null = sin definir
-  areaId             String?  // id del Maestro (tipo="area") — referencia real, igual convención que Record
-  area               String?  // snapshot del nombre de área
-  servicio           String?  // tipo de servicio (texto libre)
-  esExcepcion        Boolean  @default(false) // no entra al ciclo de actualización ni al checklist
+  tipoProveedorId    String?  // id del Maestro (tipo="tipoProveedor"): Crítico / No crítico — columna "Tipo" del Excel
+  criticidad         String?  // snapshot del valor del maestro tipoProveedor | null = sin definir
+  areaId             String?  // id del Maestro (tipo="areaProveedor") — maestro propio de Proveedores, distinto del área de Compras
+  area               String?  // snapshot del nombre del área de proveedor
+  tipoServicioId     String?  // id del Maestro (tipo="tipoServicio")
+  servicio           String?  // snapshot del nombre del tipo de servicio
+  esExcepcion        Boolean  @default(false) // no entra al ciclo de actualización ni al checklist, sin importar fechas
   motivoExcepcionId  String?  // id del Maestro (tipo="motivoExcepcion")
   motivoExcepcion    String?  // snapshot del nombre del motivo
   justificacionExcepcion String?
   fechaExcepcion     DateTime? // cuándo se marcó (o figura en el Excel) como excepción — para el informe mensual
   radicaFacturas     Boolean  @default(false) // solo excepciones: ya está radicando facturas
   radicaFacturasAt   DateTime?
-  fechaActualizacion DateTime? // última vez que quedó Actualizado (o fecha del Excel) — para el informe mensual
-  clasificacionMonto String?  // clasificación por monto: Adquisición de Bajo Impacto, Operación de Alto Costo, Grandes Contribuyentes…
+  fechaActualizacion DateTime? // fecha de la ÚLTIMA actualización — base del cálculo del ciclo (no la fecha de registro)
+  clasificacionMontoId String? // id del Maestro (tipo="clasificacionMonto")
+  clasificacionMonto String?  // snapshot del nombre de la clasificación por monto
   revision           String?  // quién revisa: SRM, Financiero…
   observacion        String?
   fechaInvitacion    DateTime? // cuándo se invitó a actualizarse (Excel)
-  createdAt          DateTime @default(now())
+  createdAt          DateTime @default(now()) // fecha de registro
+  creadoPorUserId    String?  // quién lo registró (sin FK, como el resto de referencias a User)
+  creadoPorNombre    String?  // snapshot del nombre; "Importación Excel" / "Migración histórica" si no lo creó una persona
   updatedAt          DateTime @updatedAt
   ciclos             ProveedorCiclo[]
   procesos           ProveedorProceso[] // LEGADO: historial importado del Excel anterior, ya no lo usa la UI
   checklist          ProveedorChecklist? // LEGADO: reemplazado por ProveedorCicloDocumento
+  records            Record[]
 
+  @@index([tipoProveedorId])
+  @@index([clasificacionMontoId])
+  @@index([tipoServicioId])
+  @@index([areaId])
   @@map("proveedores")
 }
 
@@ -207,8 +222,8 @@ model Proveedor {
 // crea una fila por proveedor y ciclo: es el histórico anual.
 model ProveedorCiclo {
   id                  Int       @id @default(autoincrement())
-  proveedorId         String
-  proveedor           Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+  proveedorNit        String
+  proveedor           Proveedor @relation(fields: [proveedorNit], references: [nit], onUpdate: Cascade, onDelete: Cascade)
   anio                Int       // año en que inicia el ciclo (2026 = 1 abr 2026 → 31 mar 2027)
   clasificacion       String    // "actualizacion" | "nuevo" (nuevo = creado en ese año, entra actualizado)
   estado              String    // "desactualizado" | "en_proceso" | "en_aprobacion" | "actualizado"
@@ -219,7 +234,7 @@ model ProveedorCiclo {
   updatedAt           DateTime  @updatedAt
   documentos          ProveedorCicloDocumento[]
 
-  @@unique([proveedorId, anio])
+  @@unique([proveedorNit, anio])
   @@map("proveedor_ciclos")
 }
 
@@ -268,8 +283,8 @@ model CicloProveedorIniciado {
 // (ver lib/proveedoresProcesos.js).
 model ProveedorProceso {
   id            String    @id @default(cuid())
-  proveedorId   String
-  proveedor     Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+  proveedorNit  String
+  proveedor     Proveedor @relation(fields: [proveedorNit], references: [nit], onUpdate: Cascade, onDelete: Cascade)
   proceso       String    // "actualizacion" | "nuevo" | "excepcion"
   estado        String?   // snapshot — "Aprobado" | "Pendiente" | "En revisión" | etc (texto tal cual del origen)
   estadoId      String?   // id del Maestro (tipo="estadoProveedor") — referencia real, igual convención que Record
@@ -280,7 +295,7 @@ model ProveedorProceso {
   criticidad    String?   // "Critico" | "No crítico"
   clasificacion String?   // clasificación por monto
   area          String?   // snapshot
-  areaId        String?   // id del Maestro (tipo="area") — mismo maestro que usa Record
+  areaId        String?   // id del Maestro (tipo="areaProveedor")
   servicio      String?   // snapshot
   servicioId    String?   // id del Maestro (tipo="tipoServicio")
   viaExcepcionCorreo Boolean @default(false) // vinculación liviana por correo (ADM-P-01: proveedores del CEO, almacenes de cadena, tiquetes, universidades, ferias, licencias/suscripciones extranjeras, entidades certificadoras) — exime de checklist completo, no se marca como "desactualizado" por eso
@@ -289,7 +304,7 @@ model ProveedorProceso {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  @@index([proveedorId])
+  @@index([proveedorNit])
   @@index([proceso])
   @@map("proveedor_procesos")
 }
@@ -298,8 +313,8 @@ model ProveedorProceso {
 // criticidad/área/contacto se derivan en vivo del ProveedorProceso más
 // reciente, ver lib/proveedoresProcesos.js#checklistDe).
 model ProveedorChecklist {
-  proveedorId  String    @id
-  proveedor    Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+  proveedorNit String    @id
+  proveedor    Proveedor @relation(fields: [proveedorNit], references: [nit], onUpdate: Cascade, onDelete: Cascade)
   // Los 3 de abajo son 100% manuales. criticidad/área/contacto se derivan
   // automáticamente del proceso más reciente (ver checklistDerivadosDe en
   // lib/proveedoresProcesos.js) — los *Override de abajo permiten forzarlos a

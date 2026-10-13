@@ -30,6 +30,10 @@ export async function GET(request) {
       checklist: sp.get("checklist") || "",
       criticidad: sp.get("criticidad") || "",
       areaId: sp.get("areaId") || "",
+      tipoProveedorId: sp.get("tipoProveedorId") || "",
+      clasificacionMontoId: sp.get("clasificacionMontoId") || "",
+      tipoServicioId: sp.get("tipoServicioId") || "",
+      excepcion: sp.get("excepcion") || "",
     });
     return NextResponse.json(data);
   } catch (err) {

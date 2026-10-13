@@ -35,7 +35,7 @@ export const ROLE_ICONS = {
 };
 
 // Roles que trabajan en Compras (Registros, Dashboard de compras, Alertas, Nova).
-// El rol Proveedores NO entra aquí: solo ve su módulo de proveedores.
+// El rol Proveedores NO entra aquí: ve su módulo de proveedores, Maestros y Nova.
 export const ROLES_COMPRAS = [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR];
 
 // admin: acceso total — el único que puede eliminar registros y el único que
@@ -58,15 +58,17 @@ export function canViewUsuarios(role) {
 }
 
 export function canViewAgenteIA(role) {
-  return ROLES_COMPRAS.includes(role);
+  return ROLES_COMPRAS.includes(role) || role === ROLES.PROVEEDORES;
 }
 
 export function canViewAuditoria(role) {
   return role === ROLES.ADMIN;
 }
 
+// El rol Proveedores también administra Maestros (tipo, clasificación por monto,
+// tipo de servicio, motivos de excepción y el ciclo de proveedores).
 export function canViewMaestros(role) {
-  return role === ROLES.ADMIN;
+  return role === ROLES.ADMIN || role === ROLES.PROVEEDORES;
 }
 
 // Módulo de proveedores: maestro, tablero del ciclo e indicadores.
@@ -148,7 +150,7 @@ export const NON_ADMIN_EDITABLE_FIELDS = [
   "estadoLegalizacionId",
   "nit",
   "proveedor",
-  "proveedorId",
+  "proveedorNit",
   "fe",
   "valorConIva",
   "valorSinIva",

@@ -162,20 +162,29 @@ export async function fetchProveedores(onlyActive, search) {
   return jsonFetch(`/api/proveedores${queryString({ onlyActive: onlyActive ? "1" : "", search })}`, "GET");
 }
 
-export async function fetchProveedorDetalle(id) {
-  return jsonFetch(`/api/proveedores/${id}`, "GET");
+// El NIT es la llave primaria del proveedor: todas las rutas van por NIT.
+const rutaProveedor = (nit) => `/api/proveedores/${encodeURIComponent(nit)}`;
+
+export async function fetchProveedorDetalle(nit) {
+  return jsonFetch(rutaProveedor(nit), "GET");
 }
 
 export async function createProveedorApi(data) {
   return jsonFetch("/api/proveedores", "POST", data);
 }
 
-export async function updateProveedorApi(id, data) {
-  return jsonFetch(`/api/proveedores/${id}`, "PATCH", data);
+export async function updateProveedorApi(nit, data) {
+  return jsonFetch(rutaProveedor(nit), "PATCH", data);
 }
 
-export async function deleteProveedorApi(id) {
-  return jsonFetch(`/api/proveedores/${id}`, "DELETE");
+export async function deleteProveedorApi(nit) {
+  return jsonFetch(rutaProveedor(nit), "DELETE");
+}
+
+// Validación en tiempo real: { nit, valido, existe, proveedor: { nit, nombre, activo } | null }.
+// "excluir" es el NIT actual cuando se está editando (no cuenta como duplicado).
+export async function verificarNitApi(nit, excluir) {
+  return jsonFetch(`/api/proveedores/verificar-nit${queryString({ nit, excluir })}`, "GET");
 }
 
 export async function fetchMaestroProveedores(filters = {}) {
@@ -200,6 +209,11 @@ export async function reviewProveedoresApi() {
   return jsonFetch("/api/agent/review-proveedores", "POST");
 }
 
+// Análisis con IA del Informe mensual de proveedores del mes indicado (mismo formato que reviewProveedoresApi).
+export async function reviewInformeProveedoresApi(anio, mes) {
+  return jsonFetch("/api/agent/review-informe-proveedores", "POST", { anio, mes });
+}
+
 export async function fetchAlertasProveedores() {
   return jsonFetch("/api/proveedores/alertas", "GET");
 }
@@ -212,16 +226,16 @@ export async function updateConfigProveedoresApi(data) {
   return jsonFetch("/api/proveedores/config", "PUT", data);
 }
 
-export async function cambiarEstadoCicloApi(id, estado) {
-  return jsonFetch(`/api/proveedores/${id}/ciclo/estado`, "PATCH", { estado });
+export async function cambiarEstadoCicloApi(nit, estado) {
+  return jsonFetch(`${rutaProveedor(nit)}/ciclo/estado`, "PATCH", { estado });
 }
 
-export async function setDocumentoCicloApi(id, clave, cumple) {
-  return jsonFetch(`/api/proveedores/${id}/ciclo/documentos`, "PATCH", { clave, cumple });
+export async function setDocumentoCicloApi(nit, clave, cumple) {
+  return jsonFetch(`${rutaProveedor(nit)}/ciclo/documentos`, "PATCH", { clave, cumple });
 }
 
-export async function cambiarClasificacionApi(id, data) {
-  return jsonFetch(`/api/proveedores/${id}/clasificacion`, "PATCH", data);
+export async function cambiarClasificacionApi(nit, data) {
+  return jsonFetch(`${rutaProveedor(nit)}/clasificacion`, "PATCH", data);
 }
 
 // Búsqueda en lenguaje natural (Nova) para cualquier tabla de proveedores.

@@ -1,0 +1,142 @@
+{
+  "_descripcion": "Configuración de normalización y mapeo para migrar el Excel 'Informe Proveedores Sincosoft' al módulo de Proveedores. La usan scripts/proveedores/migrarProveedoresExcel.mjs (validar / simular / aplicar). Para una nueva plantilla o una nueva migración a producción solo se ajusta este archivo: los alias se comparan sin tildes, sin mayúsculas y con espacios colapsados.",
+
+  "hojas": {
+    "control actualizacion": "actualizacion",
+    "control proveedores nuevos": "nuevo",
+    "control excepciones": "excepcion"
+  },
+  "_hojasIgnoradas": "Nunca se leen. 'Contraseñas Adpro' contiene credenciales en texto plano; 'Informe' es un resumen precalculado.",
+  "hojasIgnoradas": ["contrasenas adpro", "informe"],
+
+  "_prioridadProceso": "Un NIT que aparece en varias hojas toma los datos de la hoja con mayor prioridad (primero de la lista).",
+  "prioridadProceso": ["excepcion", "nuevo", "actualizacion"],
+
+  "_columnas": "Columna canónica → encabezados aceptados en el Excel. La fila de encabezados es la primera que contiene 'Razón social'.",
+  "columnas": {
+    "razonSocial": ["razon social"],
+    "nit": ["nit", "nit proveedor"],
+    "fechaInvitacion": ["fecha invitacion"],
+    "fecha": ["fecha"],
+    "estado": ["estado"],
+    "contacto": ["contacto"],
+    "observacion": ["observacion", "observaciones"],
+    "tipo": ["tipo"],
+    "clasificacionMonto": ["clasificacion por monto"],
+    "area": ["area"],
+    "tipoServicio": ["tipo servicio", "tipo de servicio"]
+  },
+  "_columnasObligatorias": "Si falta alguna en una hoja, esa hoja NO se migra (error).",
+  "columnasObligatorias": ["razonSocial", "nit"],
+  "_columnasRequeridas": "Las columnas pedidas para la migración. Si una hoja no la trae se reporta como advertencia y el campo queda sin dato desde esa hoja; si NINGUNA hoja la trae, la validación falla.",
+  "columnasRequeridas": ["estado", "contacto", "observacion", "tipo", "clasificacionMonto", "area", "tipoServicio"],
+
+  "_valoresVacios": "Se tratan como celda vacía en cualquier columna.",
+  "valoresVacios": ["", "-", "--", "x", "n/a", "na", "no hay", "correo", "sin informacion", "pendiente por definir"],
+
+  "_valoresDeBaja": "En Tipo / Clasificación / Área / Tipo servicio indican un proveedor dado de baja (no son valores de maestro): marcan al proveedor como inactivo.",
+  "valoresDeBaja": ["anulado", "desvinculado", "descarte"],
+
+  "estados": {
+    "aprobado": ["aprobado", "ok", "ok aprobado"],
+    "en_aprobacion": ["en aprobacion"],
+    "en_proceso": ["en proceso", "pendiente", "en revision", "solicitado", "en espera de respuesta"],
+    "inactivo": ["desvinculado", "no apto para actualizacion", "no apto", "anulado", "descarte"]
+  },
+
+  "_revision": "La columna de Revisión (Revisión Andrea / Yuli: Financiero, SRM) NO se migra. Estos valores solo sirven para detectar columnas corridas.",
+  "revision": {
+    "SRM": ["srm"],
+    "Financiero": ["financiero"]
+  },
+  "_revisionEnColumnaFecha": "En 'Control Excepciones' la columna 'Fecha' trae la revisión (Financiero/SRM) porque las columnas están corridas: si 'Fecha' no es una fecha y coincide con una revisión, esa columna se ignora (no se usa como fecha ni se migra).",
+  "revisionEnColumnaFecha": true,
+
+  "_nit": "Reglas (iguales a lib/proveedoresCicloReglas.js#normalizeNit): NIT colombiano con dígito de verificación (900.123.456-7) → sin DV; resto → mayúsculas, solo letras y dígitos (acepta NIT extranjeros: RFC, CIF, EIN). Válido: 5 a 20 caracteres con al menos un dígito.",
+
+  "_fechas": "Fechas en texto dd/mm/aaaa [hh:mm:ss a. m.] o celdas de fecha; se interpretan en hora de Colombia.",
+
+  "_fechaActualizacion": "Base del cálculo del ciclo. Solo se toma cuando el estado es 'aprobado'. Nunca retrocede una fecha más reciente que ya exista en la BD. Las excepciones no la usan.",
+  "fechaActualizacion": {
+    "nuevo": ["fecha", "fechaInvitacion"],
+    "actualizacion": ["fecha", "fechaInvitacion"],
+    "excepcion": []
+  },
+
+  "maestros": {
+    "tipoProveedor": {
+      "_nota": "Columna 'Tipo' = criticidad. No se crean valores nuevos: lo que no mapea se reporta.",
+      "crearNuevos": false,
+      "valores": {
+        "Crítico": ["critico"],
+        "No crítico": ["no critico", "nocritico"]
+      },
+      "invalidos": ["inteligencia artificial"]
+    },
+    "clasificacionMonto": {
+      "crearNuevos": false,
+      "valores": {
+        "Adquisición de Bajo Impacto": ["adquisicion de bajo impacto", "bajo impacto"],
+        "Operación de Alto Costo": ["operacion de alto costo", "alto costo"],
+        "Grandes Contribuyentes o excepciones": ["grandes contribuyentes o excepciones", "grandes contribuyentes", "excepcion"],
+        "Proveedor Internacional": ["proveedor internacional", "internacional"]
+      },
+      "invalidos": []
+    },
+    "areaProveedor": {
+      "_nota": "Maestro propio de Proveedores (distinto del área de Compras). Las áreas compuestas ('Administrativo/ Mercadeo', 'Mercadeo / Administrativo') se unifican ordenando sus partes.",
+      "crearNuevos": true,
+      "compuestos": { "separador": "/", "unir": " / ", "ordenar": true },
+      "valores": {
+        "Administrativo": [],
+        "Bienestar": [],
+        "Bitakora": [],
+        "Cosmos": [],
+        "Desarrollo": [],
+        "Dirección Ejecutiva": ["direccion ejecutiva"],
+        "Financiero": [],
+        "Formación": ["formacion"],
+        "Gentesoft": ["gente soft"],
+        "Infraestructura": [],
+        "JPA": [],
+        "Jurídico": ["juridico"],
+        "Mercadeo": [],
+        "Sistemas de Gestión": ["sistemas de gestion"],
+        "SST": ["seguridad y salud en el trabajo"]
+      },
+      "invalidos": ["operacion de alto costo"]
+    },
+    "tipoServicio": {
+      "_nota": "Los valores sin alias se crean tal cual (primera letra en mayúscula); los equivalentes se unifican aquí.",
+      "crearNuevos": true,
+      "valores": {
+        "Licencias": ["licencia"],
+        "Eventos": ["evento"],
+        "Equipos de tecnología": ["equipos de tecnologia"],
+        "Mantenimiento de vehículos": ["mantenimiento vehiculo", "mantenimiento vehiculos"],
+        "Mantenimiento de vidrios": ["manteniendo vidrios"],
+        "Pólizas de seguros": ["polizas"],
+        "Onboarding": ["omboarding"],
+        "Membresía": ["membresia"],
+        "Servicio de avalúo": ["servicio avaluo"],
+        "Servicio de música para eventos": ["servicio de musica eventos"],
+        "Suscripciones": [],
+        "Conciliación extrajudicial": [],
+        "Salud": []
+      },
+      "invalidos": ["gentesoft"]
+    }
+  },
+
+  "motivoExcepcion": {
+    "_nota": "Motivo para los proveedores de la hoja de Excepciones (primera regla que aplique).",
+    "reglas": [
+      { "clasificacionMonto": "Grandes Contribuyentes o excepciones", "motivo": "Gran contribuyente" },
+      { "clasificacionMonto": "Proveedor Internacional", "motivo": "Proveedor internacional" },
+      { "observacionContiene": "compren", "motivo": "Compra ocasional" }
+    ],
+    "porDefecto": "Por clasificar"
+  },
+
+  "descripcionPorDefecto": "Proveedor migrado desde el Excel de Gestión de Proveedores"
+}

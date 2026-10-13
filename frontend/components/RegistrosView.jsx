@@ -506,12 +506,12 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                           <span className="desc-tooltip-bubble">{r.proveedor}</span>
                         </span>
                       ) : "—"}
-                      {r.proveedorId && alertasProveedores[r.proveedorId] && (
+                      {r.proveedorNit && alertasProveedores[r.proveedorNit] && (
                         <span
-                          className={`prov-alert-icon prov-alert-${alertasProveedores[r.proveedorId].nivel}`}
-                          title={alertasProveedores[r.proveedorId].titulo}
+                          className={`prov-alert-icon prov-alert-${alertasProveedores[r.proveedorNit].nivel}`}
+                          title={alertasProveedores[r.proveedorNit].titulo}
                           role="img"
-                          aria-label={`Alerta del proveedor: ${alertasProveedores[r.proveedorId].titulo}`}
+                          aria-label={`Alerta del proveedor: ${alertasProveedores[r.proveedorNit].titulo}`}
                         >⚠</span>
                       )}
                     </td>
@@ -569,13 +569,13 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                               className={`icon-action-btn rate${r.calificacion ? " checked" : ""}`}
                               onClick={() => setRatingRecord(r)}
                               title={
-                                !r.proveedorId
+                                !r.proveedorNit
                                   ? "Este registro no tiene un proveedor del catálogo asociado"
                                   : r.calificacion
                                     ? `Calificado con ${r.calificacion.estrellas} estrella(s) — click para editar`
                                     : "Calificar proveedor"
                               }
-                              disabled={!r.proveedorId}
+                              disabled={!r.proveedorNit}
                             >
                               <IconStar size={13} filled={!!r.calificacion} />
                             </button>

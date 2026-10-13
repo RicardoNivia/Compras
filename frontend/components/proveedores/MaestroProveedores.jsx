@@ -10,8 +10,9 @@ import ProveedorDetalleModal from "@/components/proveedores/ProveedorDetalleModa
 import ProveedorFormModal from "@/components/proveedores/ProveedorFormModal";
 import InformeMensualModal from "@/components/proveedores/InformeMensualModal";
 import { usePantallaNova } from "@/lib/novaPantalla";
+import { esCritico, claveCriticidad, fmtFecha } from "@/lib/proveedoresOpciones";
 
-const VACIO = { q: "", clasificacion: [], estado: [], checklist: "", criticidad: "", areaId: "" };
+const VACIO = { q: "", clasificacion: [], estado: [], checklist: "", criticidad: "", areaId: "", clasificacionMontoId: "", tipoServicioId: "", excepcion: "" };
 const PAGE_SIZES = [25, 50, 100];
 
 // Misma nomenclatura de la página original de Gestión de Proveedores.
@@ -43,6 +44,22 @@ const CORTOS = {
   listasRestr: "Listas",
 };
 
+function celdaCriticidad(r) {
+  if (!r.criticidad) return <span className="muted">Sin definir</span>;
+  return esCritico(r.criticidad) ? <span className="pill critical">{r.criticidad}</span> : r.criticidad;
+}
+
+// Texto largo en una sola línea con el detalle completo al pasar el mouse (patrón de Registros).
+function celdaTexto(v) {
+  if (!v) return <span className="muted">—</span>;
+  return (
+    <span className="desc-tooltip-wrap">
+      <span className="desc-text">{v}</span>
+      <span className="desc-tooltip-bubble">{v}</span>
+    </span>
+  );
+}
+
 function motivoFila(r) {
   if (r.clasificacion === "inactivo") return r.inactivoMotivo || "Inactivo";
   if (r.clasificacion === "excepcion") return r.motivoExcepcion || "Excepción";
@@ -59,7 +76,9 @@ function conRequisito(r, clave, cumple) {
 
 // Maestro general de proveedores. Misma estructura que la tabla de Registros: barra de filtros,
 // pestañas con la nomenclatura original, tabla con pie de paginación y el detalle en una modal.
-export default function MaestroProveedores({ initial, areas = [], motivos = [], canEdit }) {
+// catalogos: maestros de Proveedores { areas, tipos, clasificaciones, servicios, motivos } (ver app/(app)/proveedores/page.js).
+export default function MaestroProveedores({ initial, catalogos = {}, canEdit }) {
+  const { areas = [], clasificaciones = [], servicios = [] } = catalogos;
   const [data, setData] = useState(initial);
   const [filters, setFilters] = useState(VACIO);
   const [searchMode, setSearchMode] = useState("manual");
@@ -106,7 +125,7 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
       q: f.q || "",
       clasificacion: f.clasificacion ? [f.clasificacion] : [],
       estado: f.estado ? [f.estado] : [],
-      criticidad: f.criticidad || "",
+      criticidad: claveCriticidad(f.criticidad),
       checklist: f.checklist || "",
       areaId: area?.id || "",
     };
@@ -130,7 +149,7 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
     setAviso("");
     setOcupado(true);
     try {
-      await cambiarEstadoCicloApi(r.id, estado);
+      await cambiarEstadoCicloApi(r.nit, estado);
       setAviso(`«${r.nombre}» pasó a ${ESTADOS.find((e) => e.key === estado)?.label}.`);
     } catch (err) {
       setError(err.message || "No se pudo cambiar el estado.");
@@ -144,7 +163,7 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
   async function alternarRadicacion(r, radica) {
     setError("");
     try {
-      await cambiarClasificacionApi(r.id, { accion: "radicar", radica });
+      await cambiarClasificacionApi(r.nit, { accion: "radicar", radica });
     } catch (err) {
       setError(err.message || "No se pudo guardar la radicación.");
     }
@@ -154,9 +173,9 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
   // Marcar o desmarcar un requisito del checklist con un clic (se refleja al instante).
   async function alternarRequisito(r, clave, cumple) {
     setError("");
-    setData((d) => ({ ...d, rows: d.rows.map((x) => (x.id === r.id ? conRequisito(x, clave, cumple) : x)) }));
+    setData((d) => ({ ...d, rows: d.rows.map((x) => (x.nit === r.nit ? conRequisito(x, clave, cumple) : x)) }));
     try {
-      await setDocumentoCicloApi(r.id, clave, cumple);
+      await setDocumentoCicloApi(r.nit, clave, cumple);
     } catch (err) {
       setError(err.message || "No se pudo guardar el requisito.");
     }
@@ -194,12 +213,12 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
   const conEstado = ["todos", "nuevos", "actualizacion"].includes(pestana);
   const conMotivo = ["excepciones", "inactivos", "por_registrar"].includes(pestana);
   const seleccionable = canEdit && (esChecklist || conEstado);
-  const todosMarcados = visibles.filter((r) => r.ciclo).length > 0 && visibles.filter((r) => r.ciclo).every((r) => seleccion.has(r.id));
+  const todosMarcados = visibles.filter((r) => r.ciclo).length > 0 && visibles.filter((r) => r.ciclo).every((r) => seleccion.has(r.nit));
   const hayFiltros = JSON.stringify(filters) !== JSON.stringify(VACIO);
   usePantallaNova(
     `Pantalla Gestión de proveedores (ciclo ${data.anio}, corte en ${data.diasParaCorte} días). Pestaña activa: ${actual.label} con ${filas.length} proveedores${conToggle && soloIncompletos[pestana] ? " (solo con checklist incompleto)" : ""}. Conteos por pestaña: ${PESTANAS.map((p) => `${p.label} ${conteos[p.key]}`).join(", ")}. Filtros activos: ${hayFiltros ? "sí" : "ninguno"}.${seleccion.size ? ` Seleccionados: ${seleccion.size}.` : ""}`
   );
-  const columnas = 6 + (esChecklist ? 12 : conEstado ? 4 : 2) + (seleccionable ? 1 : 0);
+  const columnas = 6 + (esChecklist ? 12 : (conEstado ? 4 : 2) + 4) + (seleccionable ? 1 : 0);
 
   function alternarSeleccion(id) {
     const n = new Set(seleccion);
@@ -209,74 +228,77 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
 
   function alternarTodos() {
     const n = new Set(seleccion);
-    const ids = visibles.filter((r) => r.ciclo).map((r) => r.id);
+    const ids = visibles.filter((r) => r.ciclo).map((r) => r.nit);
     if (todosMarcados) ids.forEach((id) => n.delete(id)); else ids.forEach((id) => n.add(id));
     setSeleccion(n);
   }
 
   return (
     <div className="prov-maestro">
-      <div className="toolbar" style={{ flexDirection: "column", alignItems: "stretch" }}>
-        <div className="dash-tabs" role="tablist" aria-label="Modo de búsqueda" style={{ alignSelf: "flex-start" }}>
-          <button type="button" role="tab" aria-selected={searchMode === "manual"} className="dash-tab" onClick={() => setSearchMode("manual")}>
-            Filtros manuales
-          </button>
-          <button type="button" role="tab" aria-selected={searchMode === "ia"} className="dash-tab" onClick={() => setSearchMode("ia")}>
-            <IconSpark size={13} /> Buscar con Nova
-          </button>
+      <div className="toolbar prov-filtros">
+        <div className="prov-filtros-fila">
+          <div className="dash-tabs prov-filtros-modo" role="tablist" aria-label="Modo de búsqueda">
+            <button type="button" role="tab" aria-selected={searchMode === "manual"} className="dash-tab" onClick={() => setSearchMode("manual")}>
+              Filtros
+            </button>
+            <button type="button" role="tab" aria-selected={searchMode === "ia"} className="dash-tab" onClick={() => setSearchMode("ia")}>
+              <IconSpark size={13} /> Nova
+            </button>
+          </div>
+          {searchMode === "manual" && (
+            <input
+              id="prov-q" type="search" className="prov-filtros-buscar" aria-label="Buscar por nombre o NIT"
+              placeholder="Buscar por nombre o NIT…" value={filters.q} onChange={(e) => cambiar({ q: e.target.value })}
+            />
+          )}
+          <div className="spacer" />
+          {hayFiltros && <button type="button" className="btn small" onClick={limpiar}>Limpiar filtros</button>}
+          <button type="button" className="btn small" onClick={() => setInforme(true)}>Informe mensual</button>
+          {canEdit && (
+            <button type="button" className="btn btn-primary small" onClick={() => setCreando(true)}>
+              <IconPlus size={13} /> Nuevo proveedor
+            </button>
+          )}
         </div>
 
         {searchMode === "ia" ? (
           <BuscarConNova areas={areas} onApply={aplicarNova} onClear={limpiar} />
         ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            <div className="field search-field">
-              <label htmlFor="prov-q">Buscar</label>
-              <input id="prov-q" type="search" placeholder="Nombre o NIT…" value={filters.q} onChange={(e) => cambiar({ q: e.target.value })} />
-            </div>
-            <div className="field">
-              <label htmlFor="prov-area">Área</label>
-              <select id="prov-area" value={filters.areaId} onChange={(e) => cambiar({ areaId: e.target.value })}>
-                <option value="">Todas</option>
-                {areas.map((a) => <option key={a.id} value={a.id}>{a.valor}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="prov-crit">Criticidad</label>
-              <select id="prov-crit" value={filters.criticidad} onChange={(e) => cambiar({ criticidad: e.target.value })}>
-                <option value="">Todas</option>
-                <option value="Critico">Crítico</option>
-                <option value="No crítico">No crítico</option>
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="prov-estado">Estado</label>
-              <select id="prov-estado" value={filters.estado[0] || ""} onChange={(e) => cambiar({ estado: e.target.value ? [e.target.value] : [] })}>
-                <option value="">Todos</option>
-                {ESTADOS.map((e) => <option key={e.key} value={e.key}>{e.label}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="prov-check">Checklist</label>
-              <select id="prov-check" value={filters.checklist} onChange={(e) => cambiar({ checklist: e.target.value })}>
-                <option value="">Todos</option>
-                <option value="completo">Completo</option>
-                <option value="incompleto">Incompleto</option>
-              </select>
-            </div>
+          <div className="prov-filtros-selects">
+            <select aria-label="Área" className={filters.areaId ? "activo" : ""} value={filters.areaId} onChange={(e) => cambiar({ areaId: e.target.value })}>
+              <option value="">Área: todas</option>
+              {areas.map((a) => <option key={a.id} value={a.id}>{a.valor}</option>)}
+            </select>
+            <select aria-label="Tipo (criticidad)" className={filters.criticidad ? "activo" : ""} value={filters.criticidad} onChange={(e) => cambiar({ criticidad: e.target.value })}>
+              <option value="">Tipo: todos</option>
+              <option value="critico">Crítico</option>
+              <option value="no_critico">No crítico</option>
+              <option value="sin_definir">Sin definir</option>
+            </select>
+            <select aria-label="Clasificación por monto" className={filters.clasificacionMontoId ? "activo" : ""} value={filters.clasificacionMontoId} onChange={(e) => cambiar({ clasificacionMontoId: e.target.value })}>
+              <option value="">Clasificación: todas</option>
+              {clasificaciones.map((m) => <option key={m.id} value={m.id}>{m.valor}</option>)}
+            </select>
+            <select aria-label="Tipo de servicio" className={filters.tipoServicioId ? "activo" : ""} value={filters.tipoServicioId} onChange={(e) => cambiar({ tipoServicioId: e.target.value })}>
+              <option value="">Servicio: todos</option>
+              {servicios.map((m) => <option key={m.id} value={m.id}>{m.valor}</option>)}
+            </select>
+            <select aria-label="Excepción" className={filters.excepcion ? "activo" : ""} value={filters.excepcion} onChange={(e) => cambiar({ excepcion: e.target.value })}>
+              <option value="">Excepción: todos</option>
+              <option value="si">Excepción: sí</option>
+              <option value="no">Excepción: no</option>
+            </select>
+            <select aria-label="Estado en el ciclo" className={filters.estado.length ? "activo" : ""} value={filters.estado[0] || ""} onChange={(e) => cambiar({ estado: e.target.value ? [e.target.value] : [] })}>
+              <option value="">Estado: todos</option>
+              {ESTADOS.map((e) => <option key={e.key} value={e.key}>{e.label}</option>)}
+            </select>
+            <select aria-label="Checklist" className={filters.checklist ? "activo" : ""} value={filters.checklist} onChange={(e) => cambiar({ checklist: e.target.value })}>
+              <option value="">Checklist: todos</option>
+              <option value="completo">Checklist completo</option>
+              <option value="incompleto">Checklist incompleto</option>
+            </select>
           </div>
         )}
-
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-          <button type="button" className="btn" onClick={limpiar}>Limpiar filtros</button>
-          <button type="button" className="btn" onClick={() => setInforme(true)}>Informe mensual</button>
-          <div className="spacer" />
-          {canEdit && (
-            <button type="button" className="btn btn-primary" onClick={() => setCreando(true)}>
-              <IconPlus size={13} /> Nuevo proveedor
-            </button>
-          )}
-        </div>
       </div>
 
       {novaInfo && <p className="prov-note">{novaInfo}</p>}
@@ -339,9 +361,13 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
                 <th>NIT</th>
                 {esChecklist && <th>Proceso</th>}
                 {esChecklist && <th>Estado</th>}
-                {esChecklist && <th>Criticidad</th>}
+                {esChecklist && <th>Tipo</th>}
                 <th>Área</th>
-                {!esChecklist && <th>Criticidad</th>}
+                {!esChecklist && <th>Tipo</th>}
+                {!esChecklist && <th>Clasificación por monto</th>}
+                {!esChecklist && <th>Tipo de servicio</th>}
+                {!esChecklist && <th>Excepción</th>}
+                {!esChecklist && <th>Últ. actualización</th>}
                 {conEstado && <th>Estado</th>}
                 {conMotivo && <th>{pestana === "por_registrar" ? "Situación" : "Motivo"}</th>}
                 {esChecklist && Object.entries(CORTOS).map(([clave, corto]) => <th key={clave} className="prov-chk-col" title={clave}>{corto}</th>)}
@@ -359,10 +385,10 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
                 const completo = r.ciclo && r.checklist.completos === r.checklist.total;
                 const editable = canEdit && !!r.ciclo;
                 return (
-                  <tr key={r.id}>
+                  <tr key={r.nit}>
                     {seleccionable && (
                       <td>
-                        {r.ciclo ? <input type="checkbox" checked={seleccion.has(r.id)} onChange={() => alternarSeleccion(r.id)} aria-label={`Seleccionar ${r.nombre}`} /> : null}
+                        {r.ciclo ? <input type="checkbox" checked={seleccion.has(r.nit)} onChange={() => alternarSeleccion(r.nit)} aria-label={`Seleccionar ${r.nombre}`} /> : null}
                       </td>
                     )}
                     <td className="truncate prov-name-cell">
@@ -390,9 +416,13 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
                         )}
                       </td>
                     )}
-                    {esChecklist && <td>{r.criticidad === "Critico" ? <span className="pill critical">Crítico</span> : (r.criticidad || "Sin definir")}</td>}
-                    <td className="truncate" title={r.servicio || undefined}>{r.area || "—"}</td>
-                    {!esChecklist && <td>{r.criticidad === "Critico" ? <span className="pill critical">Crítico</span> : (r.criticidad || "Sin definir")}</td>}
+                    {esChecklist && <td>{celdaCriticidad(r)}</td>}
+                    <td className="truncate">{r.area || "—"}</td>
+                    {!esChecklist && <td>{celdaCriticidad(r)}</td>}
+                    {!esChecklist && <td className="truncate">{celdaTexto(r.clasificacionMonto)}</td>}
+                    {!esChecklist && <td className="truncate">{celdaTexto(r.servicio)}</td>}
+                    {!esChecklist && <td>{r.esExcepcion ? <span className="pill accent">Sí</span> : <span className="muted">No</span>}</td>}
+                    {!esChecklist && <td className="mono">{r.esExcepcion ? <span className="muted">No aplica</span> : fmtFecha(r.fechaActualizacion)}</td>}
                     {conEstado && (
                       <td>
                         {!r.ciclo ? <span className="pill muted">{r.clasificacionLabel}</span> : editable ? (
@@ -437,7 +467,7 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
                     )}
                     <td className="actions-cell">
                       <div className="row-actions">
-                        <button type="button" className="icon-action-btn" onClick={() => setDetalleId(r.id)} title="Ver detalle" aria-label={`Ver detalle de ${r.nombre}`}>
+                        <button type="button" className="icon-action-btn" onClick={() => setDetalleId(r.nit)} title="Ver detalle" aria-label={`Ver detalle de ${r.nombre}`}>
                           <IconEye size={14} />
                         </button>
                         {canEdit && (
@@ -472,9 +502,8 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
 
       {detalleId && (
         <ProveedorDetalleModal
-          proveedorId={detalleId}
-          areas={areas}
-          motivos={motivos}
+          proveedorNit={detalleId}
+          catalogos={catalogos}
           canEdit={canEdit}
           onClose={() => setDetalleId(null)}
           onChanged={() => recargar()}
@@ -482,15 +511,15 @@ export default function MaestroProveedores({ initial, areas = [], motivos = [], 
       )}
       {creando && (
         <ProveedorFormModal
-          areas={areas}
+          catalogos={catalogos}
           onClose={() => setCreando(false)}
-          onSaved={(p) => { setCreando(false); recargar(); setDetalleId(p.id); }}
+          onSaved={(p) => { setCreando(false); recargar(); setDetalleId(p.nit); }}
         />
       )}
       {editando && (
         <ProveedorFormModal
           proveedor={editando}
-          areas={areas}
+          catalogos={catalogos}
           onClose={() => setEditando(null)}
           onSaved={() => { setEditando(null); recargar(); }}
           onClasificado={() => { setEditando(null); recargar(); }}
