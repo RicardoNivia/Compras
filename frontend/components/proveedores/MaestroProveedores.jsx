@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import {
-  fetchMaestroProveedores, cambiarEstadoCicloApi, cambiarClasificacionApi, setDocumentoCicloApi, accionMasivaProveedoresApi,
+  deleteProveedorApi, fetchMaestroProveedores, cambiarEstadoCicloApi, cambiarClasificacionApi, setDocumentoCicloApi, accionMasivaProveedoresApi,
 } from "@/lib/api";
-import { IconPlus, IconSpark, IconEye, IconEdit, IconInfo } from "@/components/icons";
+import { IconPlus, IconSpark, IconEye, IconEdit, IconInfo, IconTrash } from "@/components/icons";
 import BuscarConNova from "@/components/proveedores/BuscarConNova";
 import ProveedorDetalleModal from "@/components/proveedores/ProveedorDetalleModal";
 import ProveedorFormModal from "@/components/proveedores/ProveedorFormModal";
 import InformeMensualModal from "@/components/proveedores/InformeMensualModal";
 import { usePantallaNova } from "@/lib/novaPantalla";
+import ValoracionPuntaje from "@/components/ValoracionPuntaje";
 import { esCritico, claveCriticidad, fmtFecha } from "@/lib/proveedoresOpciones";
 
 const VACIO = { q: "", clasificacion: [], estado: [], checklist: "", criticidad: "", areaId: "", clasificacionMontoId: "", tipoServicioId: "", excepcion: "" };
@@ -100,6 +101,28 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit })
   const [seleccion, setSeleccion] = useState(() => new Set());
   const [estadoMasivo, setEstadoMasivo] = useState("en_proceso");
   const [ocupado, setOcupado] = useState(false);
+  // Proveedor a eliminar (confirmación). Solo se puede si ningún registro de compra lo usa.
+  const [eliminando, setEliminando] = useState(null);
+  const [borrando, setBorrando] = useState(false);
+
+  async function confirmarEliminar() {
+    if (!eliminando) return;
+    setBorrando(true);
+    setError("");
+    setAviso("");
+    try {
+      await deleteProveedorApi(eliminando.nit);
+      setAviso(`Se eliminó «${eliminando.nombre}» (NIT ${eliminando.nit}).`);
+      setEliminando(null);
+      setSeleccion((sel) => { const n = new Set(sel); n.delete(eliminando.nit); return n; });
+      await recargar();
+    } catch (err) {
+      setError(err.message || "No se pudo eliminar el proveedor.");
+      setEliminando(null);
+    } finally {
+      setBorrando(false);
+    }
+  }
 
   async function recargar(f = filters) {
     try {
@@ -218,7 +241,7 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit })
   usePantallaNova(
     `Pantalla Gestión de proveedores (ciclo ${data.anio}, corte en ${data.diasParaCorte} días). Pestaña activa: ${actual.label} con ${filas.length} proveedores${conToggle && soloIncompletos[pestana] ? " (solo con checklist incompleto)" : ""}. Conteos por pestaña: ${PESTANAS.map((p) => `${p.label} ${conteos[p.key]}`).join(", ")}. Filtros activos: ${hayFiltros ? "sí" : "ninguno"}.${seleccion.size ? ` Seleccionados: ${seleccion.size}.` : ""}`
   );
-  const columnas = 6 + (esChecklist ? 12 : (conEstado ? 4 : 2) + 4) + (seleccionable ? 1 : 0);
+  const columnas = 6 + (esChecklist ? 12 : (conEstado ? 4 : 2) + 5) + (seleccionable ? 1 : 0);
 
   function alternarSeleccion(id) {
     const n = new Set(seleccion);
@@ -368,6 +391,7 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit })
                 {!esChecklist && <th>Tipo de servicio</th>}
                 {!esChecklist && <th>Excepción</th>}
                 {!esChecklist && <th>Últ. actualización</th>}
+                {!esChecklist && <th title="Calificación general de Nova: promedio del puntaje del proveedor en sus compras valoradas">Calificación Nova</th>}
                 {conEstado && <th>Estado</th>}
                 {conMotivo && <th>{pestana === "por_registrar" ? "Situación" : "Motivo"}</th>}
                 {esChecklist && Object.entries(CORTOS).map(([clave, corto]) => <th key={clave} className="prov-chk-col" title={clave}>{corto}</th>)}
@@ -423,6 +447,13 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit })
                     {!esChecklist && <td className="truncate">{celdaTexto(r.servicio)}</td>}
                     {!esChecklist && <td>{r.esExcepcion ? <span className="pill accent">Sí</span> : <span className="muted">No</span>}</td>}
                     {!esChecklist && <td className="mono">{r.esExcepcion ? <span className="muted">No aplica</span> : fmtFecha(r.fechaActualizacion)}</td>}
+                    {!esChecklist && (
+                      <td>
+                        {r.valoracionIA
+                          ? <ValoracionPuntaje puntaje={r.valoracionIA.promedio} decimales titulo={`Promedio de ${r.valoracionIA.cantidad} compra(s) valoradas`} />
+                          : <span className="muted" title="Sin compras valoradas por Nova">—</span>}
+                      </td>
+                    )}
                     {conEstado && (
                       <td>
                         {!r.ciclo ? <span className="pill muted">{r.clasificacionLabel}</span> : editable ? (
@@ -473,6 +504,20 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit })
                         {canEdit && (
                           <button type="button" className="icon-action-btn edit" onClick={() => setEditando(r)} title="Editar" aria-label={`Editar ${r.nombre}`}>
                             <IconEdit size={13} />
+                          </button>
+                        )}
+                        {canEdit && (
+                          <button
+                            type="button"
+                            className="icon-action-btn delete"
+                            onClick={() => setEliminando(r)}
+                            disabled={r.registrosCompras > 0}
+                            title={r.registrosCompras > 0
+                              ? `No se puede eliminar: lo usan ${r.registrosCompras} registro(s) de compra. Márcalo como inactivo desde Editar.`
+                              : "Eliminar"}
+                            aria-label={`Eliminar ${r.nombre}`}
+                          >
+                            <IconTrash size={13} />
                           </button>
                         )}
                       </div>
@@ -526,6 +571,29 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit })
         />
       )}
       {informe && <InformeMensualModal onClose={() => setInforme(false)} />}
+      {eliminando && (
+        <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !borrando) setEliminando(null); }}>
+          <div className="modal" role="alertdialog" aria-modal="true" aria-labelledby="prov-eliminar-t" style={{ maxWidth: 460 }}>
+            <div className="modal-head">
+              <h3 id="prov-eliminar-t">Eliminar proveedor</h3>
+              <button type="button" className="btn-ghost icon-btn" onClick={() => setEliminando(null)} disabled={borrando} aria-label="Cerrar">✕</button>
+            </div>
+            <div className="modal-body" style={{ display: "block" }}>
+              <p style={{ marginTop: 0 }}>¿Eliminar <strong>{eliminando.nombre}</strong> (NIT <span className="mono">{eliminando.nit}</span>)?</p>
+              <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
+                Se borran también su historial de ciclos y su checklist. Ningún registro de compra lo usa, así que no se pierde información de Compras. Queda constancia en Auditoría. Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <div className="spacer" />
+              <button type="button" className="btn" onClick={() => setEliminando(null)} disabled={borrando}>Cancelar</button>
+              <button type="button" className="btn btn-danger-solid" onClick={confirmarEliminar} disabled={borrando}>
+                {borrando ? <span className="spinner" /> : <IconTrash size={13} />} Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,9 +6,12 @@ import {
   fetchProveedorDetalle, setDocumentoCicloApi,
 } from "@/lib/api";
 import ProveedorFormModal from "@/components/proveedores/ProveedorFormModal";
+import ComprasProveedor from "@/components/proveedores/ComprasProveedor";
+import ValoracionPuntaje from "@/components/ValoracionPuntaje";
 
 const TABS = [
   { key: "checklist", label: "Checklist" },
+  { key: "compras", label: "Compras y calificaciones" },
   { key: "historial", label: "Histórico por año" },
   { key: "datos", label: "Datos" },
 ];
@@ -127,6 +130,8 @@ export default function ProveedorDetalle({ proveedorNit, catalogos = {}, canEdit
         </section>
       )}
 
+      {tab === "compras" && <ComprasProveedor nit={nitActual} />}
+
       {tab === "historial" && (
         <section aria-label="Histórico por año">
           <ol className="prov-history">
@@ -148,6 +153,8 @@ export default function ProveedorDetalle({ proveedorNit, catalogos = {}, canEdit
         <section aria-label="Datos del proveedor">
           <dl className="prov-kv">
             <dt>NIT</dt><dd className="mono">{detalle.nit}</dd>
+            <dt>Calificación general (Nova)</dt>
+            <dd>{detalle.valoracionIA ? <><ValoracionPuntaje puntaje={detalle.valoracionIA.promedio} decimales /> <span className="muted">en {detalle.valoracionIA.cantidad} compra(s) valoradas</span></> : "Sin valorar"}</dd>
             <dt>Clasificación</dt><dd>{detalle.clasificacionLabel}</dd>
             <dt>Tipo (criticidad)</dt><dd>{detalle.criticidad || "Sin definir"}</dd>
             <dt>Clasificación por monto</dt><dd>{detalle.clasificacionMonto || "—"}</dd>

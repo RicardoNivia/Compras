@@ -473,3 +473,22 @@ export async function sendReportNowApi(id) {
   const { jobId } = await handle(res);
   return pollJob(jobId);
 }
+
+// ---------- Valoración con IA de compras radicadas ----------
+
+// null si la compra aún no se ha valorado.
+export async function getValoracionApi(recordId) {
+  const { valoracion } = await jsonFetch(`/api/records/${recordId}/valoracion`, "GET");
+  return valoracion;
+}
+
+// Genera (o vuelve a generar) con IA la valoración de una compra ya radicada y la guarda.
+export async function generarValoracionApi(recordId) {
+  const { valoracion } = await jsonFetch(`/api/records/${recordId}/valoracion`, "POST");
+  return valoracion;
+}
+
+// Historial de compras de un proveedor con su valoración y la calificación general.
+export async function fetchComprasProveedorApi(nit) {
+  return jsonFetch(`/api/proveedores/${encodeURIComponent(nit)}/compras`, "GET");
+}

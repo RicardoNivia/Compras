@@ -44,6 +44,7 @@ model Record {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   calificacion        CalificacionProveedor?
+  valoracion          ValoracionCompra?
 
   @@index([proveedorNit])
   @@map("records")
@@ -70,6 +71,31 @@ model CalificacionProveedor {
   updatedAt            DateTime  @updatedAt
 
   @@map("calificaciones_proveedor")
+}
+
+// Valoración con IA de una compra radicada (una por registro; se puede volver a generar).
+// Evalúa la compra y al proveedor con todos los parámetros del registro y con las compras
+// anteriores a ella con ese mismo proveedor. El proveedor se obtiene por el registro
+// (Record.proveedorNit), así un cambio de NIT no deja la valoración desfasada.
+model ValoracionCompra {
+  id                   Int      @id @default(autoincrement())
+  recordId             String   @unique
+  record               Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  puntajeCompra        Int      // 1 a 5
+  puntajeProveedor     Int?     // 1 a 5 — null si la compra no tiene proveedor
+  resumen              String
+  observacionCompra    String   // por qué la IA calificó así la compra
+  observacionProveedor String?  // por qué calificó así al proveedor
+  factores             String?  // JSON: [{ factor, impacto: "positivo"|"neutro"|"negativo", detalle }]
+  comprasPrevias       Int      @default(0) // cuántas compras anteriores con el mismo proveedor se analizaron
+  modelo               String?
+  origen               String   @default("radicacion") // "radicacion" | "carga masiva"
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  creadoPorUserId      String?
+  creadoPorNombre      String?  // "Valoración masiva" cuando no la generó una persona
+
+  @@map("valoraciones_compra")
 }
 
 // Auditoría de acciones sobre registros (crear / editar / eliminar / radicar).

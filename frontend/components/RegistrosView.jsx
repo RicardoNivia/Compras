@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import RecordModal from "@/components/RecordModal";
 import RatingModal from "@/components/RatingModal";
+import ValoracionModal from "@/components/ValoracionModal";
+import ValoracionPuntaje from "@/components/ValoracionPuntaje";
 import { TimelineButton } from "@/components/RecordTimelineModal";
 import { fmtCOP } from "@/lib/format";
 import { getDiasInfo } from "@/lib/diasInfo";
@@ -33,6 +35,7 @@ const COLUMNS = [
   { key: "valorSinIva", label: "Valor sin IVA" },
   { key: "valorCot", label: "Valor Cot." },
   { key: "observaciones", label: "Observaciones" },
+  { key: "valoracion", label: "Valoración Nova" },
 ];
 
 function estadoPillClass(estado) {
@@ -59,6 +62,7 @@ function uniqueSorted(records, field) {
 
 function sortValue(r, key) {
   if (key === "dias") return getDiasInfo(r).dias ?? -Infinity;
+  if (key === "valoracion") return r.valoracion?.puntajeCompra ?? -1;
   const v = r[key];
   if (v === null || v === undefined) return "";
   return v;
@@ -118,6 +122,8 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
 
   const [modalRecord, setModalRecord] = useState(undefined); // undefined = closed, null = new
   const [ratingRecord, setRatingRecord] = useState(null);
+  // Valoración de Nova: { record, auto } — auto=true se abre al radicar y genera la valoración de una vez.
+  const [valoracionModal, setValoracionModal] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
@@ -277,13 +283,21 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
     setConfirmRadicado(null);
     setTogglingId(r.id);
     setRecords((prev) => prev.map((x) => (x.id === r.id ? { ...x, radicado: true } : x)));
+    let radicado = false;
     try {
       await patchRecordApi(r.id, { radicado: true });
+      radicado = true;
     } catch {
       setRecords((prev) => prev.map((x) => (x.id === r.id ? { ...x, radicado: false } : x)));
     } finally {
       setTogglingId(null);
     }
+    // Al radicar se abre la valoración de Nova de la compra y del proveedor (se guarda sola).
+    if (radicado) setValoracionModal({ record: { ...r, radicado: true }, auto: true });
+  }
+
+  function handleValoracion(recordId, v) {
+    setRecords((prev) => prev.map((x) => (x.id === recordId ? { ...x, valoracion: { puntajeCompra: v.puntajeCompra, puntajeProveedor: v.puntajeProveedor } } : x)));
   }
 
   async function handleDelete(id) {
@@ -500,20 +514,31 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                     <td><span className={`pill ${legalizacionPillClass(r.estadoLegalizacion)}`}>{r.estadoLegalizacion || "—"}</span></td>
                     <td className="mono">{r.nit || "—"}</td>
                     <td>
-                      {r.proveedor ? (
-                        <span className="desc-tooltip-wrap">
-                          <span className="desc-text">{r.proveedor}</span>
-                          <span className="desc-tooltip-bubble">{r.proveedor}</span>
-                        </span>
-                      ) : "—"}
-                      {r.proveedorNit && alertasProveedores[r.proveedorNit] && (
-                        <span
-                          className={`prov-alert-icon prov-alert-${alertasProveedores[r.proveedorNit].nivel}`}
-                          title={alertasProveedores[r.proveedorNit].titulo}
-                          role="img"
-                          aria-label={`Alerta del proveedor: ${alertasProveedores[r.proveedorNit].titulo}`}
-                        >⚠</span>
-                      )}
+                      <div className="prov-celda">
+                        {r.proveedor ? (
+                          <span className="desc-tooltip-wrap prov-celda-nombre">
+                            <span className="desc-text">{r.proveedor}</span>
+                            <span className="desc-tooltip-bubble">{r.proveedor}</span>
+                          </span>
+                        ) : "—"}
+                        {r.proveedorNit && alertasProveedores[r.proveedorNit] && (() => {
+                          const al = alertasProveedores[r.proveedorNit];
+                          return (
+                            <span className="desc-tooltip-wrap prov-alert-wrap">
+                              <span
+                                className={`prov-alert-icon prov-alert-${al.nivel}`}
+                                role="img"
+                                tabIndex={0}
+                                aria-label={`Alerta del proveedor: ${al.titulo}. ${al.detalle || ""}`}
+                              >⚠</span>
+                              <span className="desc-tooltip-bubble prov-alert-bubble" role="tooltip">
+                                <strong>{al.titulo}</strong>
+                                {al.detalle ? <span>{al.detalle}</span> : null}
+                              </span>
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </td>
                     <td className="mono cell-fe">{r.fe || "—"}</td>
                     <td className="num">{fmtCOP(r.valorConIva)}</td>
@@ -526,6 +551,22 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                           <span className="desc-tooltip-bubble">{r.observaciones}</span>
                         </span>
                       ) : "—"}
+                    </td>
+                    <td className="cell-valoracion">
+                      {!r.radicado ? <span className="muted" title="Se valora al radicar la compra">—</span> : r.valoracion ? (
+                        <button
+                          type="button" className="valoracion-celda"
+                          onClick={() => setValoracionModal({ record: r, auto: false })}
+                          title="Ver por qué Nova calificó así la compra y al proveedor"
+                        >
+                          <ValoracionPuntaje puntaje={r.valoracion.puntajeCompra} titulo="Compra" />
+                          {r.valoracion.puntajeProveedor != null && <ValoracionPuntaje puntaje={r.valoracion.puntajeProveedor} titulo="Proveedor" />}
+                        </button>
+                      ) : (allowToggle || allowEdit) ? (
+                        <button type="button" className="btn small" onClick={() => setValoracionModal({ record: r, auto: false })} title="Valorar esta compra con Nova">
+                          <IconSpark size={12} /> Valorar
+                        </button>
+                      ) : <span className="muted">—</span>}
                     </td>
                     <td className="actions-cell">
                       {confirmDeleteId === r.id ? (
@@ -623,6 +664,16 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
           maestros={maestros}
           proveedores={proveedores}
           presupuestos={presupuestos}
+        />
+      )}
+
+      {valoracionModal && (
+        <ValoracionModal
+          record={valoracionModal.record}
+          auto={valoracionModal.auto}
+          canGenerate={allowToggle || allowEdit}
+          onClose={() => setValoracionModal(null)}
+          onSaved={handleValoracion}
         />
       )}
 

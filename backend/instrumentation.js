@@ -13,5 +13,9 @@ export async function register() {
 
     const { startReportScheduler } = await import("@/lib/reportScheduler");
     startReportScheduler();
+
+    // Valora en segundo plano las compras radicadas que aún no tienen valoración con IA (ver lib/valoracionAuto.js).
+    const { startValoracionAutomatica } = await import("@/lib/valoracionAuto");
+    startValoracionAutomatica();
   }
 }
