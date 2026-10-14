@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { valoracionGeneralPorProveedor } from "@/lib/valoraciones";
 import {
   logCicloEstado, logCicloDocumento, logCicloIniciado, logProveedorUpdate, logConfigProveedoresUpdate,
 } from "@/lib/audit";
@@ -189,7 +190,8 @@ export async function getProveedorDetalle(nit) {
   const resumen = resumenProveedor(p, anio, cicloVigente);
   const historial = p.ciclos.filter((c) => c.anio !== anio).map(filaCiclo);
   const diasSinGestion = cicloVigente ? Math.floor((Date.now() - new Date(cicloVigente.updatedAt).getTime()) / 86400000) : null;
-  return { anio, ...resumen, diasSinGestion, historial, fechaCorte: finCicloFecha(anio, await getConfigProveedores()), inicioCiclo: inicioCiclo(anio, await getConfigProveedores()) };
+  const valoracionIA = (await valoracionGeneralPorProveedor()).get(p.nit) || null;
+  return { anio, ...resumen, valoracionIA, diasSinGestion, historial, fechaCorte: finCicloFecha(anio, await getConfigProveedores()), inicioCiclo: inicioCiclo(anio, await getConfigProveedores()) };
 }
 
 // ---------- Listado del maestro (con filtros combinables) ----------
@@ -201,7 +203,16 @@ export async function listMaestroProveedores(filtros = {}) {
     include: { ciclos: { where: { anio }, include: { documentos: true } } },
   });
 
-  const todos = rows.map((p) => resumenProveedor(p, anio, p.ciclos[0] || null));
+  // Cuántos registros de compra usan cada proveedor: con alguno, no se puede eliminar.
+  const usos = await prisma.record.groupBy({ by: ["proveedorNit"], where: { proveedorNit: { not: null } }, _count: { _all: true } });
+  const registrosPorNit = new Map(usos.map((u) => [u.proveedorNit, u._count._all]));
+  // Calificación general con IA: promedio del puntaje de proveedor de sus compras valoradas.
+  const valoraciones = await valoracionGeneralPorProveedor();
+  const todos = rows.map((p) => ({
+    ...resumenProveedor(p, anio, p.ciclos[0] || null),
+    registrosCompras: registrosPorNit.get(p.nit) || 0,
+    valoracionIA: valoraciones.get(p.nit) || null,
+  }));
 
   const q = String(filtros.q || "").trim().toLowerCase();
   const clasif = filtros.clasificacion ? [].concat(filtros.clasificacion) : [];
@@ -487,7 +498,7 @@ export async function alertasPorProveedor() {
     const fila = filaCiclo(ciclo);
     const checklist = checklistDe(p, fila ? fila.documentos : {});
     const alerta = alertaCompras(p, ciclo ? { ...fila, anio } : null, checklist);
-    if (alerta.nivel !== "ok") out[p.nit] = { nivel: alerta.nivel, titulo: alerta.titulo };
+    if (alerta.nivel !== "ok") out[p.nit] = { nivel: alerta.nivel, titulo: alerta.titulo, detalle: alerta.detalle };
   }
   return out;
 }

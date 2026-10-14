@@ -41,6 +41,16 @@ export const MAESTRO_FIELD_LABELS = {
   activo: "Activo",
 };
 
+export const VALORACION_FIELD_LABELS = {
+  puntajeCompra: "Puntaje de la compra (Nova)",
+  puntajeProveedor: "Puntaje del proveedor (Nova)",
+  resumen: "Resumen de la valoración",
+  observacionCompra: "Observación sobre la compra",
+  observacionProveedor: "Observación sobre el proveedor",
+  comprasPrevias: "Compras previas analizadas",
+  origen: "Origen de la valoración",
+};
+
 export const CALIFICACION_FIELD_LABELS = {
   estrellas: "Estrellas",
   causasIds: "Causas",
@@ -63,6 +73,7 @@ export const PROVEEDOR_FIELD_LABELS = {
   servicio: "Tipo de servicio",
   fechaActualizacion: "Fecha de última actualización",
   creadoPorNombre: "Registrado por",
+  datosBorrados: "Datos propios borrados con el proveedor",
   esExcepcion: "Excepción",
   motivoExcepcion: "Motivo de excepción",
   justificacionExcepcion: "Justificación de excepción",
@@ -155,6 +166,7 @@ export const ENTITY_LABELS = {
   informe: "Informe automático",
   "agente-ia": "Agente IA",
   calificacion: "Calificación de proveedor",
+  valoracion: "Valoración Nova de compra",
   cicloProveedor: "Ciclo de proveedor",
   configProveedores: "Configuración de proveedores",
 };

@@ -67,6 +67,9 @@ export function toClientRecord(r, actual = {}) {
     // estrellas, no el detalle de causas (eso se pide aparte, GET
     // /api/records/[id]/calificacion, cuando se abre el modal de calificar).
     calificacion: actual.calificacionEstrellas != null ? { estrellas: actual.calificacionEstrellas } : null,
+    // Valoración con IA de la compra radicada (solo los puntajes; el detalle se pide aparte, GET
+    // /api/records/[id]/valoracion) — null si todavía no se valoró.
+    valoracion: actual.valoracion ?? null,
   };
 }
 
@@ -84,12 +87,14 @@ async function hydrateConDatosActuales(rows) {
     rows.flatMap((r) => MAESTRO_CAMPOS.map((c) => r[c.idField])).filter(Boolean)
   )];
   const recordIds = rows.map((r) => r.id);
-  const [proveedores, usuarios, maestros, calificaciones] = await Promise.all([
+  const [proveedores, usuarios, maestros, calificaciones, valoraciones] = await Promise.all([
     proveedorNits.length ? prisma.proveedor.findMany({ where: { nit: { in: proveedorNits } } }) : [],
     userIds.length ? prisma.user.findMany({ where: { id: { in: userIds } } }) : [],
     maestroIds.length ? prisma.maestro.findMany({ where: { id: { in: maestroIds } } }) : [],
     recordIds.length ? prisma.calificacionProveedor.findMany({ where: { recordId: { in: recordIds } }, select: { recordId: true, estrellas: true } }) : [],
+    recordIds.length ? prisma.valoracionCompra.findMany({ where: { recordId: { in: recordIds } }, select: { recordId: true, puntajeCompra: true, puntajeProveedor: true } }) : [],
   ]);
+  const valoracionPorRecordId = new Map(valoraciones.map((v) => [v.recordId, { puntajeCompra: v.puntajeCompra, puntajeProveedor: v.puntajeProveedor }]));
   const proveedorPorNit = new Map(proveedores.map((p) => [p.nit, p]));
   const usuarioPorId = new Map(usuarios.map((u) => [u.id, u]));
   const maestroPorId = new Map(maestros.map((m) => [m.id, m]));
@@ -102,6 +107,7 @@ async function hydrateConDatosActuales(rows) {
       proveedorNit: p?.nit,
       responsableNombre: u?.nombre,
       calificacionEstrellas: calificacionPorRecordId.get(r.id),
+      valoracion: valoracionPorRecordId.get(r.id),
     };
     for (const campo of MAESTRO_CAMPOS) {
       const m = r[campo.idField] ? maestroPorId.get(r[campo.idField]) : null;

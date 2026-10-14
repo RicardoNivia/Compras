@@ -245,6 +245,21 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
         },
       },
     },
+    {
+      name: "consultar_valoraciones",
+      description: "Consulta las valoraciones de Nova GUARDADAS de las compras radicadas: puntaje de la compra y del proveedor (1 a 5), el resumen, por qué se calificó así (observación de la compra y del proveedor) y los factores considerados. Úsala para preguntas como \"¿por qué la compra #339 tiene 1?\", \"¿cómo califica la IA a COMPENSAR y por qué?\", \"¿cuáles son las compras peor valoradas?\", \"proveedores con calificación baja\" o \"¿qué compras tienen puntaje de proveedor menor a 3?\". Con un registro o un proveedor concreto devuelve el detalle completo; sin filtros devuelve las compras peor valoradas y los promedios. Los criterios con los que se califica NO salen de esta herramienta: están en la guía de la aplicación (sección 9). Si una compra no tiene valoración, dilo (puede que aún no esté radicada o no se haya valorado).",
+      input_schema: {
+        type: "object",
+        properties: {
+          registro: { type: "string", description: "Número de la compra (el # de la tabla de Registros), ej. \"339\" o \"#339\" (opcional)." },
+          proveedor: { type: "string", description: "Nombre (parcial) o NIT del proveedor (opcional)." },
+          puntajeCompraMaximo: { type: "integer", description: "Solo valoraciones cuyo puntaje de la compra sea menor o igual a este (1 a 5) (opcional)." },
+          puntajeProveedorMaximo: { type: "integer", description: "Solo valoraciones cuyo puntaje del proveedor sea menor o igual a este (1 a 5) (opcional)." },
+          orden: { type: "string", description: "\"peores\" (por defecto) o \"mejores\" — orden por puntaje de la compra (opcional)." },
+          limit: { type: "integer", description: "Máximo de valoraciones a devolver (opcional, por defecto 8, máximo 25). Con 3 o menos se incluye el detalle completo (observaciones y factores)." },
+        },
+      },
+    },
   ];
 
   if (canSeeProveedoresGestion) {
@@ -429,6 +444,68 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
             excepcion: p.esExcepcion, activo: p.activo,
             fechaRegistro: fechaISO(p.createdAt), fechaUltimaActualizacion: p.esExcepcion ? "No aplica (excepción)" : fechaISO(p.fechaActualizacion),
           })),
+        };
+      }
+      case "consultar_valoraciones": {
+        const limit = Math.max(1, Math.min(25, Number(args.limit) || 8));
+        const recordWhere = {};
+        if (args.registro) {
+          const n = Number(String(args.registro).replace(/\D/g, ""));
+          if (!n) return { error: "El número de registro no es válido." };
+          recordWhere.localSeq = n;
+        }
+        if (args.proveedor) {
+          const txt = String(args.proveedor).trim();
+          const nitTxt = txt.toUpperCase().replace(/[^A-Z0-9]/g, "");
+          const provs = await prisma.proveedor.findMany({
+            where: { OR: [{ nombre: { contains: txt, mode: "insensitive" } }, ...(nitTxt ? [{ nit: { contains: nitTxt } }] : [])] },
+            select: { nit: true, nombre: true },
+            take: 20,
+          });
+          if (!provs.length) return { encontrados: 0, nota: "No hay ningún proveedor con ese nombre/NIT en el catálogo." };
+          recordWhere.proveedorNit = { in: provs.map((p) => p.nit) };
+        }
+        const where = { record: recordWhere };
+        if (Number.isInteger(args.puntajeCompraMaximo)) where.puntajeCompra = { lte: args.puntajeCompraMaximo };
+        if (Number.isInteger(args.puntajeProveedorMaximo)) where.puntajeProveedor = { lte: args.puntajeProveedorMaximo };
+
+        const mejores = norm(args.orden) === "mejores";
+        const [total, promedios, filas] = await Promise.all([
+          prisma.valoracionCompra.count({ where }),
+          prisma.valoracionCompra.aggregate({ where, _avg: { puntajeCompra: true, puntajeProveedor: true } }),
+          prisma.valoracionCompra.findMany({
+            where,
+            orderBy: [{ puntajeCompra: mejores ? "desc" : "asc" }, { id: "asc" }],
+            take: limit,
+            include: { record: { select: { localSeq: true, fechaSolicitud: true, descripcion: true, proveedor: true, proveedorNit: true, estado: true } } },
+          }),
+        ]);
+        if (!total) return { encontradas: 0, nota: "No hay valoraciones de Nova para ese filtro (la compra puede no estar radicada todavía o no haberse valorado)." };
+        const detallada = filas.length <= 3;
+        const redondeo = (x) => (x == null ? null : Math.round(x * 10) / 10);
+        return {
+          valoracionesEncontradas: total,
+          promedioPuntajeCompra: redondeo(promedios._avg.puntajeCompra),
+          promedioPuntajeProveedor: redondeo(promedios._avg.puntajeProveedor),
+          valoracionesDevueltas: filas.length,
+          valoraciones: filas.map((v) => {
+            let factores = [];
+            try { factores = v.factores ? JSON.parse(v.factores) : []; } catch { factores = []; }
+            return {
+              compra: `#${v.record.localSeq}`,
+              fechaSolicitud: v.record.fechaSolicitud,
+              descripcion: v.record.descripcion,
+              estado: v.record.estado,
+              proveedor: v.record.proveedor,
+              nitProveedor: v.record.proveedorNit,
+              puntajeCompra: v.puntajeCompra,
+              puntajeProveedor: v.puntajeProveedor,
+              resumen: v.resumen,
+              comprasAnterioresAnalizadas: v.comprasPrevias,
+              ...(detallada ? { porQueCalificoLaCompra: v.observacionCompra, porQueCalificoAlProveedor: v.observacionProveedor, factores } : {}),
+            };
+          }),
+          nota: detallada ? undefined : "Para ver por qué se calificó una compra o un proveedor concreto, vuelve a llamar a la herramienta con el número de registro o el proveedor.",
         };
       }
       case "estado_gestion_proveedor": {

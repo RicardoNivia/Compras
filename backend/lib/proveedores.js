@@ -272,14 +272,43 @@ export async function updateProveedor(nit, body, actor) {
   }
 }
 
+// Dónde se usa un proveedor fuera de sus propios datos. Registros de compra (FK RESTRICT) y
+// calificaciones (snapshot del NIT, sin FK) bloquean la eliminación. Su ciclo, checklist y
+// procesos son datos propios del proveedor y se borran con él (ON DELETE CASCADE); la
+// auditoría nunca se borra.
+export async function usosDeProveedor(nit) {
+  const [registros, calificaciones] = await Promise.all([
+    prisma.record.count({ where: { proveedorNit: nit } }),
+    prisma.calificacionProveedor.count({ where: { proveedorNit: nit } }),
+  ]);
+  return { registros, calificaciones };
+}
+
+function errorEnUso(usos) {
+  const partes = [];
+  if (usos.registros) partes.push(`${usos.registros} registro(s) de compra`);
+  if (usos.calificaciones) partes.push(`${usos.calificaciones} calificación(es)`);
+  const err = new Error(`No se puede eliminar: el proveedor está en uso en ${partes.join(" y ")}. Para dejar de usarlo, márcalo como inactivo.`);
+  err.status = 409;
+  return err;
+}
+
 export async function deleteProveedor(nit, actor) {
-  const current = await prisma.proveedor.findUnique({ where: { nit } });
+  const current = await prisma.proveedor.findUnique({ where: { nit }, include: { _count: { select: { ciclos: true, procesos: true } } } });
   if (!current) throw notFound();
-  if (await isProveedorInUse(current.nit)) {
-    const err = new Error("No se puede eliminar: este proveedor ya está en uso en registros existentes. Márcalo como inactivo.");
-    err.status = 409;
+  const usos = await usosDeProveedor(current.nit);
+  if (usos.registros || usos.calificaciones) throw errorEnUso(usos);
+  try {
+    await prisma.proveedor.delete({ where: { nit } });
+  } catch (err) {
+    // Red de seguridad: si entre la validación y el borrado se creó un registro con este
+    // proveedor, la FK (ON DELETE RESTRICT) lo impide.
+    if (err.code === "P2003" || err.code === "P2014") throw errorEnUso(await usosDeProveedor(current.nit));
     throw err;
   }
-  await prisma.proveedor.delete({ where: { nit } });
-  await logProveedorDelete(actor, toClientProveedor(current, false)).catch(() => {});
+  const { _count, ...datos } = current;
+  await logProveedorDelete(actor, {
+    ...toClientProveedor(datos, false),
+    datosBorrados: `${_count.ciclos} ciclo(s) con su checklist y ${_count.procesos} proceso(s) histórico(s)`,
+  }).catch(() => {});
 }

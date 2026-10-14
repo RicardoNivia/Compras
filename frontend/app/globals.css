@@ -2016,3 +2016,66 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 }
 .campo-error{ display:block; margin-top:4px; font-size:12px; font-weight:600; color:var(--critical); }
 .desc-text.desc-text-ancha{ max-width:min(520px, 45vw); }
+
+/* Valoración con IA de compras radicadas */
+.valoracion-pill{ white-space:nowrap; font-weight:700; }
+.valoracion-pill-max{ opacity:.65; font-weight:500; margin-left:1px; }
+.valoracion-puntajes{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; padding:12px 14px; border-radius:12px; background:var(--accent-wash); margin-bottom:12px; }
+.valoracion-puntajes > div{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+.valoracion-label{ font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+.valoracion-puntajes .valoracion-pill{ font-size:15px; padding:4px 12px; width:fit-content; }
+.valoracion-resumen{ font-weight:600; margin:0 0 12px; }
+.valoracion h4{ margin:14px 0 4px; font-size:12.5px; text-transform:uppercase; letter-spacing:0.04em; color:var(--accent); }
+.valoracion p{ margin:0 0 6px; font-size:13.5px; line-height:1.55; }
+.valoracion-factores{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.valoracion-factores li{ display:flex; gap:10px; align-items:flex-start; font-size:13px; line-height:1.45; }
+.valoracion-factores .pill{ flex:none; margin-top:1px; }
+.valoracion-pie{ margin-top:14px !important; }
+.cell-valoracion{ white-space:nowrap; }
+.valoracion-celda{ appearance:none; border:none; background:transparent; padding:0; cursor:pointer; display:inline-flex; gap:4px; align-items:center; }
+.valoracion-celda:hover .valoracion-pill{ filter:brightness(0.95); box-shadow:0 0 0 2px var(--accent-wash); }
+.prov-calif-general{ display:grid; grid-template-columns:minmax(180px, 1.2fr) minmax(130px, 1fr) minmax(180px, 1.4fr); gap:16px; align-items:center; padding:12px 14px; margin-bottom:12px; border-radius:12px; background:var(--accent-wash); }
+.prov-calif-general > div{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+.prov-calif-principal .valoracion-pill{ font-size:18px; padding:4px 14px; width:fit-content; }
+.prov-calif-dist{ gap:2px !important; }
+.prov-calif-dist-fila{ display:grid; grid-template-columns:24px 1fr 28px; gap:6px; align-items:center; font-size:11.5px; }
+.prov-calif-dist-barra{ height:6px; border-radius:99px; background:var(--surface); overflow:hidden; }
+.prov-calif-dist-barra > span{ display:block; height:100%; background:var(--accent); border-radius:99px; }
+@media (max-width: 720px){ .prov-calif-general{ grid-template-columns:1fr; } }
+
+/* Registros: proveedor y alerta en la misma línea; el tooltip del ícono explica la alerta */
+.prov-celda{ display:flex; align-items:center; gap:6px; min-width:0; }
+.prov-celda-nombre{ flex:1 1 auto; min-width:0; }
+.prov-celda .prov-alert-wrap{ flex:none; display:inline-flex; }
+.prov-celda .prov-alert-icon{ margin-left:0; line-height:1; padding:1px 3px; border-radius:6px; background:color-mix(in srgb, var(--warning) 16%, transparent); }
+.prov-celda .prov-alert-icon.prov-alert-inactivo{ color:var(--critical); background:color-mix(in srgb, var(--critical) 14%, transparent); }
+.prov-celda .prov-alert-icon.prov-alert-tramite{ color:var(--accent); background:var(--accent-wash); }
+.prov-celda .prov-alert-icon.prov-alert-excepcion{ color:var(--muted); background:var(--surface-2); }
+.prov-alert-wrap:hover .desc-tooltip-bubble, .prov-alert-wrap:focus-within .desc-tooltip-bubble{ display:block; }
+.prov-alert-bubble{ min-width:230px; max-width:320px; }
+.prov-alert-bubble strong{ display:block; margin-bottom:3px; }
+.prov-alert-bubble span{ display:block; }
+
+/* Detalle del proveedor › Compras y calificaciones: análisis de la calificación + una tarjeta por compra */
+.prov-porque{ margin-bottom:14px; padding:14px 16px; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+.prov-porque h4{ margin:0 0 8px; font-size:12.5px; text-transform:uppercase; letter-spacing:0.04em; color:var(--accent); }
+.prov-porque ul{ margin:0; padding-left:18px; display:flex; flex-direction:column; gap:6px; font-size:13.5px; line-height:1.5; }
+.prov-porque-nova{ padding:8px 10px; border-radius:8px; background:var(--accent-wash); list-style:none; margin-left:-18px; }
+.compras-lista{ display:flex; flex-direction:column; gap:10px; margin-bottom:12px; }
+.compra-card{ border:1px solid var(--border); border-radius:12px; background:var(--surface); overflow:hidden; }
+.compra-card.sin-valorar{ background:var(--surface-2); }
+.compra-card-head{ display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:4px 12px; align-items:center; padding:10px 14px; }
+.compra-card-num{ font-weight:700; color:var(--accent); }
+.compra-card-desc{ min-width:0; font-weight:600; }
+.compra-card-meta{ grid-column:2; font-size:12px; color:var(--muted); }
+.compra-card-puntajes{ grid-column:3; grid-row:1 / span 2; display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+.compra-card-puntajes .valoracion-label{ margin-right:4px; }
+.compra-card-body{ padding:4px 14px 14px; border-top:1px solid var(--border); }
+.compra-card-resumen{ font-weight:600; margin:10px 0 8px; font-size:13.5px; }
+.compra-card-cols{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; }
+.compra-card-cols h5{ margin:0 0 3px; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+.compra-card-cols p, .compra-card-obs{ margin:0; font-size:13px; line-height:1.5; }
+.compra-card-obs{ margin-top:8px; }
+.compra-card-factores{ list-style:none; margin:10px 0; padding:0; display:flex; flex-wrap:wrap; gap:6px 10px; font-size:12.5px; }
+.compra-card-factores li{ display:flex; align-items:center; gap:5px; }
+@media (max-width: 720px){ .compra-card-head{ grid-template-columns:1fr; } .compra-card-puntajes, .compra-card-meta{ grid-column:1; grid-row:auto; justify-content:flex-start; } .compra-card-cols{ grid-template-columns:1fr; } }

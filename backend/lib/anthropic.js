@@ -7,6 +7,13 @@ function getAnthropicApiKey() {
   return process.env.ANTHROPIC_API_KEY || process.env.ANTROPIC_API_KEY;
 }
 
+// Las claves de usuario (sk-ant-usr-…) no pertenecen a un workspace: Anthropic exige indicarlo en cada llamada.
+// Solo se envía si se define ANTHROPIC_WORKSPACE_ID; con una clave de workspace (la normal del servidor) no hace falta.
+function workspaceHeader() {
+  const id = process.env.ANTHROPIC_WORKSPACE_ID;
+  return id ? { "anthropic-workspace-id": id } : {};
+}
+
 const ANTHROPIC_API_BASE = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
 // 4096 (y luego 8192) se quedaban cortos para informes con muchas secciones +
@@ -91,6 +98,7 @@ export async function* streamAnthropicChat({ model, systemInstruction, contents,
     headers: {
       "Content-Type": "application/json",
       "x-api-key": apiKey,
+      ...workspaceHeader(),
       "anthropic-version": ANTHROPIC_VERSION,
     },
     body: JSON.stringify({
@@ -181,6 +189,7 @@ export async function runAnthropicAgentChat({ model, systemInstruction, contents
       headers: {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
+        ...workspaceHeader(),
         "anthropic-version": ANTHROPIC_VERSION,
       },
       body: JSON.stringify({
@@ -269,6 +278,7 @@ export async function generateAnthropicJson({ model, systemInstruction, prompt, 
     headers: {
       "Content-Type": "application/json",
       "x-api-key": apiKey,
+      ...workspaceHeader(),
       "anthropic-version": ANTHROPIC_VERSION,
     },
     body: JSON.stringify({

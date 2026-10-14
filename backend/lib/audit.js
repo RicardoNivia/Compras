@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS } from "@/lib/auditLabels";
+import { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS } from "@/lib/auditLabels";
 
 export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, ACTION_LABELS, ENTITY_LABELS } from "@/lib/auditLabels";
 
@@ -334,6 +334,33 @@ export async function logCalificacionUpsert(actor, before, after) {
     recordInfo: calificacionSummary(after),
     actor,
     changes,
+  });
+}
+
+// ---------- Valoración IA de compras radicadas ----------
+
+export async function logValoracionUpsert(actor, before, after, registroInfo) {
+  const changes = diffFields(before, after, VALORACION_FIELD_LABELS);
+  if (!changes.length) return;
+  await writeLog({
+    action: before ? "editar" : "crear",
+    entityType: "valoracion",
+    recordId: after.recordId,
+    recordInfo: `${registroInfo || "Compra"} — compra ${after.puntajeCompra}/5${after.puntajeProveedor != null ? `, proveedor ${after.puntajeProveedor}/5` : ""}`,
+    actor,
+    changes,
+  });
+}
+
+// Resumen de una pasada de valoración automática (carga masiva de compras ya radicadas).
+export async function logValoracionMasiva(valoradas, conError, promedioCompra) {
+  await writeLog({
+    action: "crear",
+    entityType: "valoracion",
+    recordId: `carga-masiva-${Date.now()}`,
+    recordInfo: `Valoración masiva de Nova: ${valoradas} compra(s) valorada(s)${conError ? `, ${conError} con error` : ""}${promedioCompra != null ? ` · promedio ${promedioCompra.toFixed(2)}/5` : ""}`,
+    actor: { nombre: "Valoración masiva" },
+    changes: [],
   });
 }
 
