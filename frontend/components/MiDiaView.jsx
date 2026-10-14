@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { reviewPendientesApi } from "@/lib/api";
 import { IconSpark, IconAlert, IconCheck, IconClock, IconArrowRight } from "@/components/icons";
 import { TimelineButton } from "@/components/RecordTimelineModal";
+import { AnimatedNumber } from "@/components/charts/chartKit";
 
 const PAGE_SIZES = [25, 50, 100];
 
@@ -124,7 +125,7 @@ function Seccion({ s, items }) {
           <span className="card-sub" style={{ margin: 0 }}>{s.descripcion}</span>
         </span>
         <span className="mi-dia-seccion-conteo">
-          {criticos > 0 && <span className="pill critical">{criticos} urgente(s)</span>}
+          {criticos > 0 && <span className="pill critical pulso">{criticos} urgente(s)</span>}
           <span className={`pill ${n.cls}`}>{items.length}</span>
           <span className="mi-dia-flecha" aria-hidden="true">{abierta ? "▾" : "▸"}</span>
         </span>
@@ -225,9 +226,9 @@ export default function MiDiaView({ initialData, user }) {
           <p className="card-sub" style={{ margin: 0, textTransform: "capitalize" }}>{hoy}</p>
         </div>
         <div className="mi-dia-resumen" aria-label="Resumen de pendientes">
-          <div className="mi-dia-stat"><strong>{todos.length}</strong><span>pendientes</span></div>
-          <div className={`mi-dia-stat${criticos ? " critico" : ""}`}><strong>{criticos}</strong><span>urgentes</span></div>
-          <div className={`mi-dia-stat${atencion ? " atencion" : ""}`}><strong>{atencion}</strong><span>en atención</span></div>
+          <div className="mi-dia-stat"><strong><AnimatedNumber value={todos.length} /></strong><span>pendientes</span></div>
+          <div className={`mi-dia-stat${criticos ? " critico" : ""}`}><strong><AnimatedNumber value={criticos} /></strong><span>urgentes</span></div>
+          <div className={`mi-dia-stat${atencion ? " atencion" : ""}`}><strong><AnimatedNumber value={atencion} /></strong><span>en atención</span></div>
           {corte != null && (
             <div className={`mi-dia-stat${corte <= 30 ? " atencion" : ""}`}><strong>{corte}</strong><span>días al corte del ciclo</span></div>
           )}
@@ -250,6 +251,9 @@ export default function MiDiaView({ initialData, user }) {
         <div className="empty">Tu rol no tiene pendientes configurados.</div>
       ) : todos.length === 0 ? (
         <div className="mi-dia-vacio">
+          <span className="confeti" aria-hidden="true">
+            {Array.from({ length: 16 }).map((_, i) => <i key={i} style={{ "--i": i }} />)}
+          </span>
           <IconCheck size={26} />
           <h3>Todo al día</h3>
           <p className="card-sub">No tienes pendientes{soloMio ? " propios" : ""} en este momento. Buen trabajo.</p>

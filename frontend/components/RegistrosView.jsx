@@ -247,6 +247,9 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
     setPuntajeProveedorMax("");
     setAiApplied(null);
     setAiError("");
+    // Vuelve la tabla al orden con el que se abre la página.
+    setSortKey("fechaSolicitud");
+    setSortDir("desc");
   }
 
   // Traduce aiQuery a los mismos filtros de arriba (vía Anthropic, del lado
@@ -349,6 +352,28 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
     setRatingRecord(null);
   }
 
+
+  // Botones de la barra de filtros: en modo manual van al mismo nivel que los campos (sin salto de línea);
+  // en modo Nova, en su propia fila.
+  const accionesFiltro = (
+    <>
+      <button
+        type="button"
+        className={`btn${onlyIncumplimiento ? " btn-danger-solid" : ""}`}
+        onClick={() => setOnlyIncumplimiento((v) => !v)}
+        aria-pressed={onlyIncumplimiento}
+        title="Solicitudes en proceso o entregadas con más de 8 días hábiles"
+      >
+        <IconAlert size={13} /> Incumplimiento (&gt;8 días)
+      </button>
+      <button type="button" className="btn" onClick={clearFilters}>Limpiar filtros</button>
+      {allowCreate && (
+        <button type="button" className="btn btn-primary filter-add" onClick={() => setModalRecord(null)}>
+          <IconPlus size={13} /> Agregar registro
+        </button>
+      )}
+    </>
+  );
   return (
     <div>
       <div className="toolbar" id="registros-toolbar" style={{ flexDirection: "column", alignItems: "stretch" }}>
@@ -494,26 +519,11 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
             <label htmlFor="reg-valor-max">Valor hasta</label>
             <input id="reg-valor-max" type="number" min="0" placeholder="Ej. 20000000" value={valorMax} onChange={(e) => setValorMax(e.target.value)} />
           </div>
+          <div className="filter-actions">{accionesFiltro}</div>
         </div>
         )}
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-          <button
-            type="button"
-            className={`btn${onlyIncumplimiento ? " btn-danger-solid" : ""}`}
-            onClick={() => setOnlyIncumplimiento((v) => !v)}
-            aria-pressed={onlyIncumplimiento}
-            title="Solicitudes en proceso o entregadas con más de 8 días hábiles"
-          >
-            <IconAlert size={13} /> Incumplimiento (&gt;8 días)
-          </button>
-          <button type="button" className="btn" onClick={clearFilters}>Limpiar filtros</button>
-          <div className="spacer" />
-          {allowCreate && (
-            <button type="button" className="btn btn-primary" onClick={() => setModalRecord(null)}>
-              <IconPlus size={13} /> Agregar registro
-            </button>
-          )}
-        </div>
+        {/* Con Nova los filtros son chips, así que los botones van en su propia fila. */}
+        {searchMode === "ia" && <div className="filter-actions filter-actions-row">{accionesFiltro}</div>}
       </div>
 
       <div className="table-card">

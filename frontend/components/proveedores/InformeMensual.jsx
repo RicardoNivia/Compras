@@ -5,30 +5,46 @@ import { fetchInformeMensual, reviewInformeProveedoresApi } from "@/lib/api";
 import { saveBlob } from "@/lib/exportHelpers";
 import { usePantallaNova } from "@/lib/novaPantalla";
 import ExplicarProveedoresIA from "@/components/proveedores/ExplicarProveedoresIA";
+import { BarGradient, roundedTop, stagger, tween, useMorph, useProgress, useReveal, useUid } from "@/components/charts/chartKit";
 
 const COLOR = { activo: "var(--good)", pendiente: "var(--warning)", inactivo: "var(--critical)" };
 const PDF = { navy: [12, 39, 72], blue: [27, 95, 184], ink: [11, 34, 57], muted: [100, 125, 151], activo: [11, 107, 46], pendiente: [217, 119, 6], inactivo: [185, 28, 28], nuevo: [27, 95, 184], act: [79, 151, 232] };
 
 // Barras agrupadas: nuevos vs actualizados de los últimos 6 meses.
 function TendenciaChart({ data }) {
+  const [hover, setHover] = useState(null);
+  const [ref, shown] = useReveal();
+  const uid = useUid();
+  const p = useProgress(shown);
+  const vals = useMorph(data.flatMap((d) => [d.nuevos, d.actualizados]));
   const W = 1200, H = 210, P = { l: 44, r: 20, t: 26, b: 32 };
-  const max = Math.max(1, ...data.flatMap((d) => [d.nuevos, d.actualizados]));
+  const max = Math.max(1, ...vals);
   const innerW = W - P.l - P.r, innerH = H - P.t - P.b, grupo = innerW / data.length, bw = Math.min(46, grupo / 3.2);
   const y = (v) => P.t + innerH - (v / max) * innerH;
   return (
-    <svg className="prov-tendencia-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Tendencia: ${data.map((d) => `${d.label} ${d.nuevos} nuevos y ${d.actualizados} actualizados`).join("; ")}`}>
+    <svg ref={ref} className="prov-tendencia-svg cx" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Tendencia: ${data.map((d) => `${d.label} ${d.nuevos} nuevos y ${d.actualizados} actualizados`).join("; ")}`}>
+      <defs>
+        <BarGradient id={`${uid}n`} color="var(--accent)" top={1} bottom={0.65} />
+        <BarGradient id={`${uid}a`} color="var(--secondary)" top={1} bottom={0.65} />
+      </defs>
       {[0, 1, 2, 3, 4].map((i) => {
         const v = (max / 4) * i;
-        return (<g key={i}><line x1={P.l} x2={W - P.r} y1={y(v)} y2={y(v)} stroke="var(--grid)" /><text x={P.l - 6} y={y(v) + 4} textAnchor="end" fontSize="13" fill="var(--muted)">{Math.round(v)}</text></g>);
+        return (<g key={i} style={{ opacity: Math.min(1, p * 3) }}><line x1={P.l} x2={W - P.r} y1={y(v)} y2={y(v)} stroke="var(--grid)" strokeDasharray={i === 0 ? undefined : "3 5"} /><text x={P.l - 6} y={y(v) + 4} textAnchor="end" fontSize="13" fill="var(--muted)">{Math.round(v)}</text></g>);
       })}
       {data.map((d, i) => {
         const cx = P.l + grupo * i + grupo / 2;
+        const t = stagger(p, i, data.length);
+        const base = P.t + innerH;
+        const vn = vals[i * 2] ?? 0, va = vals[i * 2 + 1] ?? 0;
+        const hn = (base - y(vn)) * t, ha = (base - y(va)) * t;
+        const atenuado = hover != null && hover !== i;
         return (
-          <g key={d.key}>
-            <rect x={cx - bw - 2} y={y(d.nuevos)} width={bw} height={P.t + innerH - y(d.nuevos)} rx="5" fill="var(--accent)"><title>{`${d.label}: ${d.nuevos} nuevos`}</title></rect>
-            <rect x={cx + 2} y={y(d.actualizados)} width={bw} height={P.t + innerH - y(d.actualizados)} rx="5" fill="var(--secondary)"><title>{`${d.label}: ${d.actualizados} actualizados`}</title></rect>
-            {d.nuevos > 0 && <text x={cx - bw / 2 - 2} y={y(d.nuevos) - 4} textAnchor="middle" fontSize="13" fontWeight="700" fill="var(--ink)">{d.nuevos}</text>}
-            {d.actualizados > 0 && <text x={cx + bw / 2 + 2} y={y(d.actualizados) - 4} textAnchor="middle" fontSize="13" fontWeight="700" fill="var(--ink)">{d.actualizados}</text>}
+          <g key={d.key} style={{ opacity: atenuado ? 0.4 : 1, transition: "opacity .2s ease" }} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
+            <rect x={cx - grupo / 2 + 4} y={P.t - 8} width={grupo - 8} height={innerH + 8} rx="10" fill="var(--accent)" className="cx-band" style={{ opacity: hover === i ? 0.07 : 0 }} />
+            <path className="cx-bar" d={roundedTop(cx - bw - 2, base - hn, bw, hn, 6)} fill={`url(#${uid}n)`} style={{ filter: hover === i ? "drop-shadow(0 5px 8px color-mix(in srgb, var(--accent) 40%, transparent))" : "none" }}><title>{`${d.label}: ${d.nuevos} nuevos`}</title></path>
+            <path className="cx-bar" d={roundedTop(cx + 2, base - ha, bw, ha, 6)} fill={`url(#${uid}a)`} style={{ filter: hover === i ? "drop-shadow(0 5px 8px color-mix(in srgb, var(--secondary) 40%, transparent))" : "none" }}><title>{`${d.label}: ${d.actualizados} actualizados`}</title></path>
+            {d.nuevos > 0 && <text x={cx - bw / 2 - 2} y={base - hn - 5} textAnchor="middle" fontSize="13" fontWeight="700" fill="var(--ink)" style={{ opacity: Math.max(0, (t - 0.45) / 0.55) }}>{tween(Math.round(vn), t)}</text>}
+            {d.actualizados > 0 && <text x={cx + bw / 2 + 2} y={base - ha - 5} textAnchor="middle" fontSize="13" fontWeight="700" fill="var(--ink)" style={{ opacity: Math.max(0, (t - 0.45) / 0.55) }}>{tween(Math.round(va), t)}</text>}
             <text x={cx} y={H - 9} textAnchor="middle" fontSize="14" fontWeight={d.actual ? 700 : 400} fill="var(--ink)">{d.label}</text>
           </g>
         );
@@ -92,7 +108,7 @@ function ListaMini({ filas, vacio }) {
   return (
     <ul className="prov-mini">
       {filas.slice(0, 6).map((r) => <li key={r.id}><span>{r.nombre}</span><small>{r.fecha} · {r.estado}</small></li>)}
-      {filas.length > 6 && <li className="more">y {filas.length - 6} más en el Excel</li>}
+      {filas.length > 6 && <li className="more">y {filas.length - 6} más</li>}
     </ul>
   );
 }

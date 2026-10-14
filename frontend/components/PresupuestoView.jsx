@@ -5,6 +5,7 @@ import { fmtCOP } from "@/lib/format";
 import { savePresupuestoApi, deletePresupuestoApi, setModoAnioApi, fetchPresupuestos } from "@/lib/api";
 import { IconMoney, IconPlus, IconAlert, IconChevronDown, IconBuilding, IconLayers, IconCheck, IconSearch } from "@/components/icons";
 import MoneyInput from "@/components/MoneyInput";
+import { easeOutQuart, tween, useMorph, useProgress, useReveal, useUid } from "@/components/charts/chartKit";
 
 const ALERTA_PCT = 80;
 const CRITICO_PCT = 90;
@@ -42,19 +43,30 @@ function BudgetDonut({ pct, size = 132, stroke = 14 }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const clamped = pct === null ? 0 : Math.max(0, Math.min(100, pct));
-  const offset = c - (clamped / 100) * c;
   const color = severityColor(pct);
+  const [ref, shown] = useReveal();
+  const uid = useUid();
+  const p = useProgress(shown, 1300);
+  const t = easeOutQuart(p);
+  const [vis] = useMorph([clamped]);
+  const offset = c - (vis / 100) * c * t;
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="presupuesto-donut">
+    <svg ref={ref} viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="presupuesto-donut cx">
+      <defs>
+        <linearGradient id={`${uid}g`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.7 }} />
+          <stop offset="100%" style={{ stopColor: color, stopOpacity: 1 }} />
+        </linearGradient>
+      </defs>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--grid)" strokeWidth={stroke} />
       <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+        cx={size / 2} cy={size / 2} r={r} fill="none" stroke={`url(#${uid}g)`} strokeWidth={stroke}
         strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        style={{ transition: "stroke-dashoffset .5s ease, stroke .3s ease" }}
+        style={{ filter: `drop-shadow(0 0 6px color-mix(in srgb, ${color} 45%, transparent))` }}
       />
       <text x="50%" y="48%" textAnchor="middle" dominantBaseline="central" fontSize={size * 0.2} fontWeight="800" fill="var(--ink)">
-        {pct === null ? "—" : `${Math.round(clamped)}%`}
+        {pct === null ? "—" : `${tween(Math.round(vis), t)}%`}
       </text>
       <text x="50%" y="68%" textAnchor="middle" dominantBaseline="central" fontSize={size * 0.075} fontWeight="700" fill="var(--muted)" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
         consumido

@@ -7,6 +7,8 @@ import StackedBarChartSvg from "@/components/charts/StackedBarChartSvg";
 import CompliancePercentChartSvg from "@/components/charts/CompliancePercentChartSvg";
 import PieChartSvg from "@/components/charts/PieChartSvg";
 import GaugeSvg from "@/components/charts/GaugeSvg";
+import Sparkline from "@/components/charts/Sparkline";
+import { AnimatedNumber } from "@/components/charts/chartKit";
 import { fmtCOP, fmtCompact, fmtNum, fmtPesos, fmtDateDisplay, monthKey, monthLabel } from "@/lib/format";
 import { businessDaysBetween, businessDaysElapsedToToday } from "@/lib/businessDays";
 import { getDiasInfo } from "@/lib/diasInfo";
@@ -199,6 +201,36 @@ export default function DashboardView({ records, presupuestos = [] }) {
 
   // ---------- KPI 1: valor del mes ----------
   const kpi1 = useMemo(() => {
+    // Vista Anual: el KPI es el total del año y se compara contra el año anterior (no contra el mes anterior).
+    // En el año en curso se compara el mismo período (enero hasta el mes actual) para no cotejar un año parcial con uno completo.
+    if (viewMode === "anual" && selectedYear) {
+      const prevYear = String(Number(selectedYear) - 1);
+      const esActual = selectedYear === currentYear;
+      const mesTope = esActual ? currentMonthKey.slice(5) : "12";
+      const delAnio = (anio, hastaMes) => records.filter((r) => {
+        const mk = monthKey(r.fechaSolicitud) || "";
+        return !isAnulado(r) && mk.startsWith(anio) && mk.slice(5) <= hastaMes;
+      });
+      const actuales = delAnio(selectedYear, mesTope);
+      const previos = delAnio(prevYear, mesTope);
+      const value = sum(actuales, (r) => r.valorConIva);
+      const prevValue = previos.length ? sum(previos, (r) => r.valorConIva) : null;
+      const delta = prevValue ? ((value - prevValue) / prevValue) * 100 : null;
+      const meses = Array.from({ length: Number(mesTope) }, (_, i) => `${selectedYear}-${String(i + 1).padStart(2, "0")}`);
+      const serie = meses.map((mk) => sum(actuales.filter((r) => monthKey(r.fechaSolicitud) === mk), (r) => r.valorConIva));
+      const periodoPrev = esActual ? `mismo período de ${prevYear}` : prevYear;
+      return {
+        label: `${selectedYear} · total del año${esActual ? " a la fecha" : ""}`,
+        value, delta, foot: "", prevValue, serie,
+        deltaLabel: `vs ${periodoPrev}`,
+        prevLabel: prevValue != null ? periodoPrev : null,
+        explainRecords: [
+          ...actuales.map((r) => compactRecord(r, { periodo: "actual" })),
+          ...previos.map((r) => compactRecord(r, { periodo: "anterior" })),
+        ],
+      };
+    }
+
     const currentMonth = allMonthsAsc[allMonthsAsc.length - 1] || null;
     const lastClosedMonth = allMonthsAsc.length > 1 ? allMonthsAsc[allMonthsAsc.length - 2] : currentMonth;
     const baseMonth = selectedMonth || lastClosedMonth;
@@ -230,8 +262,11 @@ export default function DashboardView({ records, presupuestos = [] }) {
       ...(prevMonth ? recordsFor(prevMonth, "anterior") : []),
     ];
 
-    return { label, value, delta, foot, prevValue, prevLabel: prevMonth ? monthLabel(prevMonth, multiYear) : null, explainRecords };
-  }, [yearFilteredRecords, allMonthsAsc, selectedMonth, multiYear]);
+    // Tendencia de los 6 meses hasta el mes base (para el sparkline del KPI).
+    const serie = idx >= 0 ? allMonthsAsc.slice(Math.max(0, idx - 5), idx + 1).map(valueFor) : [];
+
+    return { label, value, delta, foot, prevValue, serie, deltaLabel: "vs mes anterior", prevLabel: prevMonth ? monthLabel(prevMonth, multiYear) : null, explainRecords };
+  }, [yearFilteredRecords, allMonthsAsc, selectedMonth, multiYear, viewMode, selectedYear, records, currentYear, currentMonthKey]);
 
   // ---------- KPI 2: cumplimiento de tiempos ----------
   // Cuenta como "resuelta" toda solicitud ya entregada, y también las que
@@ -859,12 +894,13 @@ export default function DashboardView({ records, presupuestos = [] }) {
             <div className="label">{kpi1.label}</div>
             <div className="kpi-ic"><IconMoney size={14} /></div>
           </div>
-          <div className="value">{fmtPesos(kpi1.value)}</div>
+          <div className="value"><AnimatedNumber value={kpi1.value} format={fmtPesos} /></div>
           {kpi1.delta !== null && (
-            <div className="delta">
-              {kpi1.delta > 0 ? "▲" : kpi1.delta < 0 ? "▼" : "＝"} {Math.abs(kpi1.delta).toFixed(1)}%
+            <div className={`delta delta-chip ${kpi1.delta > 0 ? "up" : kpi1.delta < 0 ? "down" : ""}`} title={`Frente a: ${kpi1.deltaLabel.replace("vs ", "")}`}>
+              {kpi1.delta > 0 ? "▲" : kpi1.delta < 0 ? "▼" : "＝"} {Math.abs(kpi1.delta).toFixed(1)}% <span className="delta-vs">{kpi1.deltaLabel}</span>
             </div>
           )}
+          <Sparkline data={kpi1.serie} color="var(--accent)" />
           {kpi1.foot && <div className="foot">{kpi1.foot}</div>}
           <KpiExplain
             label={kpi1.label} value={fmtPesos(kpi1.value)}
@@ -877,7 +913,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
             <div className="label">Cumplimiento de tiempos</div>
             <div className="kpi-ic"><IconClock size={14} /></div>
           </div>
-          <div className="value">{cumplimiento.total ? `${cumplimiento.pct.toFixed(0)}%` : "—"}</div>
+          <div className="value">{cumplimiento.total ? <AnimatedNumber value={Math.round(cumplimiento.pct)} format={(v) => `${v}%`} /> : "—"}</div>
           <div className="meter-track">
             <div className="meter-fill" style={{ width: `${cumplimiento.pct}%` }} />
           </div>
@@ -892,7 +928,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
             <div className="label">En proceso</div>
             <div className="kpi-ic"><IconAlert size={14} /></div>
           </div>
-          <div className="value">{fmtNum(kpi3.count)}</div>
+          <div className="value"><AnimatedNumber value={kpi3.count} format={fmtNum} /></div>
           <div className="foot">{fmtPesos(kpi3.value)}</div>
           <KpiExplain label="En proceso" value={`${fmtNum(kpi3.count)} (${fmtPesos(kpi3.value)})`} records={kpi3.explainRecords} />
         </div>
@@ -901,7 +937,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
             <div className="label">Ticket promedio</div>
             <div className="kpi-ic"><IconTrendUp size={14} /></div>
           </div>
-          <div className="value">{fmtPesos(kpi4.avg)}</div>
+          <div className="value"><AnimatedNumber value={kpi4.avg} format={fmtPesos} /></div>
           <KpiExplain label="Ticket promedio" value={fmtPesos(kpi4.avg)} records={kpi4.explainRecords} />
         </div>
       </div>
@@ -1117,7 +1153,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
           <div className="card">
             <h3>Valor de compras por mes</h3>
             <p className="card-sub">Total con IVA por mes de solicitud (excluye anulados).</p>
-            <BarChartSvg data={valorPorMes} />
+            <BarChartSvg data={valorPorMes} onSelect={(d) => { setViewMode("mensual"); setSelectedMonth(d.key); }} />
           </div>
         ) : (
           <div className="card">

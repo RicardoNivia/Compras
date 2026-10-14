@@ -250,7 +250,7 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
                         </span>
                       </td>
                       {tab === "causaCalificacion" && <td>{"★".repeat(m.aplicaEstrellas || 0)}</td>}
-                      <td>{m.enUso ? <span className="pill accent" title={enUsoTitle(m)}>{m.usadoEn?.join(" · ") || "Sí"}</span> : <span className="muted">No</span>}</td>
+                      <td>{m.enUso ? <span className="pill accent" title={enUsoTitle(m)}>{m.usadoEn?.join(" · ") || "Sí"}</span> : <span className="pill good" title="Sin uso: se puede editar o eliminar">Libre</span>}</td>
                       <td>
                         <ToggleSwitch
                           checked={m.activo}
