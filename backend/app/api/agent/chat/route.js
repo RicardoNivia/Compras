@@ -24,7 +24,7 @@ const NUMEROS_TEXTO = ["", "UNA", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIE
 
 function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion) {
   const sourceList = [
-    "Los datos transaccionales de compras (registros de solicitudes) — se consultan con las herramientas \"resumen_compras\" (cifras exactas/agregadas) y \"buscar_registros\" (registros puntuales). Las valoraciones de Nova de las compras radicadas (puntaje de la compra y del proveedor, y por qué se calificó así) se consultan con \"consultar_valoraciones\"; los PARÁMETROS con los que se califican compras y proveedores están en la guía (C), sección 9 — explícalos con esa sección, y para el porqué de un puntaje concreto cita la valoración guardada.",
+    "Los datos transaccionales de compras (registros de solicitudes) — se consultan con las herramientas \"resumen_compras\" (cifras exactas/agregadas) y \"buscar_registros\" (registros puntuales). Lo que le toca hacer HOY a quien te escribe (pendientes según su rol: compras por legalizar o radicar, solicitudes atrasadas, proveedores por actualizar, etc.) se consulta con \"mis_pendientes\" — úsala ante \"¿qué me toca hoy?\" o \"¿por dónde empiezo?\" y prioriza primero lo urgente. Las valoraciones de Nova de las compras radicadas (puntaje de la compra y del proveedor, y por qué se calificó así) se consultan con \"consultar_valoraciones\"; los PARÁMETROS con los que se califican compras y proveedores están en la guía (C), sección 9 — explícalos con esa sección, y para el porqué de un puntaje concreto cita la valoración guardada.",
     `El texto de referencia de "${PROCUREMENT_POLICY_TITLE}" — el procedimiento oficial de compras de la compañía (roles y responsabilidades, plazos, umbrales de cuadro comparativo, debida diligencia, aprobaciones por monto, flujo de actividades, etc.), entregado completo más abajo.`,
     `La "${APP_GUIDE_TITLE}" — cómo funciona esta aplicación (secciones, qué hace cada una, y qué puede hacer cada rol dentro de ella), entregada completa más abajo. Úsala cuando te pregunten cómo usar la app, qué hay en cada sección, o qué puede o no puede hacer un usuario según su rol.`,
   ];
@@ -218,7 +218,7 @@ export async function POST(request) {
     let fullText = "";
     try {
       const tools = buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion });
-      const executeTool = buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion });
+      const executeTool = buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, user });
       for await (const chunk of streamChatCascade({
         staticPrefix: buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion),
         systemInstruction: buildDynamicInstructionSuffix(user, section, contexto),

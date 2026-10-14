@@ -357,19 +357,12 @@ export async function reviewObservacionesApi({ observaciones, estadoLegalizacion
   return handle(res);
 }
 
-// ---------- Alertas y notificaciones (ver AlertasView.jsx) ----------
+// ---------- Mi día y alertas (ver MiDiaView.jsx) ----------
 
-export async function fetchAlertsApi() {
-  const res = await fetch("/api/alerts");
-  return handle(res);
-}
-
-// "Revisar con IA" de la página de Alertas — análisis completo (resumen,
-// riesgos, proyección, sugerencias) a partir de las listas ya calculadas por
-// el servidor; no manda datos desde el cliente, el backend recalcula las
-// listas por su cuenta para no confiar en lo que haya en pantalla.
-export async function reviewAlertasApi() {
-  const res = await fetch("/api/agent/review-alertas", { method: "POST" });
+// "Mi día y alertas": lo que le toca hoy al usuario según su rol (ver backend/lib/pendientes.js).
+// Nova resume el día del usuario: { resumen, prioridades: string[], consejo }.
+export async function reviewPendientesApi() {
+  const res = await fetch("/api/agent/review-pendientes", { method: "POST" });
   return handle(res);
 }
 

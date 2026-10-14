@@ -13,7 +13,7 @@ import CommandPalette from "@/components/CommandPalette";
 // /api/auth/me), se usa eso; "show" queda como valor por defecto de respaldo.
 export const ALL_NAV_ITEMS = [
   { key: "dashboard", href: "/dashboard", label: "Dashboard de compras", Icon: IconDashboard, feature: "viewDashboard", show: canViewDashboard },
-  { key: "alertas", href: "/alertas", label: "Alertas y notificaciones", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas },
+  { key: "alertas", href: "/alertas", label: "Mi día y alertas", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas },
   { key: "registros", href: "/registros", label: "Registros", Icon: IconTable, feature: null, show: canViewRegistros },
   { key: "agente-ia", href: "/agente-ia", label: "Nova", Icon: IconSpark, feature: "viewAgenteIA", show: canViewAgenteIA },
   { key: "proveedores", href: "/proveedores", label: "Proveedores", Icon: IconBuilding, feature: "viewProveedores", show: canViewProveedores },

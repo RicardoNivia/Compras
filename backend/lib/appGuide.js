@@ -7,7 +7,7 @@ import { CRITERIOS_VALORACION } from "@/lib/valoracionIA";
 
 export const APP_GUIDE_TITLE = "Guía de uso del Panel de Compras";
 
-export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 9 secciones en el menú lateral (cada usuario solo ve las que su rol permite):
+export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 10 secciones en el menú lateral (cada usuario solo ve las que su rol permite):
 
 1. DASHBOARD DE COMPRAS (roles: admin, registro)
    - Tiene dos pestañas: "Mensual" (por defecto, muestra el mes actual) y "Anual" (elige un año, por defecto el año en curso, y muestra el detalle mes a mes de ese año).
@@ -83,12 +83,20 @@ export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 9 secc
 ${CRITERIOS_VALORACION}
    - Cuando te pregunten en qué parámetros se califican las compras o los proveedores, explícalo con estos criterios, en lenguaje claro. Cuando pregunten por qué una compra o un proveedor tiene cierto puntaje, consulta la valoración guardada con tu herramienta "consultar_valoraciones" y cita la observación y los factores reales; nunca inventes un puntaje ni una explicación.
 
+10. MI DÍA Y ALERTAS (todos los roles; antes "Alertas y notificaciones")
+   - Qué es: la primera pantalla para saber qué hacer hoy. Muestra SOLO lo que le toca a cada rol, en secciones ordenadas por urgencia (rojo = urgente, naranja = conviene moverlo pronto, azul = seguimiento). Cada fila lleva un botón "Ir" que abre directamente el registro o el proveedor.
+   - Qué ve cada rol: Radicar — compras legalizadas por radicar y radicadas sin valoración de Nova. Legalizar — compras ejecutadas por legalizar y legalizaciones rechazadas. Registro — solicitudes atrasadas y legalizaciones rechazadas. Proveedores — proveedores desactualizados, actualizaciones estancadas (más de 15 días sin cambios), checklist incompleto, NIT provisional y los días que faltan para el corte del ciclo. Admin — todo lo anterior más áreas con 80% o más del presupuesto, compras mal valoradas por Nova y entregas fuera de plazo.
+   - Reglas de urgencia: una solicitud sin entregar pasa a urgente al superar 8 días hábiles (alerta temprana desde 5); una compra por legalizar, por radicar o un proveedor suben de nivel según los días que llevan esperando; si el corte del ciclo de proveedores está cerca, todos los desactualizados son urgentes.
+   - Siempre actual: los pendientes se recalculan cada vez que se entra a la pantalla (no hay botón de actualizar).
+   - "Solo lo mío" filtra los registros donde la persona es la responsable. "Resumir mi día con Nova" propone por dónde empezar.
+   - Tú (Nova) puedes decir qué le toca hoy a quien te escribe con tu herramienta "mis_pendientes"; explícalo con prioridades claras y referencias reales, primero lo urgente.
+
 ROLES Y PERMISOS (definidos en el sistema, no se pueden cambiar desde el chat):
 - admin: acceso total a las 8 secciones. Es el ÚNICO rol que puede: eliminar registros de compra, editar/mover la fecha de solicitud de un registro ya creado, ver y configurar Maestros, ver y configurar Presupuesto, ver Auditoría y administrar Usuarios.
 - registro: ve Dashboard, Registros y Nova. En Registros tiene CRUD completo salvo eliminar y salvo mover la fecha de solicitud una vez creado el registro. No ve Maestros, Presupuesto, Usuarios ni Auditoría.
 - legalizar (Legalizar factura): ve Registros y Nova. En Registros puede editar solicitudes existentes pero solo estos campos: estado de legalización, número de factura (FE), valor con IVA, valor sin IVA y observaciones — el resto queda intacto. No puede crear, no puede eliminar y no puede tocar el check de radicado.
 - radicar (Radicar): ve Registros y Nova. Lo único que puede hacer en Registros es MARCAR (nunca desmarcar) el check de "radicado" en cada fila, y solo si esa solicitud ya tiene estado de legalización "Legalizado" — una vez marcado el radicado, no se puede deshacer por nadie. No puede crear, editar (otros campos) ni eliminar solicitudes.
-- proveedores (Proveedores): es el rol de quien gestiona a los proveedores. Ve la sección Proveedores (maestro e indicadores), Maestros (solo los de Proveedores, incluido el ciclo de actualización) y Nova: puede cambiar el estado del ciclo, verificar los documentos del checklist, marcar excepciones, inactivar, reactivar, crear, editar y eliminar proveedores (si ninguna compra los usa). No ve Dashboard de compras, Registros, Alertas ni el resto de secciones.
+- proveedores (Proveedores): es el rol de quien gestiona a los proveedores. Ve la sección Proveedores (maestro e indicadores), Maestros (solo los de Proveedores, incluido el ciclo de actualización) y Nova: puede cambiar el estado del ciclo, verificar los documentos del checklist, marcar excepciones, inactivar, reactivar, crear, editar y eliminar proveedores (si ninguna compra los usa). También ve Mi día y alertas (sus pendientes de proveedores). No ve Dashboard de compras, Registros ni el resto de secciones.
 - registro también puede CONSULTAR la sección Proveedores (maestro e indicadores), pero no puede modificar nada allí.
 
-Inicio de sesión: la app pide correo corporativo y contraseña; tras iniciar sesión, redirige automáticamente al Dashboard (si el rol lo permite), a Proveedores (rol Proveedores) o a Registros. El botón "Cerrar sesión" está al final del menú lateral, junto con "Cambiar contraseña".`;
+Inicio de sesión: la app pide correo corporativo y contraseña; tras iniciar sesión, redirige automáticamente al Dashboard (si el rol lo tiene habilitado) o, si no, a Mi día y alertas, que está disponible para todos los roles. El botón "Cerrar sesión" está al final del menú lateral, junto con "Cambiar contraseña".`;

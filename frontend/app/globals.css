@@ -2079,3 +2079,33 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 .compra-card-factores{ list-style:none; margin:10px 0; padding:0; display:flex; flex-wrap:wrap; gap:6px 10px; font-size:12.5px; }
 .compra-card-factores li{ display:flex; align-items:center; gap:5px; }
 @media (max-width: 720px){ .compra-card-head{ grid-template-columns:1fr; } .compra-card-puntajes, .compra-card-meta{ grid-column:1; grid-row:auto; justify-content:flex-start; } .compra-card-cols{ grid-template-columns:1fr; } }
+
+/* ---------- Mi día y alertas ---------- */
+.mi-dia{ display:flex; flex-direction:column; gap:14px; }
+.mi-dia-cabecera{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; padding:18px 20px; border-radius:16px; background:linear-gradient(135deg, var(--accent-wash), var(--surface)); border:1px solid var(--border); }
+.mi-dia-saludo{ margin:0 0 2px; font-family:"Nunito",sans-serif; font-size:24px; }
+.mi-dia-resumen{ display:flex; flex-wrap:wrap; gap:10px; }
+.mi-dia-stat{ display:flex; flex-direction:column; align-items:center; min-width:92px; padding:8px 14px; border-radius:12px; background:var(--surface); border:1px solid var(--border); }
+.mi-dia-stat strong{ font-size:22px; line-height:1.1; font-family:"Nunito",sans-serif; }
+.mi-dia-stat span{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; text-align:center; }
+.mi-dia-stat.critico{ border-color:var(--critical); } .mi-dia-stat.critico strong{ color:var(--critical); }
+.mi-dia-stat.atencion{ border-color:var(--warning); } .mi-dia-stat.atencion strong{ color:var(--warning); }
+.mi-dia-acciones{ display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.mi-dia-seccion{ border:1px solid var(--border); border-left-width:5px; border-radius:14px; background:var(--surface); box-shadow:var(--shadow); overflow:hidden; }
+.mi-dia-seccion.nivel-critico{ border-left-color:var(--critical); }
+.mi-dia-seccion.nivel-atencion{ border-left-color:var(--warning); }
+.mi-dia-seccion.nivel-info{ border-left-color:var(--accent); }
+.mi-dia-seccion-head{ appearance:none; width:100%; border:none; background:transparent; cursor:pointer; text-align:left; display:flex; align-items:center; gap:12px; padding:14px 16px; color:inherit; }
+.mi-dia-seccion-head:hover{ background:var(--surface-2); }
+.mi-dia-punto{ flex:none; width:10px; height:10px; border-radius:50%; background:var(--muted); }
+.mi-dia-punto.critical{ background:var(--critical); } .mi-dia-punto.warning{ background:var(--warning); } .mi-dia-punto.accent{ background:var(--accent); } .mi-dia-punto.good{ background:var(--good); }
+.mi-dia-seccion-titulo{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.mi-dia-seccion-titulo strong{ font-size:15px; }
+.mi-dia-seccion-conteo{ flex:none; display:flex; align-items:center; gap:8px; }
+.mi-dia-flecha{ color:var(--muted); width:14px; text-align:center; }
+.mi-dia-tabla td, .mi-dia-tabla th{ vertical-align:middle; }
+.mi-dia-tabla tr.mi-dia-mio td:first-child{ box-shadow:inset 3px 0 0 var(--accent); }
+.mi-dia-vacio{ display:flex; flex-direction:column; align-items:center; gap:4px; padding:40px 16px; border:1px dashed var(--border); border-radius:16px; color:var(--good); text-align:center; }
+.mi-dia-vacio h3{ margin:4px 0 0; color:var(--ink); }
+.mi-dia-aldia{ display:flex; align-items:center; gap:6px; margin:0; font-size:13px; color:var(--good); }
+.mi-dia-prioridades{ margin:0 0 10px; padding-left:20px; display:flex; flex-direction:column; gap:8px; font-size:13.5px; line-height:1.5; }

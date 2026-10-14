@@ -105,6 +105,11 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
   const [valorMin, setValorMin] = useState("");
   const [valorMax, setValorMax] = useState("");
   const [onlyIncumplimiento, setOnlyIncumplimiento] = useState(false);
+  // Radicado ("si" | "no") y valoración de Nova ("con" | "sin") + puntaje máximo (de la compra / del proveedor).
+  const [radicadoFiltro, setRadicadoFiltro] = useState("");
+  const [valoracionFiltro, setValoracionFiltro] = useState("");
+  const [puntajeCompraMax, setPuntajeCompraMax] = useState("");
+  const [puntajeProveedorMax, setPuntajeProveedorMax] = useState("");
 
   // Modo de búsqueda: "manual" (filtros de siempre) o "ia" (lenguaje natural,
   // traducido a esos mismos filtros — un solo motor de filtrado para ambos).
@@ -174,9 +179,15 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
       if (valorMin !== "" && !(r.valorConIva >= Number(valorMin))) return false;
       if (valorMax !== "" && !(r.valorConIva <= Number(valorMax))) return false;
       if (onlyIncumplimiento && !((getDiasInfo(r).dias ?? 0) > 8)) return false;
+      if (radicadoFiltro === "si" && !r.radicado) return false;
+      if (radicadoFiltro === "no" && r.radicado) return false;
+      if (valoracionFiltro === "con" && !r.valoracion) return false;
+      if (valoracionFiltro === "sin" && r.valoracion) return false;
+      if (puntajeCompraMax !== "" && !(r.valoracion && r.valoracion.puntajeCompra <= Number(puntajeCompraMax))) return false;
+      if (puntajeProveedorMax !== "" && !(r.valoracion && r.valoracion.puntajeProveedor != null && r.valoracion.puntajeProveedor <= Number(puntajeProveedorMax))) return false;
       return true;
     });
-  }, [records, search, area, estado, medioPago, licitacion, estadoLegalizacion, dateFrom, dateTo, valorMin, valorMax, onlyIncumplimiento]);
+  }, [records, search, area, estado, medioPago, licitacion, estadoLegalizacion, dateFrom, dateTo, valorMin, valorMax, onlyIncumplimiento, radicadoFiltro, valoracionFiltro, puntajeCompraMax, puntajeProveedorMax]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -200,7 +211,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
 
   useEffect(() => {
     setPage(1);
-  }, [search, area, estado, medioPago, licitacion, dateFrom, dateTo, valorMin, valorMax, onlyIncumplimiento, pageSize]);
+  }, [search, area, estado, medioPago, licitacion, dateFrom, dateTo, valorMin, valorMax, onlyIncumplimiento, radicadoFiltro, valoracionFiltro, puntajeCompraMax, puntajeProveedorMax, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -230,6 +241,10 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
     setValorMin("");
     setValorMax("");
     setOnlyIncumplimiento(false);
+    setRadicadoFiltro("");
+    setValoracionFiltro("");
+    setPuntajeCompraMax("");
+    setPuntajeProveedorMax("");
     setAiApplied(null);
     setAiError("");
   }
@@ -261,6 +276,10 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
       setValorMin(filters.valorMin != null ? String(filters.valorMin) : "");
       setValorMax(filters.valorMax != null ? String(filters.valorMax) : "");
       setOnlyIncumplimiento(!!filters.onlyIncumplimiento);
+      setRadicadoFiltro(filters.radicado === "si" || filters.radicado === "no" ? filters.radicado : "");
+      setValoracionFiltro(filters.valoracion === "con" || filters.valoracion === "sin" ? filters.valoracion : "");
+      setPuntajeCompraMax(filters.puntajeCompraMax != null ? String(filters.puntajeCompraMax) : "");
+      setPuntajeProveedorMax(filters.puntajeProveedorMax != null ? String(filters.puntajeProveedorMax) : "");
       setAiApplied(filters);
     } catch (err) {
       setAiError(err.message || "No se pudo interpretar la búsqueda.");
@@ -375,6 +394,12 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
                 {aiApplied.valorMax != null && <span className="chip">Valor máx: {fmtCOP(aiApplied.valorMax)}</span>}
                 {aiApplied.search && <span className="chip">Texto: {aiApplied.search}</span>}
                 {aiApplied.onlyIncumplimiento && <span className="chip">Solo incumplidas</span>}
+                {aiApplied.radicado === "si" && <span className="chip">Radicadas</span>}
+                {aiApplied.radicado === "no" && <span className="chip">Sin radicar</span>}
+                {aiApplied.valoracion === "con" && <span className="chip">Con valoración de Nova</span>}
+                {aiApplied.valoracion === "sin" && <span className="chip">Sin valoración de Nova</span>}
+                {aiApplied.puntajeCompraMax != null && <span className="chip">Compra ≤ {aiApplied.puntajeCompraMax}★</span>}
+                {aiApplied.puntajeProveedorMax != null && <span className="chip">Proveedor ≤ {aiApplied.puntajeProveedorMax}★</span>}
                 <span className="count-note">{sorted.length} resultado(s)</span>
               </div>
             )}
@@ -421,6 +446,36 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
             <select id="reg-estado-legal" value={estadoLegalizacion} onChange={(e) => setEstadoLegalizacion(e.target.value)}>
               <option value="">Todos</option>
               {estadoLegalizacionOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="reg-radicado">Radicado</label>
+            <select id="reg-radicado" value={radicadoFiltro} onChange={(e) => setRadicadoFiltro(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="si">Radicados</option>
+              <option value="no">Sin radicar</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="reg-valoracion">Valoración Nova</label>
+            <select id="reg-valoracion" value={valoracionFiltro} onChange={(e) => setValoracionFiltro(e.target.value)}>
+              <option value="">Todas</option>
+              <option value="con">Valoradas</option>
+              <option value="sin">Sin valorar</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="reg-puntaje-compra">Compra (máx. ★)</label>
+            <select id="reg-puntaje-compra" value={puntajeCompraMax} onChange={(e) => setPuntajeCompraMax(e.target.value)}>
+              <option value="">Cualquiera</option>
+              {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n} o menos</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="reg-puntaje-prov">Proveedor (máx. ★)</label>
+            <select id="reg-puntaje-prov" value={puntajeProveedorMax} onChange={(e) => setPuntajeProveedorMax(e.target.value)}>
+              <option value="">Cualquiera</option>
+              {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n} o menos</option>)}
             </select>
           </div>
           <div className="field">
