@@ -681,6 +681,15 @@ input, select, textarea{
 textarea{ resize:vertical; }
 input:focus, select:focus, textarea:focus{ border-color:var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
 .search-field{ flex:1; min-width:180px; }
+/* Botones de la barra de filtros de Registros: alineados con la base de los campos.
+   En modo manual el contenedor desaparece (display:contents): "Incumplimiento" y "Limpiar filtros" quedan justo
+   después del último campo y solo "Agregar registro" se va al extremo derecho. */
+.filter-actions{ display:contents; }
+.filter-actions .btn{ align-self:flex-end; height:var(--input-h, 34px); }
+.filter-actions .filter-add{ margin-left:auto; }
+.filter-actions-row{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.filter-actions-row .btn{ align-self:center; }
+.swatch-promedio{ display:inline-block; width:18px; height:0; border-top:2px dashed var(--warning); flex:none; }
 .search-field input{ width:100%; }
 
 /* ---------- Autocompletar de proveedor (RecordModal) ---------- */
@@ -1593,8 +1602,9 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
     width .38s cubic-bezier(.16,1,.3,1), height .38s cubic-bezier(.16,1,.3,1);
 }
 .floating-agent-panel.is-expanded{
-  width:660px; height:min(820px, calc(100vh - 56px));
-  max-width:calc(100vw - 32px); max-height:calc(100vh - 56px);
+  /* Anclado a 142px del borde inferior: la altura máxima debe dejar ese espacio y un margen arriba, o la cabecera se corta. */
+  width:660px; height:min(820px, calc(100vh - 162px));
+  max-width:calc(100vw - 32px); max-height:calc(100vh - 162px);
 }
 @media (prefers-reduced-motion: reduce){
   .floating-agent-panel, .floating-agent-panel.is-open, .floating-agent-fab,
@@ -1859,15 +1869,15 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 @keyframes provPop{ from{ opacity:0; transform:scale(.8); } to{ opacity:1; transform:none; } }
 @keyframes provGauge{ from{ stroke-dashoffset:600; } }
 @keyframes provFade{ from{ opacity:0; } to{ opacity:1; } }
-.chart-wrap svg rect{ transform-box:fill-box; transform-origin:bottom; animation:provGrowY .75s cubic-bezier(.2,.8,.2,1) both; }
-.chart-wrap svg rect:nth-of-type(2n){ animation-delay:.06s; }
-.chart-wrap svg rect:nth-of-type(3n){ animation-delay:.12s; }
-.chart-wrap svg rect:nth-of-type(4n){ animation-delay:.18s; }
-.chart-wrap svg path{ transform-box:fill-box; transform-origin:center; animation:provPop .8s ease both; }
-.chart-wrap svg path:nth-of-type(2n){ animation-delay:.08s; }
-.chart-wrap svg path:nth-of-type(3n){ animation-delay:.16s; }
-.gauge-ring svg circle:nth-of-type(2){ animation:provGauge 1.1s cubic-bezier(.2,.8,.2,1) both; }
-.chart-wrap svg text{ animation:provFade .9s ease .35s both; }
+.chart-wrap svg:not(.cx) rect{ transform-box:fill-box; transform-origin:bottom; animation:provGrowY .75s cubic-bezier(.2,.8,.2,1) both; }
+.chart-wrap svg:not(.cx) rect:nth-of-type(2n){ animation-delay:.06s; }
+.chart-wrap svg:not(.cx) rect:nth-of-type(3n){ animation-delay:.12s; }
+.chart-wrap svg:not(.cx) rect:nth-of-type(4n){ animation-delay:.18s; }
+.chart-wrap svg:not(.cx) path{ transform-box:fill-box; transform-origin:center; animation:provPop .8s ease both; }
+.chart-wrap svg:not(.cx) path:nth-of-type(2n){ animation-delay:.08s; }
+.chart-wrap svg:not(.cx) path:nth-of-type(3n){ animation-delay:.16s; }
+.gauge-ring svg:not(.cx) circle:nth-of-type(2){ animation:provGauge 1.1s cubic-bezier(.2,.8,.2,1) both; }
+.chart-wrap svg:not(.cx) text{ animation:provFade .9s ease .35s both; }
 .estado-row .fill, .medio-row .fill, .estado-card .fill, .presupuesto-row-bar .fill, .prov-compact .prov-hstack-bar, .prov-compact .prov-progress span{ transform-origin:left; animation:provGrowX .8s cubic-bezier(.2,.8,.2,1) both; }
 .prov-compact .prov-hstack-row:nth-child(2) .prov-hstack-bar, .prov-compact .estado-row:nth-child(2) .fill{ animation-delay:.08s; }
 .prov-compact .prov-hstack-row:nth-child(3) .prov-hstack-bar, .prov-compact .estado-row:nth-child(3) .fill{ animation-delay:.16s; }
@@ -1875,6 +1885,107 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 .kpi .value{ animation:provFade .6s ease both; }
 @media (prefers-reduced-motion: reduce){
   .chart-wrap svg rect, .chart-wrap svg path, .chart-wrap svg text, .gauge-ring svg circle, .estado-row .fill, .medio-row .fill, .estado-card .fill, .presupuesto-row-bar .fill, .prov-compact .prov-hstack-bar, .prov-compact .prov-progress span, .kpi .value{ animation:none !important; }
+}
+
+/* Gráficas animadas (components/charts/chartKit.js): la entrada la maneja React con una barra de progreso;
+   aquí solo van las transiciones de interacción, el brillo y los efectos de reposo. */
+.cx-bar{ stroke:rgba(255,255,255,0.28); stroke-width:1; cursor:pointer; transition:opacity .22s ease, filter .22s ease; }
+.cx-slice{ transform-box:fill-box; stroke:rgba(255,255,255,0.22); stroke-width:1; transition:transform .28s cubic-bezier(.2,.8,.2,1), opacity .22s ease, filter .22s ease; }
+.cx-band{ transition:opacity .2s ease; pointer-events:none; }
+.cx text{ transition:opacity .2s ease, fill .2s ease; }
+.legend .chip-interactivo{ padding:3px 9px; border-radius:999px; border:1px solid transparent; cursor:default; transition:opacity .2s ease, background .2s ease, border-color .2s ease, transform .2s ease; }
+.legend .chip-interactivo.on{ background:color-mix(in srgb, var(--accent) 10%, transparent); border-color:color-mix(in srgb, var(--accent) 35%, transparent); transform:translateY(-1px); }
+.legend .chip-interactivo.dim{ opacity:.4; }
+.legend .chip-interactivo .swatch{ border-radius:50%; width:10px; height:10px; box-shadow:0 0 0 2px color-mix(in srgb, currentColor 0%, transparent); transition:transform .2s ease; }
+.legend .chip-interactivo.on .swatch{ transform:scale(1.3); }
+.gauge-ring svg.cx circle:nth-of-type(2){ animation:cxGlow 3.2s ease-in-out 1.6s infinite; }
+@keyframes cxGlow{ 0%,100%{ filter:drop-shadow(0 0 4px color-mix(in srgb, currentColor 0%, transparent)); } 50%{ filter:drop-shadow(0 0 9px rgba(255,255,255,0.35)); } }
+.gauge-value{ font-variant-numeric:tabular-nums; }
+.chart-wrap .bar-total-label{ font-variant-numeric:tabular-nums; }
+@media (prefers-reduced-motion: reduce){
+  .cx-bar, .cx-slice, .cx-band, .cx text, .legend .chip-interactivo, .gauge-ring svg.cx circle:nth-of-type(2){ transition:none !important; animation:none !important; }
+}
+
+/* Barras horizontales (dashboard, presupuesto, proveedores): brillo superior, resplandor y un destello que cruza una vez
+   al terminar de crecer. El color de cada barra sigue siendo el que le pone el componente. */
+.estado-row .fill, .medio-row .fill, .estado-card .fill, .presupuesto-row-bar .fill{
+  position:relative; overflow:hidden;
+  box-shadow: 0 0 12px -2px color-mix(in srgb, currentColor 0%, transparent), inset 0 -2px 0 rgba(0,0,0,0.08);
+  transition: width .6s cubic-bezier(.2,.8,.2,1), filter .2s ease;
+}
+.estado-row .fill::before, .medio-row .fill::before, .estado-card .fill::before, .presupuesto-row-bar .fill::before{
+  content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(255,255,255,0.34), rgba(255,255,255,0) 62%); pointer-events:none;
+}
+.estado-row .fill::after, .medio-row .fill::after, .estado-card .fill::after, .presupuesto-row-bar .fill::after{
+  content:""; position:absolute; top:0; bottom:0; width:45%; left:0; transform:translateX(-120%);
+  background:linear-gradient(100deg, transparent, rgba(255,255,255,0.5), transparent); pointer-events:none;
+  animation:cxSheen 1.5s ease .9s 1 both;
+}
+@keyframes cxSheen{ from{ transform:translateX(-120%); } to{ transform:translateX(330%); } }
+.estado-row:hover .fill, .medio-row:hover .fill, .presupuesto-row-bar:hover .fill, .estado-card:hover .fill{ filter:brightness(1.1) saturate(1.15); }
+.prov-hstack-bar{ box-shadow:0 2px 8px -3px rgba(16,24,64,0.35); border-radius:6px; }
+.prov-hstack-bar span{ background-image:linear-gradient(180deg, rgba(255,255,255,0.3), rgba(255,255,255,0) 65%); transition:filter .2s ease; }
+.prov-hstack-bar span:hover{ filter:brightness(1.12); }
+@media (prefers-reduced-motion: reduce){
+  .estado-row .fill::after, .medio-row .fill::after, .estado-card .fill::after, .presupuesto-row-bar .fill::after{ animation:none !important; display:none; }
+}
+
+/* Transiciones de interfaz: al abrir una pantalla su contenido entra en cascada (fundido + leve ascenso) y las tarjetas
+   KPI reaccionan al cursor. Solo corren al montarse (cambio de página); "backwards" evita dejar transform residual. */
+@keyframes cxRise{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; transform:none; } }
+@keyframes cxFade{ from{ opacity:0; } to{ opacity:1; } }
+.topbar{ animation:cxFade .35s ease backwards; }
+main > *{ animation:cxRise .55s cubic-bezier(.16,1,.3,1) backwards; }
+main > *:nth-child(2){ animation-delay:.05s; }
+main > *:nth-child(3){ animation-delay:.1s; }
+main > *:nth-child(4){ animation-delay:.15s; }
+main > *:nth-child(5){ animation-delay:.2s; }
+main > *:nth-child(n+6){ animation-delay:.25s; }
+.kpi-row > .kpi{ animation:cxRise .6s cubic-bezier(.16,1,.3,1) backwards; }
+.kpi-row > .kpi:nth-child(2){ animation-delay:.07s; }
+.kpi-row > .kpi:nth-child(3){ animation-delay:.14s; }
+.kpi-row > .kpi:nth-child(4){ animation-delay:.21s; }
+.kpi-row > .kpi:nth-child(n+5){ animation-delay:.28s; }
+.kpi{ transition:transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease, border-color .25s ease; }
+.kpi:hover{ transform:translateY(-3px); box-shadow:0 14px 28px -14px rgba(16,24,64,0.35); border-color:color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.kpi:hover .kpi-ic{ transform:scale(1.1) rotate(-4deg); }
+.kpi .kpi-ic{ transition:transform .25s cubic-bezier(.2,.8,.2,1); }
+.mi-dia-seccion{ transition:box-shadow .25s ease, border-color .25s ease; }
+.mi-dia-seccion:hover{ box-shadow:0 10px 24px -16px rgba(16,24,64,0.4); }
+@media (prefers-reduced-motion: reduce){
+  .topbar, main > *, .kpi-row > .kpi{ animation:none !important; }
+  .kpi, .kpi:hover, .kpi .kpi-ic{ transition:none !important; transform:none !important; }
+}
+
+/* KPIs: chip de variación, sparkline; gráficas con clic; Mi día: pulso de críticos y celebración */
+.kpi .delta-chip{ align-self:flex-start; padding:2px 9px; border-radius:999px; background:color-mix(in srgb, var(--good) 14%, transparent); animation:cxPop .6s cubic-bezier(.34,1.56,.64,1) .5s backwards; }
+.kpi .delta-chip.down{ color:var(--critical); background:color-mix(in srgb, var(--critical) 12%, transparent); }
+.kpi .delta-chip .delta-vs{ font-weight:500; font-size:11px; color:var(--ink-2); }
+@keyframes cxPop{ from{ opacity:0; transform:scale(.6); } to{ opacity:1; transform:none; } }
+.kpi-spark{ display:block; margin-top:8px; overflow:visible; }
+.kpi-spark-dot{ animation:cxBeat 2.2s ease-in-out 1.4s infinite; transform-box:fill-box; transform-origin:center; }
+@keyframes cxBeat{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.6); } }
+.cx-clickable{ cursor:pointer; }
+.pill.pulso{ animation:cxPulse 1.9s ease-in-out infinite; }
+@keyframes cxPulse{ 0%,100%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--critical) 45%, transparent); } 50%{ box-shadow:0 0 0 6px transparent; } }
+.mi-dia-vacio{ position:relative; overflow:hidden; }
+.mi-dia-vacio .confeti{ position:absolute; left:50%; top:38%; width:0; height:0; pointer-events:none; }
+.mi-dia-vacio .confeti i{
+  position:absolute; width:7px; height:11px; border-radius:2px; opacity:0;
+  background:var(--c, var(--accent)); --ang:calc(var(--i) * 22.5deg); --dist:calc(70px + (var(--i) * 7px));
+  animation:cxConfeti 1.5s cubic-bezier(.16,1,.3,1) calc(var(--i) * 0.02s + .15s) 1 both;
+}
+.mi-dia-vacio .confeti i:nth-child(4n+1){ --c:var(--accent); }
+.mi-dia-vacio .confeti i:nth-child(4n+2){ --c:var(--good); }
+.mi-dia-vacio .confeti i:nth-child(4n+3){ --c:var(--warning); }
+.mi-dia-vacio .confeti i:nth-child(4n){ --c:var(--s4); }
+@keyframes cxConfeti{
+  0%{ opacity:1; transform:rotate(var(--ang)) translateY(0) rotate(0); }
+  100%{ opacity:0; transform:rotate(var(--ang)) translateY(calc(var(--dist) * -1)) rotate(420deg); }
+}
+@media (prefers-reduced-motion: reduce){
+  .kpi .delta-chip, .kpi-spark-dot, .pill.pulso, .mi-dia-vacio .confeti i{ animation:none !important; }
+  .mi-dia-vacio .confeti{ display:none; }
 }
 
 /* Modal de detalle del proveedor: más aire y mejor jerarquía */
@@ -2079,3 +2190,33 @@ table.maestros-table td.acciones{ display:flex; justify-content:flex-end; gap:6p
 .compra-card-factores{ list-style:none; margin:10px 0; padding:0; display:flex; flex-wrap:wrap; gap:6px 10px; font-size:12.5px; }
 .compra-card-factores li{ display:flex; align-items:center; gap:5px; }
 @media (max-width: 720px){ .compra-card-head{ grid-template-columns:1fr; } .compra-card-puntajes, .compra-card-meta{ grid-column:1; grid-row:auto; justify-content:flex-start; } .compra-card-cols{ grid-template-columns:1fr; } }
+
+/* ---------- Mi día y alertas ---------- */
+.mi-dia{ display:flex; flex-direction:column; gap:14px; }
+.mi-dia-cabecera{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; padding:18px 20px; border-radius:16px; background:linear-gradient(135deg, var(--accent-wash), var(--surface)); border:1px solid var(--border); }
+.mi-dia-saludo{ margin:0 0 2px; font-family:"Nunito",sans-serif; font-size:24px; }
+.mi-dia-resumen{ display:flex; flex-wrap:wrap; gap:10px; }
+.mi-dia-stat{ display:flex; flex-direction:column; align-items:center; min-width:92px; padding:8px 14px; border-radius:12px; background:var(--surface); border:1px solid var(--border); }
+.mi-dia-stat strong{ font-size:22px; line-height:1.1; font-family:"Nunito",sans-serif; }
+.mi-dia-stat span{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; text-align:center; }
+.mi-dia-stat.critico{ border-color:var(--critical); } .mi-dia-stat.critico strong{ color:var(--critical); }
+.mi-dia-stat.atencion{ border-color:var(--warning); } .mi-dia-stat.atencion strong{ color:var(--warning); }
+.mi-dia-acciones{ display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.mi-dia-seccion{ border:1px solid var(--border); border-left-width:5px; border-radius:14px; background:var(--surface); box-shadow:var(--shadow); overflow:hidden; }
+.mi-dia-seccion.nivel-critico{ border-left-color:var(--critical); }
+.mi-dia-seccion.nivel-atencion{ border-left-color:var(--warning); }
+.mi-dia-seccion.nivel-info{ border-left-color:var(--accent); }
+.mi-dia-seccion-head{ appearance:none; width:100%; border:none; background:transparent; cursor:pointer; text-align:left; display:flex; align-items:center; gap:12px; padding:14px 16px; color:inherit; }
+.mi-dia-seccion-head:hover{ background:var(--surface-2); }
+.mi-dia-punto{ flex:none; width:10px; height:10px; border-radius:50%; background:var(--muted); }
+.mi-dia-punto.critical{ background:var(--critical); } .mi-dia-punto.warning{ background:var(--warning); } .mi-dia-punto.accent{ background:var(--accent); } .mi-dia-punto.good{ background:var(--good); }
+.mi-dia-seccion-titulo{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.mi-dia-seccion-titulo strong{ font-size:15px; }
+.mi-dia-seccion-conteo{ flex:none; display:flex; align-items:center; gap:8px; }
+.mi-dia-flecha{ color:var(--muted); width:14px; text-align:center; }
+.mi-dia-tabla td, .mi-dia-tabla th{ vertical-align:middle; }
+.mi-dia-tabla tr.mi-dia-mio td:first-child{ box-shadow:inset 3px 0 0 var(--accent); }
+.mi-dia-vacio{ display:flex; flex-direction:column; align-items:center; gap:4px; padding:40px 16px; border:1px dashed var(--border); border-radius:16px; color:var(--good); text-align:center; }
+.mi-dia-vacio h3{ margin:4px 0 0; color:var(--ink); }
+.mi-dia-aldia{ display:flex; align-items:center; gap:6px; margin:0; font-size:13px; color:var(--good); }
+.mi-dia-prioridades{ margin:0 0 10px; padding-left:20px; display:flex; flex-direction:column; gap:8px; font-size:13.5px; line-height:1.5; }

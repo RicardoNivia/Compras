@@ -78,12 +78,14 @@ function conRequisito(r, clave, cumple) {
 // Maestro general de proveedores. Misma estructura que la tabla de Registros: barra de filtros,
 // pestañas con la nomenclatura original, tabla con pie de paginación y el detalle en una modal.
 // catalogos: maestros de Proveedores { areas, tipos, clasificaciones, servicios, motivos } (ver app/(app)/proveedores/page.js).
-export default function MaestroProveedores({ initial, catalogos = {}, canEdit }) {
+export default function MaestroProveedores({ initial, catalogos = {}, canEdit, initialQ = "" }) {
   const { areas = [], clasificaciones = [], servicios = [] } = catalogos;
   const [data, setData] = useState(initial);
-  const [filters, setFilters] = useState(VACIO);
+  const [filters, setFilters] = useState(() => ({ ...VACIO, q: initialQ }));
   const [searchMode, setSearchMode] = useState("manual");
   const [pestana, setPestana] = useState(() => {
+    // Con una búsqueda (por NIT, desde Mi día) se muestran todos los grupos para no ocultar el proveedor.
+    if (initialQ) return "todos";
     const c = initial.conteos.clasificacion;
     return c.actualizacion ? "actualizacion" : c.nuevo ? "nuevos" : "todos";
   });

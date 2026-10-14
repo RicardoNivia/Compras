@@ -93,8 +93,9 @@ export function canViewReportes(role) {
   return role === ROLES.ADMIN;
 }
 
+// "Mi día y alertas": lo que le toca hoy a cada rol. También lo ve Proveedores (sus pendientes de actualización).
 export function canViewAlertas(role) {
-  return ROLES_COMPRAS.includes(role);
+  return ROLES_COMPRAS.includes(role) || role === ROLES.PROVEEDORES;
 }
 
 export function canCreateRecord(role) {

@@ -17,7 +17,7 @@ function badRequest(message) {
 // route handlers que la usan) para que la matriz tenga efecto real.
 export const FEATURES = [
   { key: "viewDashboard", label: "Ver Dashboard de compras", section: "Dashboard", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR] },
-  { key: "viewAlertas", label: "Ver Alertas y notificaciones", section: "Alertas", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR] },
+  { key: "viewAlertas", label: "Ver Mi día y alertas", section: "Alertas", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR, ROLES.PROVEEDORES] },
   { key: "viewAgenteIA", label: "Ver Nova", section: "Nova", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR, ROLES.PROVEEDORES] },
   { key: "createRecord", label: "Crear registro de compra", section: "Registros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
   { key: "editRecord", label: "Editar registro de compra", section: "Registros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR] },

@@ -23,6 +23,10 @@ const FILTER_SCHEMA = {
     valorMin: { type: "NUMBER", nullable: true },
     valorMax: { type: "NUMBER", nullable: true },
     onlyIncumplimiento: { type: "BOOLEAN" },
+    radicado: { type: "STRING", nullable: true },
+    valoracion: { type: "STRING", nullable: true },
+    puntajeCompraMax: { type: "NUMBER", nullable: true },
+    puntajeProveedorMax: { type: "NUMBER", nullable: true },
   },
   required: ["onlyIncumplimiento"],
 };
@@ -108,6 +112,10 @@ Reglas:
 - "valorMin"/"valorMax": montos en pesos colombianos como número plano (sin puntos, comas ni símbolo de moneda). "más de X" → valorMin=X. "menos de X" → valorMax=X. Si dicen "X millones", multiplica por 1.000.000.
 - "search": solo texto libre que no encaje en ningún otro filtro (p. ej. nombre de proveedor o palabras de la descripción), o null si todo ya quedó cubierto por los demás campos.
 - "onlyIncumplimiento": true SOLO si piden explícitamente solicitudes atrasadas, incumplidas, o con más de 8 días hábiles.
+- "radicado": "si" si piden compras radicadas (ya radicadas, con radicado); "no" si piden las que NO están radicadas / sin radicar / pendientes de radicar; null si no lo mencionan.
+- "valoracion": la valoración de Nova es el puntaje de 1 a 5 que Nova da a la compra y al proveedor cuando se radica. "con" si piden las que YA tienen valoración / fueron valoradas / calificadas por Nova; "sin" si piden las que NO han sido valoradas / sin valorar / sin calificar por Nova; null si no la mencionan. Ejemplo: "radicados que no han sido valorados por Nova" → radicado="si", valoracion="sin".
+- "puntajeCompraMax": número de 1 a 5 si piden compras con calificación/puntaje de la compra baja o "menor o igual a N" (ej. "mal valoradas" → 2; "con 3 o menos" → 3). null si no lo piden.
+- "puntajeProveedorMax": igual, pero para el puntaje del PROVEEDOR (ej. "proveedores mal calificados" → 2). null si no lo piden.
 
 Valores válidos de "area": ${listOrNone(options.areas)}
 Valores válidos de "estado": ${listOrNone(options.estados)}

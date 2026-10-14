@@ -4,6 +4,7 @@ import { listAuditLogs } from "@/lib/audit";
 import { buildAggregates } from "@/lib/reportContent";
 import { listMaestroProveedores, getProveedorDetalle, indicadoresCiclo } from "@/lib/proveedoresCiclo";
 import { prisma } from "@/lib/prisma";
+import { getPendientesParaNova } from "@/lib/pendientes";
 
 // Herramientas ("tool use" de Anthropic) que el Agente IA del chat puede
 // invocar bajo demanda en vez de recibir TODO el dataset de compras en cada
@@ -246,6 +247,11 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
       },
     },
     {
+      name: "mis_pendientes",
+      description: "Lo que le toca hacer HOY a la persona que te escribe, según su rol (es lo mismo que ve en la pantalla \"Mi día y alertas\"): compras por legalizar o por radicar, legalizaciones rechazadas, solicitudes atrasadas, proveedores desactualizados o estancados, checklist incompleto, presupuesto en riesgo y compras mal valoradas (según el rol). Devuelve por sección el total, cuántos son urgentes y los primeros ítems con su referencia (#123 o NIT), días y detalle. Úsala para preguntas como \"¿qué me toca hoy?\", \"¿qué tengo pendiente?\", \"¿por dónde empiezo?\", \"¿qué está urgente?\". Cada rol solo ve sus propios pendientes. Si no hay nada, dilo: está todo al día.",
+      input_schema: { type: "object", properties: { limite: { type: "integer", description: "Máximo de ítems por sección (opcional, por defecto 8, máximo 20)." } } },
+    },
+    {
       name: "consultar_valoraciones",
       description: "Consulta las valoraciones de Nova GUARDADAS de las compras radicadas: puntaje de la compra y del proveedor (1 a 5), el resumen, por qué se calificó así (observación de la compra y del proveedor) y los factores considerados. Úsala para preguntas como \"¿por qué la compra #339 tiene 1?\", \"¿cómo califica la IA a COMPENSAR y por qué?\", \"¿cuáles son las compras peor valoradas?\", \"proveedores con calificación baja\" o \"¿qué compras tienen puntaje de proveedor menor a 3?\". Con un registro o un proveedor concreto devuelve el detalle completo; sin filtros devuelve las compras peor valoradas y los promedios. Los criterios con los que se califica NO salen de esta herramienta: están en la guía de la aplicación (sección 9). Si una compra no tiene valoración, dilo (puede que aún no esté radicada o no se haya valorado).",
       input_schema: {
@@ -345,7 +351,7 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
 // Fábrica del ejecutor: "records"/"presupuestos" se cargan como mucho una vez
 // por request de chat (memoizados aquí), sin importar cuántas veces el modelo
 // llame a una herramienta que los necesite en la misma conversación-turno.
-export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion }) {
+export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, user }) {
   let recordsPromise = null;
   const getRecords = () => (recordsPromise ??= listRecords());
 
@@ -445,6 +451,11 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
             fechaRegistro: fechaISO(p.createdAt), fechaUltimaActualizacion: p.esExcepcion ? "No aplica (excepción)" : fechaISO(p.fechaActualizacion),
           })),
         };
+      }
+      case "mis_pendientes": {
+        if (!user) return { error: "No se pudo identificar al usuario." };
+        const maxItems = Math.max(1, Math.min(20, Number(args.limite) || 8));
+        return getPendientesParaNova(user, maxItems);
       }
       case "consultar_valoraciones": {
         const limit = Math.max(1, Math.min(25, Number(args.limit) || 8));
