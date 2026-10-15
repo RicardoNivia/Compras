@@ -5,6 +5,7 @@ import { buildAggregates } from "@/lib/reportContent";
 import { listMaestroProveedores, getProveedorDetalle, indicadoresCiclo } from "@/lib/proveedoresCiclo";
 import { prisma } from "@/lib/prisma";
 import { getPendientesParaNova } from "@/lib/pendientes";
+import { CONSULTAR_REFERENCIA_TOOL, consultarReferencia } from "@/lib/referenciasNova";
 
 // Herramientas ("tool use" de Anthropic) que el Agente IA del chat puede
 // invocar bajo demanda en vez de recibir TODO el dataset de compras en cada
@@ -16,8 +17,9 @@ import { getPendientesParaNova } from "@/lib/pendientes";
 // eso, "resumen_compras" calcula los totales exactos del lado del servidor
 // sobre el 100% de los datos, sin importar cuántos registros haya.
 
-const MAX_BUSCAR_LIMIT = 100;
-const DEFAULT_BUSCAR_LIMIT = 30;
+// Límites moderados: cada registro devuelto se vuelve a cobrar en cada vuelta siguiente de la conversación.
+const MAX_BUSCAR_LIMIT = 50;
+const DEFAULT_BUSCAR_LIMIT = 20;
 
 function norm(v) {
   return (v || "").toString().trim().toLowerCase();
@@ -185,6 +187,7 @@ function buildAuditoriaResumen(logs) {
 // después — así nunca "sabe" que existen si no puede usarlas.
 export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion }) {
   const tools = [
+    CONSULTAR_REFERENCIA_TOOL,
     {
       name: "resumen_compras",
       description: "Cifras EXACTAS (sumas, conteos, promedios, porcentajes) calculadas sobre el 100% de los registros de compra que cumplan los filtros dados — totales por área/categoría/estado/proveedor, cumplimiento de tiempos de entrega, % de legalización, etc. Úsala SIEMPRE para cualquier pregunta de totales, promedios, distribución o \"análisis general\" — nunca sumes o calcules estos números tú mismo a partir de buscar_registros (esa es solo para citar ejemplos puntuales, no para agregados). Para comparar dos periodos (ej. \"2025 vs 2026\", \"este trimestre vs el anterior\"), llama esta misma herramienta UNA VEZ POR CADA periodo (con 'anio', o con 'fechaDesde'/'fechaHasta' si el periodo no es un año calendario completo) y compara tú los totales ya exactos que te devuelva cada llamada — no hace falta (ni debes) sumar registros individuales para esto.",
@@ -202,7 +205,7 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
     },
     {
       name: "buscar_registros",
-      description: "Busca registros de compra INDIVIDUALES que cumplan filtros específicos, para citar ejemplos puntuales (proveedor, descripción, montos, fechas) — NO la uses para calcular totales o porcentajes generales (para eso usa resumen_compras). Devuelve como máximo 'limit' registros (por defecto 30, máximo 100) ordenados del más reciente al más antiguo, más el total de coincidencias reales (que puede ser mayor a lo devuelto).",
+      description: "Busca registros de compra INDIVIDUALES que cumplan filtros específicos, para citar ejemplos puntuales (proveedor, descripción, montos, fechas) — NO la uses para calcular totales o porcentajes generales (para eso usa resumen_compras). Devuelve como máximo 'limit' registros (por defecto 20, máximo 50) ordenados del más reciente al más antiguo, más el total de coincidencias reales (que puede ser mayor a lo devuelto).",
       input_schema: {
         type: "object",
         properties: {
@@ -217,7 +220,7 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
           fechaHasta: { type: "string", description: "Fecha máxima de solicitud, formato YYYY-MM-DD (opcional)." },
           valorMin: { type: "number", description: "Valor con IVA mínimo en pesos colombianos (opcional)." },
           valorMax: { type: "number", description: "Valor con IVA máximo en pesos colombianos (opcional)." },
-          limit: { type: "integer", description: "Máximo de registros a devolver (opcional, por defecto 30, máximo 100)." },
+          limit: { type: "integer", description: "Máximo de registros a devolver (opcional, por defecto 20, máximo 50)." },
         },
       },
     },
@@ -339,7 +342,7 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
           entidad: { type: "string", description: "Filtra por tipo de entidad afectada, ej. \"record\", \"user\", \"presupuesto\" (opcional, coincidencia parcial)." },
           desde: { type: "string", description: "Fecha mínima, formato YYYY-MM-DD (opcional)." },
           hasta: { type: "string", description: "Fecha máxima, formato YYYY-MM-DD (opcional)." },
-          limit: { type: "integer", description: "Máximo de movimientos a devolver (opcional, por defecto 50, máximo 200)." },
+          limit: { type: "integer", description: "Máximo de movimientos a devolver (opcional, por defecto 30, máximo 80)." },
         },
       },
     });
@@ -361,6 +364,8 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
   return async function executeTool(name, input) {
     const args = input || {};
     switch (name) {
+      case "consultar_referencia":
+        return consultarReferencia(args || {});
       case "resumen_compras": {
         const records = await getRecords();
         // fechaDesde/fechaHasta explícitos tienen prioridad sobre "anio" —
@@ -601,7 +606,7 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
       }
       case "registro_auditoria": {
         if (!canSeeAuditoria) return { error: "No autorizado para consultar auditoría." };
-        const limit = Math.max(1, Math.min(200, Number(args.limit) || 50));
+        const limit = Math.max(1, Math.min(80, Number(args.limit) || 30));
         const { logs } = await listAuditLogs({ from: args.desde, to: args.hasta, pageSize: 300 });
         const filtered = logs.filter((l) => {
           if (args.usuario) {

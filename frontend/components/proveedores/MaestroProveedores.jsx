@@ -447,7 +447,7 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit, i
                     {!esChecklist && <td>{celdaCriticidad(r)}</td>}
                     {!esChecklist && <td className="truncate">{celdaTexto(r.clasificacionMonto)}</td>}
                     {!esChecklist && <td className="truncate">{celdaTexto(r.servicio)}</td>}
-                    {!esChecklist && <td>{r.esExcepcion ? <span className="pill accent">Sí</span> : <span className="muted">No</span>}</td>}
+                    {!esChecklist && <td>{r.esExcepcion ? <span className="pill accent">Sí</span> : <span className="pill muted">No</span>}</td>}
                     {!esChecklist && <td className="mono">{r.esExcepcion ? <span className="muted">No aplica</span> : fmtFecha(r.fechaActualizacion)}</td>}
                     {!esChecklist && (
                       <td>

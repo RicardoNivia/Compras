@@ -66,6 +66,28 @@ async function fetchWithRetry(url, options, timeoutMs = CONNECT_TIMEOUT_MS) {
 // "contents" llega en el formato usado en toda la ruta de chat
 // ({role: "user"|"model", parts:[{text}]}) — aquí se traduce al formato de
 // mensajes de Anthropic.
+// Marca el último mensaje como punto de caché ("prompt caching" incremental): en una pregunta del chat el modelo va y
+// vuelve varias veces con herramientas, y cada vuelta reenvía toda la conversación. Con esta marca, lo ya enviado en la
+// vuelta anterior se lee de la caché (~10 % del precio normal) en vez de cobrarse completo otra vez.
+function conCacheEnUltimo(messages) {
+  if (!messages.length) return messages;
+  const out = messages.slice(0, -1);
+  const ultimo = messages[messages.length - 1];
+  const bloques = typeof ultimo.content === "string" ? [{ type: "text", text: ultimo.content || " " }] : ultimo.content.map((b) => ({ ...b }));
+  bloques[bloques.length - 1] = { ...bloques[bloques.length - 1], cache_control: { type: "ephemeral" } };
+  out.push({ ...ultimo, content: bloques });
+  return out;
+}
+
+// Un resultado de herramienta enorme (cientos de registros o movimientos) se cobra en cada vuelta siguiente: se recorta
+// y se le avisa al modelo para que pida algo más específico.
+const MAX_TOOL_RESULT_CHARS = 15000;
+function recortarResultado(result) {
+  const s = JSON.stringify(result);
+  if (s.length <= MAX_TOOL_RESULT_CHARS) return s;
+  return `${s.slice(0, MAX_TOOL_RESULT_CHARS)}… [resultado recortado por tamaño: si necesitas más detalle, vuelve a consultar con filtros más específicos o un límite menor]`;
+}
+
 function toAnthropicMessages(contents) {
   return contents.map((c) => ({
     role: c.role === "model" ? "assistant" : "user",
@@ -88,7 +110,7 @@ export async function* streamAnthropicChat({ model, systemInstruction, contents,
 
   const system = cacheableSystemPrefix
     ? [
-        { type: "text", text: cacheableSystemPrefix, cache_control: { type: "ephemeral" } },
+        { type: "text", text: cacheableSystemPrefix, cache_control: { type: "ephemeral", ttl: "1h" } },
         { type: "text", text: systemInstruction },
       ]
     : systemInstruction;
@@ -105,7 +127,7 @@ export async function* streamAnthropicChat({ model, systemInstruction, contents,
       model,
       max_tokens: MAX_TOKENS,
       system,
-      messages: toAnthropicMessages(contents),
+      messages: conCacheEnUltimo(toAnthropicMessages(contents)),
       stream: true,
     }),
   });
@@ -175,7 +197,7 @@ export async function runAnthropicAgentChat({ model, systemInstruction, contents
 
   const system = cacheableSystemPrefix
     ? [
-        { type: "text", text: cacheableSystemPrefix, cache_control: { type: "ephemeral" } },
+        { type: "text", text: cacheableSystemPrefix, cache_control: { type: "ephemeral", ttl: "1h" } },
         { type: "text", text: systemInstruction },
       ]
     : systemInstruction;
@@ -196,7 +218,7 @@ export async function runAnthropicAgentChat({ model, systemInstruction, contents
         model,
         max_tokens: MAX_TOKENS,
         system,
-        messages,
+        messages: conCacheEnUltimo(messages),
         tools,
       }),
     }, AGENT_ROUND_TIMEOUT_MS);
@@ -213,6 +235,7 @@ export async function runAnthropicAgentChat({ model, systemInstruction, contents
     }
 
     const data = await res.json();
+    if (process.env.AI_USAGE_LOG === "1") console.log("[ia-uso]", JSON.stringify(data?.usage || {})); // diagnóstico de consumo, solo si se activa
     const content = data?.content || [];
     const toolUseBlocks = content.filter((b) => b.type === "tool_use");
     const textBlocks = content.filter((b) => b.type === "text" && b.text);
@@ -231,7 +254,7 @@ export async function runAnthropicAgentChat({ model, systemInstruction, contents
       } catch (err) {
         result = { error: err.message || "Error ejecutando la herramienta." };
       }
-      toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(result) });
+      toolResults.push({ type: "tool_result", tool_use_id: block.id, content: recortarResultado(result) });
     }
     messages.push({ role: "user", content: toolResults });
   }
@@ -306,6 +329,7 @@ export async function generateAnthropicJson({ model, systemInstruction, prompt, 
   }
 
   const data = await res.json();
+    if (process.env.AI_USAGE_LOG === "1") console.log("[ia-uso]", JSON.stringify(data?.usage || {})); // diagnóstico de consumo, solo si se activa
   const text = (data?.content || []).filter((c) => c.type === "text").map((c) => c.text || "").join("");
   if (data?.stop_reason === "max_tokens") {
     throw new Error(`Anthropic cortó la respuesta por ser demasiado larga (límite de ${MAX_TOKENS} tokens) — intenta con un prompt más acotado (menos secciones/tablas a la vez).`);

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { backendFetch } from "@/lib/backendFetch";
 import { getSessionUser } from "@/lib/auth";
 import AppShell from "@/components/AppShell";
+import { PERIODOS } from "@/components/informes/estudioUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,14 @@ export default async function VerInformesPage() {
               <span className="est-pdf-thumb" aria-hidden="true" />
               <span style={{ minWidth: 0 }}>
                 <strong>{i.nombre}</strong>
+                {(() => {
+                  const p = PERIODOS.find((x) => x.value === i.periodoGeneral);
+                  return (
+                    <span className="est-chip est-compartido-periodo" title={p ? `Datos: ${p.label}` : "Datos: todo el histórico"}>
+                      Datos · {p ? p.corto : "Histórico"}
+                    </span>
+                  );
+                })()}
                 <small>{i.periodoLabel}{i.audiencia ? ` · Para ${i.audiencia}` : ""} · {i.secciones} secciones</small>
                 {i.creadoPor && <small>Creado por {i.creadoPor}</small>}
               </span>
