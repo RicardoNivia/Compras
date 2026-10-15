@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { generateReportContent, resumenCifras } from "@/lib/reportContent";
+import { generateReportContent, resumenCifras, huella } from "@/lib/reportContent";
 import { generateReportPdfBuffer } from "@/lib/reportPdf";
 import { periodoLabel, MESES } from "@/lib/reportSchedule";
 import { generateStructuredJson } from "@/lib/aiStructured";
@@ -45,21 +45,39 @@ function fmtPesosCorto(n) {
   return `$ ${new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1, notation: "compact", compactDisplay: "short" }).format(n || 0)}`;
 }
 
-// 2 o 3 líneas que resumen el informe para el cuerpo del correo ({resumen_nova}). Si la IA falla, un resumen simple
-// con las cifras ya calculadas: el correo nunca queda sin texto.
-async function resumenNova(content, cifras) {
+// 2 o 3 líneas que resumen el informe para el cuerpo del correo ({resumen_nova}). Si el informe tiene secciones de Nova,
+// el resumen ya vino en la misma llamada (content.resumenNova). Si no, se pide aparte, pero solo si las secciones
+// cambiaron desde la edición anterior (huella en previas). Si la IA falla, un resumen simple con las cifras ya
+// calculadas: el correo nunca queda sin texto.
+async function resumenNova(content, cifras, previas = {}) {
   const basico = `se comprometieron ${fmtPesosCorto(cifras.valor)} en ${cifras.compras} compras${cifras.cumplimientoPct != null ? `, con ${cifras.cumplimientoPct}% de cumplimiento de tiempos` : ""}.`;
+  if (content.resumenNova) return { texto: content.resumenNova };
+  const prompt = `Contenido del informe (secciones ya calculadas):\n${JSON.stringify((content.secciones || []).map((s) => ({ titulo: s.titulo, destacado: s.destacado, contenido: s.contenido, variacion: s.variacion?.texto })))}`;
+  const clave = huella(`resumen-correo|${prompt}`);
+  if (previas[clave]?.texto) return { texto: previas[clave].texto, clave };
   try {
     const res = await generateStructuredJson({
       systemInstruction: "Escribes el resumen corto que va en el cuerpo de un correo que acompaña un informe de compras en PDF. Español de Colombia, tono profesional y cordial. 2 o 3 frases, sin saludo ni despedida, empezando en minúscula porque va después de \"En resumen:\". Usa solo cifras que aparezcan en el contenido entregado; nunca inventes datos.",
-      prompt: `Contenido del informe (secciones ya calculadas):\n${JSON.stringify((content.secciones || []).map((s) => ({ titulo: s.titulo, destacado: s.destacado, contenido: s.contenido, variacion: s.variacion?.texto })))}`,
+      prompt,
       schema: { type: "OBJECT", properties: { resumen: { type: "STRING" } }, required: ["resumen"] },
       budgetMs: 25000,
     });
-    return (res.resumen || "").trim() || basico;
+    const texto = (res.resumen || "").trim();
+    return texto ? { texto, clave } : { texto: basico };
   } catch {
-    return basico;
+    return { texto: basico };
   }
+}
+
+// Huellas de los textos de Nova de la última edición del informe (content._ia), para no volver a pedirle a la IA lo
+// mismo cuando los datos no cambiaron (ver resolverIaEnLote en reportContent.js).
+async function huellasPrevias(reportId) {
+  const prev = await prisma.reportEdicion.findFirst({
+    where: { reportId, origen: { not: "foto" }, estado: { in: ["por_enviar", "enviado"] } },
+    orderBy: { createdAt: "desc" },
+    select: { contenido: true },
+  }).catch(() => null);
+  return parse(prev?.contenido, {})._ia || {};
 }
 
 // Reemplaza {mes} {año} {periodo} {valor_total} {fecha_envio} {resumen_nova} en el asunto y el mensaje.
@@ -112,13 +130,17 @@ export async function generarEdicion(report, { origen = "programado", actor = nu
       return foto;
     }
 
-    const content = await generateReportContent({ ...opts, ahora: now });
+    const plantillaMensaje = report.mensaje || MENSAJE_DEFECTO;
+    const conResumen = plantillaMensaje.includes("{resumen_nova}");
+    const previasIa = await huellasPrevias(report.id);
+    const content = await generateReportContent({ ...opts, ahora: now, previasIa, conResumen });
     const [pdfBuffer, cifras] = await Promise.all([
       generateReportPdfBuffer(content, { ...pdfOpts, fecha: now, subtitulo: pdfOpts.subtitulo ? pdfOpts.subtitulo.replace(periodoLabel(report.periodoGeneral), etiqueta) : pdfOpts.subtitulo }),
       resumenCifras(report.periodoGeneral, { excluirAnulados, ahora: now }),
     ]);
-    const plantillaMensaje = report.mensaje || MENSAJE_DEFECTO;
-    const resumen = plantillaMensaje.includes("{resumen_nova}") ? await resumenNova(content, cifras) : "";
+    const res = conResumen ? await resumenNova(content, cifras, previasIa) : null;
+    const resumen = res?.texto || "";
+    if (res?.clave) content._ia = { ...(content._ia || {}), [res.clave]: { texto: res.texto } };
     const vars = { ...variablesDe(report, cifras, resumen, now), nombre: report.nombre };
     const destinatarios = parse(report.destinatarios, []);
     const cc = parse(report.cc, []);

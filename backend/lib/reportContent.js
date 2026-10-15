@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { generateStructuredJson } from "@/lib/aiStructured";
 import { listRecords } from "@/lib/records";
 import { listPresupuestos } from "@/lib/presupuestos";
@@ -753,6 +754,108 @@ async function iaConCache(pregunta, contexto) {
   return value;
 }
 
+// ---------- Secciones de Nova en lote ----------
+// Antes cada sección de Nova era una llamada a la IA que mandaba otra vez los mismos datos del período (4 secciones =
+// 4 llamadas + 1 para el resumen del correo). Ahora:
+//  1. Todas las secciones de Nova del informe (y, si se pide, el resumen del correo) salen en UNA sola llamada, con los
+//     datos del período enviados una vez.
+//  2. Cada texto queda guardado con la "huella" de los datos que lo produjeron (hash de los datos + la pregunta). Si al
+//     volver a generar los datos no cambiaron (vista previa, otra prueba, reponer un período), se reutiliza sin llamar
+//     a la IA; solo se piden las secciones nuevas o cambiadas. La huella también se guarda en el contenido de cada
+//     edición (content._ia), así sobrevive a reinicios del servidor (ver reportEdiciones.js).
+const IA_VERSION = "lote-1"; // súbela si cambian las instrucciones, para no reutilizar textos viejos
+const IA_HUELLA_MS = 24 * 60 * 60 * 1000;
+const iaHuellas = globalThis.__reportIaHuellas || (globalThis.__reportIaHuellas = new Map());
+
+export const huella = (s) => createHash("sha1").update(String(s)).digest("hex").slice(0, 20);
+
+function huellaGet(k, previas) {
+  const hit = iaHuellas.get(k);
+  if (hit && Date.now() - hit.at < IA_HUELLA_MS) return hit.value;
+  return previas?.[k] || null;
+}
+function huellaSet(k, value) {
+  iaHuellas.set(k, { at: Date.now(), value });
+  if (iaHuellas.size > 500) iaHuellas.delete(iaHuellas.keys().next().value);
+}
+
+const IA_LOTE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    respuestas: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: { n: { type: "NUMBER" }, contenido: { type: "STRING" }, destacado: { type: "STRING", nullable: true } },
+        required: ["n", "contenido"],
+      },
+    },
+    resumenCorreo: { type: "STRING", nullable: true },
+  },
+  required: ["respuestas"],
+};
+
+const IA_LOTE_SYSTEM_INSTRUCTION = `Eres Nova y redactas las secciones de texto de un informe de compras (el resto del informe son cifras, gráficas y tablas que el sistema calcula aparte). Te entregan los datos exactos del período UNA vez y una lista numerada de secciones, cada una con la instrucción de qué escribir. Devuelve en "respuestas" una entrada por sección con su mismo número "n": "contenido" de 2 a 5 líneas en español (usa "- " para viñetas si ayuda a la lectura) y "destacado" opcional (una cifra clave, ej. "$42.300.000" o "6 compras", o null). Cada sección debe aportar algo distinto: no repitas lo que dice otra.
+
+Reglas estrictas: basa cualquier cifra, suma, conteo o porcentaje EXCLUSIVAMENTE en los "agregados" (calculados sobre el 100% de los datos, son exactos); la "muestra" de registros es solo para citar ejemplos puntuales, nunca para calcular totales. Si un dato no está en los agregados ni se deriva de ellos con certeza, dilo en vez de inventarlo. Nunca inventes cifras, proveedores, fechas ni datos. Sé conciso.`;
+
+const RESUMEN_CORREO_INSTRUCCION = `Además, en "resumenCorreo" escribe el resumen corto que va en el cuerpo del correo que acompaña el informe en PDF: 2 o 3 frases, español de Colombia, tono profesional y cordial, sin saludo ni despedida, empezando en minúscula porque va después de "En resumen:". Solo cifras de los agregados.`;
+
+// preguntas: textos de las secciones de Nova en orden. Devuelve { respuestas: [{contenido, destacado}|{error}], resumen,
+// mapa } — mapa son las huellas usadas, para guardarlas en el contenido de la edición.
+export async function resolverIaEnLote(preguntas, { periodo, excluirAnulados, ahora, previas = {}, conResumen = false }) {
+  const datos = await datosDelPeriodoTexto({ periodo: periodo || "historico", excluirAnulados: !!excluirAnulados, ahora }, 40);
+  const hDatos = huella(datos);
+  const claves = preguntas.map((p) => huella(`${IA_VERSION}|${hDatos}|${String(p).trim()}`));
+  const claveResumen = huella(`${IA_VERSION}|${hDatos}|resumen`);
+  const valores = {};
+  const faltan = [];
+  claves.forEach((k, i) => {
+    const hit = huellaGet(k, previas);
+    if (hit) valores[k] = hit;
+    else if (!faltan.some((j) => claves[j] === k)) faltan.push(i);
+  });
+  let resumen = conResumen ? huellaGet(claveResumen, previas)?.texto || null : null;
+  const pedirResumen = conResumen && !resumen;
+  let errorLote = null;
+
+  if (faltan.length || pedirResumen) {
+    try {
+      const out = await generateStructuredJson({
+        systemInstruction: IA_LOTE_SYSTEM_INSTRUCTION,
+        prompt: `${datos}
+
+Secciones a redactar:
+${faltan.length ? faltan.map((i, n) => `${n + 1}. """${preguntas[i]}"""`).join("\n") : "(ninguna: devuelve respuestas vacías)"}${pedirResumen ? `\n\n${RESUMEN_CORREO_INSTRUCCION}` : ""}`,
+        schema: IA_LOTE_SCHEMA,
+        budgetMs: 60000,
+      });
+      for (const r of out.respuestas || []) {
+        const i = faltan[Math.round(Number(r.n)) - 1];
+        if (i == null || !r.contenido) continue;
+        const v = { contenido: String(r.contenido).trim(), destacado: r.destacado || null };
+        valores[claves[i]] = v;
+        huellaSet(claves[i], v);
+      }
+      if (pedirResumen && out.resumenCorreo?.trim()) {
+        resumen = out.resumenCorreo.trim();
+        huellaSet(claveResumen, { texto: resumen });
+      }
+    } catch (err) {
+      errorLote = err.message || "error de la IA";
+    }
+  }
+
+  const mapa = {};
+  claves.forEach((k) => { if (valores[k]) mapa[k] = valores[k]; });
+  if (resumen) mapa[claveResumen] = { texto: resumen };
+  return {
+    respuestas: claves.map((k) => valores[k] || { error: errorLote || "Nova no devolvió esta sección" }),
+    resumen,
+    mapa,
+  };
+}
+
 async function renderBloqueIa(b, periodo, excluirAnulados, ahora) {
   if (!b.pregunta || !b.pregunta.trim()) {
     return { titulo: b.titulo || "Análisis con IA", contenido: "(Este bloque no tiene una pregunta configurada.)", destacado: null, grafico: null, tabla: null };
@@ -1072,7 +1175,9 @@ export { loadAggregates };
 // puntual contra la IA en este mismo momento (ver renderBloqueIa arriba).
 // sinIa: para los informes solo para consultar, los bloques "ia" muestran el texto que se guardó al diseñarlos
 // (bloque.textoGuardado) en vez de volver a llamar a la IA. Todo lo demás se calcula con los datos del momento.
-export async function renderReportFromBloques(bloques, { nombre, periodo, excluirAnulados = false, ahora = new Date(), sinIa = false } = {}) {
+// previasIa: huellas de la edición anterior (content._ia) para reutilizar textos de Nova sobre los mismos datos.
+// conResumen: aprovechar la misma llamada para el resumen del correo ({resumen_nova}); queda en content.resumenNova.
+export async function renderReportFromBloques(bloques, { nombre, periodo, excluirAnulados = false, ahora = new Date(), sinIa = false, previasIa = {}, conResumen = false } = {}) {
   // El periodo es UNO SOLO para todo el informe (se eligió al inicio de
   // "Armar informe" en vez de uno por bloque) — se recalcula relativo a
   // "ahora" en cada generación (ver filterRecordsByPeriodo), nunca con una
@@ -1085,7 +1190,21 @@ export async function renderReportFromBloques(bloques, { nombre, periodo, exclui
   const sufijo = periodoSufijo(periodo);
   const prevRecords = filterRecordsByPeriodo(allRecords, periodo, 1, ahora);
   const ctx = { prevRecords, prevAggregates: buildAggregates(prevRecords, presupuestos), etiquetaPrev: etiquetaPeriodoAnterior(periodo, ahora), allRecords, ahora, presupuestos };
-  const secciones = await Promise.all((bloques || []).map((b) => {
+
+  // Las secciones de Nova sobre el período del informe (las del Estudio) salen todas juntas en una sola llamada.
+  const enLote = sinIa ? [] : (bloques || []).map((b, i) => ({ b, i })).filter(({ b }) => b.tipo === "ia" && !b.contexto && b.pregunta?.trim());
+  const lote = enLote.length
+    ? await resolverIaEnLote(enLote.map(({ b }) => b.pregunta), { periodo, excluirAnulados, ahora: ymd(ahora) !== ymd(new Date()) ? ymd(ahora) : null, previas: previasIa, conResumen })
+    : null;
+  const deLote = new Map(enLote.map(({ i }, n) => [i, lote.respuestas[n]]));
+
+  const secciones = await Promise.all((bloques || []).map((b, i) => {
+    if (deLote.has(i)) {
+      const r = deLote.get(i);
+      return r.error
+        ? { titulo: b.titulo || "Análisis de Nova", contenido: `(No se pudo generar este análisis con IA: ${r.error})`, destacado: null, grafico: null, tabla: null }
+        : { titulo: b.titulo || "Análisis de Nova", contenido: r.contenido, destacado: r.destacado || null, grafico: null, tabla: null };
+    }
     if (b.tipo === "ia" && sinIa) {
       return { titulo: b.titulo || "Análisis de Nova", contenido: b.textoGuardado || "(Este análisis se actualiza cuando quien creó el informe lo abre en el Estudio.)", destacado: b.destacadoGuardado || null, grafico: null, tabla: null, _textoGuardado: true };
     }
@@ -1108,6 +1227,7 @@ export async function renderReportFromBloques(bloques, { nombre, periodo, exclui
     saludo: "Buen día,",
     secciones,
     cierre: "Para más detalle, ingresa al Panel de Compras.",
+    ...(lote ? { _ia: lote.mapa, resumenNova: lote.resumen || null } : {}),
   };
 }
 
@@ -1160,27 +1280,33 @@ async function buildContextoDatos(contexto) {
 // análisis de IA" de un bloque kpi/grafico/tabla para que el análisis se
 // base EXCLUSIVAMENTE en los datos exactos de ESE bloque; sin él, se
 // comporta como una pregunta libre sobre todo el histórico (flujo original).
-export async function generateBloqueIaContent(pregunta, contexto) {
-  let userPrompt;
-  if (contexto && contexto.tipoOrigen === "general") {
-    const { records: allRecords, presupuestos } = await loadRecordsAndPresupuestos();
-    const base = contexto.excluirAnulados ? allRecords.filter((r) => r.estado !== "Anulado") : allRecords;
-    const ref = contexto.ahora ? new Date(`${contexto.ahora}T12:00:00`) : new Date();
-    const records = filterRecordsByPeriodo(base, contexto.periodo, 0, ref);
-    const previos = filterRecordsByPeriodo(base, contexto.periodo, 1, ref);
-    const etiquetaPrev = etiquetaPeriodoAnterior(contexto.periodo, ref);
-    const previo = etiquetaPrev
-      ? `\nAgregados exactos del período anterior (${etiquetaPrev}), para comparar:\n${JSON.stringify({ totalRegistros: previos.length, totalValorConIva: previos.reduce((s, r) => s + (r.valorConIva || 0), 0), porArea: countBy(previos, "area"), tiemposEntrega: buildTiemposEntrega(previos) })}\n`
-      : "";
-    userPrompt = `Pregunta para este bloque del informe:
-"""${pregunta}"""
-
-Período del informe: ${PERIODO_LABELS[contexto.periodo] || "histórico completo"}${contexto.excluirAnulados ? " (sin compras anuladas)" : ""}.
+// Datos exactos del período de un informe, en texto, para los bloques de Nova. Va separado de la pregunta para poder
+// mandarlo UNA sola vez aunque el informe tenga varios bloques de Nova (ver resolverIaEnLote).
+async function datosDelPeriodoTexto({ periodo, excluirAnulados, ahora }, maxMuestra = MAX_RECORDS) {
+  const { records: allRecords, presupuestos } = await loadRecordsAndPresupuestos();
+  const base = excluirAnulados ? allRecords.filter((r) => r.estado !== "Anulado") : allRecords;
+  const ref = ahora ? new Date(`${ahora}T12:00:00`) : new Date();
+  const records = filterRecordsByPeriodo(base, periodo, 0, ref);
+  const previos = filterRecordsByPeriodo(base, periodo, 1, ref);
+  const etiquetaPrev = etiquetaPeriodoAnterior(periodo, ref);
+  const previo = etiquetaPrev
+    ? `\nAgregados exactos del período anterior (${etiquetaPrev}), para comparar:\n${JSON.stringify({ totalRegistros: previos.length, totalValorConIva: previos.reduce((s, r) => s + (r.valorConIva || 0), 0), porArea: countBy(previos, "area"), tiemposEntrega: buildTiemposEntrega(previos) })}\n`
+    : "";
+  return `Período del informe: ${PERIODO_LABELS[periodo] || "histórico completo"}${excluirAnulados ? " (sin compras anuladas)" : ""}.
 Agregados exactos del período:
 ${JSON.stringify(buildAggregates(records, presupuestos))}
 ${previo}
 Muestra de registros del período (solo para ejemplos puntuales, no para totales):
-${JSON.stringify(records.slice(-MAX_RECORDS).map(compactRecord))}`;
+${JSON.stringify(records.slice(-maxMuestra).map(compactRecord))}`;
+}
+
+export async function generateBloqueIaContent(pregunta, contexto) {
+  let userPrompt;
+  if (contexto && contexto.tipoOrigen === "general") {
+    userPrompt = `Pregunta para este bloque del informe:
+"""${pregunta}"""
+
+${await datosDelPeriodoTexto(contexto)}`;
   } else if (contexto && contexto.tipoOrigen) {
     const datos = await buildContextoDatos(contexto);
     userPrompt = `Petición del administrador sobre este análisis:
@@ -1262,10 +1388,10 @@ export async function generateReportContent(reportOrPrompt) {
   if (typeof reportOrPrompt === "string") {
     return generateReportContentFromPrompt(reportOrPrompt);
   }
-  const { prompt, bloques, nombre, periodoGeneral, excluirAnulados, ahora, sinIa } = reportOrPrompt || {};
+  const { prompt, bloques, nombre, periodoGeneral, excluirAnulados, ahora, sinIa, previasIa, conResumen } = reportOrPrompt || {};
   const parsedBloques = Array.isArray(bloques) ? bloques : (typeof bloques === "string" ? JSON.parse(bloques || "[]") : []);
   if (parsedBloques.length > 0) {
-    return renderReportFromBloques(parsedBloques, { nombre, periodo: periodoGeneral, excluirAnulados: !!excluirAnulados, ahora: ahora || new Date(), sinIa: !!sinIa });
+    return renderReportFromBloques(parsedBloques, { nombre, periodo: periodoGeneral, excluirAnulados: !!excluirAnulados, ahora: ahora || new Date(), sinIa: !!sinIa, previasIa: previasIa || {}, conResumen: !!conResumen });
   }
   return generateReportContentFromPrompt(prompt);
 }

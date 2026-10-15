@@ -150,7 +150,8 @@ const BLOQUE_SCHEMA = {
   required: ["tipo", "titulo"],
 };
 
-const CATALOGO_TEXTO = () => `Tipos de bloque (usa EXACTAMENTE estos valores en "tipo"):
+// dashboard: false omite la guía de gráficas del Dashboard (larga) cuando el pedido no tiene que ver con ellas.
+const CATALOGO_TEXTO = ({ dashboard = true } = {}) => `Tipos de bloque (usa EXACTAMENTE estos valores en "tipo"):
 - "ia": párrafo que Nova redacta al generar el informe con los datos EXACTOS del período (resumen ejecutivo, conclusiones, explicación de una caída). Pon en "pregunta" qué debe escribir (instrucción concreta, 1-3 frases). Es la forma correcta de cualquier texto que mencione cifras.
 - "texto": texto fijo escrito tal cual en "contenido" (solo notas sin cifras).
 - "kpi": una cifra clave. "metrica" es EXACTAMENTE una de: ${Object.entries(CATALOGO_BLOQUES.metricasKpi).map(([k, v]) => `${k} (${v})`).join(", ")}. Se compara sola con el período anterior.
@@ -168,8 +169,17 @@ const CATALOGO_TEXTO = () => `Tipos de bloque (usa EXACTAMENTE estos valores en 
 - "consumoCategoriaArea": por área, valor del período, acumulado del año, presupuesto, disponible y % consumido (como "Consumo por categoría y área").
 - En "grafico", "limite": N muestra solo los N primeros (ej. top 5 proveedores).
 Períodos válidos para "periodoGeneral": ${PERIODOS.join(", ")} (mes_anterior = el mes calendario anterior a la fecha de cada envío).
+${dashboard ? `\n${GRAFICAS_DASHBOARD}` : ""}`;
 
-${GRAFICAS_DASHBOARD}`;
+// Versión mínima del catálogo para pedidos que solo tocan el texto de una sección de Nova o una nota ("más corto",
+// "más formal", "explica la caída"): no hace falta mandarle a Nova todas las gráficas y cifras.
+const CATALOGO_SOLO_TEXTO = `Tipos de bloque de texto:
+- "ia": párrafo que Nova redacta al generar el informe con los datos EXACTOS del período. Su "pregunta" es la instrucción de qué escribir (1-3 frases); para cambiar cómo se redacta, cambia la "pregunta".
+- "texto": texto fijo escrito tal cual en "contenido" (solo notas sin cifras).`;
+
+// ¿El pedido habla de gráficas, cifras o vistas del Dashboard? Entonces sí va el catálogo completo.
+const PIDE_ESTRUCTURA = /dashboard|tablero|gr[aá]fic|cifra|kpi|indicador|tabla|top|agreg|añad|anad|nuev|pon|quit|elimin|borr|mueve|mover|sub|baj|orden|dona|torta|barra|column|l[ií]nea|apilad|promedio|d[ií]as|mes|semana|a[nñ]o|per[ií]odo|[aá]rea|categor|proveedor|presupuest|pendient|plazo|ahorro|cumplim|consumo|valor|cantidad|estado|responsable|medio de pago|ciclo|valoraci/i;
+const PIDE_DASHBOARD = /dashboard|tablero|como en el panel|participaci|top ?5|ahorro|cumplimiento|consumo|medio de pago|valor cotizado|ticket/i;
 
 // Lo que muestra el Dashboard de compras y cómo se arma cada vista como bloque del informe. Así, cuando el usuario
 // pide "la gráfica de valor de compras por mes del dashboard", Nova sabe exactamente qué bloque crear (mismo título).
@@ -344,11 +354,22 @@ const TIPOS_ETIQUETA = { ia: "Análisis de Nova", texto: "Nota", kpi: "Cifra cla
 
 export async function editarConNova({ nombre, periodoGeneral, contexto, bloques, seleccion, instruccion, historial }) {
   const sel = Number.isInteger(seleccion) && bloques?.[seleccion] ? seleccion : null;
+  // Menos texto a la IA en cada pedido: catálogo mínimo si solo se retoca el texto de la sección seleccionada, guía del
+  // Dashboard solo si el pedido la menciona, y el informe sin los textos ya redactados (textoGuardado), que no hacen
+  // falta para decidir los cambios.
+  const pedido = String(instruccion || "");
+  const conversacion = `${pedido} ${(historial || []).slice(-2).map((m) => m.texto).join(" ")}`;
+  const soloTexto = sel != null && ["ia", "texto"].includes(bloques[sel].tipo) && !PIDE_ESTRUCTURA.test(pedido);
+  const catalogo = soloTexto ? CATALOGO_SOLO_TEXTO : CATALOGO_TEXTO({ dashboard: PIDE_DASHBOARD.test(conversacion) });
+  const compactos = (bloques || []).map((b, i) => {
+    const { textoGuardado, destacadoGuardado, ...resto } = b; // eslint-disable-line no-unused-vars
+    return { i, ...resto };
+  });
   const res = await generateStructuredJson({
     systemInstruction: `Eres Nova dentro del editor del Estudio de informes. El usuario te pide cambios sobre un informe y tú devuelves SOLO las operaciones a aplicar (no el informe completo), en orden, y una respuesta corta en español (1-2 frases) contando qué hiciste.
 Operaciones ("op"): "cambiar" (indice + bloque con SOLO los campos que cambian; para quitar un límite de días usa ultimosDias 0), "agregar" (bloque completo con tipo y titulo; posicion opcional, por defecto al final), "quitar" (indice), "mover" (indice + posicion). Los índices se refieren a la lista tal como va quedando después de cada operación. Si no hay nada que cambiar, devuelve operaciones vacías y explícalo.
 
-${CATALOGO_TEXTO()}
+${catalogo}
 
 Reglas:
 - Si hay una sección seleccionada, el pedido se refiere a ESA sección salvo que diga lo contrario. No toques las demás.
@@ -359,11 +380,11 @@ Reglas:
 - Haz EXACTAMENTE lo que piden: no cambies "agruparPor" a "area" ni a otro valor que no pidieron. Si piden algo que no está en el catálogo (otra agrupación, otra cifra), no lo cambies por algo parecido sin decirlo: explica en "respuesta" qué no se puede y qué propones en su lugar.
 - Nunca inventes cifras ni nombres de proveedores o áreas.`,
     prompt: `Informe actual:
-${JSON.stringify({ nombre, periodoGeneral, audiencia: contexto?.audiencia || null, tono: contexto?.tono || null, bloques: (bloques || []).map((b, i) => ({ i, ...b })) })}
+${JSON.stringify({ nombre, periodoGeneral, audiencia: contexto?.audiencia || null, tono: contexto?.tono || null, bloques: compactos })}
 (Índices actuales: 0 a ${Math.max(0, (bloques || []).length - 1)}.)
 
 ${sel != null ? `Sección seleccionada: índice ${sel} ("${bloques[sel].titulo}").` : "No hay sección seleccionada."}
-${historial?.length ? `Conversación previa:\n${historial.slice(-6).map((m) => `${m.rol}: ${m.texto}`).join("\n")}\n` : ""}
+${historial?.length ? `Conversación previa:\n${historial.slice(-4).map((m) => `${m.rol}: ${String(m.texto || "").slice(0, 300)}`).join("\n")}\n` : ""}
 Pedido del usuario: """${String(instruccion || "").slice(0, 1500)}"""`,
     schema: EDICION_SCHEMA,
     budgetMs: 45000,
