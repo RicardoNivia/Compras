@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/apiGuard";
+import { getSessionUser } from "@/lib/auth-server";
 import { getJob } from "@/lib/reportJobs";
 
 // Consulta genérica de estado para trabajos en segundo plano de Informes
@@ -37,9 +38,14 @@ import { getJob } from "@/lib/reportJobs";
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function GET(request, { params }) {
-  const { denied } = await requirePermission("viewReportes");
-  if (denied) return denied;
   const job = getJob(params.jobId);
+  // Quien tiene permiso de Informes consulta cualquier trabajo; el resto, solo los que creó (informes compartidos).
+  const { denied } = await requirePermission("viewReportes");
+  if (denied) {
+    const user = await getSessionUser();
+    if (!user || !job || job.ownerId !== user.id) return denied;
+  }
+
   if (!job) return NextResponse.json({ error: "Trabajo no encontrado o expirado." }, { status: 404 });
 
   if (job.status === "pending") return NextResponse.json({ status: "pending" });

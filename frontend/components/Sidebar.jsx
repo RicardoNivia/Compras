@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, ROLE_LABELS } from "@/lib/roles";
-import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail, IconBell, IconSearch, IconBuilding } from "@/components/icons";
+import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail, IconBell, IconSearch, IconBuilding, IconEye, IconChevronDown } from "@/components/icons";
+import { fetchCompartidosApi } from "@/lib/api";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 import CommandPalette from "@/components/CommandPalette";
 
@@ -35,6 +36,13 @@ export default function Sidebar({ user }) {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const pathname = usePathname();
+  // "Ver informes": informes solo para consultar compartidos con la persona; se despliega con la lista.
+  const [compartidos, setCompartidos] = useState([]);
+  const [verAbierto, setVerAbierto] = useState(false);
+  useEffect(() => {
+    fetchCompartidosApi().then((r) => setCompartidos(r.informes || [])).catch(() => {});
+  }, [pathname]);
+  useEffect(() => { if (pathname?.startsWith("/ver-informes")) setVerAbierto(true); }, [pathname]);
   const router = useRouter();
 
   const items = ALL_NAV_ITEMS.filter((item) => (item.feature ? (user.permissions?.[item.feature] ?? item.show(user.role)) : item.show(user.role)));
@@ -91,6 +99,25 @@ export default function Sidebar({ user }) {
               <span className="label">{label}</span>
             </Link>
           ))}
+          {compartidos.length > 0 && (
+            <div className="sidebar-grupo">
+              <button type="button" className={"sidebar-link" + (pathname?.startsWith("/ver-informes") ? " active" : "")} onClick={() => setVerAbierto((v) => !v)} aria-expanded={verAbierto}>
+                <span className="sidebar-link-ic"><IconEye size={17} /></span>
+                <span className="label">Ver informes</span>
+                <span className={"sidebar-chevron" + (verAbierto ? " abierto" : "")} aria-hidden="true"><IconChevronDown size={13} /></span>
+              </button>
+              {verAbierto && (
+                <div className="sidebar-sub">
+                  {compartidos.map((i) => (
+                    <Link key={i.id} href={"/ver-informes/" + i.id} className={"sidebar-sublink" + (pathname === "/ver-informes/" + i.id ? " active" : "")} title={i.nombre}>
+                      {i.nombre}
+                    </Link>
+                  ))}
+                  <Link href="/ver-informes" className={"sidebar-sublink todos" + (pathname === "/ver-informes" ? " active" : "")}>Ver todos</Link>
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         <div className="sidebar-foot">

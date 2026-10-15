@@ -4,6 +4,7 @@ import { generateReportContent } from "@/lib/reportContent";
 import { generateReportPdfBuffer } from "@/lib/reportPdf";
 import { resolveEmailBody } from "@/lib/reportEmailBody";
 import { createJob } from "@/lib/reportJobs";
+import { opcionesDe } from "@/lib/reportEdiciones";
 
 // Arranca (sin guardar nada) la generación de la vista previa del informe a
 // partir del prompt como un trabajo en segundo plano — puede tardar hasta
@@ -60,6 +61,19 @@ export async function POST(request) {
   const hasBloques = Array.isArray(body.bloques) && body.bloques.length > 0;
   if (!hasPrompt && !hasBloques) {
     return NextResponse.json({ error: "Describe qué debe contener el informe (prompt) o agrega al menos un bloque." }, { status: 400 });
+  }
+
+  // Estudio de informes: el editor solo necesita el contenido (lo dibuja en pantalla); el PDF se pide aparte al abrir
+  // la vista previa (render-pdf), así cada cambio en el editor responde rápido.
+  if (body.tipo === "estudio") {
+    const opts = opcionesDe(body);
+    const jobId = createJob(async () => {
+      const content = await generateReportContent(opts.contenido);
+      if (body.soloContenido) return { content };
+      const pdfBuffer = await generateReportPdfBuffer(content, opts.pdf);
+      return { content, pdfBase64: pdfBuffer.toString("base64") };
+    });
+    return NextResponse.json({ jobId }, { status: 202 });
   }
 
   const jobId = createJob(async () => {

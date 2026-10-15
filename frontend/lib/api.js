@@ -366,23 +366,20 @@ export async function reviewPendientesApi() {
   return handle(res);
 }
 
-// ---------- Informes automáticos (ver InformesView.jsx) ----------
+// ---------- Estudio de informes (ver components/informes/*) ----------
 
 export async function fetchReportsApi() {
-  const res = await fetch("/api/reports", { cache: "no-store" });
-  return handle(res);
+  return jsonFetch("/api/reports", "GET");
 }
 
-// La generación puede tardar hasta ~100s (Anthropic sobre cientos de
-// registros, ver backend/lib/aiStructured.js) — más de lo que el
-// proxy de rewrites deja esperar en una sola llamada. El backend arranca un
-// trabajo en segundo plano y devuelve su id de inmediato; esta función hace
-// el polling acá (varios GETs cortos y rápidos) para que quien la llama siga
-// viéndola como una promesa normal que resuelve con el resultado final.
-// "jobsPath" es la ruta de consulta de estado (distinta por feature: Informes
-// automáticos usa /api/reports/jobs/[jobId], el chat del Agente IA usa
-// /api/agent/chat/jobs/[jobId] — mismo patrón, mismo lib/reportJobs.js del lado del backend).
-async function pollJob(jobId, { jobsPath = "/api/reports/jobs", maxWaitMs = 115000, intervalMs = 2000 } = {}) {
+export async function fetchReportApi(id) {
+  return jsonFetch(`/api/reports/${id}`, "GET");
+}
+
+// La generación con IA puede tardar más de lo que el proxy de rewrites deja esperar en una sola llamada. El backend
+// arranca un trabajo en segundo plano y devuelve su id; esta función hace el polling (GETs cortos) para que quien la
+// llama la vea como una promesa normal. "jobsPath" cambia por feature (el chat de Nova usa /api/agent/chat/jobs).
+async function pollJob(jobId, { jobsPath = "/api/reports/jobs", maxWaitMs = 115000, intervalMs = 1500 } = {}) {
   const deadline = Date.now() + maxWaitMs;
   while (Date.now() < deadline) {
     const res = await fetch(`${jobsPath}/${jobId}`, { cache: "no-store" });
@@ -394,77 +391,99 @@ async function pollJob(jobId, { jobsPath = "/api/reports/jobs", maxWaitMs = 1150
   throw new Error("La operación está tardando más de lo esperado. Intenta de nuevo en un momento.");
 }
 
-// Vuelve a dibujar el PDF a partir de un contenido ya generado (sin IA, sin
-// polling — responde al instante) — se usa al abrir "Editar informe" para
-// mostrar de nuevo el mismo PDF guardado la última vez.
-export async function renderReportPdfApi({ content, nombre, tipo }) {
-  const res = await fetch("/api/reports/render-pdf", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content, nombre, tipo }),
-  });
-  return handle(res);
+async function jobFetch(url, body, opts) {
+  const { jobId } = await jsonFetch(url, "POST", body || {});
+  return pollJob(jobId, opts);
 }
 
-export async function previewReportApi({ prompt, bloques, nombre, prioridad, cuerpoHtml, periodoGeneral, tipo }) {
-  const res = await fetch("/api/reports/preview", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, bloques, nombre, prioridad, cuerpoHtml, periodoGeneral, tipo }),
-  });
-  const { jobId } = await handle(res);
-  return pollJob(jobId);
+export async function fetchPlantillasApi() {
+  return jsonFetch("/api/reports/plantillas", "GET");
 }
 
-// Botón "Armar informe automáticamente con IA" (ReportEditor.jsx) — sin
-// prompt: la IA analiza los datos reales y propone una estructura de bloques
-// {periodoSugerido, bloques: [{tipo, titulo, metrica?, agruparPor?, ...}]}.
-export async function sugerirBloquesApi() {
-  const res = await fetch("/api/reports/sugerir-bloques", { method: "POST" });
-  const { jobId } = await handle(res);
-  return pollJob(jobId);
+// Contenido del informe tal como quedaría hoy (sin guardar nada). soloContenido: el editor lo dibuja en pantalla y
+// pide el PDF aparte solo al abrir la vista previa.
+export async function previewEstudioApi(informe, { soloContenido = true } = {}) {
+  return jobFetch("/api/reports/preview", { ...informe, tipo: "estudio", soloContenido });
 }
 
-// Botón "IA" del editor del cuerpo del correo (ReportBodyEditor.jsx) — no
-// genera nada desde cero, revisa/reescribe el texto que el usuario ya
-// escribió y devuelve {texto} para que decida si lo aplica.
-export async function generateCuerpoCorreoIaApi({ texto }) {
-  const res = await fetch("/api/reports/cuerpo-ia", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ texto }),
-  });
-  const { jobId } = await handle(res);
-  return pollJob(jobId, { maxWaitMs: 60000 });
+// Vuelve a dibujar el PDF a partir de un contenido ya generado: sin IA, responde al instante.
+export async function renderReportPdfApi({ content, ...informe }) {
+  return jsonFetch("/api/reports/render-pdf", "POST", { ...informe, content, tipo: "estudio" });
+}
+
+// Nova: "armar" (desde el pedido), "editar" (cambio en lenguaje natural), "programacion" (frase → regla), "mensaje".
+export async function novaInformeApi(accion, body) {
+  return jobFetch(`/api/reports/nova/${accion}`, body, { maxWaitMs: 120000 });
+}
+
+export async function proximasFechasApi(regla) {
+  return jsonFetch("/api/reports/proximas-fechas", "POST", regla);
+}
+
+export async function cifraDetalleApi(params) {
+  return jsonFetch("/api/reports/cifra", "POST", params);
 }
 
 export async function createReportApi(data) {
-  const res = await fetch("/api/reports", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  return handle(res);
+  return jsonFetch("/api/reports", "POST", data);
 }
 
 export async function updateReportApi(id, data) {
-  const res = await fetch(`/api/reports/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  return handle(res);
+  return jsonFetch(`/api/reports/${id}`, "PATCH", data);
 }
 
 export async function deleteReportApi(id) {
-  const res = await fetch(`/api/reports/${id}`, { method: "DELETE" });
-  return handle(res);
+  return jsonFetch(`/api/reports/${id}`, "DELETE");
 }
 
-export async function sendReportNowApi(id) {
-  const res = await fetch(`/api/reports/${id}/send-now`, { method: "POST" });
-  const { jobId } = await handle(res);
-  return pollJob(jobId);
+export async function fetchEdicionesApi(reportId) {
+  return jsonFetch(`/api/reports/${reportId}/ediciones`, "GET");
+}
+
+// origen "manual" (Generar ahora) o "prueba" (solo para quien la pide).
+export async function generarEdicionApi(reportId, origen = "manual") {
+  return jobFetch(`/api/reports/${reportId}/ediciones`, { origen }, { maxWaitMs: 150000 });
+}
+
+export async function fetchEdicionApi(edId) {
+  return jsonFetch(`/api/reports/ediciones/${edId}`, "GET");
+}
+
+export function edicionPdfUrl(edId, { inline = false } = {}) {
+  return `/api/reports/ediciones/${edId}/pdf${inline ? "?inline=1" : ""}`;
+}
+
+export async function marcarEdicionEnviadaApi(edId) {
+  return jsonFetch(`/api/reports/ediciones/${edId}/enviado`, "POST");
+}
+
+export async function fetchPorEnviarApi() {
+  return jsonFetch("/api/reports/por-enviar", "GET");
+}
+
+// Informes solo para consultar (menú "Ver informes"): no requieren el permiso de Informes, solo tener acceso.
+export async function fetchCompartidosApi() {
+  return jsonFetch("/api/reports/compartidos", "GET");
+}
+
+export async function fetchCompartidoApi(id) {
+  return jsonFetch(`/api/reports/compartidos/${id}`, "GET");
+}
+
+export async function contenidoCompartidoApi(id) {
+  return jobFetch(`/api/reports/compartidos/${id}`, {}, { maxWaitMs: 120000 });
+}
+
+export async function fetchUsuariosInformesApi() {
+  return jsonFetch("/api/reports/usuarios", "GET");
+}
+
+export async function fetchEdicionContenidoApi(edId) {
+  return jsonFetch(`/api/reports/ediciones/${edId}/contenido`, "GET");
+}
+
+export async function fetchActividadInformeApi(reportId) {
+  return jsonFetch(`/api/reports/${reportId}/actividad`, "GET");
 }
 
 // ---------- Valoración con IA de compras radicadas ----------

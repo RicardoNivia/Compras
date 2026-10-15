@@ -5,6 +5,7 @@ import { listMaestroProveedores, getConfigProveedores } from "@/lib/proveedoresC
 import { esCritico } from "@/lib/proveedoresCicloReglas";
 import { isRoleAllowed } from "@/lib/permissions";
 import { businessDaysElapsedToToday } from "@/lib/businessDays";
+import { edicionesPorEnviar } from "@/lib/reportEdiciones";
 
 // "Mi día": motor ÚNICO de lo que le toca hacer a cada persona según su rol. Alimenta la página
 // "Mi día y alertas", el contador del menú lateral y la herramienta "mis_pendientes" de Nova, así
@@ -218,7 +219,30 @@ function provPorRegistrar(filas) {
 
 // ---------- Catálogo de secciones y qué ve cada rol ----------
 
+// Informes del Estudio que ya se generaron y esperan que su responsable los envíe ("Lo envío yo").
+async function informesPorEnviar(user) {
+  const eds = await edicionesPorEnviar(user);
+  return eds.map((e) => {
+    const dias = Math.floor((Date.now() - new Date(e.createdAt).getTime()) / 86400000);
+    const n = e.destinatarios.length;
+    return {
+      id: `inf-${e.id}`,
+      ref: e.periodoLabel,
+      titulo: e.reportNombre || "Informe",
+      contexto: e.origen === "prueba" ? "Prueba (solo para ti)" : n ? `Para ${n} persona(s)` : "Sin destinatarios",
+      dias,
+      detalle: `Generado el ${new Date(e.createdAt).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`,
+      nivel: dias >= 2 ? "atencion" : "info",
+      href: `/informes/${e.reportId}?tab=ediciones`,
+      accion: "enviarInforme",
+      edicionId: e.id,
+      mio: true,
+    };
+  });
+}
+
 const SECCIONES = [
+  { clave: "informesPorEnviar", titulo: "Informes listos para que los envíes", descripcion: "Se generaron a su hora con el PDF listo: descárgalo y envíalo desde Outlook con el correo ya escrito.", roles: ["admin", "registro", "legalizar", "radicar", "proveedores"], fuente: "informes", permiso: "viewReportes" },
   // Compras
   { clave: "atrasadas", titulo: "Solicitudes atrasadas", descripcion: "Compras sin fecha de entrega. Pasados 8 días hábiles incumplen el plazo; desde 5 ya conviene moverlas.", roles: ["admin", "registro"], fuente: "records" },
   { clave: "porLegalizar", titulo: "Compras por legalizar", descripcion: "Ya fueron entregadas o ejecutadas pero su legalización no se ha hecho. Los días cuentan desde la entrega.", roles: ["admin", "legalizar"], fuente: "records" },
@@ -270,6 +294,7 @@ export async function getPendientes(user) {
     provEstancados: () => provEstancados(prov.rows, ctxProv.anio),
     provChecklist: () => provChecklist(prov.rows),
     provPorRegistrar: () => provPorRegistrar(prov.rows),
+    informesPorEnviar: () => informesPorEnviar(user),
   };
 
   const secciones = [];
@@ -279,7 +304,7 @@ export async function getPendientes(user) {
       clave: s.clave,
       titulo: s.titulo,
       descripcion: s.descripcion,
-      dominio: s.fuente === "proveedores" ? "proveedores" : s.fuente === "presupuesto" ? "presupuesto" : "compras",
+      dominio: s.fuente === "proveedores" ? "proveedores" : s.fuente === "presupuesto" ? "presupuesto" : s.fuente === "informes" ? "informes" : "compras",
       total: items.length,
       criticos: items.filter((i) => i.nivel === "critico").length,
       nivel: items.length ? peorNivel(items) : "ok",

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/apiGuard";
 import { generateReportPdfBuffer } from "@/lib/reportPdf";
+import { opcionesDe } from "@/lib/reportEdiciones";
 
 // Vuelve a dibujar el PDF a partir de un contenido YA GENERADO (sin llamar a
 // la IA) — se usa al abrir "Editar informe" para mostrar de nuevo el mismo
@@ -51,7 +52,8 @@ export async function POST(request) {
     return NextResponse.json({ error: "Falta el contenido del informe." }, { status: 400 });
   }
   try {
-    const pdfBuffer = await generateReportPdfBuffer(body.content, { nombre: body.nombre, dashboardLayout: body.tipo === "dashboard" });
+    const pdfOpts = body.tipo === "estudio" ? opcionesDe(body).pdf : { nombre: body.nombre, dashboardLayout: body.tipo === "dashboard" };
+    const pdfBuffer = await generateReportPdfBuffer(body.content, pdfOpts);
     return NextResponse.json({ pdfBase64: pdfBuffer.toString("base64") });
   } catch (err) {
     return NextResponse.json({ error: err.message || "No se pudo generar el PDF." }, { status: 500 });

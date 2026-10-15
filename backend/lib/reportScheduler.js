@@ -1,118 +1,52 @@
 import { prisma } from "@/lib/prisma";
-import { generateReportContent } from "@/lib/reportContent";
-import { generateReportPdfBuffer } from "@/lib/reportPdf";
-import { resolveEmailBody } from "@/lib/reportEmailBody";
-import { sendReportEmail, isMailerConfigured, MAIL_MAINTENANCE } from "@/lib/mailer";
-import { markSent } from "@/lib/reports";
-import { logReportSent } from "@/lib/audit";
+import { esFechaDeEnvio } from "@/lib/reportSchedule";
+import { generarEdicion } from "@/lib/reportEdiciones";
 
 const CHECK_INTERVAL_MS = 60 * 1000;
 
-// Último día real del mes de "now" (ej. 28/29 en febrero, 30 en abril/junio/
-// septiembre/noviembre, 31 en el resto) — día 0 del mes siguiente.
-function lastDayOfMonth(now) {
-  return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-}
+// No hay un cron externo en este stack: mientras el proceso de Next.js del backend esté corriendo, este intervalo
+// revisa cada minuto qué informes activos tocan hoy (ver lib/reportSchedule.js: frecuencias, días hábiles y festivos)
+// y, a partir de su hora, genera la edición del día (ver lib/reportEdiciones.js). Ya no depende del correo: sin SMTP
+// la edición queda "por enviar" y le llega al responsable en Mi día ("Lo envío yo"); con correo automático
+// habilitado y el informe configurado así, se envía sola.
+// "A partir de su hora" (no "exactamente a esa hora"): si el servidor estaba apagado a las 8:00 y arranca a las 9:10,
+// la edición de hoy se genera igual. Nunca dos el mismo día: se mira si ya existe una edición programada de hoy.
 
-// El día configurado se "recorta" al último día real del mes: así elegir 31
-// funciona como "fin de mes" todo el año (30 en meses de 30 días, el 28/29 en
-// febrero) en vez de nunca disparar en los meses que no llegan a ese día.
-function effectiveMonthDay(diaMes, now) {
-  return Math.min(diaMes, lastDayOfMonth(now));
-}
+const enCurso = globalThis.__reportesEnCurso || (globalThis.__reportesEnCurso = new Set());
 
-function dateKey(d) {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
-// Sábado y domingo se configuran por separado (uno puede ser hábil y el otro
-// no, ver sabadoHabil/domingoHabil en el informe) — un día entre semana
-// siempre es hábil.
-function esHabil(d, report) {
-  const wd = d.getDay();
-  if (wd === 6) return !!report.sabadoHabil;
-  if (wd === 0) return !!report.domingoHabil;
-  return true;
-}
-
-// Si el día cae en uno no hábil, avanza de a un día hasta encontrar el
-// siguiente que sí lo sea (nunca más de 2 pasos, dado que solo sábado/domingo
-// pueden ser no hábiles).
-function shiftToBusinessDay(d, report) {
-  const shifted = new Date(d.getTime());
-  while (!esHabil(shifted, report)) shifted.setDate(shifted.getDate() + 1);
-  return shifted;
-}
-
-// Fecha "objetivo" de este informe para el período que contiene a "now"
-// (hoy, para diaria; el día de la semana más cercano, para semanal; el día
-// del mes efectivo, para mensual), ya ajustada al siguiente hábil si
-// corresponde — isDue solo compara esta fecha contra "now" por día calendario.
-function scheduledDateFor(report, now) {
-  if (report.frecuencia === "semanal") {
-    const base = new Date(now.getTime());
-    base.setDate(base.getDate() + (report.diaSemana - now.getDay()));
-    return shiftToBusinessDay(base, report);
-  }
-  if (report.frecuencia === "mensual") {
-    const base = new Date(now.getFullYear(), now.getMonth(), effectiveMonthDay(report.diaMes, now));
-    return shiftToBusinessDay(base, report);
-  }
-  return shiftToBusinessDay(now, report); // "diaria"
-}
-
-// No hay un cron externo en este stack — mientras el proceso de Next.js del
-// backend esté corriendo (npm run dev / npm start), este intervalo revisa
-// cada minuto qué informes activos están "vencidos" según su frecuencia/hora
-// configurada y los envía. Es deliberadamente simple (sin node-cron) para no
-// agregar una dependencia nueva solo para esto.
-function isDue(report, now) {
-  const [h, m] = report.hora.split(":").map(Number);
-  if (now.getHours() !== h || now.getMinutes() !== m) return false;
-
-  if (dateKey(scheduledDateFor(report, now)) !== dateKey(now)) return false;
-
-  // Ya se envió hoy (evita reenvíos durante el mismo minuto si el intervalo
-  // se solapa, o si el servidor se reinicia dentro de la ventana).
-  const last = report.ultimoEnvio ? new Date(report.ultimoEnvio) : null;
-  if (last && dateKey(last) === dateKey(now)) return false;
-
-  return true;
+function inicioDelDia(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 async function runDueReports() {
-  if (MAIL_MAINTENANCE || !isMailerConfigured()) return;
-  let due;
+  let reports;
   try {
-    due = await prisma.reportConfig.findMany({ where: { activo: true, esBorrador: false } });
+    // Solo informes del Estudio: los del constructor anterior quedan sin programar hasta que se abran y se activen
+    // de nuevo en el Estudio (así no empiezan a aparecer de golpe en Mi día informes que nadie revisó).
+    reports = await prisma.reportConfig.findMany({ where: { activo: true, esBorrador: false, tipo: "estudio" } });
   } catch {
-    return; // BD no disponible en este tick — se reintenta en el siguiente
+    return; // BD no disponible en este tick: se reintenta en el siguiente
   }
 
   const now = new Date();
-  for (const report of due) {
-    if (!isDue(report, now)) continue;
-    try {
-      const content = await generateReportContent({ prompt: report.prompt, bloques: report.bloques, nombre: report.nombre, periodoGeneral: report.periodoGeneral });
-      const [pdfBuffer, cuerpo] = await Promise.all([
-        generateReportPdfBuffer(content, { nombre: report.nombre, prioridad: report.prioridad, dashboardLayout: report.tipo === "dashboard" }),
-        resolveEmailBody({ cuerpoHtml: report.cuerpoHtml, content, nombre: report.nombre, cuerpoModo: report.cuerpoModo, cuerpoPrompt: report.cuerpoPrompt }),
-      ]);
-      const destinatarios = JSON.parse(report.destinatarios || "[]");
-      const cc = JSON.parse(report.cc || "[]");
-      await sendReportEmail({
-        to: destinatarios,
-        cc,
-        subject: content.asunto || report.nombre,
-        text: cuerpo.text,
-        html: cuerpo.html,
-        attachments: [{ filename: `${report.nombre || "Informe"}.pdf`, content: pdfBuffer, contentType: "application/pdf" }],
-      });
-      await markSent(report.id, content, cuerpo.text);
-      await logReportSent(null, report, true).catch(() => {});
-    } catch (err) {
-      await logReportSent(null, report, false, err.message).catch(() => {});
-    }
+  const minutos = now.getHours() * 60 + now.getMinutes();
+  for (const report of reports) {
+    if (enCurso.has(report.id)) continue;
+    const [h, m] = String(report.hora || "08:00").split(":").map(Number);
+    if (minutos < h * 60 + m) continue;
+    if (!esFechaDeEnvio(report, now)) continue;
+
+    // Los informes solo para consultar no se envían: a su hora se les guarda una foto automática en su histórico.
+    const consulta = (() => { try { return JSON.parse(report.contexto || "{}").proposito === "consulta"; } catch { return false; } })();
+    const yaHoy = await prisma.reportEdicion.count({
+      where: { reportId: report.id, creadoPorUserId: null, origen: consulta ? "foto" : "programado", createdAt: { gte: inicioDelDia(now) } },
+    }).catch(() => 1);
+    if (yaHoy) continue;
+
+    enCurso.add(report.id);
+    generarEdicion(report, { origen: consulta ? "foto" : "programado" })
+      .catch(() => {})
+      .finally(() => enCurso.delete(report.id));
   }
 }
 
