@@ -145,6 +145,18 @@ export const REPORT_FIELD_LABELS = {
   periodoGeneral: "Periodo de los datos",
   activo: "Activo",
   esBorrador: "Borrador",
+  pedido: "Pedido a Nova",
+  reglaTexto: "Programación (texto)",
+  ordinal: "Semana del mes",
+  fechaUnica: "Fecha de envío único",
+  saltarFestivos: "Saltar festivos",
+  condicion: "Condición de envío",
+  entrega: "Forma de entrega",
+  responsables: "Responsables del envío",
+  asunto: "Asunto del correo",
+  mensaje: "Mensaje del correo",
+  proposito: "Propósito del informe",
+  accesoNombres: "Personas con acceso",
 };
 
 export const ACTION_LABELS = {
@@ -153,6 +165,8 @@ export const ACTION_LABELS = {
   eliminar: "Eliminó",
   radicar: "Radicó",
   enviar: "Envió",
+  generar: "Generó",
+  descargar: "Descargó",
   bloqueoIa: "Bloqueó respuesta IA",
 };
 
@@ -164,6 +178,7 @@ export const ENTITY_LABELS = {
   presupuesto: "Presupuesto",
   permiso: "Permiso",
   informe: "Informe automático",
+  informeEdicion: "Edición de informe",
   "agente-ia": "Agente IA",
   calificacion: "Calificación de proveedor",
   valoracion: "Valoración Nova de compra",

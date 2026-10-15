@@ -6,6 +6,8 @@ import { reviewPendientesApi } from "@/lib/api";
 import { IconSpark, IconAlert, IconCheck, IconClock, IconArrowRight } from "@/components/icons";
 import { TimelineButton } from "@/components/RecordTimelineModal";
 import { AnimatedNumber } from "@/components/charts/chartKit";
+import EnviarInformeModal from "@/components/informes/EnviarInformeModal";
+import { IconMail } from "@/components/icons";
 
 const PAGE_SIZES = [25, 50, 100];
 
@@ -39,7 +41,7 @@ function diasPill(dias, nivel) {
 }
 
 // Tabla de una sección (paginada como el resto de tablas de la app).
-function SeccionTabla({ items, dominio }) {
+function SeccionTabla({ items, dominio, onEnviarInforme }) {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
@@ -48,6 +50,7 @@ function SeccionTabla({ items, dominio }) {
   const visibles = items.slice((current - 1) * pageSize, current * pageSize);
   const esProv = dominio === "proveedores";
   const esPresupuesto = dominio === "presupuesto";
+  const esInformes = dominio === "informes";
 
   // Si el filtro reduce la lista, la página actual no puede quedar fuera de rango.
   useEffect(() => { setPage(1); }, [items.length, pageSize]);
@@ -58,10 +61,10 @@ function SeccionTabla({ items, dominio }) {
         <table className="audit-log mi-dia-tabla">
           <thead>
             <tr>
-              <th>{esProv ? "NIT" : esPresupuesto ? "" : "#"}</th>
-              <th>{esProv ? "Proveedor" : esPresupuesto ? "Área" : "Descripción"}</th>
-              <th>{esPresupuesto ? "Período" : esProv ? "Área · tipo" : "Proveedor · área"}</th>
-              <th>{esPresupuesto ? "% consumido" : esProv ? "Días" : "Días háb."}</th>
+              <th>{esProv ? "NIT" : esPresupuesto ? "" : esInformes ? "Período" : "#"}</th>
+              <th>{esProv ? "Proveedor" : esPresupuesto ? "Área" : esInformes ? "Informe" : "Descripción"}</th>
+              <th>{esPresupuesto ? "Período" : esProv ? "Área · tipo" : esInformes ? "Para" : "Proveedor · área"}</th>
+              <th>{esPresupuesto ? "% consumido" : esProv || esInformes ? "Días" : "Días háb."}</th>
               <th>Detalle</th>
               <th></th>
             </tr>
@@ -80,9 +83,15 @@ function SeccionTabla({ items, dominio }) {
                 <td style={{ whiteSpace: "nowrap" }}>
                   <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                     {it.recordId && <TimelineButton recordId={it.recordId} localSeq={Number(String(it.ref).replace("#", "")) || null} />}
-                    <button type="button" className="btn small ir-registro-btn" onClick={() => router.push(it.href)} title="Abrir">
-                      Ir <IconArrowRight size={11} />
-                    </button>
+                    {it.accion === "enviarInforme" ? (
+                      <button type="button" className="btn small btn-primary" onClick={() => onEnviarInforme?.(it.edicionId)} title="Enviar el informe">
+                        <IconMail size={11} /> Enviar
+                      </button>
+                    ) : (
+                      <button type="button" className="btn small ir-registro-btn" onClick={() => router.push(it.href)} title="Abrir">
+                        Ir <IconArrowRight size={11} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -111,7 +120,7 @@ function SeccionTabla({ items, dominio }) {
   );
 }
 
-function Seccion({ s, items }) {
+function Seccion({ s, items, onEnviarInforme }) {
   const nivel = items.length ? (items.some((i) => i.nivel === "critico") ? "critico" : items.some((i) => i.nivel === "atencion") ? "atencion" : "info") : "ok";
   const criticos = items.filter((i) => i.nivel === "critico").length;
   const [abierta, setAbierta] = useState(nivel === "critico" || nivel === "atencion");
@@ -130,7 +139,7 @@ function Seccion({ s, items }) {
           <span className="mi-dia-flecha" aria-hidden="true">{abierta ? "▾" : "▸"}</span>
         </span>
       </button>
-      {abierta && <SeccionTabla items={items} dominio={s.dominio} />}
+      {abierta && <SeccionTabla items={items} dominio={s.dominio} onEnviarInforme={onEnviarInforme} />}
     </section>
   );
 }
@@ -201,8 +210,11 @@ export default function MiDiaView({ initialData, user }) {
   const data = initialData;
   const [soloMio, setSoloMio] = useState(false);
   const [nova, setNova] = useState(false);
+  const [enviarInforme, setEnviarInforme] = useState(null);
+  const router = useRouter();
 
-  const hayMios = useMemo(() => data.secciones.some((s) => s.items.some((i) => i.mio)), [data]);
+  // "Solo lo mío" filtra los registros de compras donde la persona es responsable: solo se ofrece si tiene alguno.
+  const hayMios = useMemo(() => data.secciones.some((s) => s.dominio === "compras" && s.items.some((i) => i.mio)), [data]);
 
   // Con "Solo lo mío" se muestran únicamente los registros de los que la persona es responsable.
   const secciones = useMemo(() => data.secciones.map((s) => ({
@@ -259,7 +271,7 @@ export default function MiDiaView({ initialData, user }) {
           <p className="card-sub">No tienes pendientes{soloMio ? " propios" : ""} en este momento. Buen trabajo.</p>
         </div>
       ) : (
-        conItems.map(({ s, items }) => <Seccion key={s.clave} s={s} items={items} />)
+        conItems.map(({ s, items }) => <Seccion key={s.clave} s={s} items={items} onEnviarInforme={setEnviarInforme} />)
       )}
 
       {alDia.length > 0 && todos.length > 0 && (
@@ -269,6 +281,7 @@ export default function MiDiaView({ initialData, user }) {
       )}
 
       {nova && <ResumenNova onClose={() => setNova(false)} />}
+      {enviarInforme && <EnviarInformeModal edicionId={enviarInforme} onClose={() => setEnviarInforme(null)} onEnviado={() => router.refresh()} />}
     </div>
   );
 }

@@ -25,9 +25,11 @@ function cleanupOld() {
   }
 }
 
-export function createJob(taskFn) {
+// ownerId: quien creó el trabajo. Permite que un usuario sin permiso de Informes consulte SU trabajo (p. ej. ver un
+// informe compartido con él, ver app/api/reports/compartidos/*).
+export function createJob(taskFn, ownerId = null) {
   const id = randomUUID();
-  const job = { status: "pending", result: null, error: null, createdAt: Date.now() };
+  const job = { status: "pending", result: null, error: null, createdAt: Date.now(), ownerId };
   jobs.set(id, job);
   cleanupOld();
 

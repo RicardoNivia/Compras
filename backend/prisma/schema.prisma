@@ -450,10 +450,53 @@ model ReportConfig {
   ultimoContenido String?   // JSON: snapshot de la última vista previa/envío generado (ver REPORT_SCHEMA)
   ultimoCuerpoCorreo String? // texto plano del cuerpo de correo de esa misma vista previa/envío — sin esto, al editar un informe ya guardado no había forma de volver a mostrar el cuerpo exacto que se generó (solo el contenido del PDF)
   ultimoEnvio     DateTime?
+  // ---- Estudio de informes (ver lib/reportSchedule.js, lib/reportEdiciones.js, lib/reportNova.js) ----
+  pedido          String?   // lo que el usuario le pidió a Nova al crear el informe ("Quiero un informe mensual para gerencia...")
+  contexto        String?   // JSON { audiencia, tono } que Nova entendió del pedido
+  reglaTexto      String?   // la programación tal como la escribió el usuario ("el primer lunes hábil de cada mes a las 8")
+  ordinal         Int?      // frecuencia "mensual_semana": 1..4 = primero..cuarto, -1 = último (con diaSemana)
+  fechaUnica      String?   // frecuencia "unica": YYYY-MM-DD
+  saltarFestivos  Boolean   @default(true) // si la fecha cae en festivo colombiano (o fin de semana no hábil) se corre al siguiente hábil
+  condicion       String    @default("siempre") // "siempre" | "presupuesto80" | "fueraPlazo": si no se cumple, ese período no se genera
+  entrega         String    @default("yo") // "yo" (Lo envío yo) | "correo" (automático, cuando haya SMTP) | "teams" (próximamente)
+  responsables    String?   // JSON [{ id, nombre }]: a quién se le avisa en Mi día para que lo envíe (por defecto, quien lo creó)
+  asunto          String?   // asunto del correo con variables {mes} {año} {valor_total} {fecha_envio}
+  mensaje         String?   // cuerpo del correo con las mismas variables + {resumen_nova}
   createdBy       String?
   createdByNombre String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  ediciones       ReportEdicion[]
 
   @@map("report_configs")
+}
+
+// Cada generación de un informe (programada, manual o de prueba) queda archivada con su PDF tal como salió ese día:
+// es lo que el responsable descarga y envía ("Lo envío yo"), lo que se compara entre meses y el historial del informe.
+model ReportEdicion {
+  id               Int          @id @default(autoincrement())
+  reportId         String
+  report           ReportConfig @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  periodoLabel     String       // "Octubre 2026", "2026", "Histórico"
+  origen           String       @default("programado") // "programado" | "manual" | "prueba"
+  estado           String       // "por_enviar" | "enviado" | "omitido" | "error"
+  motivo           String?      // por qué se omitió o falló
+  contenido        String?      // JSON: el contenido generado (secciones) — ver lib/reportContent.js
+  pdf              Bytes?
+  asunto           String?      // ya con las variables reemplazadas
+  mensaje          String?
+  destinatarios    String?      // JSON string[] (snapshot al generar)
+  cc               String?      // JSON string[]
+  resumen          String?      // JSON { valor, compras, cumplimientoPct, enProceso, fueraPlazo } para comparar ediciones
+  descargadoAt     DateTime?
+  enviadoAt        DateTime?
+  enviadoPorUserId String?
+  enviadoPorNombre String?
+  createdAt        DateTime     @default(now())
+  creadoPorUserId  String?
+  creadoPorNombre  String?      // "Programación automática" cuando la generó el programador
+
+  @@index([reportId, createdAt])
+  @@index([estado])
+  @@map("report_ediciones")
 }

@@ -1,7 +1,11 @@
+import { createHash } from "crypto";
 import { generateStructuredJson } from "@/lib/aiStructured";
 import { listRecords } from "@/lib/records";
 import { listPresupuestos } from "@/lib/presupuestos";
 import { businessDaysBetween, businessDaysElapsedToToday } from "@/lib/businessDays";
+import { prisma } from "@/lib/prisma";
+import { indicadoresCiclo } from "@/lib/proveedoresCiclo";
+import { ymd, MESES } from "@/lib/reportSchedule";
 
 // Mismo umbral que el KPI "Cumplimiento de tiempos" del Dashboard (ver
 // DashboardView.jsx) — para que un informe que hable de tiempos de entrega
@@ -268,15 +272,58 @@ const PERIODO_LABELS = {
   mes_anterior: "mes anterior",
   anio_actual: "año actual",
   anio_anterior: "año anterior",
+  semana_anterior: "semana anterior",
 };
+
+// Rango [desde, hasta] (YYYY-MM-DD, inclusivo) de un período relativo a "now". offset = 1 da el período inmediatamente
+// anterior, para comparar (en "anio_actual" es el mismo tramo enero→hoy del año pasado). "historico" → null.
+export function rangoPeriodo(periodo, offset = 0, now = new Date()) {
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  switch (periodo) {
+    case "mes_actual": {
+      if (!offset) return { desde: ymd(new Date(y, m, 1)), hasta: ymd(now) };
+      return { desde: ymd(new Date(y, m - offset, 1)), hasta: ymd(new Date(y, m - offset + 1, 0)) };
+    }
+    case "mes_anterior":
+      return { desde: ymd(new Date(y, m - 1 - offset, 1)), hasta: ymd(new Date(y, m - offset, 0)) };
+    case "anio_actual":
+      return { desde: ymd(new Date(y - offset, 0, 1)), hasta: ymd(new Date(y - offset, m, now.getDate())) };
+    case "anio_anterior":
+      return { desde: ymd(new Date(y - 1 - offset, 0, 1)), hasta: ymd(new Date(y - 1 - offset, 11, 31)) };
+    case "semana_anterior": {
+      const lunes = new Date(y, m, now.getDate() - ((now.getDay() + 6) % 7) - 7 * (1 + offset));
+      return { desde: ymd(lunes), hasta: ymd(new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6)) };
+    }
+    default:
+      return null;
+  }
+}
+
+// Cómo se nombra el período anterior en las comparaciones ("vs agosto", "vs mismo período de 2025").
+export function etiquetaPeriodoAnterior(periodo, now = new Date()) {
+  const r = rangoPeriodo(periodo, 1, now);
+  if (!r) return null;
+  const [y, mm] = r.desde.split("-").map(Number);
+  if (periodo === "mes_actual" || periodo === "mes_anterior") return MESES[mm - 1];
+  if (periodo === "anio_actual") return `mismo período de ${y}`;
+  if (periodo === "anio_anterior") return String(y);
+  return "la semana previa";
+}
 
 function periodoSufijo(periodo) {
   const label = PERIODO_LABELS[periodo];
   return label ? ` (${label})` : "";
 }
 
-function filterRecordsByPeriodo(records, periodo) {
-  if (!periodo || periodo === "historico" || !PERIODO_LABELS[periodo]) return records;
+// "ahora": fecha de referencia del período (por defecto hoy). Permite generar un envío como si fuera otra fecha,
+// p. ej. reponer el informe de un mes que no se generó (ver lib/reportEdiciones.js#generarEdicion).
+function filterRecordsByPeriodo(records, periodo, offset = 0, ahora = new Date()) {
+  if (!periodo || periodo === "historico" || !PERIODO_LABELS[periodo]) return offset ? [] : records;
+  const rango = rangoPeriodo(periodo, offset, ahora);
+  if (rango) {
+    return records.filter((r) => r.fechaSolicitud && r.fechaSolicitud.slice(0, 10) >= rango.desde && r.fechaSolicitud.slice(0, 10) <= rango.hasta);
+  }
   const now = new Date();
   const anioActual = now.getFullYear();
   const mesActual = now.getMonth(); // 0 = enero
@@ -359,7 +406,29 @@ const KPI_METRICAS = {
   ticketPromedio: { label: "Ticket promedio por compra", formato: "moneda", compute: computeTicketPromedio },
   ahorroTotal: { label: "Ahorro total (cotizado vs. comprado)", formato: "moneda", compute: computeAhorroTotal },
   pctAhorro: { label: "% de ahorro global", formato: "porcentaje", compute: computePctAhorro },
+  // Mismas cifras que las tarjetas del Dashboard
+  enProceso: { label: "Compras en proceso", formato: "entero", compute: (rs) => rs.filter((r) => r.estado === "Proceso").length },
+  valorCotizado: { label: "Valor cotizado", formato: "moneda", compute: (rs) => cotizacionesValidas(rs).reduce((s, r) => s + (r.valorCot || 0), 0) },
+  valorCompraCotizados: { label: "Valor compra (cotizados)", formato: "moneda", compute: (rs) => cotizacionesValidas(rs).reduce((s, r) => s + (r.valorConIva || 0), 0) },
+  // Presupuesto vs. gastado — nivel general (año del período, acumulado hasta el fin del período)
+  presupuestado: { label: "Presupuestado", formato: "moneda", general: "presupuestado" },
+  gastadoAnio: { label: "Gastado en el año", formato: "moneda", general: "gastado" },
+  pctConsumido: { label: "% consumido del presupuesto", formato: "porcentaje", general: "pct" },
+  disponible: { label: "Presupuesto disponible", formato: "moneda", general: "disponible" },
 };
+
+// Presupuesto vs. gastado del año del período (igual que "Presupuesto vs. gastado — nivel general" del Dashboard).
+function presupuestoGeneral(ctx, periodo) {
+  if (!ctx?.presupuestos) return null;
+  const ahora = ctx.ahora || new Date();
+  const hasta = rangoPeriodo(periodo, 0, ahora)?.hasta || ymd(ahora);
+  const anio = hasta.slice(0, 4);
+  const presupuestado = ctx.presupuestos.filter((p) => String(p.anio) === anio).reduce((s, p) => s + (p.total || 0), 0);
+  const gastado = (ctx.allRecords || [])
+    .filter((r) => r.fechaSolicitud && r.fechaSolicitud.slice(0, 4) === anio && r.fechaSolicitud.slice(0, 10) <= hasta)
+    .reduce((s, r) => s + (r.valorConIva || 0), 0);
+  return { presupuestado, gastado, pct: presupuestado ? Math.round((gastado / presupuestado) * 1000) / 10 : null, disponible: presupuestado - gastado, anio };
+}
 
 function resolveKpiValue(metrica, records, aggregates) {
   const def = KPI_METRICAS[metrica] || KPI_METRICAS.totalValorConIva;
@@ -371,8 +440,71 @@ function resolveKpiValue(metrica, records, aggregates) {
 const AGRUPAR_LABELS = {
   area: "área", categoria: "categoría", estado: "estado",
   estadoLegalizacion: "estado de legalización", proveedor: "proveedor",
-  responsable: "responsable", medioPago: "medio de pago", mes: "mes",
+  responsable: "responsable", medioPago: "medio de pago", mes: "mes", dia: "día",
 };
+
+// "mes" y "dia" son agrupaciones cronológicas (eje X = tiempo); el resto agrupa por un campo del registro y se ordena
+// por valor (top N).
+const AGRUPACIONES_CRONOLOGICAS = ["mes", "dia"];
+
+function agruparRegistros(records, campo, limit) {
+  if (campo === "mes") return groupRecordsByMonth(records);
+  if (campo === "dia") return groupRecordsByDay(records);
+  return groupRecordsBy(records, campo, limit);
+}
+
+// Columnas apiladas: eje X = tiempo (mes o día), cada columna partida por una "serie" (área, categoría, proveedor…).
+// Las 5 series de mayor valor van con su nombre; el resto se agrupa en "Otras".
+function groupTiempoPorSerie(records, campo, serie, metrica) {
+  const claveTiempo = (r) => (campo === "dia" ? r.fechaSolicitud.slice(0, 10) : r.fechaSolicitud.slice(0, 7));
+  const totales = new Map();
+  for (const r of records) {
+    if (!r.fechaSolicitud) continue;
+    const s = r[serie] || "Sin dato";
+    totales.set(s, (totales.get(s) || 0) + (metrica === "cantidad" ? 1 : r.valorConIva || 0));
+  }
+  const top = [...totales.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([s]) => s);
+  const series = totales.size > top.length ? [...top, "Otras"] : top;
+  const map = new Map();
+  for (const r of records) {
+    if (!r.fechaSolicitud) continue;
+    const k = claveTiempo(r);
+    if (!map.has(k)) map.set(k, new Map());
+    const s = top.includes(r[serie] || "Sin dato") ? r[serie] || "Sin dato" : "Otras";
+    const m = map.get(k);
+    m.set(s, (m.get(s) || 0) + (metrica === "cantidad" ? 1 : r.valorConIva || 0));
+  }
+  const datos = [...map.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(campo === "dia" ? -62 : -12)
+    .map(([k, m]) => {
+      const p = k.split("-");
+      const etiqueta = campo === "dia" ? `${Number(p[2])} ${MESES_CORTOS[Number(p[1]) - 1]}` : `${MESES_CORTOS[Number(p[1]) - 1]} ${p[0]}`;
+      const segmentos = series.map((s) => ({ nombre: s, valor: m.get(s) || 0 }));
+      return { etiqueta, valor: segmentos.reduce((a, x) => a + x.valor, 0), segmentos };
+    });
+  return { series, datos };
+}
+
+// Agrupación por día de solicitud, en orden cronológico (máximo los últimos 62 días con datos).
+function groupRecordsByDay(records) {
+  const map = new Map();
+  for (const r of records) {
+    if (!r.fechaSolicitud) continue;
+    const key = r.fechaSolicitud.slice(0, 10);
+    if (!map.has(key)) map.set(key, { cantidad: 0, valorConIva: 0 });
+    const e = map.get(key);
+    e.cantidad += 1;
+    e.valorConIva += r.valorConIva || 0;
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-62)
+    .map(([key, v]) => {
+      const [, m, d] = key.split("-");
+      return { nombre: `${Number(d)} ${MESES_CORTOS[Number(m) - 1]}`, cantidad: v.cantidad, valorConIva: v.valorConIva };
+    });
+}
 
 function resolvePath(obj, path) {
   return path.split(".").reduce((o, k) => (o == null ? null : o[k]), obj);
@@ -385,8 +517,8 @@ function fmtMoneda(n) {
 function fmtKpiValue(valor, formato) {
   if (valor === null || valor === undefined) return "Sin datos";
   if (formato === "moneda") return fmtMoneda(valor);
-  if (formato === "porcentaje") return `${valor}%`;
-  if (formato === "dias") return `${valor} días hábiles`;
+  if (formato === "porcentaje") return `${Number(valor).toLocaleString("es-CO", { maximumFractionDigits: 1 })} %`;
+  if (formato === "dias") return `${Number(valor).toLocaleString("es-CO", { maximumFractionDigits: 1 })} días hábiles`;
   return String(valor);
 }
 
@@ -461,51 +593,123 @@ function renderBloqueTexto(b, aggregates) {
 async function conAnalisisIa(b, contenidoBase, contexto) {
   if (!b.analisisIa) return contenidoBase;
   try {
-    const analisis = await generateBloqueIaContent(b.analisisPregunta, contexto);
+    const analisis = await iaConCache(b.analisisPregunta, contexto);
     return `${contenidoBase}\n\n${analisis.contenido}`;
   } catch (err) {
     return `${contenidoBase}\n\n(No se pudo generar el análisis de IA: ${err.message})`;
   }
 }
 
-async function renderBloqueKpi(b, records, aggregates, sufijo, periodo) {
+// Variación frente al período anterior: en puntos para porcentajes, en % para el resto.
+function variacionKpi(valor, previo, formato, etiqueta) {
+  if (valor == null || previo == null || !etiqueta) return null;
+  const signo = (d) => (d > 0 ? "▲" : d < 0 ? "▼" : "＝");
+  if (formato === "porcentaje") {
+    const d = Math.round((valor - previo) * 10) / 10;
+    return { delta: d, texto: `${signo(d)} ${Math.abs(d).toLocaleString("es-CO")} pts vs ${etiqueta}` };
+  }
+  if (!previo) return null;
+  const pct = Math.round(((valor - previo) / previo) * 1000) / 10;
+  return { delta: pct, texto: `${signo(pct)} ${Math.abs(pct).toLocaleString("es-CO")} % vs ${etiqueta}` };
+}
+
+async function renderBloqueKpi(b, records, aggregates, sufijo, periodo, ctx = {}) {
   const def = KPI_METRICAS[b.metrica] || KPI_METRICAS.totalValorConIva;
-  const valor = resolveKpiValue(b.metrica, records, aggregates);
+  const general = def.general ? presupuestoGeneral(ctx, periodo) : null;
+  const valor = def.general ? (general ? general[def.general] : null) : resolveKpiValue(b.metrica, records, aggregates);
   const texto = fmtKpiValue(valor, def.formato);
-  const contenido = await conAnalisisIa(b, `${def.label}${sufijo}: ${texto}.`, { tipoOrigen: "kpi", metrica: b.metrica, periodo });
+  let variacion = null;
+  if (!def.general && b.comparar !== false && ctx.prevRecords && ctx.prevRecords.length) {
+    const previo = resolveKpiValue(b.metrica, ctx.prevRecords, ctx.prevAggregates);
+    variacion = variacionKpi(valor, previo, def.formato, ctx.etiquetaPrev);
+  }
+  const base = `${def.label}${sufijo}: ${texto}${variacion ? ` (${variacion.texto})` : ""}.`;
+  const contenido = await conAnalisisIa(b, base, { tipoOrigen: "kpi", metrica: b.metrica, periodo });
   // "_origen" es solo una etiqueta interna (no afecta el correo ni el PDF de
   // los informes normales): el PDF del informe tipo "Dashboard" la usa para
   // agrupar los KPI en una cuadrícula en vez de mostrarlos en lista (ver
   // generateReportPdfBuffer, opción dashboardLayout).
-  return { titulo: b.titulo || `${def.label}${sufijo}`, contenido, destacado: texto, grafico: null, tabla: null, _origen: "kpi" };
+  return { titulo: b.titulo || `${def.label}${sufijo}`, contenido, destacado: texto, grafico: null, tabla: null, _origen: "kpi", _metrica: b.metrica || "totalValorConIva", variacion };
 }
 
-async function renderBloqueGrafico(b, records, sufijo, periodo) {
+// "Los últimos N días" en una sección: usa los registros de los últimos N días hasta hoy (o la fecha de referencia),
+// sin importar el período del informe. Devuelve los registros a usar y el sufijo del título.
+function recortarUltimosDias(b, records, sufijo, ctx) {
+  const n = Math.round(Number(b.ultimosDias) || 0);
+  if (!n || n < 1 || !ctx?.allRecords) return { records, sufijo, dias: null };
+  const hoy = ctx.ahora || new Date();
+  const desde = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - (Math.min(n, 120) - 1));
+  const d0 = ymd(desde);
+  const d1 = ymd(hoy);
+  return {
+    records: ctx.allRecords.filter((r) => r.fechaSolicitud && r.fechaSolicitud.slice(0, 10) >= d0 && r.fechaSolicitud.slice(0, 10) <= d1),
+    sufijo: ` (últimos ${n} días)`,
+    dias: { desde, n: Math.min(n, 120) },
+  };
+}
+
+// Con "últimos N días" agrupados por día, los días sin compras también aparecen (en 0).
+function completarDias(grupos, dias) {
+  if (!dias) return grupos;
+  const porNombre = new Map(grupos.map((g) => [g.nombre, g]));
+  const out = [];
+  for (let i = 0; i < dias.n; i++) {
+    const d = new Date(dias.desde.getFullYear(), dias.desde.getMonth(), dias.desde.getDate() + i);
+    const nombre = `${d.getDate()} ${MESES_CORTOS[d.getMonth()]}`;
+    out.push(porNombre.get(nombre) || { nombre, cantidad: 0, valorConIva: 0 });
+  }
+  return out;
+}
+
+async function renderBloqueGrafico(b, recordsPeriodo, sufijoPeriodo, periodo, ctx) {
+  const { records, sufijo, dias } = recortarUltimosDias(b, recordsPeriodo, sufijoPeriodo, ctx);
   const campo = b.agruparPor || "area";
   const metrica = b.metricaAgrupada === "cantidad" ? "cantidad" : "valorConIva";
   const etiquetaCampo = AGRUPAR_LABELS[campo] || campo;
-  const grupos = campo === "mes" ? groupRecordsByMonth(records) : groupRecordsBy(records, campo, 8);
+  const cronologico = AGRUPACIONES_CRONOLOGICAS.includes(campo);
+  // Columnas apiladas (tiempo × serie), p. ej. "valor de compras por área y mes".
+  if (cronologico && b.serie && AGRUPAR_LABELS[b.serie] && !AGRUPACIONES_CRONOLOGICAS.includes(b.serie)) {
+    const { series, datos } = groupTiempoPorSerie(records, campo, b.serie, metrica);
+    const titulo = b.titulo || `Por ${AGRUPAR_LABELS[b.serie]} y ${etiquetaCampo}${sufijo}`;
+    if (!datos.length) return { titulo, contenido: "No hay compras registradas en este periodo.", destacado: null, grafico: null, tabla: null };
+    const pico = datos.reduce((m, d) => (d.valor > m.valor ? d : m), datos[0]);
+    const contenido = await conAnalisisIa(b, `${metrica === "valorConIva" ? "Valor comprado" : "Cantidad de compras"} por ${etiquetaCampo}, dividido por ${AGRUPAR_LABELS[b.serie]}${sufijo}. Las 5 de mayor ${metrica === "valorConIva" ? "valor" : "cantidad"} van con su nombre; el resto, en "Otras".`, { tipoOrigen: "grafico", agruparPor: b.serie, metricaAgrupada: b.metricaAgrupada, periodo });
+    return {
+      titulo,
+      contenido,
+      destacado: `Pico: ${pico.etiqueta} · ${metrica === "valorConIva" ? fmtMoneda(pico.valor) : `${pico.valor} compra(s)`}`,
+      grafico: { titulo, tipo: "apiladas", datos, series, metrica, promedio: b.promedio !== false },
+      _agruparPor: campo,
+      tabla: null,
+    };
+  }
+  const grupos = campo === "dia" ? completarDias(agruparRegistros(records, campo, 8), dias) : agruparRegistros(records, campo, Math.min(Number(b.limite) || 8, 15));
   if (grupos.length === 0) {
     return { titulo: b.titulo || `Por ${etiquetaCampo}${sufijo}`, contenido: "No hay compras registradas en este periodo.", destacado: null, grafico: null, tabla: null };
   }
   const datos = grupos.map((g) => ({ etiqueta: g.nombre, valor: g[metrica] }));
-  const top = datos[0];
-  const destacado = `${top.etiqueta}: ${metrica === "valorConIva" ? fmtMoneda(top.valor) : `${top.valor} compra(s)`}`;
+  // En una agrupación por tiempo lo que destaca es el pico (no el primero de la lista).
+  const top = cronologico ? datos.reduce((m, d) => (d.valor > m.valor ? d : m), datos[0]) : datos[0];
+  const fmtTop = metrica === "valorConIva" ? fmtMoneda(top.valor) : `${top.valor} compra(s)`;
+  const destacado = cronologico ? `Pico: ${top.etiqueta} · ${fmtTop}` : `${top.etiqueta}: ${fmtTop}`;
+  const tipoGrafico = ["dona", "columnas", "linea", "barras"].includes(b.estilo) ? b.estilo : cronologico ? "columnas" : "barras";
   const contextoIa = { tipoOrigen: "grafico", agruparPor: campo, metricaAgrupada: b.metricaAgrupada, periodo };
   const contenido = await conAnalisisIa(b, `Comparación de ${metrica === "valorConIva" ? "valor comprado" : "cantidad de compras"} por ${etiquetaCampo}${sufijo}.`, contextoIa);
   return {
     titulo: b.titulo || `Por ${etiquetaCampo}${sufijo}`,
     contenido,
     destacado,
-    grafico: { titulo: b.titulo || "Comparación", tipo: "barras", datos },
+    grafico: { titulo: b.titulo || "Comparación", tipo: tipoGrafico, datos, metrica, promedio: b.promedio !== false && (tipoGrafico === "columnas" || tipoGrafico === "linea") },
+    _agruparPor: campo,
     tabla: null,
   };
 }
 
-async function renderBloqueTabla(b, records, sufijo, periodo) {
+async function renderBloqueTabla(b, recordsPeriodo, sufijoPeriodo, periodo, ctx) {
+  const { records, sufijo } = recortarUltimosDias(b, recordsPeriodo, sufijoPeriodo, ctx);
   const campo = b.agruparPor || "area";
   const etiquetaCampo = AGRUPAR_LABELS[campo] || campo;
-  const grupos = campo === "mes" ? groupRecordsByMonth(records) : groupRecordsBy(records, campo, 15);
+  const grupos = agruparRegistros(records, campo, 15);
   if (grupos.length === 0) {
     return { titulo: b.titulo || `Resumen por ${etiquetaCampo}${sufijo}`, contenido: "No hay compras registradas en este periodo.", destacado: null, grafico: null, tabla: null };
   }
@@ -534,12 +738,132 @@ async function renderBloqueTabla(b, records, sufijo, periodo) {
 // envío manual o programado), no al agregar el bloque en el editor. Así
 // siempre responde con datos frescos del momento del envío, igual que
 // kpi/grafico/tabla (ver generateBloqueIaContent).
-async function renderBloqueIa(b) {
+// Caché corta de los bloques de Nova: el editor regenera la vista previa a cada cambio y no tiene sentido volver a
+// preguntarle a la IA lo mismo sobre los mismos datos. Expira a los 10 minutos (los envíos programados ocurren mucho
+// después, así que siempre salen con datos frescos).
+const iaCache = globalThis.__reportIaCache || (globalThis.__reportIaCache = new Map());
+const IA_CACHE_MS = 10 * 60 * 1000;
+
+async function iaConCache(pregunta, contexto) {
+  const key = JSON.stringify([pregunta, contexto]);
+  const hit = iaCache.get(key);
+  if (hit && Date.now() - hit.at < IA_CACHE_MS) return hit.value;
+  const value = await generateBloqueIaContent(pregunta, contexto);
+  iaCache.set(key, { at: Date.now(), value });
+  if (iaCache.size > 200) iaCache.delete(iaCache.keys().next().value);
+  return value;
+}
+
+// ---------- Secciones de Nova en lote ----------
+// Antes cada sección de Nova era una llamada a la IA que mandaba otra vez los mismos datos del período (4 secciones =
+// 4 llamadas + 1 para el resumen del correo). Ahora:
+//  1. Todas las secciones de Nova del informe (y, si se pide, el resumen del correo) salen en UNA sola llamada, con los
+//     datos del período enviados una vez.
+//  2. Cada texto queda guardado con la "huella" de los datos que lo produjeron (hash de los datos + la pregunta). Si al
+//     volver a generar los datos no cambiaron (vista previa, otra prueba, reponer un período), se reutiliza sin llamar
+//     a la IA; solo se piden las secciones nuevas o cambiadas. La huella también se guarda en el contenido de cada
+//     edición (content._ia), así sobrevive a reinicios del servidor (ver reportEdiciones.js).
+const IA_VERSION = "lote-1"; // súbela si cambian las instrucciones, para no reutilizar textos viejos
+const IA_HUELLA_MS = 24 * 60 * 60 * 1000;
+const iaHuellas = globalThis.__reportIaHuellas || (globalThis.__reportIaHuellas = new Map());
+
+export const huella = (s) => createHash("sha1").update(String(s)).digest("hex").slice(0, 20);
+
+function huellaGet(k, previas) {
+  const hit = iaHuellas.get(k);
+  if (hit && Date.now() - hit.at < IA_HUELLA_MS) return hit.value;
+  return previas?.[k] || null;
+}
+function huellaSet(k, value) {
+  iaHuellas.set(k, { at: Date.now(), value });
+  if (iaHuellas.size > 500) iaHuellas.delete(iaHuellas.keys().next().value);
+}
+
+const IA_LOTE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    respuestas: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: { n: { type: "NUMBER" }, contenido: { type: "STRING" }, destacado: { type: "STRING", nullable: true } },
+        required: ["n", "contenido"],
+      },
+    },
+    resumenCorreo: { type: "STRING", nullable: true },
+  },
+  required: ["respuestas"],
+};
+
+const IA_LOTE_SYSTEM_INSTRUCTION = `Eres Nova y redactas las secciones de texto de un informe de compras (el resto del informe son cifras, gráficas y tablas que el sistema calcula aparte). Te entregan los datos exactos del período UNA vez y una lista numerada de secciones, cada una con la instrucción de qué escribir. Devuelve en "respuestas" una entrada por sección con su mismo número "n": "contenido" de 2 a 5 líneas en español (usa "- " para viñetas si ayuda a la lectura) y "destacado" opcional (una cifra clave, ej. "$42.300.000" o "6 compras", o null). Cada sección debe aportar algo distinto: no repitas lo que dice otra.
+
+Reglas estrictas: basa cualquier cifra, suma, conteo o porcentaje EXCLUSIVAMENTE en los "agregados" (calculados sobre el 100% de los datos, son exactos); la "muestra" de registros es solo para citar ejemplos puntuales, nunca para calcular totales. Si un dato no está en los agregados ni se deriva de ellos con certeza, dilo en vez de inventarlo. Nunca inventes cifras, proveedores, fechas ni datos. Sé conciso.`;
+
+const RESUMEN_CORREO_INSTRUCCION = `Además, en "resumenCorreo" escribe el resumen corto que va en el cuerpo del correo que acompaña el informe en PDF: 2 o 3 frases, español de Colombia, tono profesional y cordial, sin saludo ni despedida, empezando en minúscula porque va después de "En resumen:". Solo cifras de los agregados.`;
+
+// preguntas: textos de las secciones de Nova en orden. Devuelve { respuestas: [{contenido, destacado}|{error}], resumen,
+// mapa } — mapa son las huellas usadas, para guardarlas en el contenido de la edición.
+export async function resolverIaEnLote(preguntas, { periodo, excluirAnulados, ahora, previas = {}, conResumen = false }) {
+  const datos = await datosDelPeriodoTexto({ periodo: periodo || "historico", excluirAnulados: !!excluirAnulados, ahora }, 40);
+  const hDatos = huella(datos);
+  const claves = preguntas.map((p) => huella(`${IA_VERSION}|${hDatos}|${String(p).trim()}`));
+  const claveResumen = huella(`${IA_VERSION}|${hDatos}|resumen`);
+  const valores = {};
+  const faltan = [];
+  claves.forEach((k, i) => {
+    const hit = huellaGet(k, previas);
+    if (hit) valores[k] = hit;
+    else if (!faltan.some((j) => claves[j] === k)) faltan.push(i);
+  });
+  let resumen = conResumen ? huellaGet(claveResumen, previas)?.texto || null : null;
+  const pedirResumen = conResumen && !resumen;
+  let errorLote = null;
+
+  if (faltan.length || pedirResumen) {
+    try {
+      const out = await generateStructuredJson({
+        systemInstruction: IA_LOTE_SYSTEM_INSTRUCTION,
+        prompt: `${datos}
+
+Secciones a redactar:
+${faltan.length ? faltan.map((i, n) => `${n + 1}. """${preguntas[i]}"""`).join("\n") : "(ninguna: devuelve respuestas vacías)"}${pedirResumen ? `\n\n${RESUMEN_CORREO_INSTRUCCION}` : ""}`,
+        schema: IA_LOTE_SCHEMA,
+        budgetMs: 60000,
+      });
+      for (const r of out.respuestas || []) {
+        const i = faltan[Math.round(Number(r.n)) - 1];
+        if (i == null || !r.contenido) continue;
+        const v = { contenido: String(r.contenido).trim(), destacado: r.destacado || null };
+        valores[claves[i]] = v;
+        huellaSet(claves[i], v);
+      }
+      if (pedirResumen && out.resumenCorreo?.trim()) {
+        resumen = out.resumenCorreo.trim();
+        huellaSet(claveResumen, { texto: resumen });
+      }
+    } catch (err) {
+      errorLote = err.message || "error de la IA";
+    }
+  }
+
+  const mapa = {};
+  claves.forEach((k) => { if (valores[k]) mapa[k] = valores[k]; });
+  if (resumen) mapa[claveResumen] = { texto: resumen };
+  return {
+    respuestas: claves.map((k) => valores[k] || { error: errorLote || "Nova no devolvió esta sección" }),
+    resumen,
+    mapa,
+  };
+}
+
+async function renderBloqueIa(b, periodo, excluirAnulados, ahora) {
   if (!b.pregunta || !b.pregunta.trim()) {
     return { titulo: b.titulo || "Análisis con IA", contenido: "(Este bloque no tiene una pregunta configurada.)", destacado: null, grafico: null, tabla: null };
   }
   try {
-    const res = await generateBloqueIaContent(b.pregunta, b.contexto);
+    // Sin un contexto propio, la pregunta se responde sobre el MISMO período del informe (no sobre todo el histórico).
+    const contexto = b.contexto || { tipoOrigen: "general", periodo: periodo || "historico", excluirAnulados: !!excluirAnulados, ...(ahora && ymd(ahora) !== ymd(new Date()) ? { ahora: ymd(ahora) } : {}) };
+    const res = await iaConCache(b.pregunta, contexto);
     return { titulo: b.titulo || "Análisis con IA", contenido: res.contenido, destacado: res.destacado || null, grafico: null, tabla: null };
   } catch (err) {
     return { titulo: b.titulo || "Análisis con IA", contenido: `(No se pudo generar este análisis con IA: ${err.message})`, destacado: null, grafico: null, tabla: null };
@@ -581,27 +905,319 @@ function renderBloquePendientes(b, records, sufijo) {
   };
 }
 
+// ---- Bloques del Estudio de informes ----
+
+function diasDeRegistro(r) {
+  if (!r.fechaSolicitud) return null;
+  return r.fechaEntrega ? businessDaysBetween(r.fechaSolicitud, r.fechaEntrega) : businessDaysElapsedToToday(r.fechaSolicitud);
+}
+
+// Compras que superaron el plazo de 8 días hábiles: entregadas tarde y las que siguen sin entregar ya vencidas.
+function renderBloqueFueraPlazo(b, records, sufijo) {
+  const filas = [];
+  for (const r of records) {
+    if (r.estado === "Anulado") continue;
+    const dias = diasDeRegistro(r);
+    if (dias != null && dias > SLA_DIAS_HABILES) filas.push({ r, dias, entregada: !!r.fechaEntrega });
+  }
+  filas.sort((a, x) => x.dias - a.dias);
+  const titulo = b.titulo || `Compras fuera de plazo${sufijo}`;
+  if (!filas.length) {
+    return { titulo, contenido: `Ninguna compra superó los ${SLA_DIAS_HABILES} días hábiles en este período.`, destacado: "0 compras", grafico: null, tabla: null, _total: 0 };
+  }
+  const pendientes = filas.filter((x) => !x.entregada).length;
+  return {
+    titulo,
+    contenido: `${filas.length} compra(s) superaron los ${SLA_DIAS_HABILES} días hábiles${pendientes ? `, ${pendientes} de ellas todavía sin entregar` : ""}. La más larga lleva ${filas[0].dias} días hábiles.`,
+    destacado: `${filas.length} compra(s)`,
+    grafico: null,
+    tabla: {
+      columnas: ["#", "Descripción", "Área", "Días háb.", "Estado"],
+      filas: filas.slice(0, 15).map(({ r, dias, entregada }) => [r.localSeq ? String(r.localSeq) : "—", r.descripcion || r.informe || "—", r.area || "—", String(dias), entregada ? "Entregada tarde" : "Sin entregar"]),
+    },
+    _total: filas.length,
+  };
+}
+
+// Proveedores con la peor valoración de Nova en las compras del período (promedio del puntaje de proveedor).
+async function renderBloqueProveedoresValoracion(b, records, sufijo) {
+  const titulo = b.titulo || `Proveedores a revisar${sufijo}`;
+  const ids = records.map((r) => r.id);
+  const vals = ids.length
+    ? await prisma.valoracionCompra.findMany({ where: { recordId: { in: ids }, puntajeProveedor: { not: null } }, select: { puntajeProveedor: true, recordId: true } })
+    : [];
+  if (!vals.length) return { titulo, contenido: "No hay compras valoradas por Nova en este período.", destacado: null, grafico: null, tabla: null };
+  const porId = new Map(records.map((r) => [r.id, r]));
+  const grupos = new Map();
+  for (const v of vals) {
+    const r = porId.get(v.recordId);
+    const nombre = r?.proveedor || "Sin proveedor";
+    if (!grupos.has(nombre)) grupos.set(nombre, { nombre, xs: [], valor: 0 });
+    const g = grupos.get(nombre);
+    g.xs.push(v.puntajeProveedor);
+    g.valor += r?.valorConIva || 0;
+  }
+  const lista = [...grupos.values()]
+    .map((g) => ({ ...g, promedio: g.xs.reduce((a, x) => a + x, 0) / g.xs.length }))
+    .sort((a, x) => a.promedio - x.promedio || x.valor - a.valor);
+  const bajos = lista.filter((g) => g.promedio <= 2);
+  const umbral = Number(b.umbral) || 3;
+  const mostrar = lista.filter((g) => g.promedio <= umbral).slice(0, 10);
+  return {
+    titulo,
+    contenido: bajos.length
+      ? `${bajos.length} proveedor(es) tienen una valoración de Nova de 2 o menos en este período; conviene revisarlos.`
+      : `Ningún proveedor quedó con valoración de 2 o menos. Se listan los de ${umbral} o menos.`,
+    destacado: `${bajos.length} proveedor(es) con 2★ o menos`,
+    grafico: null,
+    tabla: mostrar.length
+      ? { columnas: ["Proveedor", "Valoración", "Compras", "Valor"], filas: mostrar.map((g) => [g.nombre, `${g.promedio.toFixed(1).replace(".", ",")} ★`, String(g.xs.length), fmtMoneda(g.valor)]) }
+      : null,
+  };
+}
+
+// Estado del ciclo anual de actualización de proveedores (no depende del período del informe).
+async function renderBloqueCicloProveedores(b) {
+  const ind = await indicadoresCiclo();
+  const e = ind.estados || {};
+  const corte = ind.diasParaCorte != null ? `; faltan ${ind.diasParaCorte} días para el corte` : "";
+  const criticos = ind.criticos?.pendientes ? ` Hay ${ind.criticos.pendientes} proveedor(es) críticos pendientes.` : "";
+  return {
+    titulo: b.titulo || `Ciclo de proveedores ${ind.anio}`,
+    contenido: `${ind.pctActualizado}% de los ${ind.enCiclo} proveedores del ciclo están actualizados${corte}.${criticos}`,
+    destacado: `${ind.pctActualizado}% actualizados`,
+    grafico: {
+      titulo: "Estado del ciclo",
+      tipo: b.estilo === "barras" ? "barras" : "dona",
+      metrica: "cantidad",
+      datos: [
+        { etiqueta: "Actualizados", valor: e.actualizado || 0 },
+        { etiqueta: "En aprobación", valor: e.en_aprobacion || 0 },
+        { etiqueta: "En proceso", valor: e.en_proceso || 0 },
+        { etiqueta: "Desactualizados", valor: e.desactualizado || 0 },
+      ],
+    },
+    tabla: null,
+  };
+}
+
+async function recordsDelInforme(excluirAnulados) {
+  const { records, presupuestos } = await loadRecordsAndPresupuestos();
+  return { base: excluirAnulados ? records.filter((r) => r.estado !== "Anulado") : records, presupuestos };
+}
+
+// "Cumplimiento de entregas" del Dashboard: de las compras entregadas, cuántas llegaron en 8 días hábiles o menos.
+function renderBloqueCumplimientoEntregas(b, records, sufijo) {
+  const t = buildTiemposEntrega(records.filter((r) => r.estado !== "Anulado"));
+  const titulo = b.titulo || `Cumplimiento de entregas${sufijo}`;
+  if (!t.totalEntregados) return { titulo, contenido: "No hubo compras entregadas en este período.", destacado: null, grafico: null, tabla: null };
+  const no = t.totalEntregados - t.cumplieronSla;
+  return {
+    titulo,
+    contenido: `${t.cumplieronSla} de ${t.totalEntregados} compras entregadas dentro de ${SLA_DIAS_HABILES} días hábiles${t.promedioDiasHabiles != null ? ` (promedio: ${String(t.promedioDiasHabiles).replace(".", ",")} días hábiles)` : ""}.`,
+    destacado: `${String(t.cumplimientoPct).replace(".", ",")} % a tiempo`,
+    grafico: { titulo, tipo: "dona", metrica: "cantidad", datos: [{ etiqueta: "Cumplió", valor: t.cumplieronSla }, { etiqueta: "No cumplió", valor: no }] },
+    tabla: null,
+  };
+}
+
+// "Ahorro por área" del Dashboard: valor cotizado vs. comprado por área (solo compras con cotización válida).
+function renderBloqueAhorroArea(b, records, sufijo) {
+  const titulo = b.titulo || `Ahorro por área${sufijo}`;
+  const porArea = new Map();
+  for (const r of records) {
+    const a = r.area || "Sin área";
+    if (!porArea.has(a)) porArea.set(a, { cot: 0, comp: 0, sinCot: 0 });
+    const e = porArea.get(a);
+    if (r.valorCot != null && r.valorConIva != null && !(r.valorCot > r.valorConIva * 20)) { e.cot += r.valorCot; e.comp += r.valorConIva; } else e.sinCot += 1;
+  }
+  const filas = [...porArea.entries()].map(([a, e]) => ({ a, ...e, ahorro: e.cot - e.comp, pct: e.cot ? Math.round(((e.cot - e.comp) / e.cot) * 1000) / 10 : null }))
+    .sort((x, y) => y.ahorro - x.ahorro);
+  if (!filas.length) return { titulo, contenido: "No hay compras en este período.", destacado: null, grafico: null, tabla: null };
+  const total = filas.reduce((s, f) => s + f.ahorro, 0);
+  return {
+    titulo,
+    contenido: "Ahorro = valor cotizado − valor comprado, por área. Las compras sin cotización válida no entran en el cálculo.",
+    destacado: `Ahorro total: ${fmtMoneda(total)}`,
+    grafico: { titulo, tipo: "barras", metrica: "valorConIva", datos: filas.filter((f) => f.cot).map((f) => ({ etiqueta: f.a, valor: Math.max(0, f.ahorro) })) },
+    tabla: {
+      columnas: ["Área", "Cotizado", "Comprado", "Ahorro", "% ahorro", "Sin cot."],
+      filas: filas.map((f) => [f.a, fmtMoneda(f.cot), fmtMoneda(f.comp), fmtMoneda(f.ahorro), f.pct != null ? `${String(f.pct).replace(".", ",")} %` : "sin cotización", String(f.sinCot)]),
+    },
+  };
+}
+
+// "Consumo por categoría y área" del Dashboard: por área, lo del período, lo acumulado en el año, el presupuesto del
+// año, lo disponible y el % consumido.
+function renderBloqueConsumoCategoriaArea(b, records, sufijo, periodo, ctx) {
+  const titulo = b.titulo || `Consumo por categoría y área${sufijo}`;
+  const ahora = ctx?.ahora || new Date();
+  const hasta = rangoPeriodo(periodo, 0, ahora)?.hasta || ymd(ahora);
+  const anio = hasta.slice(0, 4);
+  const acumulado = (ctx?.allRecords || []).filter((r) => r.fechaSolicitud && r.fechaSolicitud.slice(0, 4) === anio && r.fechaSolicitud.slice(0, 10) <= hasta);
+  const presup = new Map((ctx?.presupuestos || []).filter((p) => String(p.anio) === anio).map((p) => [p.area, p.total || 0]));
+  const areas = new Map();
+  const tocar = (a) => { if (!areas.has(a)) areas.set(a, { cant: 0, mes: 0, acum: 0, cats: new Set() }); return areas.get(a); };
+  for (const r of records) { const e = tocar(r.area || "Sin área"); e.cant += 1; e.mes += r.valorConIva || 0; if (r.categoria) e.cats.add(r.categoria); }
+  for (const r of acumulado) tocar(r.area || "Sin área").acum += r.valorConIva || 0;
+  const filas = [...areas.entries()].sort((x, y) => y[1].acum - x[1].acum).map(([a, e]) => {
+    const p = presup.get(a);
+    const pct = p ? Math.round((e.acum / p) * 1000) / 10 : null;
+    return [a, String(e.cant), fmtMoneda(e.mes), fmtMoneda(e.acum), p ? fmtMoneda(p) : "—", p ? fmtMoneda(p - e.acum) : "—", pct != null ? `${String(pct).replace(".", ",")} %` : "—", [...e.cats].slice(0, 3).join(", ") || "—"];
+  });
+  if (!filas.length) return { titulo, contenido: "No hay compras en este período.", destacado: null, grafico: null, tabla: null };
+  return {
+    titulo,
+    contenido: `Valor del período, acumulado de ${anio} y presupuesto del año por área. Desde el 80 % de consumo conviene vigilar el área; desde el 90 % está cerca del límite o excedida.`,
+    destacado: null,
+    grafico: null,
+    tabla: { columnas: ["Área", "Cant.", "Del período", `Acumulado ${anio}`, `Presupuesto ${anio}`, "Disponible", "% consumido", "Categorías"], filas },
+  };
+}
+
+// Cifras base de una edición, para compararla con otras (ver lib/reportEdiciones.js).
+export async function resumenCifras(periodo, { excluirAnulados = true, ahora = new Date() } = {}) {
+  const { base } = await recordsDelInforme(excluirAnulados);
+  const records = filterRecordsByPeriodo(base, periodo, 0, ahora);
+  return {
+    valor: records.reduce((s, r) => s + (r.valorConIva || 0), 0),
+    compras: records.length,
+    cumplimientoPct: buildTiemposEntrega(records).cumplimientoPct,
+    enProceso: records.filter((r) => !r.fechaEntrega).length,
+    fueraPlazo: renderBloqueFueraPlazo({}, records, "")._total || 0,
+  };
+}
+
+// ¿Se cumple la condición de envío del informe? (ver ReportConfig.condicion)
+export async function evaluarCondicion(condicion, periodo, { excluirAnulados = true, ahora = new Date() } = {}) {
+  if (!condicion || condicion === "siempre") return { cumple: true };
+  const { base, presupuestos } = await recordsDelInforme(excluirAnulados);
+  if (condicion === "presupuesto80") {
+    const p = buildPresupuestoComparativo(base, presupuestos);
+    const areas = Object.entries(p).filter(([, v]) => (v.porcentajeGastado || 0) >= 80).map(([a]) => a);
+    return areas.length ? { cumple: true, detalle: areas.join(", ") } : { cumple: false, motivo: "Ninguna área superó el 80 % de su presupuesto." };
+  }
+  if (condicion === "fueraPlazo") {
+    const n = renderBloqueFueraPlazo({}, filterRecordsByPeriodo(base, periodo, 0, ahora), "")._total || 0;
+    return n ? { cumple: true } : { cumple: false, motivo: "No hubo compras fuera de plazo en el período." };
+  }
+  return { cumple: true };
+}
+
+const FORMULAS = {
+  totalValorConIva: "Suma del valor con IVA de las compras",
+  totalRegistros: "Cantidad de compras",
+  totalSinLegalizar: "Compras cuyo estado de legalización no es Legalizado",
+  cumplimientoPct: `Compras entregadas en ${SLA_DIAS_HABILES} días hábiles o menos ÷ compras entregadas`,
+  promedioDiasHabiles: "Promedio de días hábiles entre la solicitud y la entrega",
+  totalPendientesVencidos: `Compras sin entregar con más de ${SLA_DIAS_HABILES} días hábiles desde la solicitud`,
+  ticketPromedio: "Valor con IVA total ÷ cantidad de compras",
+  ahorroTotal: "Valor cotizado − valor comprado (solo compras con cotización válida)",
+  pctAhorro: "Ahorro ÷ valor cotizado",
+};
+
+// "¿De dónde sale esta cifra?": cómo se calcula, cuántos registros la forman, el detalle por área, los registros
+// principales y el valor del período anterior. Todo determinístico: sirve para verificar cualquier cifra del informe.
+// Con agruparPor + etiqueta explica una barra o porción de una gráfica (solo los registros de ese grupo).
+export async function cifraDetalle({ metrica, periodo, excluirAnulados = true, agruparPor, etiqueta }) {
+  const { base, presupuestos } = await recordsDelInforme(excluirAnulados);
+  const porGrupo = !!agruparPor && etiqueta != null && !AGRUPACIONES_CRONOLOGICAS.includes(agruparPor);
+  const enGrupo = (r) => !porGrupo || (r[agruparPor] || "Sin dato") === etiqueta;
+  const records = filterRecordsByPeriodo(base, periodo).filter(enGrupo);
+  const key = KPI_METRICAS[metrica] ? metrica : "totalValorConIva";
+  const def = KPI_METRICAS[key];
+  const valor = def.general ? presupuestoGeneral({ presupuestos, allRecords: base }, periodo)?.[def.general] ?? null : resolveKpiValue(key, records, buildAggregates(records, presupuestos));
+  const prev = filterRecordsByPeriodo(base, periodo, 1).filter(enGrupo);
+  const etiquetaPrev = etiquetaPeriodoAnterior(periodo);
+  const valorPrev = prev.length ? resolveKpiValue(key, prev, buildAggregates(prev, presupuestos)) : null;
+  const porArea = Object.entries(countBy(records, "area"))
+    .map(([area, v]) => ({ area, cantidad: v.cantidad, valor: v.valorConIva }))
+    .sort((a, b) => b.valor - a.valor);
+  const tiempos = key === "cumplimientoPct" || key === "promedioDiasHabiles" || key === "totalPendientesVencidos";
+  const ordenados = tiempos
+    ? records.map((r) => ({ r, dias: diasDeRegistro(r) })).filter((x) => x.dias != null).sort((a, b) => b.dias - a.dias)
+    : [...records].sort((a, b) => (b.valorConIva || 0) - (a.valorConIva || 0)).map((r) => ({ r, dias: null }));
+  const muestra = ordenados.slice(0, 8).map(({ r, dias }) => ({
+    id: r.id, localSeq: r.localSeq, descripcion: r.descripcion || r.informe || "—", area: r.area || "—", valorConIva: r.valorConIva || 0, dias,
+  }));
+  const filtroPeriodo = PERIODO_LABELS[periodo] ? `Compras con fecha de solicitud en el ${PERIODO_LABELS[periodo]}` : "Todas las compras";
+  return {
+    metrica: key,
+    label: def.label,
+    valor,
+    valorTexto: fmtKpiValue(valor, def.formato),
+    formato: def.formato,
+    formula: FORMULAS[key] || def.label,
+    filtro: `${filtroPeriodo}${excluirAnulados ? ", sin las anuladas" : ""}${porGrupo ? ` · ${AGRUPAR_LABELS[agruparPor] || agruparPor}: ${etiqueta}` : ""}`,
+    registros: records.length,
+    porArea,
+    muestra,
+    tiempos,
+    anterior: valorPrev != null
+      ? { etiqueta: etiquetaPrev, valor: valorPrev, valorTexto: fmtKpiValue(valorPrev, def.formato), variacion: variacionKpi(valor, valorPrev, def.formato, etiquetaPrev) }
+      : null,
+  };
+}
+
+// Catálogo que Nova puede usar al armar o editar un informe (ver lib/reportNova.js).
+export const CATALOGO_BLOQUES = {
+  metricasKpi: Object.fromEntries(Object.entries(KPI_METRICAS).map(([k, v]) => [k, v.label])),
+  agruparPor: AGRUPAR_LABELS,
+};
+
+export { loadAggregates };
+
 // Arma el informe de forma determinística a partir de los bloques que el
 // usuario configuró manualmente en el constructor (ReportBloqueBuilder.jsx):
 // kpi/grafico/tabla se calculan en JS directo sobre los datos reales (sin IA,
 // sin posibilidad de inventar cifras); "texto" es lo que el usuario escribió
 // a mano (o lo que trajo "generar borrador con IA"); "ia" ejecuta la pregunta
 // puntual contra la IA en este mismo momento (ver renderBloqueIa arriba).
-export async function renderReportFromBloques(bloques, { nombre, periodo } = {}) {
+// sinIa: para los informes solo para consultar, los bloques "ia" muestran el texto que se guardó al diseñarlos
+// (bloque.textoGuardado) en vez de volver a llamar a la IA. Todo lo demás se calcula con los datos del momento.
+// previasIa: huellas de la edición anterior (content._ia) para reutilizar textos de Nova sobre los mismos datos.
+// conResumen: aprovechar la misma llamada para el resumen del correo ({resumen_nova}); queda en content.resumenNova.
+export async function renderReportFromBloques(bloques, { nombre, periodo, excluirAnulados = false, ahora = new Date(), sinIa = false, previasIa = {}, conResumen = false } = {}) {
   // El periodo es UNO SOLO para todo el informe (se eligió al inicio de
   // "Armar informe" en vez de uno por bloque) — se recalcula relativo a
   // "ahora" en cada generación (ver filterRecordsByPeriodo), nunca con una
   // fecha fija guardada. Aplica a kpi/grafico/tabla y a los placeholders
   // "{{...}}" dentro de los bloques de texto (ver interpolarTexto).
-  const { records: allRecords, presupuestos } = await loadRecordsAndPresupuestos();
-  const records = filterRecordsByPeriodo(allRecords, periodo);
+  const { records: todos, presupuestos } = await loadRecordsAndPresupuestos();
+  const allRecords = excluirAnulados ? todos.filter((r) => r.estado !== "Anulado") : todos;
+  const records = filterRecordsByPeriodo(allRecords, periodo, 0, ahora);
   const aggregates = buildAggregates(records, presupuestos);
   const sufijo = periodoSufijo(periodo);
-  const secciones = await Promise.all((bloques || []).map((b) => {
-    if (b.tipo === "ia") return renderBloqueIa(b);
-    if (b.tipo === "kpi") return renderBloqueKpi(b, records, aggregates, sufijo, periodo);
-    if (b.tipo === "grafico") return renderBloqueGrafico(b, records, sufijo, periodo);
-    if (b.tipo === "tabla") return renderBloqueTabla(b, records, sufijo, periodo);
+  const prevRecords = filterRecordsByPeriodo(allRecords, periodo, 1, ahora);
+  const ctx = { prevRecords, prevAggregates: buildAggregates(prevRecords, presupuestos), etiquetaPrev: etiquetaPeriodoAnterior(periodo, ahora), allRecords, ahora, presupuestos };
+
+  // Las secciones de Nova sobre el período del informe (las del Estudio) salen todas juntas en una sola llamada.
+  const enLote = sinIa ? [] : (bloques || []).map((b, i) => ({ b, i })).filter(({ b }) => b.tipo === "ia" && !b.contexto && b.pregunta?.trim());
+  const lote = enLote.length
+    ? await resolverIaEnLote(enLote.map(({ b }) => b.pregunta), { periodo, excluirAnulados, ahora: ymd(ahora) !== ymd(new Date()) ? ymd(ahora) : null, previas: previasIa, conResumen })
+    : null;
+  const deLote = new Map(enLote.map(({ i }, n) => [i, lote.respuestas[n]]));
+
+  const secciones = await Promise.all((bloques || []).map((b, i) => {
+    if (deLote.has(i)) {
+      const r = deLote.get(i);
+      return r.error
+        ? { titulo: b.titulo || "Análisis de Nova", contenido: `(No se pudo generar este análisis con IA: ${r.error})`, destacado: null, grafico: null, tabla: null }
+        : { titulo: b.titulo || "Análisis de Nova", contenido: r.contenido, destacado: r.destacado || null, grafico: null, tabla: null };
+    }
+    if (b.tipo === "ia" && sinIa) {
+      return { titulo: b.titulo || "Análisis de Nova", contenido: b.textoGuardado || "(Este análisis se actualiza cuando quien creó el informe lo abre en el Estudio.)", destacado: b.destacadoGuardado || null, grafico: null, tabla: null, _textoGuardado: true };
+    }
+    if (b.tipo === "ia") return renderBloqueIa(b, periodo, excluirAnulados, ahora);
+    if (b.tipo === "kpi") return renderBloqueKpi(b, records, aggregates, sufijo, periodo, ctx);
+    if (b.tipo === "fueraPlazo") return renderBloqueFueraPlazo(b, records, sufijo);
+    if (b.tipo === "proveedoresValoracion") return renderBloqueProveedoresValoracion(b, records, sufijo);
+    if (b.tipo === "cicloProveedores") return renderBloqueCicloProveedores(b);
+    if (b.tipo === "cumplimientoEntregas") return renderBloqueCumplimientoEntregas(b, records, sufijo);
+    if (b.tipo === "ahorroArea") return renderBloqueAhorroArea(b, records, sufijo);
+    if (b.tipo === "consumoCategoriaArea") return renderBloqueConsumoCategoriaArea(b, records, sufijo, periodo, ctx);
+    if (b.tipo === "grafico") return renderBloqueGrafico(b, records, sufijo, periodo, ctx);
+    if (b.tipo === "tabla") return renderBloqueTabla(b, records, sufijo, periodo, ctx);
     if (b.tipo === "presupuesto") return renderBloquePresupuesto(b, aggregates, sufijo);
     if (b.tipo === "pendientes") return renderBloquePendientes(b, records, sufijo);
     return renderBloqueTexto(b, aggregates);
@@ -611,6 +1227,7 @@ export async function renderReportFromBloques(bloques, { nombre, periodo } = {})
     saludo: "Buen día,",
     secciones,
     cierre: "Para más detalle, ingresa al Panel de Compras.",
+    ...(lote ? { _ia: lote.mapa, resumenNova: lote.resumen || null } : {}),
   };
 }
 
@@ -663,9 +1280,34 @@ async function buildContextoDatos(contexto) {
 // análisis de IA" de un bloque kpi/grafico/tabla para que el análisis se
 // base EXCLUSIVAMENTE en los datos exactos de ESE bloque; sin él, se
 // comporta como una pregunta libre sobre todo el histórico (flujo original).
+// Datos exactos del período de un informe, en texto, para los bloques de Nova. Va separado de la pregunta para poder
+// mandarlo UNA sola vez aunque el informe tenga varios bloques de Nova (ver resolverIaEnLote).
+async function datosDelPeriodoTexto({ periodo, excluirAnulados, ahora }, maxMuestra = MAX_RECORDS) {
+  const { records: allRecords, presupuestos } = await loadRecordsAndPresupuestos();
+  const base = excluirAnulados ? allRecords.filter((r) => r.estado !== "Anulado") : allRecords;
+  const ref = ahora ? new Date(`${ahora}T12:00:00`) : new Date();
+  const records = filterRecordsByPeriodo(base, periodo, 0, ref);
+  const previos = filterRecordsByPeriodo(base, periodo, 1, ref);
+  const etiquetaPrev = etiquetaPeriodoAnterior(periodo, ref);
+  const previo = etiquetaPrev
+    ? `\nAgregados exactos del período anterior (${etiquetaPrev}), para comparar:\n${JSON.stringify({ totalRegistros: previos.length, totalValorConIva: previos.reduce((s, r) => s + (r.valorConIva || 0), 0), porArea: countBy(previos, "area"), tiemposEntrega: buildTiemposEntrega(previos) })}\n`
+    : "";
+  return `Período del informe: ${PERIODO_LABELS[periodo] || "histórico completo"}${excluirAnulados ? " (sin compras anuladas)" : ""}.
+Agregados exactos del período:
+${JSON.stringify(buildAggregates(records, presupuestos))}
+${previo}
+Muestra de registros del período (solo para ejemplos puntuales, no para totales):
+${JSON.stringify(records.slice(-maxMuestra).map(compactRecord))}`;
+}
+
 export async function generateBloqueIaContent(pregunta, contexto) {
   let userPrompt;
-  if (contexto && contexto.tipoOrigen) {
+  if (contexto && contexto.tipoOrigen === "general") {
+    userPrompt = `Pregunta para este bloque del informe:
+"""${pregunta}"""
+
+${await datosDelPeriodoTexto(contexto)}`;
+  } else if (contexto && contexto.tipoOrigen) {
     const datos = await buildContextoDatos(contexto);
     userPrompt = `Petición del administrador sobre este análisis:
 """${pregunta || "Escribe un análisis breve: qué destaca, qué está concentrado o disperso, y cualquier patrón relevante."}"""
@@ -746,10 +1388,10 @@ export async function generateReportContent(reportOrPrompt) {
   if (typeof reportOrPrompt === "string") {
     return generateReportContentFromPrompt(reportOrPrompt);
   }
-  const { prompt, bloques, nombre, periodoGeneral } = reportOrPrompt || {};
+  const { prompt, bloques, nombre, periodoGeneral, excluirAnulados, ahora, sinIa, previasIa, conResumen } = reportOrPrompt || {};
   const parsedBloques = Array.isArray(bloques) ? bloques : (typeof bloques === "string" ? JSON.parse(bloques || "[]") : []);
   if (parsedBloques.length > 0) {
-    return renderReportFromBloques(parsedBloques, { nombre, periodo: periodoGeneral });
+    return renderReportFromBloques(parsedBloques, { nombre, periodo: periodoGeneral, excluirAnulados: !!excluirAnulados, ahora: ahora || new Date(), sinIa: !!sinIa, previasIa: previasIa || {}, conResumen: !!conResumen });
   }
   return generateReportContentFromPrompt(prompt);
 }

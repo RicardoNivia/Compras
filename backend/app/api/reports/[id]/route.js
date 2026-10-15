@@ -1,6 +1,36 @@
 import { NextResponse } from "next/server";
 import { requirePermission, apiError } from "@/lib/apiGuard";
-import { updateReport, deleteReport } from "@/lib/reports";
+import { updateReport, deleteReport, getReport, toClientReport } from "@/lib/reports";
+
+/**
+ * @openapi
+ * /api/reports/{id}:
+ *   get:
+ *     tags: [Informes]
+ *     summary: Devuelve un informe con su programación, próxima fecha y configuración de entrega (requiere permiso viewReportes).
+ *     parameters:
+ *       - { name: id, in: path, required: true, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Informe.
+ *         content:
+ *           application/json:
+ *             schema: { type: object }
+ *       404:
+ *         description: Informe no encontrado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
+export async function GET(request, { params }) {
+  const { denied } = await requirePermission("viewReportes");
+  if (denied) return denied;
+  try {
+    return NextResponse.json(toClientReport(await getReport(params.id)));
+  } catch (err) {
+    return apiError(err);
+  }
+}
 
 /**
  * @openapi

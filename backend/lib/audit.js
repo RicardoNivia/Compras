@@ -274,6 +274,45 @@ export async function logReportSent(actor, report, ok, detail) {
   });
 }
 
+// Ediciones del Estudio de informes (ver lib/reportEdiciones.js). recordId = el informe, así la pestaña "Ediciones"
+// muestra en un solo historial la actividad del informe y la de todas sus ediciones.
+const ESTADO_EDICION = { guardado: "guardada como foto", por_enviar: "lista para enviar", enviado: "enviada", omitido: "omitida (no se cumplió la condición)", error: "con error" };
+
+export async function logEdicionGenerada(actor, report, ed) {
+  const origen = ed.origen === "prueba" ? "de prueba " : ed.origen === "manual" ? "manual " : ed.origen === "foto" ? "(foto) " : "";
+  await writeLog({
+    action: "generar",
+    entityType: "informeEdicion",
+    recordId: report.id,
+    recordInfo: `Informe "${report.nombre}" · edición ${origen}${ed.periodoLabel} ${ESTADO_EDICION[ed.estado] || ed.estado}${ed.motivo ? ` — ${ed.motivo}` : ""}`,
+    actor: actor || { nombre: "Programación automática" },
+    changes: null,
+  });
+}
+
+export async function logEdicionDescargada(actor, report, ed) {
+  await writeLog({
+    action: "descargar",
+    entityType: "informeEdicion",
+    recordId: report?.id || ed.reportId,
+    recordInfo: `Informe "${report?.nombre || ""}" · descargó el PDF de ${ed.periodoLabel}`,
+    actor,
+    changes: null,
+  });
+}
+
+export async function logEdicionEnviada(actor, report, ed) {
+  const destinos = (() => { try { return JSON.parse(ed.destinatarios || "[]").join(", "); } catch { return ""; } })();
+  await writeLog({
+    action: "enviar",
+    entityType: "informeEdicion",
+    recordId: report?.id || ed.reportId,
+    recordInfo: `Informe "${report?.nombre || ""}" · edición ${ed.periodoLabel} ${actor ? "marcada como enviada" : "enviada por correo automático"}${destinos ? ` a ${destinos}` : ""}`,
+    actor: actor || { nombre: "Correo automático" },
+    changes: null,
+  });
+}
+
 export async function listAuditLogs({ from, to, userId, recordId, action, entityType, page = 1, pageSize = 50 } = {}) {
   const where = {};
   if (from || to) {
