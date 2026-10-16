@@ -5,15 +5,18 @@ import { flushSync } from "react-dom";
 import { sendAgentChatApi } from "@/lib/api";
 import AssistantContent, { ThinkingLabel } from "@/components/AgentMessageContent";
 import { IconSend, IconPlus, IconTrash } from "@/components/icons";
+import { useAutoGrow } from "@/lib/useAutoGrow";
 
 // Barra de entrada compartida entre el estado "vacío" (centrada, junto al
 // saludo) y el estado "con mensajes" (pegada abajo) — mismo markup en ambos
 // casos para que la View Transition (ver handleSend) la reconozca como el
 // mismo elemento y anime su cambio de posición en vez de solo reemplazarla.
 function ChatInputBar({ input, setInput, onSend, onKeyDown, sending, placeholder }) {
+  const textareaRef = useAutoGrow(input); // el campo crece al escribir, sin barra de desplazamiento
   return (
     <div className="agent-chat-input agent-input-vt">
       <textarea
+        ref={textareaRef}
         rows={1}
         placeholder={placeholder}
         value={input}

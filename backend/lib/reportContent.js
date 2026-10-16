@@ -441,11 +441,68 @@ const AGRUPAR_LABELS = {
   area: "área", categoria: "categoría", estado: "estado",
   estadoLegalizacion: "estado de legalización", proveedor: "proveedor",
   responsable: "responsable", medioPago: "medio de pago", mes: "mes", dia: "día",
+  compra: "compra", // cada barra/fila es UNA compra (tops de compras)
 };
 
 // "mes" y "dia" son agrupaciones cronológicas (eje X = tiempo); el resto agrupa por un campo del registro y se ordena
 // por valor (top N).
 const AGRUPACIONES_CRONOLOGICAS = ["mes", "dia"];
+
+// Métricas de valoración de Nova (puntaje 1-5) para "grafico": en vez de sumar valor o contar compras, promedian el
+// puntaje guardado de las compras valoradas del período, agrupado por proveedor, área, categoría, etc. Sirven para
+// rankings como "top 5 proveedores con menor valoración" (orden "menor": peores primero) o "con mayor valoración".
+const METRICAS_VALORACION = { valoracionProveedor: "puntajeProveedor", valoracionCompra: "puntajeCompra" };
+const VALORACION_LABELS = { valoracionProveedor: "valoración del proveedor", valoracionCompra: "valoración de la compra" };
+const fmtPuntaje = (n) => Number(n).toFixed(1).replace(".", ",");
+
+async function calcularGruposValoracion(records, { agruparPor, metricaAgrupada, orden, limite }) {
+  const campoPuntaje = METRICAS_VALORACION[metricaAgrupada];
+  const ids = records.map((r) => r.id);
+  const vals = ids.length
+    ? await prisma.valoracionCompra.findMany({ where: { recordId: { in: ids }, ...(campoPuntaje === "puntajeProveedor" ? { puntajeProveedor: { not: null } } : {}) } /* puntajeCompra es obligatorio: no admite "not: null" */, select: { recordId: true, [campoPuntaje]: true } })
+    : [];
+  const porId = new Map(records.map((r) => [r.id, r]));
+  const grupos = new Map();
+  for (const v of vals) {
+    const r = porId.get(v.recordId);
+    if (!r) continue;
+    const nombre = agruparPor === "compra" ? etiquetaCompra(r) : r[agruparPor];
+    if (!nombre) continue; // un cajón "sin proveedor/área" no tiene sentido en un ranking
+    if (!grupos.has(nombre)) grupos.set(nombre, { nombre, xs: [], valor: 0 });
+    const g = grupos.get(nombre);
+    g.xs.push(v[campoPuntaje]);
+    g.valor += r.valorConIva || 0;
+  }
+  const mayor = orden === "mayor";
+  const lista = [...grupos.values()]
+    .map((g) => ({ nombre: g.nombre, promedio: g.xs.reduce((a, x) => a + x, 0) / g.xs.length, compras: g.xs.length, valor: g.valor }))
+    .sort((a, b) => (mayor ? b.promedio - a.promedio : a.promedio - b.promedio) || b.compras - a.compras || b.valor - a.valor);
+  return { total: lista.length, grupos: lista.slice(0, limite) };
+}
+
+async function renderGraficoValoracion(b, records, sufijo, periodo, campoPedido) {
+  const campo = AGRUPACIONES_CRONOLOGICAS.includes(campoPedido) ? "proveedor" : campoPedido;
+  const metrica = b.metricaAgrupada;
+  const orden = b.orden === "mayor" ? "mayor" : "menor";
+  const limite = Math.min(Math.max(Number(b.limite) || 5, 1), 15);
+  const etiquetaCampo = AGRUPAR_LABELS[campo] || campo;
+  const titulo = b.titulo || `${orden === "menor" ? "Menor" : "Mayor"} valoración por ${etiquetaCampo}${sufijo}`;
+  const { total, grupos } = await calcularGruposValoracion(records, { agruparPor: campo, metricaAgrupada: metrica, orden, limite });
+  if (!grupos.length) return { titulo, contenido: "No hay compras valoradas por Nova en este período.", destacado: null, grafico: null, tabla: null };
+  const datos = grupos.map((g) => ({ etiqueta: g.nombre, valor: Math.round(g.promedio * 10) / 10 }));
+  const nCompras = (g) => (campo === "compra" ? "" : ` (${g.compras} compra${g.compras === 1 ? "" : "s"})`);
+  const detalle = grupos.map((g) => `${g.nombre} ${fmtPuntaje(g.promedio)}${nCompras(g)}`).join("; ");
+  const base = `Promedio de la ${VALORACION_LABELS[metrica]} de Nova por ${etiquetaCampo}${sufijo}, de ${orden === "menor" ? "menor a mayor" : "mayor a menor"} (${grupos.length} de ${total}): ${detalle}.`;
+  const contenido = await conAnalisisIa(b, base, { tipoOrigen: "grafico", agruparPor: campo, metricaAgrupada: metrica, orden, limite, periodo });
+  return {
+    titulo,
+    contenido,
+    destacado: `${grupos[0].nombre}: ${fmtPuntaje(grupos[0].promedio)} de 5${nCompras(grupos[0])}`,
+    // Sin "_agruparPor": la ventana "de dónde sale esta cifra" explica valores y cantidades, no promedios de valoración.
+    grafico: { titulo, tipo: "barras", datos, metrica, promedio: false },
+    tabla: null,
+  };
+}
 
 function agruparRegistros(records, campo, limit) {
   if (campo === "mes") return groupRecordsByMonth(records);
@@ -527,7 +584,19 @@ function fmtKpiValue(valor, formato) {
 // grafico/tabla. A diferencia del resto de "agregados" (exactos sobre el
 // 100%), aquí se limita a las "limit" agrupaciones de mayor valor, igual que
 // hace la IA en el flujo legado, para no saturar el PDF.
+// Etiqueta corta de una compra individual para ejes y tablas: "#523 Mantenimiento de equipos…".
+function etiquetaCompra(r) {
+  const desc = String(r.descripcion || r.informe || "").replace(/\s+/g, " ").trim();
+  return `${r.localSeq ? `#${r.localSeq}` : String(r.id).slice(0, 6)} ${desc.length > 34 ? `${desc.slice(0, 34)}…` : desc}`.trim();
+}
+
 function groupRecordsBy(records, field, limit) {
+  if (field === "compra") {
+    return records
+      .map((r) => ({ nombre: etiquetaCompra(r), cantidad: 1, valorConIva: r.valorConIva || 0 }))
+      .sort((a, b) => b.valorConIva - a.valorConIva)
+      .slice(0, limit);
+  }
   const map = countBy(records, field);
   return Object.entries(map)
     .map(([nombre, v]) => ({ nombre, cantidad: v.cantidad, valorConIva: v.valorConIva }))
@@ -667,6 +736,7 @@ async function renderBloqueGrafico(b, recordsPeriodo, sufijoPeriodo, periodo, ct
   const metrica = b.metricaAgrupada === "cantidad" ? "cantidad" : "valorConIva";
   const etiquetaCampo = AGRUPAR_LABELS[campo] || campo;
   const cronologico = AGRUPACIONES_CRONOLOGICAS.includes(campo);
+  if (METRICAS_VALORACION[b.metricaAgrupada]) return renderGraficoValoracion(b, records, sufijo, periodo, campo);
   // Columnas apiladas (tiempo × serie), p. ej. "valor de compras por área y mes".
   if (cronologico && b.serie && AGRUPAR_LABELS[b.serie] && !AGRUPACIONES_CRONOLOGICAS.includes(b.serie)) {
     const { series, datos } = groupTiempoPorSerie(records, campo, b.serie, metrica);
@@ -683,7 +753,13 @@ async function renderBloqueGrafico(b, recordsPeriodo, sufijoPeriodo, periodo, ct
       tabla: null,
     };
   }
-  const grupos = campo === "dia" ? completarDias(agruparRegistros(records, campo, 8), dias) : agruparRegistros(records, campo, Math.min(Number(b.limite) || 8, 15));
+  const limiteGrupos = Math.min(Number(b.limite) || 8, 15);
+  // "orden": "menor" muestra los de MENOR valor/cantidad (por defecto los de mayor); se ordena sobre todos los grupos y luego se recorta.
+  const grupos = campo === "dia"
+    ? completarDias(agruparRegistros(records, campo, 8), dias)
+    : b.orden === "menor" && !cronologico
+      ? agruparRegistros(records, campo, 100000).filter((g) => g[metrica] > 0).sort((a, x) => a[metrica] - x[metrica]).slice(0, limiteGrupos)
+      : agruparRegistros(records, campo, limiteGrupos);
   if (grupos.length === 0) {
     return { titulo: b.titulo || `Por ${etiquetaCampo}${sufijo}`, contenido: "No hay compras registradas en este periodo.", destacado: null, grafico: null, tabla: null };
   }
@@ -700,7 +776,7 @@ async function renderBloqueGrafico(b, recordsPeriodo, sufijoPeriodo, periodo, ct
     contenido,
     destacado,
     grafico: { titulo: b.titulo || "Comparación", tipo: tipoGrafico, datos, metrica, promedio: b.promedio !== false && (tipoGrafico === "columnas" || tipoGrafico === "linea") },
-    _agruparPor: campo,
+    _agruparPor: campo === "compra" ? undefined : campo,
     tabla: null,
   };
 }
@@ -1163,6 +1239,13 @@ export async function cifraDetalle({ metrica, periodo, excluirAnulados = true, a
 export const CATALOGO_BLOQUES = {
   metricasKpi: Object.fromEntries(Object.entries(KPI_METRICAS).map(([k, v]) => [k, v.label])),
   agruparPor: AGRUPAR_LABELS,
+  // Qué se puede medir en una gráfica (eje Y): valor, cantidad o el promedio de valoración de Nova.
+  metricasGrafico: {
+    valorConIva: "Valor comprado",
+    cantidad: "Cantidad de compras",
+    valoracionProveedor: "Valoración promedio del proveedor (Nova, 1 a 5)",
+    valoracionCompra: "Valoración promedio de la compra (Nova, 1 a 5)",
+  },
 };
 
 export { loadAggregates };
@@ -1262,6 +1345,19 @@ async function buildContextoDatos(contexto) {
   }
 
   const campo = contexto.agruparPor || "area";
+  if (METRICAS_VALORACION[contexto.metricaAgrupada]) {
+    const campoVal = AGRUPACIONES_CRONOLOGICAS.includes(campo) ? "proveedor" : campo;
+    const { total, grupos: top } = await calcularGruposValoracion(records, { agruparPor: campoVal, metricaAgrupada: contexto.metricaAgrupada, orden: contexto.orden, limite: contexto.limite || 5 });
+    return {
+      tipo: contexto.tipoOrigen,
+      agrupadoPor: AGRUPAR_LABELS[campoVal] || campoVal,
+      metrica: `promedio de la ${VALORACION_LABELS[contexto.metricaAgrupada]} de Nova (de 1 a 5)`,
+      orden: contexto.orden === "mayor" ? "de mayor a menor valoración" : "de menor a mayor valoración",
+      periodo: periodoLabel,
+      gruposConValoracion: total,
+      datos: top.map((g) => ({ nombre: g.nombre, valoracionPromedio: Math.round(g.promedio * 10) / 10, comprasValoradas: g.compras, valorConIva: g.valor })),
+    };
+  }
   const grupos = groupRecordsBy(records, campo, contexto.tipoOrigen === "tabla" ? 15 : 8);
   return {
     tipo: contexto.tipoOrigen,

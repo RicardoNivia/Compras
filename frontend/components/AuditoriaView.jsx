@@ -11,6 +11,8 @@ const ACTION_PILL = {
   editar: "warning",
   eliminar: "critical",
   radicar: "secondary",
+  revocar: "critical",
+  consultar: "muted",
 };
 
 const MONEY_FIELDS = new Set(["valorConIva", "valorSinIva", "valorCot"]);

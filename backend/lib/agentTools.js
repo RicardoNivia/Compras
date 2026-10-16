@@ -18,6 +18,7 @@ import { CONSULTAR_REFERENCIA_TOOL, consultarReferencia } from "@/lib/referencia
 // sobre el 100% de los datos, sin importar cuántos registros haya.
 
 // Límites moderados: cada registro devuelto se vuelve a cobrar en cada vuelta siguiente de la conversación.
+const ENTIDADES_OCULTAS_A_NOVA = ["tokenAcceso", "mcp"];
 const MAX_BUSCAR_LIMIT = 50;
 const DEFAULT_BUSCAR_LIMIT = 20;
 
@@ -613,6 +614,8 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
             const hay = norm(l.userNombre).includes(norm(args.usuario)) || norm(l.userEmail).includes(norm(args.usuario));
             if (!hay) return false;
           }
+          // La función "Conectar con Claude" (tokens y consultas MCP) no es tema de Nova por ahora.
+          if (ENTIDADES_OCULTAS_A_NOVA.includes(l.entityType)) return false;
           if (args.entidad && !norm(l.entityType).includes(norm(args.entidad))) return false;
           return true;
         });

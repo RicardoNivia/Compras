@@ -21,6 +21,8 @@ export const ALL_NAV_ITEMS = [
   { key: "maestros", href: "/maestros", label: "Maestros", Icon: IconLayers, feature: "viewMaestros", show: canViewMaestros },
   { key: "presupuesto", href: "/presupuesto", label: "Presupuesto", Icon: IconMoney, feature: "viewPresupuesto", show: canViewPresupuesto },
   { key: "informes", href: "/informes", label: "Informes", Icon: IconMail, feature: "viewReportes", show: canViewReportes },
+  // Solo en local y solo para admin: en producción el ítem (y la página) no existen.
+  ...(process.env.NODE_ENV !== "production" ? [{ key: "conectar-claude", href: "/conectar-claude", label: "Conectar con Claude", Icon: IconKey, feature: null, show: (role) => role === "admin" }] : []),
   { key: "usuarios", href: "/usuarios", label: "Usuarios", Icon: IconUsers, feature: "viewUsuarios", show: canViewUsuarios },
   { key: "auditoria", href: "/auditoria", label: "Auditoría", Icon: IconHistory, feature: "viewAuditoria", show: canViewAuditoria },
 ];

@@ -21,5 +21,12 @@ export async function requirePermission(feature) {
 // los errores de validación lanzados desde lib/* llegan como Error con una
 // propiedad .status (p.ej. 400) que se expone tal cual; el resto cae a 500.
 export function apiError(err) {
+  // El trigger trg_texto_sin_danos (migración texto_sin_caracteres_danados) rechazó texto con U+FFFD.
+  if (/caracteres dañados/.test(String(err?.message || ""))) {
+    return NextResponse.json(
+      { error: "El texto contiene caracteres dañados, normalmente por una codificación que no es UTF-8. Vuelve a escribir los acentos y la ñ y reintenta." },
+      { status: 400 }
+    );
+  }
   return NextResponse.json({ error: err.message }, { status: err.status || 500 });
 }

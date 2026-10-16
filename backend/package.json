@@ -12,6 +12,7 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "db:seed": "node prisma/seed.mjs",
+    "db:verificar-texto": "node scripts/verificarTextoDanado.mjs",
     "db:importar": "node prisma/importar-registros.mjs",
     "db:migrar-sqlite": "node prisma/migrar-sqlite-a-postgres.mjs",
     "postinstall": "prisma generate",

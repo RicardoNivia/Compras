@@ -82,7 +82,8 @@ function drawGrafico(doc, grafico, width) {
   doc.moveDown(0.3);
 
   const datos = grafico.datos.slice(0, 8);
-  const max = Math.max(...datos.map((d) => d.valor || 0), 1);
+  const esVal = String(grafico.metrica || "").startsWith("valoracion"); // valoración de Nova: escala fija de 1 a 5
+  const max = esVal ? 5 : Math.max(...datos.map((d) => d.valor || 0), 1);
   const labelW = Math.min(130, width * 0.3);
   const valueW = 85;
   const barW = width - labelW - valueW - 16;
@@ -100,7 +101,7 @@ function drawGrafico(doc, grafico, width) {
     doc.roundedRect(barX, rowY + 2, Math.max(8, barW * pct), trackH, 4).fill(color);
 
     doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#132a46")
-      .text(fmtNum(d.valor), barX + barW + 8, rowY + 3, { width: valueW, align: "right" });
+      .text(esVal ? `${Number(d.valor).toFixed(1).replace(".", ",")} / 5` : fmtNum(d.valor), barX + barW + 8, rowY + 3, { width: valueW, align: "right" });
 
     doc.x = startX;
     doc.y = rowY + ROW_H;

@@ -34,6 +34,13 @@ export const FIELD_LABELS = {
   radicado: "Radicado",
 };
 
+export const TOKEN_FIELD_LABELS = {
+  nombre: "Nombre",
+  prefijo: "Token (inicio)",
+  expiraAt: "Vence",
+  estado: "Estado",
+};
+
 export const MAESTRO_FIELD_LABELS = {
   tipo: "Tipo",
   valor: "Valor",
@@ -185,3 +192,9 @@ export const ENTITY_LABELS = {
   cicloProveedor: "Ciclo de proveedor",
   configProveedores: "Configuración de proveedores",
 };
+
+// Conexión con Claude (MCP): solo en local — en producción no existe, así que no se ofrece en los filtros de Auditoría.
+if (process.env.NODE_ENV !== "production") {
+  Object.assign(ACTION_LABELS, { revocar: "Revocó", consultar: "Consultó" });
+  Object.assign(ENTITY_LABELS, { tokenAcceso: "Token de acceso a Claude", mcp: "Consulta desde Claude (MCP)" });
+}

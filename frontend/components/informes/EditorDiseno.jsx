@@ -44,7 +44,20 @@ function PropsSeccion({ b, onChange }) {
             <select id="p-mag" value={b.metricaAgrupada || "valorConIva"} onChange={(e) => set({ metricaAgrupada: e.target.value })}>
               <option value="valorConIva">Valor comprado</option>
               <option value="cantidad">Cantidad de compras</option>
+              <option value="valoracionProveedor">Valoración del proveedor (Nova)</option>
+              <option value="valoracionCompra">Valoración de la compra (Nova)</option>
             </select>
+          </div>
+          {!["mes", "dia"].includes(b.agruparPor) && (
+            <div className="field"><label htmlFor="p-ord">Orden del ranking</label>
+              <select id="p-ord" value={b.orden || (String(b.metricaAgrupada || "").startsWith("valoracion") ? "menor" : "mayor")} onChange={(e) => set({ orden: e.target.value })}>
+                <option value="mayor">De mayor a menor</option>
+                <option value="menor">De menor a mayor</option>
+              </select>
+            </div>
+          )}
+          <div className="field"><label htmlFor="p-lim">Cuántos mostrar</label>
+            <input id="p-lim" type="number" min="1" max="15" placeholder="Todos (hasta 8)" value={b.limite || ""} onChange={(e) => set({ limite: e.target.value ? Math.min(15, Math.max(1, Number(e.target.value))) : undefined })} />
           </div>
           <div className="field"><label htmlFor="p-est">Tipo de gráfica</label>
             <select id="p-est" value={b.estilo || "barras"} onChange={(e) => set({ estilo: e.target.value })}>
