@@ -123,7 +123,7 @@ function SeccionTabla({ items, dominio, onEnviarInforme }) {
 function Seccion({ s, items, onEnviarInforme }) {
   const nivel = items.length ? (items.some((i) => i.nivel === "critico") ? "critico" : items.some((i) => i.nivel === "atencion") ? "atencion" : "info") : "ok";
   const criticos = items.filter((i) => i.nivel === "critico").length;
-  const [abierta, setAbierta] = useState(nivel === "critico" || nivel === "atencion");
+  const [abierta, setAbierta] = useState(false); // todo empieza colapsado; el encabezado ya muestra el conteo y la urgencia
   const n = NIVEL[nivel];
   return (
     <section className={`mi-dia-seccion nivel-${nivel}`} aria-label={s.titulo}>

@@ -137,6 +137,7 @@ const BLOQUE_SCHEMA = {
     metrica: { type: "STRING", nullable: true },
     agruparPor: { type: "STRING", nullable: true },
     metricaAgrupada: { type: "STRING", nullable: true },
+    orden: { type: "STRING", nullable: true },
     estilo: { type: "STRING", nullable: true },
     serie: { type: "STRING", nullable: true },
     promedio: { type: "BOOLEAN", nullable: true },
@@ -151,13 +152,29 @@ const BLOQUE_SCHEMA = {
 };
 
 // dashboard: false omite la guía de gráficas del Dashboard (larga) cuando el pedido no tiene que ver con ellas.
+// Los períodos y las fechas NO se piden en el diseño: se eligen en Programación, en la pregunta "¿Qué período cubre
+// cada envío?" (ProgramacionWizard.jsx). Un informe programado se repite cada mes, así que un rango fijo quedaría viejo.
+const AVISO_PERIODO = 'El período y las fechas no se piden aquí: se eligen en Programación, en la pregunta "¿Qué período cubre cada envío?" (el mes anterior, lo que va del mes, la semana anterior, lo que va del año, el año anterior o todo el histórico), y se aplican a todo el informe en cada envío.';
+const AVISO_PERIODO_CORTO = 'Período: se elige en Programación ("¿Qué período cubre cada envío?")';
+const REGLA_PERIODO = `PERÍODOS Y FECHAS: NO puedes fijar períodos ni fechas concretas en el diseño (un mes, trimestre o año, "últimos N días", fechas o rangos). El período de cada envío se configura en «Programación», en la pregunta «¿Qué período cubre cada envío?» (El mes anterior completo, Lo que va del mes, La semana anterior, Lo que va del año, El año anterior completo o Todo el histórico) y vale para todo el informe. Si el usuario pide un período o fechas, NO los apliques ni uses "ultimosDias": diseña el informe igual y explícale que eso se elige en Programación → «¿Qué período cubre cada envío?».`;
+const MESES_TXT = "enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre";
+const RE_PERIODO = new RegExp(
+  "\\b(" + MESES_TXT + ")\\b|\\b(trimestre|semestre|bimestre|quincena)\\b|\\b20\\d{2}\\b|\\b\\d{4}-\\d{2}-\\d{2}\\b|\\b\\d{1,2}/\\d{1,2}(/\\d{2,4})?\\b|\\b[uú]ltim[oa]s?\\s+(\\d+\\s+)?(d[ií]as?|semanas?|meses|mes|a[nñ]os?)\\b|\\b(este|esta|el|la)\\s+(mes|semana|a[nñ]o)\\s*(pasad[oa]|anterior|actual|en curso)?\\b|\\b(mes|semana|a[nñ]o)\\s+(pasad[oa]|anterior|actual|en curso)\\b|\\b(hoy|ayer)\\b|\\b(desde|hasta)\\s+(el\\s+)?\\d|\\bfechas?\\b|\\bper[ií]odos?\\b|\\brango\\b",
+  "i"
+);
+// ¿El mensaje del usuario pide un período o fechas? Se detecta aquí (no solo en el modelo) para avisarle siempre.
+const mencionaPeriodo = (texto) => RE_PERIODO.test(String(texto || ""));
+
 const CATALOGO_TEXTO = ({ dashboard = true } = {}) => `Tipos de bloque (usa EXACTAMENTE estos valores en "tipo"):
 - "ia": párrafo que Nova redacta al generar el informe con los datos EXACTOS del período (resumen ejecutivo, conclusiones, explicación de una caída). Pon en "pregunta" qué debe escribir (instrucción concreta, 1-3 frases). Es la forma correcta de cualquier texto que mencione cifras.
 - "texto": texto fijo escrito tal cual en "contenido" (solo notas sin cifras).
 - "kpi": una cifra clave. "metrica" es EXACTAMENTE una de: ${Object.entries(CATALOGO_BLOQUES.metricasKpi).map(([k, v]) => `${k} (${v})`).join(", ")}. Se compara sola con el período anterior.
 - "grafico": una gráfica. "agruparPor" es el eje X o la categoría, EXACTAMENTE una de: ${Object.keys(CATALOGO_BLOQUES.agruparPor).join(", ")} ("mes" y "dia" son en el tiempo, en orden cronológico). "metricaAgrupada": "valorConIva" (valor comprado) o "cantidad" (número de compras) — es el eje Y. "estilo": "barras" (barras horizontales, ranking por categoría), "columnas" (columnas verticales, ideal para mes o día), "linea" (línea en el tiempo, para mes o día), "dona" (participación de pocas categorías) o "apiladas" (columnas apiladas en el tiempo). Para "apiladas" usa agruparPor "mes" o "dia" y "serie" con el campo que divide cada columna (area, categoria, proveedor, estado, estadoLegalizacion, responsable o medioPago); ej. "valor por área y mes" → agruparPor "mes", serie "area", estilo "apiladas". "promedio": true muestra una línea punteada con el promedio (por defecto sí en columnas y línea).
-  "ultimosDias": N limita ESA gráfica o tabla a los últimos N días hasta hoy (ignora el período del informe solo para esa sección; los días sin compras salen en 0). Úsalo cuando pidan "los últimos 5 días", "la última semana" (7), etc.
-  Ejemplos: "compras por día de los últimos 5 días" → agruparPor "dia", estilo "columnas", ultimosDias 5. "compras por día, cantidad en el eje Y" → agruparPor "dia", metricaAgrupada "cantidad", estilo "columnas". "valor por mes en línea" → agruparPor "mes", estilo "linea". "participación por categoría" → agruparPor "categoria", estilo "dona".
+  "metricaAgrupada" también puede ser "valoracionProveedor" o "valoracionCompra": entonces la gráfica NO suma valor ni cuenta compras, muestra el PROMEDIO de la valoración de Nova (1 a 5) de las compras valoradas del período, agrupado por "agruparPor" (casi siempre "proveedor"; no sirve con "mes" ni "dia"). Úsala para pedidos como "top 5 proveedores con menor valoración" o "con mejor valoración". "orden": "menor" ordena del menor al mayor valoración (los peor valorados primero; es el valor por defecto) y "mayor" del mayor al menor. "limite": cuántos mostrar (por defecto 5). Estilo siempre "barras".
+  "ultimosDias": NO lo uses ni lo cambies (solo existe en secciones que ya lo traían): los períodos NO se piden en el diseño, se eligen en Programación (ver PERÍODOS Y FECHAS).
+  "agruparPor": "compra" hace que CADA barra sea una compra individual (etiqueta "#número descripción"), para tops de compras: "las 5 compras de mayor valor" (metricaAgrupada "valorConIva", orden "mayor") o "las 5 compras peor valoradas" (metricaAgrupada "valoracionCompra", orden "menor"). Con "valoracionProveedor" cada barra es la valoración que recibió el proveedor en esa compra.
+  "orden": "mayor" (de mayor a menor, por defecto) o "menor" (de menor a mayor) ordena CUALQUIER ranking de una gráfica por la métrica elegida (valor, cantidad o valoración).
+  Ejemplos: "top 5 proveedores con menor valoración" → agruparPor "proveedor", metricaAgrupada "valoracionProveedor", orden "menor", limite 5, estilo "barras". "los 3 proveedores mejor valorados" → igual con orden "mayor", limite 3. "top 5 compras de mayor valor" → agruparPor "compra", metricaAgrupada "valorConIva", orden "mayor", limite 5, estilo "barras". "las 5 compras peor valoradas" → agruparPor "compra", metricaAgrupada "valoracionCompra", orden "menor", limite 5, estilo "barras". "compras por día" → agruparPor "dia", estilo "columnas". "compras por día, cantidad en el eje Y" → agruparPor "dia", metricaAgrupada "cantidad", estilo "columnas". "valor por mes en línea" → agruparPor "mes", estilo "linea". "participación por categoría" → agruparPor "categoria", estilo "dona".
 - "tabla": desglose por "agruparPor" (mismos valores que grafico).
 - "presupuesto": presupuesto vs. gastado por área (año en curso).
 - "pendientes": solicitudes sin entregar del período.
@@ -168,7 +185,9 @@ const CATALOGO_TEXTO = ({ dashboard = true } = {}) => `Tipos de bloque (usa EXAC
 - "ahorroArea": ahorro (cotizado − comprado) por área, con tabla (como "Ahorro por área" del Dashboard).
 - "consumoCategoriaArea": por área, valor del período, acumulado del año, presupuesto, disponible y % consumido (como "Consumo por categoría y área").
 - En "grafico", "limite": N muestra solo los N primeros (ej. top 5 proveedores).
-Períodos válidos para "periodoGeneral": ${PERIODOS.join(", ")} (mes_anterior = el mes calendario anterior a la fecha de cada envío).
+Períodos válidos para "periodoGeneral": ${PERIODOS.join(", ")} (mes_anterior = el mes calendario anterior a la fecha de cada envío). NO los decides tú: ver PERÍODOS Y FECHAS.
+
+${REGLA_PERIODO}
 ${dashboard ? `\n${GRAFICAS_DASHBOARD}` : ""}`;
 
 // Versión mínima del catálogo para pedidos que solo tocan el texto de una sección de Nova o una nota ("más corto",
@@ -185,8 +204,8 @@ const PIDE_DASHBOARD = /dashboard|tablero|como en el panel|participaci|top ?5|ah
 // pide "la gráfica de valor de compras por mes del dashboard", Nova sabe exactamente qué bloque crear (mismo título).
 const GRAFICAS_DASHBOARD = `GRÁFICAS Y CIFRAS DEL DASHBOARD DE COMPRAS (si el usuario nombra una, o dice "como en el dashboard", crea EXACTAMENTE este bloque con ese título):
 - Cifras de arriba del Dashboard: "Valor del mes" → kpi totalValorConIva; "Cumplimiento de tiempos" → kpi cumplimientoPct; "En proceso" / "Pendientes en riesgo" → kpi totalPendientesVencidos; "Ticket promedio" → kpi ticketPromedio; "Total compras" → kpi totalRegistros; "Ahorro total" → kpi ahorroTotal; "% ahorro global" → kpi pctAhorro.
-- "Valor de compras por mes" → grafico agruparPor "mes", metricaAgrupada "valorConIva", estilo "columnas" (con línea de promedio). Para que muestre los meses del año, usa periodoGeneral "anio_actual" o di al usuario que con "mes anterior" solo saldría un mes.
-- "Valor de compras por área y mes" → grafico agruparPor "mes", serie "area", metricaAgrupada "valorConIva", estilo "apiladas" (top 5 áreas + Otras). Igual que la anterior, necesita un período de varios meses.
+- "Valor de compras por mes" → grafico agruparPor "mes", metricaAgrupada "valorConIva", estilo "columnas" (con línea de promedio). Para que muestre varios meses, el usuario debe elegir en Programación un período largo (p. ej. "Lo que va del año"); con "El mes anterior completo" solo saldría un mes.
+- "Valor de compras por área y mes" → grafico agruparPor "mes", serie "area", metricaAgrupada "valorConIva", estilo "apiladas" (top 5 áreas + Otras). Igual que la anterior, el usuario debe elegir en Programación un período de varios meses.
 - "Participación por área" → grafico agruparPor "area", metricaAgrupada "valorConIva", estilo "dona".
 - "Participación por categoría" → grafico agruparPor "categoria", metricaAgrupada "valorConIva", estilo "dona".
 - "Compras por área" → grafico agruparPor "area", metricaAgrupada "valorConIva", estilo "barras".
@@ -195,6 +214,7 @@ const GRAFICAS_DASHBOARD = `GRÁFICAS Y CIFRAS DEL DASHBOARD DE COMPRAS (si el u
 - "Medio de pago" → grafico agruparPor "medioPago", metricaAgrupada "valorConIva", estilo "dona".
 - "Compras por responsable" → grafico agruparPor "responsable", metricaAgrupada "cantidad", estilo "barras".
 - "Top 5 proveedores por volumen de compra" → grafico agruparPor "proveedor", metricaAgrupada "valorConIva", estilo "barras".
+- "Top 5 proveedores con menor valoración" → grafico agruparPor "proveedor", metricaAgrupada "valoracionProveedor", orden "menor", limite 5, estilo "barras" (con "mayor" en orden: los mejor valorados).
 - "Cumplimiento de entregas" / "Tiempos de solicitud a entrega" → kpis cumplimientoPct y promedioDiasHabiles + bloque "fueraPlazo".
 - "Cumplimiento por mes" → no hay un bloque idéntico (cumplido vs no cumplido por mes): ofrece kpi cumplimientoPct + bloque "fueraPlazo" y dilo en la respuesta.
 - "Solicitudes pendientes" → bloque "pendientes".
@@ -232,7 +252,7 @@ function limpiarBloques(bloques, previos = []) {
     .map((b, i) => {
       const prev = previos[i] && previos[i].tipo === b.tipo ? previos[i] : null;
       const out = { tipo: b.tipo, titulo: String(b.titulo || "").slice(0, 120) };
-      for (const k of ["metrica", "agruparPor", "metricaAgrupada", "estilo", "contenido", "pregunta", "serie"]) if (b[k]) out[k] = String(b[k]);
+      for (const k of ["metrica", "agruparPor", "metricaAgrupada", "orden", "estilo", "contenido", "pregunta", "serie"]) if (b[k]) out[k] = String(b[k]);
       if (b.umbral != null) out.umbral = Number(b.umbral);
       if (b.comparar === false) out.comparar = false;
       if (b.promedio === false) out.promedio = false;
@@ -253,6 +273,21 @@ function limpiarBloques(bloques, previos = []) {
         }
       }
       if (out.tipo === "grafico") {
+        if (out.metricaAgrupada && !CATALOGO_BLOQUES.metricasGrafico[out.metricaAgrupada]) {
+          avisos.push(`No puedo graficar "${out.metricaAgrupada}"; se puede ${Object.keys(CATALOGO_BLOQUES.metricasGrafico).join(", ")}.`);
+          out.metricaAgrupada = prev?.metricaAgrupada || "valorConIva";
+        }
+        if (["valoracionProveedor", "valoracionCompra"].includes(out.metricaAgrupada)) {
+          if (CRONOLOGICOS.includes(out.agruparPor)) {
+            avisos.push("La valoración se grafica por proveedor, área, categoría… no por mes o día; la dejé por proveedor.");
+            out.agruparPor = "proveedor";
+          }
+          out.estilo = "barras";
+          delete out.serie;
+          if (out.orden !== "mayor") out.orden = "menor";
+        } else if (out.orden !== "menor" && out.orden !== "mayor") {
+          delete out.orden;
+        }
         if (out.estilo && !ESTILOS.includes(out.estilo)) {
           avisos.push(`El tipo de gráfica "${out.estilo}" no existe; se puede barras, columnas, línea, dona o apiladas.`);
           out.estilo = prev?.estilo || (CRONOLOGICOS.includes(out.agruparPor) ? "columnas" : "barras");
@@ -290,19 +325,19 @@ Cómo armarlo:
 - Agrupa 2 a 4 bloques "kpi" seguidos con las cifras más relevantes para el pedido (se muestran en una fila).
 - Agrega solo los bloques que el pedido justifica (entre 4 y 10 en total). Si pide "qué se pasó de los 8 días", usa "fueraPlazo"; si pide proveedores mal valorados, "proveedoresValoracion"; si pide presupuesto, "presupuesto".
 - "nombre": corto y claro (ej. "Informe mensual de compras · Gerencia").
-- "periodoGeneral": deduce del pedido ("mensual" → mes_anterior, "semanal" → semana_anterior, "del año" → anio_actual). Si no lo dice, mes_anterior.
+- "periodoGeneral": SIEMPRE "mes_anterior" (valor inicial); el usuario lo cambia después en Programación. Aunque el pedido mencione un mes, año, trimestre, fechas o "últimos N días", no lo apliques ni lo pongas como chip en "entendido": armas el informe igual (ver PERÍODOS Y FECHAS).
 - "audiencia": para quién es (Gerencia, Comité, Compras, Proveedores…) o null.
 - "tono": "ejecutivo", "detallado" o "formal".
-- "entendido": 3 a 5 frases cortas de lo que entendiste, para mostrárselas al usuario como chips (ej. "Período: mes anterior", "Para: Gerencia", "Incluye compras fuera de plazo").`,
+- "entendido": 3 a 5 frases cortas de lo que entendiste, para mostrárselas al usuario como chips (ej. "Para: Gerencia", "Incluye compras fuera de plazo"; nunca de período).`,
     prompt: `Pedido del usuario:\n"""${String(pedido || "").slice(0, 2000)}"""\n\nDatos disponibles (solo para saber qué existe, no para citar):\n${JSON.stringify(resumenDatos)}`,
     schema: INFORME_SCHEMA,
     budgetMs: 45000,
   });
   return {
     nombre: String(res.nombre || "Nuevo informe").slice(0, 120),
-    periodoGeneral: PERIODOS.includes(res.periodoGeneral) ? res.periodoGeneral : "mes_anterior",
+    periodoGeneral: "mes_anterior", // el período real se elige en Programación
     contexto: { audiencia: res.audiencia || null, tono: res.tono || "ejecutivo", excluirAnulados: true },
-    entendido: (res.entendido || []).slice(0, 6),
+    entendido: [...(mencionaPeriodo(pedido) ? [AVISO_PERIODO_CORTO] : []), ...(res.entendido || []).filter((t) => !/per[ií]odo|trimestre|[uú]ltimos|fechas?/i.test(t))].slice(0, 6), // un solo chip de período, el nuestro
     bloques: limpiarBloques(res.bloques).bloques,
   };
 }
@@ -376,7 +411,7 @@ Reglas:
 - "Más corto", "más formal", "explica la caída": ajusta la "pregunta" de los bloques "ia" (son las instrucciones con que Nova redacta).
 - "Cambia a torta/dona": "estilo": "dona". "Compáralo con el período anterior": las cifras kpi ya se comparan solas; si piden otra comparación que el sistema no puede calcular, dilo en "respuesta" y propone lo más cercano.
 - "Agrega el top 5 de proveedores": un bloque "tabla" o "grafico" con agruparPor "proveedor".
-- Puedes cambiar "nombre" o "periodoGeneral" solo si lo piden; si no, devuélvelos en null.
+- Puedes cambiar "nombre" solo si lo piden. "periodoGeneral" devuélvelo SIEMPRE en null: no puedes cambiar períodos ni fechas (ver PERÍODOS Y FECHAS); si lo piden, explícalo en "respuesta".
 - Haz EXACTAMENTE lo que piden: no cambies "agruparPor" a "area" ni a otro valor que no pidieron. Si piden algo que no está en el catálogo (otra agrupación, otra cifra), no lo cambies por algo parecido sin decirlo: explica en "respuesta" qué no se puede y qué propones en su lugar.
 - Nunca inventes cifras ni nombres de proveedores o áreas.`,
     prompt: `Informe actual:
@@ -392,9 +427,9 @@ Pedido del usuario: """${String(instruccion || "").slice(0, 1500)}"""`,
   const resultado = aplicarOperaciones(bloques, res.operaciones);
   const { bloques: limpios, avisos } = limpiarBloques(resultado, resultado.map((b, i) => bloques?.[i] || null));
   return {
-    respuesta: [res.respuesta || "Listo.", ...avisos.map((a) => `Ojo: ${a}`)].join("\n"),
+    respuesta: [res.respuesta || "Listo.", ...avisos.map((a) => `Ojo: ${a}`), ...(mencionaPeriodo(instruccion) && !/programaci[oó]n/i.test(res.respuesta || "") ? [AVISO_PERIODO] : [])].join("\n"),
     nombre: res.nombre ? String(res.nombre).slice(0, 120) : null,
-    periodoGeneral: PERIODOS.includes(res.periodoGeneral) ? res.periodoGeneral : null,
+    periodoGeneral: null, // los períodos se eligen en Programación, no desde el chat
     bloques: limpios,
   };
 }

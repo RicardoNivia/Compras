@@ -33,6 +33,7 @@ export const METRICAS = {
 export const AGRUPAR = {
   area: "Área", categoria: "Categoría", proveedor: "Proveedor", estado: "Estado", estadoLegalizacion: "Estado de legalización",
   responsable: "Responsable", medioPago: "Medio de pago", mes: "Mes", dia: "Día",
+  compra: "Compra individual (top de compras)",
 };
 
 export const TIPOS_SECCION = {
@@ -186,6 +187,7 @@ export const SECCIONES_LISTAS = [
     grupo: "Proveedores",
     items: [
       { clave: "topProveedores", label: "Top 5 proveedores por volumen de compra", bloques: [G("Top 5 proveedores por volumen de compra", "proveedor", "valorConIva", "barras", { limite: 5 })] },
+      { clave: "topProveedoresValoracion", label: "Top 5 proveedores con menor valoración (Nova)", bloques: [G("Top 5 proveedores con menor valoración", "proveedor", "valoracionProveedor", "barras", { limite: 5, orden: "menor" })] },
       { clave: "tablaProveedores", label: "Tabla de compras por proveedor", bloques: [{ tipo: "tabla", titulo: "Compras por proveedor", agruparPor: "proveedor" }] },
       { clave: "proveedoresValoracion", label: "Proveedores a revisar (valoración de Nova)", bloques: [{ tipo: "proveedoresValoracion", titulo: "Proveedores a revisar", umbral: 3 }] },
       { clave: "cicloProveedores", label: "Ciclo de actualización de proveedores", bloques: [{ tipo: "cicloProveedores", titulo: "Ciclo de proveedores" }] },

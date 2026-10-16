@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS } from "@/lib/auditLabels";
+import { FIELD_LABELS, TOKEN_FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS } from "@/lib/auditLabels";
 
-export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, ACTION_LABELS, ENTITY_LABELS } from "@/lib/auditLabels";
+export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, TOKEN_FIELD_LABELS, ACTION_LABELS, ENTITY_LABELS } from "@/lib/auditLabels";
 
 // Nombre corto del tipo de maestro para el resumen del log — copia local
 // (sin importar lib/maestros.js) para no crear una dependencia circular
@@ -467,4 +467,25 @@ export async function logConfigProveedoresUpdate(actor, before, after) {
   const changes = diffFields(before, after, CONFIG_PROVEEDORES_FIELD_LABELS);
   if (!changes.length) return;
   await writeLog({ action: "editar", entityType: "configProveedores", recordId: "config", recordInfo: "Ciclo de actualización de proveedores", actor, changes });
+}
+
+// ---------- Tokens de acceso (MCP) ----------
+// Nunca se audita el token ni su hash — solo nombre, prefijo, vencimiento y estado.
+
+const tokenSummary = (t) => `Token "${t.nombre}" (${t.prefijo}…)${t.dueno?.nombre ? ` de ${t.dueno.nombre}` : ""}`;
+
+export async function logTokenCreate(actor, token) {
+  const changes = diffFields(null, { ...token, expiraAt: token.expiraAt?.toISOString?.().slice(0, 10) }, TOKEN_FIELD_LABELS);
+  await writeLog({ action: "crear", entityType: "tokenAcceso", recordId: String(token.id), recordInfo: tokenSummary(token), actor, changes });
+}
+
+export async function logTokenRevoke(actor, before, after) {
+  const changes = diffFields(before, after, { estado: TOKEN_FIELD_LABELS.estado });
+  await writeLog({ action: "revocar", entityType: "tokenAcceso", recordId: String(after.id), recordInfo: tokenSummary(after), actor, changes });
+}
+
+// Cada herramienta que Claude ejecuta a nombre de una persona (solo lectura): quién, qué y con qué filtros.
+export async function logMcpConsulta(actor, tool, args) {
+  const resumen = JSON.stringify(args || {}).slice(0, 300);
+  await writeLog({ action: "consultar", entityType: "mcp", recordId: String(actor?.tokenId ?? "mcp"), recordInfo: `${tool} ${resumen}`, actor });
 }

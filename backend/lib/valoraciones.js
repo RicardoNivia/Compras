@@ -24,7 +24,7 @@ export async function valorarRegistro(recordId, actor, { origen = "radicacion" }
 
   const ctx = await construirContexto(prisma, recordId);
   // generateStructuredJson usa la API key del servidor (ANTHROPIC_API_KEY) y el modelo por defecto.
-  const resultado = await valorarConIA(ctx, { generar: ({ systemInstruction, prompt, schema, timeoutMs }) => generateStructuredJson({ systemInstruction, prompt, schema, budgetMs: timeoutMs }) });
+  const resultado = await valorarConIA(ctx, { generar: ({ systemInstruction, prompt, schema, timeoutMs }) => generateStructuredJson({ systemInstruction, prompt, schema, budgetMs: timeoutMs, cache: false }) });
   const { antes, despues } = await guardarValoracion(prisma, recordId, resultado, { actor, origen });
 
   const info = `Registro ${record.localSeq ? `#${record.localSeq}` : record.id}${record.descripcion ? ` · ${String(record.descripcion).slice(0, 60)}` : ""}`;

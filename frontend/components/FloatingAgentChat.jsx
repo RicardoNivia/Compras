@@ -6,6 +6,7 @@ import { leerPantallaNova } from "@/lib/novaPantalla";
 import { sendAgentChatApi } from "@/lib/api";
 import { canViewAgenteIA } from "@/lib/roles";
 import { ALL_NAV_ITEMS } from "@/components/Sidebar";
+import { useAutoGrow } from "@/lib/useAutoGrow";
 import AssistantContent, { ThinkingLabel } from "@/components/AgentMessageContent";
 import { IconSpark, IconSend, IconPlus } from "@/components/icons";
 
@@ -50,6 +51,7 @@ export default function FloatingAgentChat({ user }) {
   const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const textareaRef = useAutoGrow(input); // el campo crece al escribir, sin barra de desplazamiento
   const [sending, setSending] = useState(false);
   const [conversationId, setConversationId] = useState(null);
   const scrollRef = useRef(null);
@@ -231,6 +233,7 @@ export default function FloatingAgentChat({ user }) {
           <div className="floating-agent-input">
             <div className="floating-agent-input-row">
               <textarea
+                ref={textareaRef}
                 rows={1}
                 placeholder={section ? `Pregunta algo sobre ${section}…` : "Pregunta algo…"}
                 value={input}

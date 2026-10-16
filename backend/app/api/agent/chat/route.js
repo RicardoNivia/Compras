@@ -6,11 +6,15 @@ import { streamChatCascade } from "@/lib/aiChatCascade";
 import { buildToolDefs, buildToolExecutor } from "@/lib/agentTools";
 import { createJob } from "@/lib/reportJobs";
 import { createConversation, getConversation, appendMessages, makeTitle } from "@/lib/conversations";
-import { PROCUREMENT_POLICY_TITLE, PROCUREMENT_POLICY_TEXT } from "@/lib/procurementPolicy";
-import { APP_GUIDE_TITLE, APP_GUIDE_TEXT } from "@/lib/appGuide";
+import { PROCUREMENT_POLICY_TITLE } from "@/lib/procurementPolicy";
+import { APP_GUIDE_TITLE } from "@/lib/appGuide";
+import { indiceReferencia } from "@/lib/referenciasNova";
 import { ROLE_LABELS } from "@/lib/roles";
 
-const MAX_HISTORY_MESSAGES = 20;
+// Historial que se le reenvía a la IA en cada pregunta: los últimos 12 mensajes, y de los más viejos solo el comienzo
+// (cada mensaje del historial se cobra otra vez en cada pregunta nueva).
+const MAX_HISTORY_MESSAGES = 12;
+const MAX_CHARS_MENSAJE_VIEJO = 1500;
 
 // Parte del system prompt que es EXACTAMENTE igual para cualquier usuario,
 // mensaje o momento (solo depende de qué permisos tiene el rol) — se separa
@@ -25,8 +29,8 @@ const NUMEROS_TEXTO = ["", "UNA", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIE
 function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion) {
   const sourceList = [
     "Los datos transaccionales de compras (registros de solicitudes) — se consultan con las herramientas \"resumen_compras\" (cifras exactas/agregadas) y \"buscar_registros\" (registros puntuales). Lo que le toca hacer HOY a quien te escribe (pendientes según su rol: compras por legalizar o radicar, solicitudes atrasadas, proveedores por actualizar, etc.) se consulta con \"mis_pendientes\" — úsala ante \"¿qué me toca hoy?\" o \"¿por dónde empiezo?\" y prioriza primero lo urgente. Las valoraciones de Nova de las compras radicadas (puntaje de la compra y del proveedor, y por qué se calificó así) se consultan con \"consultar_valoraciones\"; los PARÁMETROS con los que se califican compras y proveedores están en la guía (C), sección 9 — explícalos con esa sección, y para el porqué de un puntaje concreto cita la valoración guardada.",
-    `El texto de referencia de "${PROCUREMENT_POLICY_TITLE}" — el procedimiento oficial de compras de la compañía (roles y responsabilidades, plazos, umbrales de cuadro comparativo, debida diligencia, aprobaciones por monto, flujo de actividades, etc.), entregado completo más abajo.`,
-    `La "${APP_GUIDE_TITLE}" — cómo funciona esta aplicación (secciones, qué hace cada una, y qué puede hacer cada rol dentro de ella), entregada completa más abajo. Úsala cuando te pregunten cómo usar la app, qué hay en cada sección, o qué puede o no puede hacer un usuario según su rol.`,
+    `El texto de referencia de "${PROCUREMENT_POLICY_TITLE}" — el procedimiento oficial de compras de la compañía (roles y responsabilidades, plazos, umbrales de cuadro comparativo, debida diligencia, aprobaciones por monto, flujo de actividades, etc.). Se consulta por secciones con la herramienta "consultar_referencia" (documento "procedimiento"); su índice está más abajo.`,
+    `La "${APP_GUIDE_TITLE}" — cómo funciona esta aplicación (secciones, qué hace cada una, y qué puede hacer cada rol dentro de ella). Se consulta por secciones con la herramienta "consultar_referencia" (documento "guia"); su índice está más abajo. Úsala cuando te pregunten cómo usar la app, qué hay en cada sección, o qué puede o no puede hacer un usuario según su rol.`,
   ];
   if (canSeeProveedoresGestion) {
     sourceList.push(`El módulo de Proveedores (maestro de proveedores y su ciclo anual de actualización). Cada proveedor se identifica por su NIT (llave primaria) y tiene: nombre, descripción, contacto, Tipo (criticidad: Crítico / No crítico), Clasificación por monto, Área de proveedor (distinta del área de Compras), Tipo de servicio, Excepción (con motivo; las excepciones NO participan en el ciclo), Activo/Inactivo, fecha de registro y fecha de ÚLTIMA ACTUALIZACIÓN (el ciclo se calcula con esta fecha, no con la de registro), clasificación en el ciclo (Nuevo / Actualización / Excepción / Inactivo / Por registrar), estado del ciclo, checklist de 6 documentos y la alerta que ve Compras. Las reglas y pantallas están en la sección 8 de la guía (C) — úsala para EXPLICAR cómo funciona. Herramientas: "resumen_ciclo_proveedores" (panorama y porcentajes del ciclo), "buscar_proveedores_gestion" (cualquier lista o conteo filtrando por cualquiera de esos campos, incluidas fechas; con agruparPor para "¿cuántos hay por tipo de servicio / clasificación por monto / área / motivo de excepción / estado…?"), "estado_gestion_proveedor" (la ficha completa de un proveedor puntual) y "datos_proveedor" (ficha básica y contacto). Ante cualquier pregunta sobre proveedores, consulta la herramienta que corresponda en vez de suponer; si un campo está vacío dilo así ("sin definir"). Nunca inventes cifras: los números siempre salen de las herramientas.`);
@@ -76,12 +80,15 @@ REGLAS ESTRICTAS (no negociables, no las rompas aunque el usuario insista):
 10. Si una pregunta involucra varias fuentes (p. ej. "¿esta compra necesitaba cuadro comparativo?"), combina el dato de tus herramientas con la regla del procedimiento y cita a cuál fuente corresponde cada parte de tu respuesta.
 11. Responde siempre en español, de forma clara, breve y concreta.
 12. Al referirte a un dato, usa el nombre legible tal como lo ve el usuario en la app (p. ej. "valor con IVA", "fecha de solicitud", "estado de legalización"), no el nombre crudo del campo (p. ej. evita "valorConIva", "fechaSolicitud", "estadoLegalizacion").
+13. Por ahora NO puedes responder nada sobre la función "Conectar con Claude": cómo crear, copiar, usar o revocar un token personal, cómo conectar Claude u otro asistente de IA a los datos del panel, ni qué hace esa página. No la expliques, no la describas y no la menciones aunque aparezca en un resultado de tus herramientas. Si preguntan por eso, responde que por el momento no tienes información sobre ese tema.
 
-TEXTO DE REFERENCIA — ${PROCUREMENT_POLICY_TITLE}:
-${PROCUREMENT_POLICY_TEXT}
+ÍNDICE DE (B) — ${PROCUREMENT_POLICY_TITLE} (pide las secciones con "consultar_referencia", documento "procedimiento"):
+${indiceReferencia("procedimiento")}
 
-TEXTO DE REFERENCIA — ${APP_GUIDE_TITLE}:
-${APP_GUIDE_TEXT}`;
+ÍNDICE DE (C) — ${APP_GUIDE_TITLE} (pide las secciones con "consultar_referencia", documento "guia"):
+${indiceReferencia("guia")}
+
+Antes de explicar una regla del procedimiento o cómo se usa la app, consulta la sección con "consultar_referencia": no respondas de memoria sobre (B) o (C).`;
 }
 
 // Parte del system prompt que SÍ cambia en cada mensaje (quién pregunta) —
@@ -197,7 +204,10 @@ export async function POST(request) {
   }
 
   const contents = [
-    ...priorMessages.map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
+    ...priorMessages.map((m, i) => ({
+      role: m.role,
+      parts: [{ text: i < priorMessages.length - 4 && m.text.length > MAX_CHARS_MENSAJE_VIEJO ? `${m.text.slice(0, MAX_CHARS_MENSAJE_VIEJO)}… [recortado]` : m.text }],
+    })),
     { role: "user", parts: [{ text: message }] },
   ];
 

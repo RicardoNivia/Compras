@@ -14,11 +14,16 @@ const SERIE_OTRAS = "#a2a6ab";
 const color = (etiqueta, i) => COLORES_ESTADO[etiqueta] || PALETA[i % PALETA.length];
 const TIEMPO = ["columnas", "linea", "apiladas"];
 
+const esValoracion = (metrica) => String(metrica || "").startsWith("valoracion");
+const fmtPuntaje = (v) => `${Number(v || 0).toFixed(1).replace(".", ",")} ★`;
+
 function fmtCorto(v, metrica) {
+  if (esValoracion(metrica)) return fmtPuntaje(v);
   if (metrica === "cantidad") return new Intl.NumberFormat("es-CO").format(v || 0);
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", notation: "compact", compactDisplay: "short", maximumFractionDigits: 1 }).format(v || 0);
 }
 function fmtLargo(v, metrica) {
+  if (esValoracion(metrica)) return fmtPuntaje(v);
   if (metrica === "cantidad") return new Intl.NumberFormat("es-CO").format(v || 0);
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(v || 0);
 }
@@ -192,19 +197,20 @@ function GraficoCategorias({ g, tipo, onDato }) {
     );
   }
 
-  const max = Math.max(...datos.map((d) => d.valor), 1);
+  const esVal = esValoracion(g.metrica); // valoración de Nova: escala fija de 1 a 5 y sin % del total
+  const max = esVal ? 5 : Math.max(...datos.map((d) => d.valor), 1);
   return (
     <div className="inf-barras" onMouseLeave={() => setHover(null)}>
       {datos.map((d, i) => (
         <button
           key={d.etiqueta} type="button" className={hover != null && hover !== i ? "dim" : ""}
           onMouseEnter={() => setHover(i)} onClick={() => onDato?.(d)} disabled={!onDato}
-          title={`${d.etiqueta}: ${fmtLargo(d.valor, g.metrica)} (${pct(d.valor, total)})`}
+          title={esVal ? `${d.etiqueta}: ${fmtLargo(d.valor, g.metrica)}` : `${d.etiqueta}: ${fmtLargo(d.valor, g.metrica)} (${pct(d.valor, total)})`}
         >
           <span className="lbl">{d.etiqueta}</span>
           <span className="track"><span className="fill" style={{ width: `${Math.max(2, (d.valor / max) * 100)}%`, background: COLORES_ESTADO[d.etiqueta] || undefined, animationDelay: `${i * 0.04}s` }} /></span>
           <span className="val">{fmtCorto(d.valor, g.metrica)}</span>
-          <span className="pct">{pct(d.valor, total)}</span>
+          {!esVal && <span className="pct">{pct(d.valor, total)}</span>}
         </button>
       ))}
     </div>

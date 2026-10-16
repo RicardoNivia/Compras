@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
-const PUBLIC_PATHS = new Set(["/api/auth/login"]);
+// Texto con caracteres dañados (U+FFFD): llega así cuando un cliente manda una codificación que no es UTF-8 y el
+// acento o la ñ ya no se puede recuperar. Se rechaza aquí con un mensaje claro; la base de datos lo rechaza también
+// (trigger trg_texto_sin_danos) por si algo escribe sin pasar por la API.
+const MENSAJE_TEXTO_DANADO =
+  "El texto contiene caracteres dañados (\uFFFD), normalmente por una codificación que no es UTF-8. Vuelve a escribir los acentos y la ñ y reintenta.";
+const TIENE_TEXTO_DANADO = /\uFFFD|\\u[fF][fF][fF][dD]/;
+const LIMITE_REVISION_BYTES = 2_000_000; // los cuerpos enormes (imágenes en base64) los cubre el trigger de la BD
+
+// /api/mcp (solo local, ver lib/mcpGate.js) se autentica con su propio token personal (Bearer), no con la cookie de sesión.
+const PUBLIC_PATHS = new Set(["/api/auth/login", ...(process.env.NODE_ENV !== "production" ? ["/api/mcp"] : [])]);
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
@@ -15,6 +24,15 @@ export async function middleware(request) {
 
   if (!payload) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+  }
+
+  if (
+    ["POST", "PUT", "PATCH"].includes(request.method) &&
+    (request.headers.get("content-type") || "").includes("application/json") &&
+    Number(request.headers.get("content-length") || 0) <= LIMITE_REVISION_BYTES
+  ) {
+    const cuerpo = await request.clone().text();
+    if (TIENE_TEXTO_DANADO.test(cuerpo)) return NextResponse.json({ error: MENSAJE_TEXTO_DANADO }, { status: 400 });
   }
 
   // La documentación Swagger (/docs y el spec que consume, /api/openapi.json)

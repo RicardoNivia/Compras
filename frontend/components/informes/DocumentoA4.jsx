@@ -10,7 +10,10 @@ import { PALETA, periodoCorto } from "@/components/informes/estudioUtils";
 const COLORES_ESTADO = { Pendiente: "#fb8500", Proceso: "#00bcd4", Ejecutado: "#60a918", Anulado: "#d14343", Legalizado: "#60a918", Rechazado: "#d14343" };
 const color = (etiqueta, i) => COLORES_ESTADO[etiqueta] || PALETA[i % PALETA.length];
 
+const esValoracion = (metrica) => String(metrica || "").startsWith("valoracion");
+
 function fmtValor(v, metrica) {
+  if (esValoracion(metrica)) return `${Number(v || 0).toFixed(1).replace(".", ",")} ★`;
   if (metrica === "cantidad") return new Intl.NumberFormat("es-CO").format(v || 0);
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", notation: "compact", compactDisplay: "short", maximumFractionDigits: 1 }).format(v || 0);
 }
@@ -130,7 +133,7 @@ function Grafico({ g, onDato }) {
       </div>
     );
   }
-  const max = Math.max(...datos.map((d) => d.valor), 1);
+  const max = esValoracion(g.metrica) ? 5 : Math.max(...datos.map((d) => d.valor), 1);
   return (
     <div className="est-barras">
       {datos.map((d, i) => (

@@ -500,3 +500,24 @@ model ReportEdicion {
   @@index([estado])
   @@map("report_ediciones")
 }
+
+// Tokens personales para conectar un cliente MCP (Claude Desktop / Claude Code / claude.ai) a /api/mcp.
+// Solo se guarda el hash SHA-256: el token en claro se muestra una única vez al crearlo.
+model TokenAcceso {
+  id                Int       @id @default(autoincrement())
+  userId            String    // dueño del token — sin FK (igual que el resto de referencias a User)
+  nombre            String    // etiqueta que le pone la persona ("Mi Claude Desktop")
+  prefijo           String    // primeros caracteres, solo para reconocerlo en la lista
+  tokenHash         String    @unique
+  expiraAt          DateTime?
+  ultimoUsoAt       DateTime?
+  usos              Int       @default(0)
+  revocadoAt        DateTime?
+  revocadoPorNombre String?
+  createdAt         DateTime  @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+
+  @@index([userId])
+  @@map("tokens_acceso")
+}
