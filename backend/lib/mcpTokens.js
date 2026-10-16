@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { ROLES } from "@/lib/roles";
 import { logTokenCreate, logTokenRevoke } from "@/lib/audit";
-import { MCP_HABILITADO, mcpPermitidoA } from "@/lib/mcpGate";
+import { mcpPermitidoA } from "@/lib/mcpGate";
 
 // Tokens personales para conectar un cliente MCP a /api/mcp. Solo se guarda el hash SHA-256 (el token tiene
 // 256 bits aleatorios, no hace falta bcrypt); el valor en claro se devuelve una única vez al crearlo.
@@ -109,7 +109,7 @@ export async function revokeToken(actor, id) {
 // Valida el Bearer de una llamada MCP y devuelve el usuario dueño (mismo shape que getSessionUser) o null.
 // Se vuelve a leer el usuario en cada llamada: si lo desactivan, el token deja de servir al instante.
 export async function authenticateBearer(raw) {
-  if (!MCP_HABILITADO || !raw || !raw.startsWith(PREFIJO_TOKEN) || raw.length > 200) return null;
+  if (!raw || !raw.startsWith(PREFIJO_TOKEN) || raw.length > 200) return null;
   const t = await prisma.tokenAcceso.findUnique({ where: { tokenHash: hashToken(raw) } });
   if (!t || t.revocadoAt || (t.expiraAt && t.expiraAt.getTime() <= Date.now())) return null;
   const u = await prisma.user.findUnique({ where: { id: t.userId } });

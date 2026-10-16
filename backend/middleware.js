@@ -9,8 +9,8 @@ const MENSAJE_TEXTO_DANADO =
 const TIENE_TEXTO_DANADO = /\uFFFD|\\u[fF][fF][fF][dD]/;
 const LIMITE_REVISION_BYTES = 2_000_000; // los cuerpos enormes (imágenes en base64) los cubre el trigger de la BD
 
-// /api/mcp (solo local, ver lib/mcpGate.js) se autentica con su propio token personal (Bearer), no con la cookie de sesión.
-const PUBLIC_PATHS = new Set(["/api/auth/login", ...(process.env.NODE_ENV !== "production" ? ["/api/mcp"] : [])]);
+// /api/mcp se autentica con su propio token personal (Bearer, solo de usuarios admin — ver lib/mcpTokens.js), no con la cookie de sesión.
+const PUBLIC_PATHS = new Set(["/api/auth/login", "/api/mcp"]);
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
