@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { authenticateBearer } from "@/lib/mcpTokens";
 import { handleMcpMessage } from "@/lib/mcpServer";
 import { checkRateLimit, recordAttempt } from "@/lib/rateLimit";
-import { MCP_HABILITADO, mcpNoDisponible } from "@/lib/mcpGate";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +21,6 @@ const rpcError = (code, message, status) => NextResponse.json({ jsonrpc: "2.0", 
  *       401: { description: Token ausente, inválido, vencido o revocado. }
  */
 export async function POST(request) {
-  if (!MCP_HABILITADO) return mcpNoDisponible();
   const auth = request.headers.get("authorization") || "";
   const user = await authenticateBearer(auth.startsWith("Bearer ") ? auth.slice(7).trim() : "");
   if (!user) {
@@ -53,6 +51,5 @@ export async function POST(request) {
 
 // Este servidor no abre flujos SSE: el cliente solo usa POST.
 export async function GET() {
-  if (!MCP_HABILITADO) return mcpNoDisponible();
   return new NextResponse(null, { status: 405, headers: { Allow: "POST" } });
 }

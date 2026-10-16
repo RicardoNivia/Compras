@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import DetailModal from "@/components/DetailModal";
 import BarChartSvg from "@/components/charts/BarChartSvg";
 import StackedBarChartSvg from "@/components/charts/StackedBarChartSvg";
@@ -56,6 +57,13 @@ function KpiExplain({ label, value, comparisonLabel, comparisonValue, records })
   const [text, setText] = useState("");
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
   async function handleClick() {
     setOpen(true);
     if (text || loading) return;
@@ -76,34 +84,39 @@ function KpiExplain({ label, value, comparisonLabel, comparisonValue, records })
       <button type="button" className="kpi-explain-btn" onClick={handleClick}>
         <IconSpark size={11} /> Explicar
       </button>
-      {open && (
-        <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
-          <div className="modal kpi-explain-modal">
-            <div className="modal-head">
-              <div className="kpi-explain-modal-title">
-                <span className="kpi-explain-modal-ic"><IconSpark size={16} /></span>
-                <div>
-                  <h3>{label}</h3>
-                  <p className="card-sub" style={{ margin: 0 }}>
-                    {value}
-                    {comparisonLabel && comparisonValue != null ? ` · ${comparisonLabel}: ${comparisonValue}` : ""}
-                  </p>
-                </div>
+      {open && createPortal(
+        <div className="modal-overlay kpi-explain-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
+          <div className="modal kpi-explain-modal" role="dialog" aria-modal="true" aria-label={`Explicación de ${label}`}>
+            <div className="kpi-explain-head">
+              <span className="kpi-explain-modal-ic"><IconSpark size={18} /></span>
+              <div className="kpi-explain-head-txt">
+                <small>Explícame este número</small>
+                <h3>{label}</h3>
               </div>
               <button type="button" className="btn-ghost icon-btn" onClick={() => setOpen(false)} aria-label="Cerrar">✕</button>
             </div>
-            <div className="modal-body">
+            <div className="kpi-explain-cifras">
+              <span className="kpi-explain-valor">{value}</span>
+              {comparisonLabel && comparisonValue != null && (
+                <span className="kpi-explain-comp">{comparisonLabel}: <b>{comparisonValue}</b></span>
+              )}
+            </div>
+            <div className="kpi-explain-body">
               {loading && (
-                <div className="kpi-explain-loading"><span className="spinner" /> Analizando los registros…</div>
+                <div className="kpi-explain-loading" role="status">
+                  <span className="spinner" /> Nova está analizando los registros…
+                </div>
               )}
               {!loading && error && <div className="modal-error"><IconAlert size={13} /> {error}</div>}
               {!loading && !error && <div className="chat-markdown">{renderMarkdown(text)}</div>}
             </div>
-            <div className="modal-foot">
+            <div className="kpi-explain-foot">
+              <span>Generado por Nova con los registros del período.</span>
               <button type="button" className="btn" onClick={() => setOpen(false)}>Cerrar</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

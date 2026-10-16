@@ -119,7 +119,7 @@ function Hero({ activos, usos, ultimoUso, onCrear, llenos }) {
   return (
     <header className="mcp-hero">
       <div className="mcp-hero-txt">
-        <small>Integración · solo lectura · entorno local</small>
+        <small>Integración · solo lectura · solo administradores</small>
         <h1>Lleva el panel a tu Claude</h1>
         <p>Pregunta por tus pendientes, compras, proveedores y presupuesto en lenguaje natural. El consumo de IA va a tu cuenta de Claude y cada consulta respeta tus permisos.</p>
       </div>

@@ -193,8 +193,6 @@ export const ENTITY_LABELS = {
   configProveedores: "Configuración de proveedores",
 };
 
-// Conexión con Claude (MCP): solo en local — en producción no existe, así que no se ofrece en los filtros de Auditoría.
-if (process.env.NODE_ENV !== "production") {
-  Object.assign(ACTION_LABELS, { revocar: "Revocó", consultar: "Consultó" });
-  Object.assign(ENTITY_LABELS, { tokenAcceso: "Token de acceso a Claude", mcp: "Consulta desde Claude (MCP)" });
-}
+// Conexión con Claude (MCP, solo admin): acciones y entidades que quedan en la auditoría.
+Object.assign(ACTION_LABELS, { revocar: "Revocó", consultar: "Consultó" });
+Object.assign(ENTITY_LABELS, { tokenAcceso: "Token de acceso a Claude", mcp: "Consulta desde Claude (MCP)" });

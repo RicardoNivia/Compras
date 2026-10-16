@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission, apiError } from "@/lib/apiGuard";
 import { mcpPermitidoA } from "@/lib/mcpGate";
 import { revokeToken } from "@/lib/mcpTokens";
-import { MCP_HABILITADO, mcpNoDisponible } from "@/lib/mcpGate";
+import { mcpNoDisponible } from "@/lib/mcpGate";
 
 /**
  * @openapi
@@ -15,7 +15,6 @@ import { MCP_HABILITADO, mcpNoDisponible } from "@/lib/mcpGate";
  *       404: { description: Token no encontrado. }
  */
 export async function DELETE(_request, { params }) {
-  if (!MCP_HABILITADO) return mcpNoDisponible();
   const { user, denied } = await requirePermission("viewUsuarios");
   if (denied) return denied;
   if (!mcpPermitidoA(user.role)) return mcpNoDisponible();

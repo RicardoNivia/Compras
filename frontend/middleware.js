@@ -20,6 +20,14 @@ export async function middleware(request) {
     return NextResponse.redirect(url);
   }
 
+  // "Conectar con Claude" es solo para administradores: cualquier otro rol vuelve a Registros (redirect real, no solo en la página).
+  if ((pathname === "/conectar-claude" || pathname.startsWith("/conectar-claude/")) && payload.role !== "admin") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/registros";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   // La autorización fina (admin vs. otros roles, y las excepciones de la
   // Matriz de permisos) se resuelve en cada page.js (server component, con
   // acceso a la BD vía el backend) — el middleware corre en Edge runtime y

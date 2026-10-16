@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission, apiError } from "@/lib/apiGuard";
 import { mcpPermitidoA } from "@/lib/mcpGate";
 import { listTokens, createToken } from "@/lib/mcpTokens";
-import { MCP_HABILITADO, mcpNoDisponible } from "@/lib/mcpGate";
+import { mcpNoDisponible } from "@/lib/mcpGate";
 
 /**
  * @openapi
@@ -19,7 +19,6 @@ import { MCP_HABILITADO, mcpNoDisponible } from "@/lib/mcpGate";
  *       200: { description: "{ token: { token, id, nombre, ... } }" }
  */
 export async function GET(request) {
-  if (!MCP_HABILITADO) return mcpNoDisponible();
   const { user, denied } = await requirePermission("viewUsuarios");
   if (denied) return denied;
   if (!mcpPermitidoA(user.role)) return mcpNoDisponible();
@@ -32,7 +31,6 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  if (!MCP_HABILITADO) return mcpNoDisponible();
   const { user, denied } = await requirePermission("viewUsuarios");
   if (denied) return denied;
   if (!mcpPermitidoA(user.role)) return mcpNoDisponible();
