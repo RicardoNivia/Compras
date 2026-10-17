@@ -223,6 +223,31 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
               </section>
   );
 
+  // "¿Por dónde le llega?": por ahora solo en local (canales.elegirCanal). La app siempre; Teams opcional; correo deshabilitado.
+  const seccionCanales = canales?.elegirCanal ? (
+    <section className="nx-canales-sel">
+      <div className="nx-para-head">
+        <p className="notif-label" style={{ margin: 0 }}>¿Por dónde le llega?</p>
+        {canales.local && <span className="nx-solo-local">Solo en local</span>}
+      </div>
+      <div className="nx-canales-opciones">
+        <label className="nx-canal-op on fija">
+          <span className="nx-canal-op-txt"><strong>En la app</strong><small>Siempre: Bandeja y aviso en pantalla</small></span>
+          <input type="checkbox" role="switch" checked disabled aria-label="En la app (siempre)" />
+        </label>
+        <label className={`nx-canal-op${canalesSel.includes("teams") ? " on" : ""}${teamsDisponible ? "" : " apagada"}`}>
+          <span className="nx-canal-op-txt"><strong>Teams</strong><small>{!teamsDisponible ? "Sin configurar en el servidor" : canales.teams === "simulado" ? "Modo simulado (no se envía)" : canales.teamsDestinoPrueba ? "Chat del bot · en local te llega a ti" : "Chat del bot de Flujos de trabajo"}</small></span>
+          <input type="checkbox" role="switch" checked={canalesSel.includes("teams")} disabled={!teamsDisponible}
+            onChange={(e) => setCanalesSel(e.target.checked ? ["app", "teams"] : ["app"])} aria-label="Enviar también por Teams" />
+        </label>
+        <label className="nx-canal-op apagada" title="El correo saliente está bloqueado por ahora">
+          <span className="nx-canal-op-txt"><strong>Correo</strong><small>Próximamente</small></span>
+          <input type="checkbox" role="switch" checked={false} disabled aria-label="Correo (deshabilitado)" />
+        </label>
+      </div>
+    </section>
+  ) : null;
+
   return (
     <Portal>
     <div className="modal-overlay" onClick={onClose}>
@@ -260,7 +285,7 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
                 <p className="notif-label" style={{ marginTop: 0 }}>Así está hoy</p>
                 <p style={{ margin: 0 }}><strong>{agenda?.cuando || notificacion.cuando}</strong> · {def?.label}</p>
                 <p className="count-note" style={{ margin: "6px 0 0" }}>
-                  Para: {destinatarios.map(nombreDe).join(", ") || "nadie"} · Canales: {canalesSel.map((c) => (c === "app" ? "App" : "Teams")).join(", ")}
+                  Para: {destinatarios.map(nombreDe).join(", ") || "nadie"} · Llega por: {canalesSel.map((c) => (c === "app" ? "App" : c === "teams" ? "Teams" : "Correo")).join(" · ")}
                 </p>
               </div>
               <label className="notif-label" htmlFor="notif-instruccion">¿Qué quieres cambiar?</label>
@@ -273,6 +298,7 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
               </div>
               <p className="count-note">Nova cambia solo lo que pidas (qué, cuándo, filtros, mensaje) y te muestra los cambios antes de guardar. Las personas se eligen abajo.</p>
               {seccionPara}
+              {seccionCanales}
             </>
           )}
 
@@ -340,9 +366,10 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
               </div>
 
               {seccionPara}
+              {seccionCanales}
 
               <button type="button" className="btn btn-ghost notif-tecnica-btn" onClick={() => setManual((m) => !m)} aria-expanded={manual}>
-                {manual ? "▾" : "▸"} Ajustar a mano (nombre, mensaje, canales y regla)
+                {manual ? "▾" : "▸"} Ajustar a mano (nombre, mensaje y regla)
               </button>
               {manual && (<>
               <div className="notif-form">
@@ -358,18 +385,6 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
                   <label htmlFor="n-plantilla">Mensaje</label>
                   <textarea id="n-plantilla" rows={3} value={regla.plantilla || ""} maxLength={1500} onChange={(e) => setR("plantilla", e.target.value)} />
                   <span className="count-note">Variables: {(def?.variables || []).map((v) => <code key={v} title={VARIABLES[v]} className="notif-var">{`{${v}}`}</code>)} · la lista de resultados se agrega sola debajo.</span>
-                </div>
-
-                <div className="field full">
-                  <label>Canales</label>
-                  <div className="notif-canales">
-                    <label className="check-row"><input type="checkbox" checked disabled /> <span>En la app</span></label>
-                    <label className="check-row" title={teamsDisponible ? "" : "Teams aún no está configurado en el servidor"}>
-                      <input type="checkbox" checked={canalesSel.includes("teams")} onChange={(e) => setCanalesSel(e.target.checked ? ["app", "teams"] : ["app"])} />
-                      <span>Teams{!teamsDisponible ? " (sin configurar)" : canales?.teams === "simulado" ? " (simulado)" : ""}</span>
-                    </label>
-                    <label className="check-row" title="Deshabilitado mientras el correo saliente esté bloqueado"><input type="checkbox" disabled /> <span>Correo (deshabilitado)</span></label>
-                  </div>
                 </div>
 
               </div>

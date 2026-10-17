@@ -210,8 +210,9 @@ export default function NotificacionesView({ user, foco = null }) {
                   <span className={`nx-estado ${n.estado}`}>{ESTADOS[n.estado]}{n.motivoPausa ? ` · ${n.motivoPausa}` : ""}</span>
                 )}
                 <div className="nx-card-fila">
-                  <div className="nx-canales">
-                    {n.canales.map((c) => <span key={c} className={`nx-canal ${c}`}>{CANALES[c] || c}</span>)}
+                  <div className="nx-canales" title="Por dónde le llega a cada destinatario">
+                    <span className="nx-canales-lbl">Llega por</span>
+                    {["app", "teams", "correo"].filter((c) => n.canales.includes(c)).map((c) => <span key={c} className={`nx-canal ${c}`}>{c === "app" ? "App" : CANALES[c] || c}</span>)}
                   </div>
                   <Avatares personas={personas} />
                 </div>
