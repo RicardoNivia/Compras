@@ -50,7 +50,7 @@ export default async function AlertasPage({ searchParams }) {
       )}
       {tab.key === "mi-dia" && <MiDiaView initialData={data} user={user} />}
       {tab.key === "bandeja" && <BandejaView user={user} />}
-      {tab.key === "notificaciones" && <NotificacionesView user={user} />}
+      {tab.key === "notificaciones" && <NotificacionesView user={user} foco={Number(searchParams?.n) || null} />}
     </AppShell>
   );
 }

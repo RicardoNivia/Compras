@@ -11,7 +11,7 @@ import { logNotificacionEnvio } from "@/lib/audit";
 
 // Ejecuta UNA notificación: revalida permisos, consulta los datos, evalúa la condición, crea la ejecución y una
 // entrega por persona y canal, y envía a Teams. Sin IA. Lo usan el programador (origen "programado"/"recuperado"),
-// el botón "Enviar ahora" (origen "manual") y "Probar ahora" (origen "prueba", solo para quien prueba).
+// el botón "Enviar ahora" (origen "manual") y "Probar" (origen "prueba": a todos los destinatarios y a quien prueba, marcada como PRUEBA, sin contar como envío del día).
 //
 // Idempotencia: cada ejecución tiene una `clave` única. La programada es "n{id}|{día}", así nunca sale dos veces el
 // mismo día aunque el servidor se reinicie; las manuales y las pruebas llevan la hora y no bloquean la programada.
@@ -59,6 +59,8 @@ export async function ejecutarNotificacion(id, { origen = "programado", actor = 
   const manual = origen === "manual" || origen === "prueba";
   if (manual && !puedeGestionar(actor, n)) throw err(403, "Solo quien creó la notificación o un administrador puede enviarla.");
   if (origen === "manual" && n.estado === "borrador") throw err(400, "Es un borrador: actívala o pruébala primero.");
+  // Por evento sale cuando ocurre el hecho: no se envía ni se prueba a mano.
+  if (manual && n.disparador === "evento") throw err(400, "Esta notificación está asociada a un evento: se envía sola cuando ocurre el hecho, no se puede enviar ni probar a mano.");
 
   // 1. El propietario debe seguir teniendo acceso a los datos; si no, se pausa sola (o se rechaza el envío manual).
   const propietario = await prisma.user.findUnique({ where: { id: n.propietarioUserId }, select: { id: true, nombre: true, email: true, role: true, activo: true } });
@@ -103,16 +105,13 @@ export async function ejecutarNotificacion(id, { origen = "programado", actor = 
       return r;
     };
 
-    // 3. Destinatarios: en prueba solo quien prueba; si no, los que no se dieron de baja.
-    let personas;
-    if (origen === "prueba") {
-      personas = [{ ...(await prisma.user.findUnique({ where: { id: actor.id }, select: { id: true, nombre: true, email: true, role: true, activo: true } })), _prueba: true }];
-    } else {
-      const ids = n.destinatarios.filter((d) => !d.deBaja).map((d) => d.userId);
-      personas = await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true, email: true, role: true, activo: true } });
-      const encontrados = new Set(personas.map((p) => p.id));
-      for (const d of n.destinatarios) if (!d.deBaja && !encontrados.has(d.userId)) personas.push({ id: d.userId, nombre: d.userNombre, activo: false, _eliminado: true });
-    }
+    // 3. Destinatarios: los que no se dieron de baja. En una prueba, además quien prueba (aunque no esté en la lista),
+    //    para que vea lo mismo que les llega a los demás.
+    const ids = n.destinatarios.filter((d) => !d.deBaja).map((d) => d.userId);
+    if (origen === "prueba" && !ids.includes(actor.id)) ids.push(actor.id);
+    const personas = await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true, email: true, role: true, activo: true } });
+    const encontrados = new Set(personas.map((p) => p.id));
+    for (const d of n.destinatarios) if (!d.deBaja && !encontrados.has(d.userId)) personas.push({ id: d.userId, nombre: d.userNombre, activo: false, _eliminado: true });
 
     // 4. Consulta general (una sola vez) y condición.
     let general = null;

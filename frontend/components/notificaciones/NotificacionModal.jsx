@@ -10,7 +10,8 @@ import {
   EVENTOS, AGRUPACIONES, ESTADOS_CICLO, VARIABLES_EVENTO,
 } from "@/lib/notificacionesCatalogo";
 import { IconSpark, IconAlert, IconArrowRight } from "@/components/icons";
-import { canViewRegistros, canViewAlertas, canViewProveedores, canViewPresupuesto } from "@/lib/roles";
+import { canViewRegistros, canViewAlertas, canViewProveedores, canViewPresupuesto, ROLE_LABELS } from "@/lib/roles";
+import { iniciales } from "@/components/notificaciones/ui";
 
 const EJEMPLOS = [
   "Todos los días, las compras que se vencen ese día",
@@ -19,6 +20,7 @@ const EJEMPLOS = [
   "Cada lunes, los proveedores desactualizados",
   "Cada día hábil, mis pendientes",
 ];
+const EJEMPLOS_EDICION = ["Que llegue a las 8:00 a. m.", "Que llegue también por Teams", "Solo si hay más de 5 resultados", "Que sea cada lunes", "Cámbiale el nombre a…"];
 const FRECUENCIAS = { diaria: "Cada día hábil", semanal: "Cada semana", mensual: "Cada mes (día fijo)", mensual_semana: "Cada mes (p. ej. primer lunes)", ultimo_habil: "Último día hábil del mes", unica: "Una sola vez" };
 const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const ORDINALES = { 1: "Primer", 2: "Segundo", 3: "Tercer", 4: "Cuarto", "-1": "Último" };
@@ -36,7 +38,11 @@ function reglaDe(n) {
 
 export default function NotificacionModal({ user, notificacion, pedidoInicial = "", canales, onClose, onSaved }) {
   const editando = !!notificacion;
-  const [paso, setPaso] = useState(editando ? "confirmar" : "pedido");
+  // Al editar se empieza por el prompt ("¿Qué quieres cambiar?"), no por el formulario.
+  const [paso, setPaso] = useState(editando ? "editar" : "pedido");
+  const [instruccion, setInstruccion] = useState("");
+  const [cambios, setCambios] = useState(null); // [{ campo, antes, despues }] que propone Nova
+  const [manual, setManual] = useState(false); // nombre, mensaje, canales y regla técnica quedan en "Ajustar a mano"
   const [pedido, setPedido] = useState(notificacion?.pedido || pedidoInicial);
   const [turno, setTurno] = useState(1);
   const [respuestas, setRespuestas] = useState([]); // historial de respuestas (todas las rondas)
@@ -63,7 +69,7 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
     : null;
   const fuente = def?.fuente;
 
-  useEffect(() => { if (paso === "pedido") textareaRef.current?.focus(); }, [paso]);
+  useEffect(() => { if (paso === "pedido" || paso === "editar") textareaRef.current?.focus(); }, [paso]);
 
   // Destinatarios elegibles: solo quienes pueden ver los datos de esta fuente.
   useEffect(() => {
@@ -100,14 +106,24 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
     setError("");
     try {
       const todas = [...respuestas, ...extra];
-      const r = await interpretarConNova({ pedido, respuestas: todas, reglaParcial: regla, turno });
+      const r = await interpretarConNova(editando
+        ? { pedido, respuestas: todas, reglaParcial: regla, turno, modo: "editar", instruccion, destinatarios, destinatariosNombres: destinatarios.map(nombreDe), canales: canalesSel }
+        : { pedido, respuestas: todas, reglaParcial: regla, turno });
       setRespuestas(todas);
       setTurno((t) => t + 1);
       setNova(r);
       setRonda({});
       if (r.regla) setRegla(r.regla);
       if (r.estado === "preguntas") { setPreguntas(r.preguntas); setPaso("preguntas"); }
-      else if (r.estado === "lista") { setPreguntas([]); setPaso("confirmar"); }
+      else if (r.estado === "lista") {
+        setPreguntas([]);
+        if (editando) {
+          if (r.destinatarios) setDestinatarios(r.destinatarios.map((d) => d.userId));
+          if (r.canales) setCanalesSel(r.canales);
+          setCambios(r.cambios || []);
+        }
+        setPaso("confirmar");
+      }
       else if (r.estado === "manual") { setPreguntas([]); setPaso("confirmar"); setTecnica(true); }
       else setPaso("aviso"); // no_permitido | es_informe | no_soportado
     } catch (e) {
@@ -145,6 +161,7 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
         canales: canalesSel,
         destinatarios,
         // "Guardar y probar" en una nueva la deja como borrador: se prueba antes de activarla.
+        // "guardar" (editar sin cambiar el estado): una pausada sigue pausada y un borrador sigue borrador.
         estado: modo === "activar" ? "activa" : modo === "borrador" ? "borrador" : editando && notificacion.estado !== "borrador" ? "activa" : "borrador",
         reanudar: modo === "activar",
       };
@@ -153,7 +170,7 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
         const p = await probarNotificacion(n.id);
         onSaved(`Guardada. ${p.mensaje || "Prueba enviada: revisa tu Bandeja."}`);
       } else {
-        onSaved(modo === "borrador" ? "Guardada como borrador." : editando ? "Cambios guardados." : "Notificación activa.");
+        onSaved(modo === "borrador" ? "Guardada como borrador." : editando || modo === "guardar" ? "Cambios guardados." : "Notificación activa.");
       }
     } catch (e) {
       setError(e.message);
@@ -174,6 +191,37 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
     permiso("viewProveedores", canViewProveedores(user.role)) && "proveedores",
     permiso("viewPresupuesto", canViewPresupuesto(user.role)) && "presupuesto",
   ].filter(Boolean);
+
+  // "¿A quién le llega?": lista visual de personas con acceso a la fuente (crear, editar y confirmar).
+  const seccionPara = (
+              <section className="nx-para">
+                <div className="nx-para-head">
+                  <div>
+                    <p className="notif-label" style={{ margin: 0 }}>¿A quién le llega?</p>
+                    <span className="count-note">Solo aparecen personas con acceso a {FUENTES[fuente]?.label || "estos datos"}. Le llega en la app{canalesSel.includes("teams") ? " y por Teams" : ""}.</span>
+                  </div>
+                  <span className={`nx-para-cuenta${destinatarios.length >= LIMITES.maxDestinatarios ? " lleno" : ""}`}>{destinatarios.length} de {LIMITES.maxDestinatarios}</span>
+                </div>
+                <ul className="nx-para-lista">
+                  {elegibles.map((u) => {
+                    const on = destinatarios.includes(u.id);
+                    const bloqueado = !on && destinatarios.length >= LIMITES.maxDestinatarios;
+                    return (
+                      <li key={u.id} className={on ? "on" : ""}>
+                        <label className={`nx-para-fila${bloqueado ? " bloqueado" : ""}`} title={bloqueado ? `Máximo ${LIMITES.maxDestinatarios} destinatarios` : ""}>
+                          <span className="nx-avatar">{u.id === user.id ? "Yo" : iniciales(u.nombre)}</span>
+                          <span className="nx-para-nombre"><strong>{u.id === user.id ? `${u.nombre} (yo)` : u.nombre}</strong><small>{ROLE_LABELS[u.role] || u.role}</small></span>
+                          <input type="checkbox" role="switch" checked={on} disabled={bloqueado}
+                            onChange={(e) => setDestinatarios((d) => (e.target.checked ? [...d, u.id] : d.filter((x) => x !== u.id)))}
+                            aria-label={`${on ? "Quitar a" : "Agregar a"} ${u.nombre}`} />
+                        </label>
+                      </li>
+                    );
+                  })}
+                  {elegibles.length === 0 && <li className="count-note" style={{ padding: 12 }}>Cargando personas…</li>}
+                </ul>
+              </section>
+  );
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -202,6 +250,28 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
                 {EJEMPLOS.map((e) => <button key={e} type="button" className="pill-btn" onClick={() => setPedido(e)}>{e}</button>)}
               </div>
               <p className="count-note">Nova te preguntará lo que no quede claro (la hora, qué hacer si es festivo, si se envía cuando no hay resultados…). Solo puedes usar datos que tu rol ya ve.</p>
+            </>
+          )}
+
+          {paso === "editar" && (
+            <>
+              <div className="notif-resumen">
+                <p className="notif-label" style={{ marginTop: 0 }}>Así está hoy</p>
+                <p style={{ margin: 0 }}><strong>{agenda?.cuando || notificacion.cuando}</strong> · {def?.label}</p>
+                <p className="count-note" style={{ margin: "6px 0 0" }}>
+                  Para: {destinatarios.map(nombreDe).join(", ") || "nadie"} · Canales: {canalesSel.map((c) => (c === "app" ? "App" : "Teams")).join(", ")}
+                </p>
+              </div>
+              <label className="notif-label" htmlFor="notif-instruccion">¿Qué quieres cambiar?</label>
+              <textarea id="notif-instruccion" ref={textareaRef} rows={3} value={instruccion} onChange={(e) => setInstruccion(e.target.value)} maxLength={1000}
+                placeholder="Ej.: que llegue a las 8 de la mañana y agrégale a Carolina"
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && instruccion.trim().length >= 3) { e.preventDefault(); interpretar(); } }} />
+              <div className="notif-ejemplos">
+                <span className="count-note">Ejemplos:</span>
+                {EJEMPLOS_EDICION.map((e) => <button key={e} type="button" className="pill-btn" onClick={() => setInstruccion(e)}>{e}</button>)}
+              </div>
+              <p className="count-note">Nova cambia solo lo que pidas (qué, cuándo, filtros, mensaje) y te muestra los cambios antes de guardar. Las personas se eligen abajo.</p>
+              {seccionPara}
             </>
           )}
 
@@ -248,6 +318,18 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
 
           {paso === "confirmar" && regla && (
             <>
+              {editando && cambios && (
+                <div className="notif-cambios">
+                  <p className="notif-label" style={{ marginTop: 0 }}>{cambios.length ? "Cambios que hará Nova" : "Nova no encontró nada que cambiar"}</p>
+                  {cambios.length > 0 && (
+                    <ul>
+                      {cambios.map((c) => (
+                        <li key={c.campo}><strong>{c.campo}:</strong> <span className="notif-antes">{c.antes}</span> <span aria-hidden="true">→</span> <span className="notif-despues">{c.despues}</span></li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
               <div className="notif-resumen">
                 <p className="notif-label" style={{ marginTop: 0 }}>Así quedará</p>
                 {nova?.resumen && <p style={{ margin: "0 0 6px" }}>{nova.resumen}</p>}
@@ -256,6 +338,12 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
                 {nova?.mensaje && nova.estado !== "lista" && <p className="count-note" style={{ margin: "6px 0 0" }}>{nova.mensaje}</p>}
               </div>
 
+              {seccionPara}
+
+              <button type="button" className="btn btn-ghost notif-tecnica-btn" onClick={() => setManual((m) => !m)} aria-expanded={manual}>
+                {manual ? "▾" : "▸"} Ajustar a mano (nombre, mensaje, canales y regla)
+              </button>
+              {manual && (<>
               <div className="notif-form">
                 <div className="field full">
                   <label htmlFor="n-nombre">Nombre</label>
@@ -283,21 +371,6 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
                   </div>
                 </div>
 
-                <div className="field full">
-                  <label>Para ({destinatarios.length} de {LIMITES.maxDestinatarios})</label>
-                  <div className="notif-para">
-                    {destinatarios.map((id) => (
-                      <span key={id} className="notif-chip">{nombreDe(id)}<button type="button" onClick={() => setDestinatarios((d) => d.filter((x) => x !== id))} aria-label={`Quitar a ${nombreDe(id)}`}>✕</button></span>
-                    ))}
-                    {destinatarios.length < LIMITES.maxDestinatarios && elegiblesLibres.length > 0 && (
-                      <select value="" onChange={(e) => e.target.value && setDestinatarios((d) => [...d, e.target.value])} aria-label="Agregar destinatario">
-                        <option value="">+ Agregar…</option>
-                        {elegiblesLibres.map((u) => <option key={u.id} value={u.id}>{u.id === user.id ? `Yo (${u.nombre})` : u.nombre}</option>)}
-                      </select>
-                    )}
-                  </div>
-                  <span className="count-note">Solo aparecen personas con acceso a {FUENTES[fuente]?.label || "estos datos"}.</span>
-                </div>
               </div>
 
               <button type="button" className="btn btn-ghost notif-tecnica-btn" onClick={() => setTecnica((t) => !t)} aria-expanded={tecnica}>
@@ -497,6 +570,7 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
                   </>)}
                 </div>
               )}
+              </>)}
             </>
           )}
           {error && <p className="modal-error">{error}</p>}
@@ -511,9 +585,21 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
               </button>
             </>
           )}
+          {paso === "editar" && (
+            <>
+              <button type="button" className="btn" onClick={() => { setManual(true); setCambios(null); setPaso("confirmar"); }} disabled={cargando}>Ajustar a mano</button>
+              <div className="spacer" />
+              <button type="button" className="btn" disabled={cargando || instruccion.trim().length > 0} onClick={() => guardar("guardar")} title={instruccion.trim() ? "Primero aplica lo que escribiste con Nova" : "Guarda los cambios de personas"}>
+                Guardar cambios
+              </button>
+              <button type="button" className="btn btn-nova" disabled={cargando || instruccion.trim().length < 3} onClick={() => interpretar()}>
+                {cargando ? <span className="spinner" /> : <IconSpark size={13} />} Aplicar con Nova
+              </button>
+            </>
+          )}
           {paso === "preguntas" && (
             <>
-              <button type="button" className="btn" onClick={() => setPaso("pedido")} disabled={cargando}>← Cambiar el pedido</button>
+              <button type="button" className="btn" onClick={() => setPaso(editando ? "editar" : "pedido")} disabled={cargando}>{editando ? "← Cambiar lo que pedí" : "← Cambiar el pedido"}</button>
               <div className="spacer" />
               <button type="button" className="btn btn-nova" disabled={cargando} onClick={responder}>
                 {cargando ? <span className="spinner" /> : null} Listo
@@ -529,9 +615,11 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
           {paso === "confirmar" && (
             <>
               {!editando && <button type="button" className="btn" onClick={() => setPaso("pedido")} disabled={cargando}>← Cambiar el pedido</button>}
+              {editando && <button type="button" className="btn" onClick={() => { setInstruccion(""); setPaso("editar"); }} disabled={cargando}>← Pedir otro cambio</button>}
               <div className="spacer" />
               <button type="button" className="btn" disabled={cargando} onClick={() => guardar("borrador")}>Guardar como borrador</button>
-              <button type="button" className="btn" disabled={cargando} onClick={() => guardar("probar")} title="Guarda y te envía una prueba solo a ti">Guardar y probar</button>
+              {/* Por evento sale solo cuando ocurre el hecho: no hay prueba manual. */}
+              {!esEvento && <button type="button" className="btn" disabled={cargando} onClick={() => guardar("probar")} title="Guarda y envía una prueba a todos los destinatarios (marcada como PRUEBA)">Guardar y probar</button>}
               <button type="button" className="btn btn-primary" disabled={cargando} onClick={() => guardar("activar")}>
                 {cargando ? <span className="spinner" /> : null} {editando && notificacion.estado === "activa" ? "Guardar" : "Activar"}
               </button>

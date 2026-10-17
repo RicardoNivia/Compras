@@ -4,9 +4,10 @@ import {
   LIMITES, FUENTES, CONSULTAS, PERIODOS, CAMPOS_FECHA, PRESETS_COMPRAS, PRESETS_PROVEEDORES, CONDICIONES, SI_FESTIVO,
   VARIABLES, EVENTOS, AGRUPACIONES, ESTADOS_CICLO, VARIABLES_EVENTO, preguntasFaltantes,
 } from "@/lib/notificacionesCatalogo";
-import { fuentesPermitidas, mensajeSinPermiso } from "@/lib/notificacionesPermisos";
+import { fuentesPermitidas, mensajeSinPermiso, destinatariosElegibles } from "@/lib/notificacionesPermisos";
 import { isRoleAllowed } from "@/lib/permissions";
 import { describirCuando, proximasFechas, esSinFiltro } from "@/lib/notificaciones";
+import { CANALES } from "@/lib/notificacionesCatalogo";
 
 // Nova convierte el pedido en lenguaje natural en una regla (ver docs/notificaciones-diseno.md §5). Solo interviene
 // al crear o editar: la ejecución no usa IA. Nada de lo que devuelve se confía tal cual: el servidor descarta
@@ -21,6 +22,7 @@ const SCHEMA = {
     estado: { type: "STRING" }, // preguntas | lista | no_permitido | es_informe | no_soportado
     mensaje: { type: "STRING", nullable: true },
     explicitos: { type: "ARRAY", items: { type: "STRING" } }, // campos que la persona dijo literalmente en el pedido
+    canales: { type: "ARRAY", items: { type: "STRING" }, nullable: true }, // edición: ["app"] | ["app","teams"]
     fuenteNoPermitida: { type: "STRING", nullable: true },
     resumen: { type: "STRING", nullable: true },
     nombre: { type: "STRING", nullable: true },
@@ -233,6 +235,9 @@ export async function interpretarPedido(entrada, user) {
   const pedido = String(entrada?.pedido || "").trim().slice(0, 1000);
   if (!pedido) throw Object.assign(new Error("Escribe qué quieres que te avise."), { status: 400 });
   const respuestas = Array.isArray(entrada.respuestas) ? entrada.respuestas.slice(0, 30) : [];
+  // Edición por prompt: se parte de la regla actual y se cambia solo lo que se pide.
+  const instruccion = String(entrada.instruccion || "").trim().slice(0, 1000);
+  const editar = entrada.modo === "editar" && !!instruccion && !!entrada.reglaParcial;
   const turno = Math.max(1, parseInt(entrada.turno, 10) || 1);
   const permitidas = await fuentesPermitidas(user);
   const noPermitidas = Object.keys(FUENTES).filter((f) => !permitidas.includes(f));
@@ -241,7 +246,11 @@ export async function interpretarPedido(entrada, user) {
     systemInstruction: systemInstruction(permitidas, noPermitidas),
     prompt: [
       `Pedido: """${pedido}"""`,
-      entrada.reglaParcial ? `Regla entendida hasta ahora: ${JSON.stringify(entrada.reglaParcial).slice(0, 2000)}` : null,
+      editar ? `MODO EDICIÓN. La notificación YA EXISTE con esta regla: ${JSON.stringify(entrada.reglaParcial).slice(0, 2000)}
+Destinatarios actuales: ${(entrada.destinatariosNombres || []).join(", ") || "ninguno"}. Canales actuales: ${(entrada.canales || ["app"]).join(", ")}.
+Cambio que pide la persona: """${instruccion}"""
+Devuelve la regla COMPLETA con SOLO ese cambio aplicado (todo lo demás igual). Las personas que la reciben NO se cambian aquí (se eligen en la lista de la pantalla): si pide agregar o quitar personas, dilo en "mensaje" ("elígelas en la lista de abajo") y no cambies nada por eso. Si pide cambiar canales, "canales" ("app" siempre va; "teams" opcional; el correo está deshabilitado). Pon "estado": "lista" si el cambio es claro; si es ambiguo, pregunta. En "resumen" di en una frase qué cambiaste.` : null,
+      !editar && entrada.reglaParcial ? `Regla entendida hasta ahora: ${JSON.stringify(entrada.reglaParcial).slice(0, 2000)}` : null,
       respuestas.length ? `Respuestas de la persona:\n${respuestas.map((r) => `- ${r.pregunta || r.id}: ${r.etiqueta || r.respuesta || r.valor}`).join("\n").slice(0, 3000)}` : null,
     ].filter(Boolean).join("\n\n"),
     schema: SCHEMA,
@@ -269,7 +278,7 @@ export async function interpretarPedido(entrada, user) {
     return { estado: "no_soportado", mensaje: res.mensaje || "No encontré una forma de armar esa notificación con los datos disponibles." };
   }
 
-  const regla = aplicarRespuestas(sinSuposiciones(fusionar(entrada.reglaParcial, res), entrada.reglaParcial, res.explicitos, pedido), respuestas);
+  const regla = aplicarRespuestas(sinSuposiciones(fusionar(entrada.reglaParcial, res), entrada.reglaParcial, res.explicitos, `${pedido} ${instruccion}`), respuestas);
   regla.pedido = pedido;
   const p = regla.disparador === "evento" ? plantillaEvento(regla.evento, regla.agrupacion) : PLANTILLAS[regla.consulta];
   regla.titulo ||= p.titulo;
@@ -306,12 +315,59 @@ export async function interpretarPedido(entrada, user) {
   if (preguntas.length) {
     return { estado: "preguntas", mensaje: res.mensaje || null, resumen: res.resumen || null, regla, preguntas };
   }
+  const extra = editar ? await aplicarEdicionPersonas(regla, res, entrada, user) : {};
   return {
     estado: "lista",
-    mensaje: res.mensaje || null,
+    mensaje: [res.mensaje, ...(extra.avisos || [])].filter(Boolean).join(" ") || null,
     resumen: res.resumen || null,
     regla,
     cuando: describirCuando(regla),
     proximas: proximasFechas(regla, 5),
+    ...(editar ? { destinatarios: extra.destinatarios, canales: extra.canales, cambios: cambiosEntre(entrada.reglaParcial, regla, entrada, extra) } : {}),
   };
+}
+
+// ---------- Edición por prompt ----------
+
+// Las personas se eligen en la lista visual, nunca con el prompt. Aquí solo se descartan las que ya no pueden recibir
+// la fuente (si el cambio pasó, p. ej., de Compras a Presupuesto) y se aplican los canales que pidió.
+async function aplicarEdicionPersonas(regla, res, entrada, user) {
+  const fuente = regla.disparador === "evento" ? EVENTOS[regla.evento]?.fuente : CONSULTAS[regla.consulta]?.fuente;
+  const elegibles = await destinatariosElegibles(fuente);
+  const avisos = [];
+  const ids = (entrada.destinatarios || []).filter((id) => elegibles.some((u) => u.id === id));
+  if (ids.length < (entrada.destinatarios || []).length) {
+    avisos.push(`Por seguridad se quitaron destinatarios sin acceso a ${FUENTES[fuente]?.label || fuente}.`);
+  }
+  let canales = entrada.canales || ["app"];
+  if (Array.isArray(res.canales) && res.canales.length) {
+    if (res.canales.includes("correo")) avisos.push("El correo está deshabilitado por ahora.");
+    canales = ["app", ...(res.canales.includes("teams") ? ["teams"] : [])];
+  }
+  const nombres = Object.fromEntries(elegibles.map((u) => [u.id, u.nombre]));
+  return { destinatarios: ids.map((id) => ({ userId: id, userNombre: id === user.id ? "Yo" : nombres[id] || id })), canales, avisos };
+}
+
+// Cambios legibles entre la regla anterior y la nueva (lo que se muestra antes de confirmar).
+function cambiosEntre(antes, despues, entrada, extra) {
+  const out = [];
+  const lbl = (r) => (r.disparador === "evento" ? EVENTOS[r.evento]?.label : CONSULTAS[r.consulta]?.label) || "—";
+  const par = (p) => Object.entries(p || {}).map(([k, v]) => `${k}: ${v}`).join(", ") || "sin filtros";
+  const agregar = (campo, a, d) => { if (String(a ?? "") !== String(d ?? "")) out.push({ campo, antes: a || "—", despues: d || "—" }); };
+  agregar("Cuándo", describirCuando(antes), describirCuando(despues));
+  agregar("Qué datos", lbl(antes), lbl(despues));
+  agregar("Filtros", par(antes.parametros), par(despues.parametros));
+  if (despues.disparador !== "evento") agregar("Cuándo se envía", CONDICIONES[antes.condicion], CONDICIONES[despues.condicion]);
+  agregar("Alcance", antes.alcance === "personal" ? "Solo lo de cada quien" : "Lo de todos", despues.alcance === "personal" ? "Solo lo de cada quien" : "Lo de todos");
+  agregar("Nombre", antes.nombre, despues.nombre);
+  agregar("Título", antes.titulo, despues.titulo);
+  agregar("Mensaje", antes.plantilla, despues.plantilla);
+  // Las personas se comparan por id (el nombre puede venir como "Yo"); solo cambian si se quitó alguien sin acceso.
+  const antesIds = entrada.destinatarios || [];
+  const despuesIds = (extra.destinatarios || []).map((d) => d.userId);
+  if (antesIds.length !== despuesIds.length || antesIds.some((id) => !despuesIds.includes(id))) {
+    agregar("Para", (entrada.destinatariosNombres || []).join(", "), (extra.destinatarios || []).map((d) => d.userNombre).join(", "));
+  }
+  agregar("Canales", (entrada.canales || ["app"]).map((c) => CANALES[c] || c).join(", "), (extra.canales || []).map((c) => CANALES[c] || c).join(", "));
+  return out;
 }

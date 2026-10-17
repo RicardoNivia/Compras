@@ -3,7 +3,7 @@
 // Copia exacta en frontend/lib/notificacionesCatalogo.js — al cambiar uno, cambia el otro (igual que lib/roles.js).
 
 export const LIMITES = {
-  maxActivasPorPersona: 10,
+  maxPorPersona: 10, // notificaciones creadas por persona (activas, pausadas y borradores)
   maxDestinatarios: 6,
   maxItemsMensaje: 25,
   maxTurnosNova: 4,

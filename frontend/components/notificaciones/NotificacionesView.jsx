@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   listarNotificaciones, cambiarEstadoNotificacion, eliminarNotificacion, probarNotificacion, enviarAhoraNotificacion,
   cambiarSuscripcion, estadoCanales,
@@ -14,11 +14,6 @@ import { FuenteIcono, Avatares, haceCuanto, Cuando, Paginacion } from "@/compone
 import { IconPlus, IconSend, IconHistory, IconEdit, IconTrash, IconEye, IconSpark, IconArrowRight, IconAlert } from "@/components/icons";
 
 const PAGE_SIZES = [25, 50, 100];
-const EJEMPLOS = [
-  "Todos los días, las compras que se vencen ese día",
-  "Cada lunes, cuántas compras se registraron la semana anterior",
-  "Cada día, las valoraciones de Nova de ayer",
-];
 const VER = [["mias", "Mías"], ["recibo", "Me llegan de otros"], ["todas", "Todas"]];
 
 function proximo(n) {
@@ -27,9 +22,12 @@ function proximo(n) {
 }
 
 // "Mis notificaciones": tarjetas con las que configuro (o, para admin, las de todos) y las de otros que me llegan.
-export default function NotificacionesView({ user }) {
+// foco: id de una notificación a resaltar (llega desde "Ver la notificación" en la Bandeja o desde Teams).
+export default function NotificacionesView({ user, foco = null }) {
   const esAdmin = user.role === "admin";
   const [ver, setVer] = useState("mias");
+  const [resaltada, setResaltada] = useState(foco);
+  const buscoFoco = useRef(foco ? ["recibo", ...(esAdmin ? ["todas"] : [])] : []);
   const [estado, setEstado] = useState("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
@@ -61,6 +59,19 @@ export default function NotificacionesView({ user }) {
 
   useEffect(() => { const t = setTimeout(cargar, 200); return () => clearTimeout(t); }, [cargar]);
   useEffect(() => { setPage(1); }, [ver, estado, q, size]);
+
+  // Si la notificación a resaltar no está entre "Mías", se busca en "Me llegan de otros" (y en "Todas" para admin).
+  useEffect(() => {
+    if (!resaltada || cargando) return;
+    if (data.notificaciones.some((n) => n.id === resaltada)) {
+      const t = setTimeout(() => document.getElementById(`notif-${resaltada}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+      const fin = setTimeout(() => setResaltada(null), 4500);
+      return () => { clearTimeout(t); clearTimeout(fin); };
+    }
+    const siguiente = buscoFoco.current.shift();
+    if (siguiente) setVer(siguiente);
+    else setResaltada(null);
+  }, [resaltada, cargando, data.notificaciones]);
   useEffect(() => { estadoCanales().then(setCanales).catch(() => {}); }, []);
   useEffect(() => { if (!aviso) return; const t = setTimeout(() => setAviso(""), 4500); return () => clearTimeout(t); }, [aviso]);
 
@@ -109,44 +120,41 @@ export default function NotificacionesView({ user }) {
   };
 
   const r = data.resumen || { activas: 0, pausadas: 0, borradores: 0, enviadasHoy: 0, deOtros: 0 };
-  const pct = Math.min(100, Math.round((r.activas / LIMITES.maxActivasPorPersona) * 100));
+  const creadas = data.misCreadas ?? 0;
+  const lleno = creadas >= LIMITES.maxPorPersona;
+  const pct = Math.min(100, Math.round((creadas / LIMITES.maxPorPersona) * 100));
   const nueva = (pedido = "") => setModal({ pedido });
 
   return (
     <div className="nx-vista">
-      {/* Encabezado con indicadores y pedido rápido */}
-      <section className="nx-hero">
-        <div className="nx-hero-texto">
-          <span className="nx-hero-kicker"><IconSpark size={13} /> Notificaciones con Nova</span>
-          <h2>¿Qué quieres que te avise?</h2>
-          <p>Escríbelo como se lo dirías a alguien. Nova te pregunta lo que no esté claro y te avisa en la app y en Teams.</p>
-          <form className="nx-hero-pedido" onSubmit={(e) => { e.preventDefault(); nueva(pedidoRapido); }}>
-            <input value={pedidoRapido} onChange={(e) => setPedidoRapido(e.target.value)} placeholder="Ej.: cada lunes, cuántas compras se registraron la semana anterior" aria-label="Pedido para Nova" />
-            <button type="submit" className="btn nx-hero-btn"><IconSpark size={14} /> Crear con Nova</button>
-          </form>
-          <div className="nx-hero-ejemplos">
-            {EJEMPLOS.map((e) => <button key={e} type="button" onClick={() => nueva(e)}>{e}</button>)}
-          </div>
+      {/* Encabezado compacto: pedido a Nova + indicadores (las tarjetas son lo principal) */}
+      <section className="nx-barra">
+        <div className="nx-barra-izq">
+        <h2 className="nx-barra-titulo"><IconSpark size={16} /> ¿Qué quieres que te avise?</h2>
+        <form className="nx-barra-pedido" onSubmit={(e) => { e.preventDefault(); if (!lleno) nueva(pedidoRapido); }}>
+          <input value={pedidoRapido} onChange={(e) => setPedidoRapido(e.target.value)} disabled={lleno}
+            placeholder={lleno ? "Llegaste a 10 notificaciones: elimina una para crear otra" : "Escríbelo como se lo dirías a alguien. Ej.: cada lunes, cuántas compras se registraron la semana anterior"}
+            aria-label="Pedido para Nova" />
+          <button type="submit" className="btn btn-primary" disabled={lleno}><IconSpark size={14} /> Crear con Nova</button>
+        </form>
         </div>
-        <div className="nx-hero-kpis">
-          <div className="nx-kpi nx-kpi-principal">
-            <div className="nx-anillo" style={{ "--pct": pct }}><span>{r.activas}<small>/{LIMITES.maxActivasPorPersona}</small></span></div>
-            <div><strong>Activas</strong><small>{LIMITES.maxActivasPorPersona - r.activas > 0 ? `Puedes activar ${LIMITES.maxActivasPorPersona - r.activas} más` : "Llegaste al máximo"}</small></div>
+        <div className="nx-barra-kpis">
+          <div className={`nx-mini nx-mini-principal${lleno ? " lleno" : ""}`} title={lleno ? "Elimina una para crear otra" : `Puedes crear ${LIMITES.maxPorPersona - creadas} más`}>
+            <span className="nx-mini-anillo" style={{ "--pct": pct }}><span>{creadas}</span></span>
+            <span><b>de {LIMITES.maxPorPersona}</b><small>{lleno ? "Llegaste al máximo" : "creadas"}</small></span>
           </div>
-          <div className="nx-kpi"><strong>{r.enviadasHoy}</strong><small>Enviadas hoy</small></div>
-          <div className="nx-kpi"><strong>{r.pausadas}</strong><small>Pausadas</small></div>
-          <div className="nx-kpi"><strong>{r.deOtros}</strong><small>Te llegan de otros</small></div>
+          <div className="nx-mini"><b>{r.activas}</b><small>Activas</small></div>
+          <div className="nx-mini"><b>{r.enviadasHoy}</b><small>Enviadas hoy</small></div>
+          <div className="nx-mini"><b>{r.pausadas}</b><small>Pausadas</small></div>
+          <div className="nx-mini"><b>{r.deOtros}</b><small>De otros</small></div>
         </div>
       </section>
-
       {canales && (canales.teams !== "real" || canales.teamsDestinoPrueba) && (
-        <div className="nx-banda">
-          <IconAlert size={14} />
-          <span>
-            {canales.teams === "simulado" ? "Teams está en modo simulado: las tarjetas se arman pero no se envían." : canales.teams === "desactivado" ? "Teams aún no está configurado: por ahora las notificaciones llegan solo a la app." : ""}
-            {canales.teamsDestinoPrueba ? " Entorno local: todo envío a Teams se redirige al correo de prueba." : ""} El correo está deshabilitado.
-          </span>
-        </div>
+        <p className="nx-nota-canal">
+          <IconAlert size={12} />
+          {canales.teams === "simulado" ? "Teams en modo simulado" : canales.teams === "desactivado" ? "Teams sin configurar: llegan solo a la app" : "Teams activo"}
+          {canales.teamsDestinoPrueba ? " · local: Teams se redirige al correo de prueba" : ""} · correo deshabilitado
+        </p>
       )}
 
       {/* Filtros */}
@@ -168,11 +176,19 @@ export default function NotificacionesView({ user }) {
 
       {/* Tarjetas */}
       <div className="nx-grid">
+        {/* Crear siempre va primero */}
+        {ver === "mias" && !cargando && (
+          <button type="button" className={`nx-card nx-card-nueva${lleno ? " lleno" : ""}`} onClick={() => !lleno && nueva()} disabled={lleno}>
+            <span className="nx-card-nueva-ic"><IconPlus size={22} /></span>
+            <strong>{lleno ? "Llegaste al máximo" : "Nueva notificación"}</strong>
+            <small>{lleno ? `Cada persona puede crear hasta ${LIMITES.maxPorPersona} notificaciones. Elimina una para crear otra.` : `Escríbela en tus palabras y Nova la arma contigo · puedes crear hasta ${LIMITES.maxPorPersona} (llevas ${creadas})`}</small>
+          </button>
+        )}
         {data.notificaciones.map((n) => {
           const personas = n.destinatarios.map((d) => ({ nombre: d.userNombre, yo: d.userId === user.id, apagado: d.deBaja }));
           const activa = n.estado === "activa";
           return (
-            <article key={n.id} className={`nx-card estado-${n.estado}${ocupado === n.id ? " ocupada" : ""}`}>
+            <article key={n.id} id={`notif-${n.id}`} className={`nx-card estado-${n.estado}${ocupado === n.id ? " ocupada" : ""}${resaltada === n.id ? " foco" : ""}`}>
               <header className="nx-card-head">
                 <FuenteIcono fuente={n.fuente} />
                 <div className="nx-card-titulo">
@@ -210,12 +226,18 @@ export default function NotificacionesView({ user }) {
               <footer className="nx-card-acciones">
                 {n.puedeGestionar ? (
                   <>
-                    <button type="button" className="btn small btn-primary" disabled={ocupado === n.id || n.estado === "borrador"} onClick={() => enviarAhora(n)} title="Enviar ahora a todos sus destinatarios">
-                      <IconSend size={12} /> Enviar ahora
-                    </button>
-                    <button type="button" className="btn small" disabled={ocupado === n.id} onClick={() => accion(n, () => probarNotificacion(n.id), "Prueba enviada.", true)} title="Te llega solo a ti, con datos reales">
-                      <IconEye size={12} /> Probar
-                    </button>
+                    {n.disparador === "evento" ? (
+                      <span className="nx-por-evento" title="Se envía sola cuando ocurre el evento">⚡ Por evento</span>
+                    ) : (
+                      <button type="button" className="btn small btn-primary" disabled={ocupado === n.id || n.estado === "borrador"} onClick={() => enviarAhora(n)} title="Enviar ahora a todos sus destinatarios">
+                        <IconSend size={12} /> Enviar ahora
+                      </button>
+                    )}
+                    {n.disparador !== "evento" && (
+                      <button type="button" className="btn small" disabled={ocupado === n.id} onClick={() => accion(n, () => probarNotificacion(n.id), "Prueba enviada.", true)} title="Envía una prueba con datos reales a todos sus destinatarios (marcada como PRUEBA)">
+                        <IconEye size={12} /> Probar
+                      </button>
+                    )}
                     <div className="spacer" />
                     <button type="button" className="nx-icono" onClick={() => setHistorial(n)} title="Historial de envíos" aria-label="Historial"><IconHistory size={15} /></button>
                     <button type="button" className="nx-icono" onClick={() => setModal(n)} title="Editar" aria-label="Editar"><IconEdit size={15} /></button>
@@ -235,13 +257,6 @@ export default function NotificacionesView({ user }) {
           );
         })}
 
-        {ver === "mias" && !cargando && (
-          <button type="button" className="nx-card nx-card-nueva" onClick={() => nueva()}>
-            <span className="nx-card-nueva-ic"><IconPlus size={22} /></span>
-            <strong>Nueva notificación</strong>
-            <small>{r.activas >= LIMITES.maxActivasPorPersona ? "Llegaste a 10 activas: podrás guardarla como borrador" : "Escríbela en tus palabras y Nova la arma contigo"}</small>
-          </button>
-        )}
       </div>
 
       {!cargando && data.notificaciones.length === 0 && ver !== "mias" && (
@@ -251,7 +266,7 @@ export default function NotificacionesView({ user }) {
           <span>{ver === "recibo" ? "Cuando alguien te agregue como destinatario, aparecerá aquí." : "Prueba con otro estado o búsqueda."}</span>
         </div>
       )}
-      {data.total > 0 && (
+      {ver !== "mias" && data.total > size && (
         <Paginacion id="notif-pagesize" page={page} size={size} total={data.total} sizes={PAGE_SIZES} onPage={setPage} onSize={setSize} etiqueta="notificación(es)" />
       )}
 

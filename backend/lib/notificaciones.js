@@ -231,9 +231,10 @@ async function validarPermisos(regla, propietario) {
   return users;
 }
 
-async function validarLimiteActivas(propietarioUserId, excluirId = null) {
-  const activas = await prisma.notificacion.count({ where: { propietarioUserId, estado: "activa", ...(excluirId ? { id: { not: excluirId } } : {}) } });
-  if (activas >= LIMITES.maxActivasPorPersona) throw err(400, `Ya tienes ${LIMITES.maxActivasPorPersona} notificaciones activas, el máximo por persona. Pausa o elimina alguna para activar esta.`);
+// Máximo de notificaciones CREADAS por persona (en cualquier estado): se valida al crear.
+async function validarLimite(propietarioUserId) {
+  const creadas = await prisma.notificacion.count({ where: { propietarioUserId } });
+  if (creadas >= LIMITES.maxPorPersona) throw err(400, `Ya tienes ${LIMITES.maxPorPersona} notificaciones, el máximo por persona. Elimina alguna para crear otra.`);
 }
 
 // ---------- Forma cliente y auditoría ----------
@@ -386,7 +387,7 @@ export async function listNotificaciones(user, { ver = "mias", estado, q, page =
   const cuenta = Object.fromEntries(porEstado.map((g) => [g.estado, g._count]));
   return {
     total, page: pagina, size: take, notificaciones: rows.map((n) => toClient(n, user)),
-    misActivas: cuenta.activa || 0,
+    misCreadas: Object.values(cuenta).reduce((a, b) => a + b, 0),
     resumen: { activas: cuenta.activa || 0, pausadas: (cuenta.pausada || 0) + (cuenta.pausada_por_permisos || 0), borradores: cuenta.borrador || 0, enviadasHoy, deOtros },
     limites: LIMITES,
   };
@@ -397,7 +398,7 @@ export async function listNotificaciones(user, { ver = "mias", estado, q, page =
 export async function createNotificacion(input, actor) {
   const regla = normalizarRegla(input);
   const users = await validarPermisos(regla, actor);
-  if (regla.estado === "activa") await validarLimiteActivas(actor.id);
+  await validarLimite(actor.id);
   const n = await prisma.notificacion.create({
     data: {
       ...datosDeRegla(regla),
@@ -422,7 +423,6 @@ export async function updateNotificacion(id, input, actor) {
   const users = await validarPermisos(regla, propietario);
   // Una pausada que se edita sigue pausada, salvo que se pida reanudarla.
   const sigueEnPausa = regla.estado === "activa" && before.estado.startsWith("pausada") && input.reanudar !== true;
-  if (regla.estado === "activa" && !sigueEnPausa && before.estado !== "activa") await validarLimiteActivas(before.propietarioUserId, before.id);
 
   const actuales = new Map(before.destinatarios.map((d) => [d.userId, d]));
   const nuevos = users.filter((u) => !actuales.has(u.id));
@@ -461,7 +461,6 @@ export async function cambiarEstado(id, accion, actor, motivo) {
     if (!(await puedeVerFuente(propietario, n.fuente))) throw err(403, `No se puede reanudar: ${n.propietarioNombre} ya no tiene acceso a ${FUENTES[n.fuente]?.label || n.fuente}.`);
     const regla = normalizarRegla({ ...toClient(n, actor), destinatarios: n.destinatarios.map((d) => d.userId), estado: "activa" });
     await validarPermisos(regla, propietario);
-    await validarLimiteActivas(n.propietarioUserId, n.id);
     data = { estado: "activa", pausadaPorUserId: null, pausadaPorNombre: null, pausadaAt: null, motivoPausa: null };
   } else {
     throw err(400, "Acción no válida.");

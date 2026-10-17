@@ -31,7 +31,7 @@ export default function ContenidoNotificacion({ c }) {
   return (
     <div className="notif-contenido">
       {c.origen === "manual" && <p className="notif-origen">Enviada manualmente por <strong>{c.manualPor || "una persona"}</strong>.</p>}
-      {c.origen === "prueba" && <p className="notif-origen prueba">Prueba: solo la recibió {c.pruebaPor || "quien la probó"}.</p>}
+      {c.origen === "prueba" && <p className="notif-origen prueba">Prueba enviada por {c.pruebaPor || "quien la configuró"} a todos los destinatarios.</p>}
       {c.origen === "recuperado" && <p className="notif-origen prueba">Enviada con retraso: el servidor no estaba disponible a la hora programada.</p>}
       {c.texto && <p className="notif-texto">{c.texto}</p>}
       {c.items?.length > 0 && (
@@ -57,7 +57,7 @@ export default function ContenidoNotificacion({ c }) {
       )}
       <p className="count-note" style={{ margin: 0 }}>
         {c.notificacionNombre ? <>Notificación «{c.notificacionNombre}» · </> : null}Configurada por {c.configuradaPor}
-        {c.enlace ? <> · <Link href={c.enlace}>Ver en el panel</Link></> : null}
+        {c.notificacionId ? <> · <Link href={`/alertas?tab=notificaciones&n=${c.notificacionId}`}>Ver la notificación</Link></> : null}
       </p>
     </div>
   );

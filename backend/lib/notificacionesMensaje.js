@@ -42,7 +42,7 @@ export function construirContenido(notif, resultado, { origen, actorNombre } = {
 }
 
 function lineaOrigen(c) {
-  if (c.origen === "prueba") return `PRUEBA · solo para ${c.pruebaPor || "quien la probó"}`;
+  if (c.origen === "prueba") return `PRUEBA · enviada por ${c.pruebaPor || "quien la configuró"}`;
   if (c.origen === "manual") return `Enviada manualmente por ${c.manualPor || "una persona"}`;
   if (c.origen === "recuperado") return "Enviada con retraso (el servidor no estaba disponible a la hora programada)";
   return null;
@@ -85,8 +85,8 @@ export function tarjetaTeams(c, { redirigidaDesde } = {}) {
     version: "1.4",
     body,
     actions: [
-      { type: "Action.OpenUrl", title: "Ver en el panel", url: `${base}${c.enlace || "/alertas"}` },
-      { type: "Action.OpenUrl", title: "Gestionar notificación", url: `${base}/alertas?tab=notificaciones` },
+      { type: "Action.OpenUrl", title: "Ver en el panel", url: `${base}/alertas?tab=bandeja` },
+      { type: "Action.OpenUrl", title: "Gestionar notificación", url: `${base}/alertas?tab=notificaciones${c.notificacionId ? `&n=${c.notificacionId}` : ""}` },
     ],
   };
 }

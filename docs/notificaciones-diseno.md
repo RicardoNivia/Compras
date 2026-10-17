@@ -36,9 +36,9 @@ Ejemplos que debe resolver:
 | Primera entrega | Fase 1: notificaciones **programadas**, en la app y por Teams. |
 | Menú | Se renombra a **"Alertas y notificaciones"**. |
 | Contador rojo | La campana cuenta **solo las notificaciones no leídas que vienen de este módulo** (las que alguien programó y configuró aquí). Los pendientes de Mi día nunca suman al contador. |
-| Límites | **10** notificaciones activas por persona (incluidos los admins) y **6** destinatarios por notificación. |
+| Límites | **10** notificaciones **creadas** por persona, en cualquier estado (incluidos los admins), y **6** destinatarios por notificación. |
 | Teams | **Un solo flujo** que escribe por chat a cada persona. |
-| Enviar ahora | Botón **"Enviar ahora"** (propietario o admin): ejecuta la notificación en ese momento para **todos** sus destinatarios, con datos reales. Queda en el historial con origen **manual** y quién la corrió, se audita (acción `enviar`) y el mensaje lo indica: "Enviada manualmente por {nombre}". No reemplaza el envío programado del día. Respeta la condición: si no hay resultados y la regla dice "solo si hay resultados", se informa y no se envía. |
+| Enviar ahora | Botón **"Enviar ahora"** (propietario o admin): ejecuta la notificación en ese momento para **todos** sus destinatarios, con datos reales. Queda en el historial con origen **manual** y quién la corrió, se audita (acción `enviar`) y el mensaje lo indica: "Enviada manualmente por {nombre}". No reemplaza el envío programado del día. **No aplica a las notificaciones por evento** (salen solas cuando ocurre el hecho): tampoco tienen "Probar" ni "Guardar y probar"; el servidor rechaza ambos. Respeta la condición: si no hay resultados y la regla dice "solo si hay resultados", se informa y no se envía. |
 | Darse de baja | Cualquier destinatario puede dejar de recibir una notificación creada por otra persona. **Queda en auditoría**, igual que volver a suscribirse o que el creador lo agregue de nuevo. |
 
 ## 3. Principio de diseño
@@ -235,7 +235,7 @@ Además, para usar el módulo se necesita la feature nueva `viewNotificaciones` 
 ### 7.3 Otros controles
 
 - **Inyección de instrucciones:** el pedido solo produce una regla que el servidor valida contra catálogos cerrados. Los textos del registro (descripción, observaciones) se insertan en el mensaje escapados y recortados; nunca vuelven a la IA.
-- **Límites:** 10 notificaciones activas por persona (también para los admins; las pausadas y los borradores no cuentan), 6 destinatarios por notificación, la frecuencia mínima es diaria (en fase 1 no hay "cada hora") y 25 ítems por mensaje.
+- **Límites:** 10 notificaciones **creadas** por persona, en cualquier estado (también para los admins; se valida al crear; por eso "Mías" no se pagina), 6 destinatarios por notificación, la frecuencia mínima es diaria (en fase 1 no hay "cada hora") y 25 ítems por mensaje.
 - **Teams:** la URL del webhook es un secreto. Va en `backend/.env`, nunca en la base de datos, el repositorio, los logs ni la auditoría (§10.4).
 - **Dejar de recibir:** cualquier destinatario puede darse de baja de una notificación que creó otro. Queda auditado y el creador lo ve.
 
@@ -362,7 +362,7 @@ Muestra el mismo contenido renderizado en HTML con las clases existentes, con es
 ```
 
 - Los checks de canal van **después** del texto.
-- "Probar ahora" ejecuta la consulta real y envía la vista previa **solo a quien prueba**, por los canales marcados, con la etiqueta "PRUEBA".
+- "Probar" ejecuta la consulta real y envía la prueba **a todos los destinatarios y a quien prueba**, por los canales marcados, con la etiqueta "PRUEBA · enviada por {nombre}". No cuenta como el envío del día. No existe en las notificaciones por evento.
 - "Ver la regla técnica" abre un formulario manual (frecuencia, hora, festivo, consulta, filtros y condición), para ajustar sin volver a llamar a Nova.
 
 ### 9.4 Historial de una notificación
@@ -624,7 +624,7 @@ En cada minuto, por cada notificación `activa` y `programado`:
 | POST | `/api/notificaciones` | Crear |
 | GET / PUT / DELETE | `/api/notificaciones/[id]` | Detalle, editar, eliminar (propietario o admin) |
 | POST | `/api/notificaciones/[id]/estado` | `{ accion: "pausar" \| "reanudar" }` |
-| POST | `/api/notificaciones/[id]/probar` | Vista previa solo para quien prueba |
+| POST | `/api/notificaciones/[id]/probar` | Prueba a todos los destinatarios y a quien prueba, marcada como PRUEBA (no aplica a eventos) |
 | POST | `/api/notificaciones/[id]/enviar` | Envío manual inmediato a todos los destinatarios (origen `manual`, clave `n{id}\|manual\|{ts}`) |
 | POST | `/api/notificaciones/[id]/baja` | El destinatario deja de recibir |
 | GET | `/api/notificaciones/[id]/ejecuciones?page=` | Historial con entregas |
@@ -703,6 +703,6 @@ Se reutilizan las clases existentes (`table-card`, `table-footer`, `modal-*`, `e
 ## 16. Decisiones confirmadas (2026-10-17)
 
 1. Menú renombrado a **"Alertas y notificaciones"**. La campana muestra en rojo solo las no leídas de este módulo.
-2. Límites: **10** notificaciones activas por persona y **6** destinatarios.
+2. Límites: **10** notificaciones creadas por persona (en cualquier estado) y **6** destinatarios.
 3. **Un solo flujo** de Teams, con validación de `clave` y del dominio `@sinco.com.co`.
 4. Los destinatarios pueden darse de baja. La baja, la nueva suscripción y cualquier cambio de destinatarios quedan en auditoría (`entityType: "notificacion"`, acciones `baja` y `alta`).
