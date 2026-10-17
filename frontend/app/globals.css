@@ -2833,7 +2833,9 @@ table.audit-log.mcp-tabla tbody td{ vertical-align:middle; white-space:nowrap; }
 .notif-pasos li.on{ color:var(--accent); font-weight:700; }
 .notif-pasos li.on span{ border-color:var(--accent); background:var(--accent); color:#fff; }
 .notif-modal-body{ padding:16px 22px; display:flex; flex-direction:column; gap:12px; max-height:66vh; overflow-y:auto; }
-.notif-modal-body textarea{ width:100%; resize:vertical; }
+/* El cuerpo del modal es una columna con altura máxima: sin esto el navegador encoge el textarea para que todo quepa. */
+.notif-modal-body > *{ flex-shrink:0; }
+.notif-modal-body textarea{ width:100%; min-height:96px; resize:vertical; line-height:1.45; }
 .notif-label{ font-size:13.5px; font-weight:700; color:var(--ink); margin:0 0 6px; display:block; }
 .notif-ejemplos{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
 .notif-nova{ display:flex; gap:10px; align-items:flex-start; padding:12px 14px; border-radius:12px; background:var(--accent-wash); color:var(--ink); font-size:13.5px; }
@@ -2960,6 +2962,25 @@ table.audit-log.mcp-tabla tbody td{ vertical-align:middle; white-space:nowrap; }
 .nx-para-nombre strong{ font-size:13px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .nx-para-nombre small{ font-size:11.5px; color:var(--muted); }
 .nx-para-fila input[role="switch"]{ flex:none; }
+/* Nombre editable en el encabezado del modal de edición */
+.nx-titulo-edit{ flex:1; min-width:0; display:flex; align-items:center; gap:8px; margin-right:12px; cursor:text; }
+.nx-titulo-pre{ flex:none; font:700 18px "Nunito",sans-serif; color:var(--ink); }
+.nx-titulo-edit input{ flex:1; min-width:0; font:700 18px "Nunito",sans-serif; color:var(--ink); background:transparent; border:1px solid transparent; border-radius:8px; padding:3px 8px; box-shadow:none; transition:border-color .15s ease, background .15s ease; }
+.nx-titulo-edit input:hover{ border-color:var(--border); background:var(--surface); }
+.nx-titulo-edit input:focus{ border-color:var(--accent); background:var(--surface); outline:none; box-shadow:0 0 0 3px var(--accent-wash); }
+.nx-titulo-edit svg{ flex:none; color:var(--muted); }
+/* "¿Por dónde le llega?" (por ahora solo en local) */
+.nx-canales-sel{ display:flex; flex-direction:column; gap:10px; padding:14px; border-radius:16px; border:1px solid var(--border); background:var(--surface); }
+.nx-solo-local{ flex:none; font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; background:color-mix(in srgb, var(--warning) 16%, transparent); color:var(--warning); }
+.nx-canales-opciones{ display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px; }
+.nx-canal-op{ display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:var(--surface); cursor:pointer; transition:border-color .15s ease, background .15s ease; }
+.nx-canal-op.on{ border-color:color-mix(in srgb, var(--accent) 55%, var(--border)); background:var(--accent-wash); }
+.nx-canal-op.fija{ cursor:default; }
+.nx-canal-op.apagada{ opacity:.6; cursor:not-allowed; }
+.nx-canal-op-txt{ flex:1; min-width:0; display:flex; flex-direction:column; }
+.nx-canal-op-txt strong{ font-size:13px; color:var(--ink); }
+.nx-canal-op-txt small{ font-size:11.5px; color:var(--muted); }
+.nx-canal-op input[role="switch"]{ flex:none; }
 .notif-cambios{ padding:12px 14px; border-radius:16px; border:1px solid color-mix(in srgb, var(--secondary) 40%, var(--border)); background:color-mix(in srgb, var(--secondary) 8%, var(--surface)); font-size:13px; }
 .notif-cambios ul{ margin:6px 0 0; padding-left:18px; display:flex; flex-direction:column; gap:4px; }
 .notif-antes{ color:var(--muted); text-decoration:line-through; }
@@ -2987,6 +3008,8 @@ table.audit-log.mcp-tabla tbody td{ vertical-align:middle; white-space:nowrap; }
 .nx-estado.pausada_por_permisos{ background:color-mix(in srgb, var(--critical) 14%, transparent); color:var(--critical); }
 .nx-card-fila{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .nx-canales{ display:flex; gap:5px; flex-wrap:wrap; }
+.nx-canales-lbl{ font-size:11px; font-weight:700; color:var(--muted); align-self:center; margin-right:2px; }
+.nx-canal.correo{ background:color-mix(in srgb, var(--warning) 16%, transparent); color:var(--warning); }
 .nx-canal{ font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:7px; background:var(--accent-wash); color:var(--accent); }
 .nx-canal.teams{ background:color-mix(in srgb, #5b5fc7 16%, transparent); color:#5b5fc7; }
 .nx-avatares{ display:inline-flex; }
