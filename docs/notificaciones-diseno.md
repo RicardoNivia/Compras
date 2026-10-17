@@ -424,7 +424,7 @@ Se usa la misma conexión ya probada (ver `docs/teams-notificaciones-fase2.md`):
 | `TEAMS_MODO` | `desactivado` · `simulado` · `real` | `desactivado`: el canal aparece como "No configurado". `simulado`: arma la tarjeta y la guarda en la entrega y en el log del backend, sin enviarla. `real`: envía. |
 | `TEAMS_WEBHOOK_URL` | `https://…powerplatform.com/…` | URL del flujo (secreto) |
 | `TEAMS_CLAVE_FLUJO` | cadena aleatoria de 32 caracteres | Secreto compartido que el flujo valida |
-| `TEAMS_DESTINO_PRUEBA` | `ricardo.nivia@sinco.com.co` | **Solo en local**: si está definida, **todo** envío a Teams se redirige a ese correo, con la etiqueta "[LOCAL → era para X]". Evita escribirle a compañeros con datos de la BD local. |
+| `TEAMS_DESTINO_PRUEBA` | `ricardo.nivia@sinco.com.co` | **Solo en local**: si está definida, **todo** envío a Teams se redirige a ese correo, con la etiqueta "[LOCAL → era para X]". Evita escribirle a compañeros con datos de la BD local. **Fuera de producción es obligatoria: sin ella no se envía nada a Teams.** |
 | `APP_URL` | `http://localhost:3000` | Base de los enlaces "Ver en el panel" |
 | `TZ` | `America/Bogota` | Hora local del programador. **Obligatoria en producción.** |
 

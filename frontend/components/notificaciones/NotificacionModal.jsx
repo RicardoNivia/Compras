@@ -9,7 +9,7 @@ import {
   LIMITES, FUENTES, CONSULTAS, PERIODOS, CAMPOS_FECHA, PRESETS_COMPRAS, PRESETS_PROVEEDORES, CONDICIONES, SI_FESTIVO, VARIABLES,
   EVENTOS, AGRUPACIONES, ESTADOS_CICLO, VARIABLES_EVENTO,
 } from "@/lib/notificacionesCatalogo";
-import { IconSpark, IconAlert, IconArrowRight } from "@/components/icons";
+import { IconSpark, IconAlert, IconArrowRight, IconEdit } from "@/components/icons";
 import { canViewRegistros, canViewAlertas, canViewProveedores, canViewPresupuesto, ROLE_LABELS } from "@/lib/roles";
 import { iniciales, Portal } from "@/components/notificaciones/ui";
 
@@ -223,12 +223,11 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
               </section>
   );
 
-  // "¿Por dónde le llega?": por ahora solo en local (canales.elegirCanal). La app siempre; Teams opcional; correo deshabilitado.
+  // "¿Por dónde le llega?" (canales.elegirCanal): la app siempre; Teams opcional si el servidor lo tiene configurado; correo deshabilitado.
   const seccionCanales = canales?.elegirCanal ? (
     <section className="nx-canales-sel">
       <div className="nx-para-head">
         <p className="notif-label" style={{ margin: 0 }}>¿Por dónde le llega?</p>
-        {canales.local && <span className="nx-solo-local">Solo en local</span>}
       </div>
       <div className="nx-canales-opciones">
         <label className="nx-canal-op on fija">
@@ -236,7 +235,7 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
           <input type="checkbox" role="switch" checked disabled aria-label="En la app (siempre)" />
         </label>
         <label className={`nx-canal-op${canalesSel.includes("teams") ? " on" : ""}${teamsDisponible ? "" : " apagada"}`}>
-          <span className="nx-canal-op-txt"><strong>Teams</strong><small>{!teamsDisponible ? "Sin configurar en el servidor" : canales.teams === "simulado" ? "Modo simulado (no se envía)" : canales.teamsDestinoPrueba ? "Chat del bot · en local te llega a ti" : "Chat del bot de Flujos de trabajo"}</small></span>
+          <span className="nx-canal-op-txt"><strong>Teams</strong><small>{!teamsDisponible ? "Sin configurar en el servidor" : canales.teams === "simulado" ? "Modo simulado (no se envía)" : canales.teamsDestinoPrueba ? (canales.local ? "Chat del bot · en local te llega a ti" : "Atención: todo se redirige a un correo de prueba (TEAMS_DESTINO_PRUEBA)") : "Chat privado del bot a cada persona"}</small></span>
           <input type="checkbox" role="switch" checked={canalesSel.includes("teams")} disabled={!teamsDisponible}
             onChange={(e) => setCanalesSel(e.target.checked ? ["app", "teams"] : ["app"])} aria-label="Enviar también por Teams" />
         </label>
@@ -253,7 +252,16 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal notif-modal-ancho" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={editando ? "Editar notificación" : "Nueva notificación"}>
         <div className="modal-head">
-          <h3>{editando ? `Editar · ${notificacion.nombre}` : "Nueva notificación"}</h3>
+          {editando && regla ? (
+            // El nombre se edita aquí mismo; se guarda con "Guardar cambios" o al confirmar lo que propone Nova.
+            <label className="nx-titulo-edit" title="Haz clic para cambiar el nombre">
+              <span className="nx-titulo-pre">Editar ·</span>
+              <input value={regla.nombre || ""} maxLength={120} onChange={(e) => setR("nombre", e.target.value)} aria-label="Nombre de la notificación" />
+              <IconEdit size={14} />
+            </label>
+          ) : (
+            <h3>Nueva notificación</h3>
+          )}
           <button type="button" className="btn btn-ghost" onClick={onClose} aria-label="Cerrar">✕</button>
         </div>
 
@@ -290,7 +298,7 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
               </div>
               <label className="notif-label" htmlFor="notif-instruccion">¿Qué quieres cambiar?</label>
               <textarea id="notif-instruccion" ref={textareaRef} rows={3} value={instruccion} onChange={(e) => setInstruccion(e.target.value)} maxLength={1000}
-                placeholder="Ej.: que llegue a las 8 de la mañana y agrégale a Carolina"
+                placeholder="Ej.: que llegue a las 8 de la mañana y solo si hay más de 5 compras"
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && instruccion.trim().length >= 3) { e.preventDefault(); interpretar(); } }} />
               <div className="notif-ejemplos">
                 <span className="count-note">Ejemplos:</span>

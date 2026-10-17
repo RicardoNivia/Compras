@@ -5,7 +5,8 @@
 // valida), y el flujo le escribe por chat a esa persona con el bot de Flujos de trabajo.
 //
 // TEAMS_MODO: "desactivado" (por defecto) | "simulado" (arma la tarjeta y no la envía) | "real".
-// TEAMS_DESTINO_PRUEBA: solo en local — si está definida, TODO envío se redirige a ese correo.
+// TEAMS_DESTINO_PRUEBA: si está definida, TODO envío se redirige a ese correo. Fuera de producción es obligatoria:
+// sin ella no se envía nada (así una prueba local nunca le escribe a un compañero).
 // La URL del webhook es un secreto: nunca se devuelve al cliente, ni se escribe en logs ni en auditoría.
 
 const TIMEOUT_MS = 10000;
@@ -33,6 +34,10 @@ export async function enviarTarjeta(destinatario, card) {
   if (!destinatario) return { ok: false, status: null, motivo: "La persona no tiene correo registrado." };
 
   const destinoPrueba = process.env.TEAMS_DESTINO_PRUEBA?.trim();
+  // Fuera de producción NUNCA se le escribe a la persona real: todo va al correo de prueba, y sin él no se envía.
+  if (!destinoPrueba && process.env.NODE_ENV !== "production") {
+    return { ok: false, status: null, motivo: "En local, Teams solo envía a TEAMS_DESTINO_PRUEBA y no está definida: no se envió." };
+  }
   const destino = destinoPrueba || destinatario;
   const body = {
     clave: process.env.TEAMS_CLAVE_FLUJO || "",
