@@ -1,6 +1,16 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { IconTable, IconBuilding, IconMoney, IconBell, IconClock } from "@/components/icons";
+
+// Los modales se dibujan en <body>: si quedan dentro de un contenedor con animación o transform, el
+// position:fixed del fondo se recorta a ese contenedor en lugar de cubrir toda la pantalla.
+export function Portal({ children }) {
+  const [listo, setListo] = useState(false);
+  useEffect(() => setListo(true), []);
+  return listo ? createPortal(children, document.body) : null;
+}
 import { FUENTES } from "@/lib/notificacionesCatalogo";
 
 // Identidad visual por fuente de datos: ícono y color (tokens de globals.css).

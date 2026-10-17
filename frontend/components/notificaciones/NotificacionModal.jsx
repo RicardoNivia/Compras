@@ -11,7 +11,7 @@ import {
 } from "@/lib/notificacionesCatalogo";
 import { IconSpark, IconAlert, IconArrowRight } from "@/components/icons";
 import { canViewRegistros, canViewAlertas, canViewProveedores, canViewPresupuesto, ROLE_LABELS } from "@/lib/roles";
-import { iniciales } from "@/components/notificaciones/ui";
+import { iniciales, Portal } from "@/components/notificaciones/ui";
 
 const EJEMPLOS = [
   "Todos los días, las compras que se vencen ese día",
@@ -224,6 +224,7 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
   );
 
   return (
+    <Portal>
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal notif-modal-ancho" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={editando ? "Editar notificación" : "Nueva notificación"}>
         <div className="modal-head">
@@ -628,5 +629,6 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

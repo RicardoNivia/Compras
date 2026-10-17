@@ -1,5 +1,7 @@
 "use client";
 
+import { Portal } from "@/components/notificaciones/ui";
+
 import { useEffect, useRef, useState } from "react";
 
 // Confirmación con el estilo de la app (en lugar de window.confirm).
@@ -26,6 +28,7 @@ export default function ConfirmarModal({ pedido, onClose }) {
   }
 
   return (
+    <Portal>
     <div className="modal-overlay" onClick={() => !enCurso && onClose()}>
       <div className="modal notif-confirmar" onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true" aria-labelledby="notif-confirmar-titulo">
         <div className="modal-head">
@@ -44,5 +47,6 @@ export default function ConfirmarModal({ pedido, onClose }) {
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

@@ -123,6 +123,7 @@ REGLAS:
 4. NUNCA supongas lo ambiguo: pregunta. Máximo 3 preguntas por turno, cada una con opciones cortas (2 a 4). Preguntas típicas: hora; qué hacer si el día es festivo; si se envía cuando no hay resultados; fecha de solicitud o de creación; lo de todos o lo de cada quien.
 5. "Compras que se vencen": las compras NO tienen fecha de vencimiento. Se usa el plazo de 8 días hábiles desde la solicitud sin fecha de entrega: preset vencen_hoy (cumplen hoy el plazo), por_vencer (les quedan 1 o 2 días) o atrasadas (ya lo pasaron). Explícalo y pregunta si incluye también las ya vencidas.
 6. La valoración de Nova de una compra se genera al RADICARLA, no al legalizarla: "cuando se legalice, dime qué valoración sacó" es el evento compra.valorada (explícalo en "mensaje"). La calificación del proveedor (estrellas) es compra.calificada. Si pide ambas (valoración y calificación), son DOS notificaciones: arma la primera y dilo en "mensaje".
+6b. Este panel es de COMPRAS: no hay datos de ventas, ingresos ni facturación de clientes. Si dice "ventas", lo más probable es que se refiera a las compras registradas: usa la consulta de compras y PREGUNTA para confirmarlo ("¿Te refieres a las compras registradas?"). Nunca respondas "no_permitido" por esto: "no_permitido" es SOLO para una fuente de la lista de no permitidas.
 7. Filtros (area, categoria, estado…): si la persona quiere "todas"/"todos"/"cualquiera", deja el filtro VACÍO; nunca escribas "todas" como valor. "Semana anterior" es de lunes a domingo. "Registradas" puede ser por fecha de solicitud o por creación: pregunta.
 8. Cuando ya está todo, estado "lista": "nombre" corto, "titulo" corto (puede usar variables) y "plantilla" de 1 o 2 frases con variables, sin cifras inventadas; "resumen" en lenguaje claro de lo que hará.
 9. Las respuestas que ya dio la persona son definitivas: no vuelvas a preguntarlas.
@@ -260,8 +261,12 @@ Devuelve la regla COMPLETA con SOLO ese cambio aplicado (todo lo demás igual). 
   // Fuente no permitida: nunca se arma la regla. Se valida también si Nova eligió una consulta o evento de esa fuente.
   const esEvento = res.disparador === "evento" || (!!EVENTOS[res.evento] && !CONSULTAS[res.consulta]);
   const fuenteElegida = esEvento ? EVENTOS[res.evento]?.fuente : CONSULTAS[res.consulta]?.fuente;
-  if (res.estado === "no_permitido" || (fuenteElegida && !permitidas.includes(fuenteElegida))) {
-    const fuente = FUENTES[res.fuenteNoPermitida] ? res.fuenteNoPermitida : fuenteElegida;
+  // "no_permitido" solo vale si de verdad apunta a una fuente que el rol NO ve; si Nova lo usa por error (p. ej. para
+  // algo que el panel no tiene, como "ventas"), se trata como no soportado o se sigue con la consulta que eligió.
+  const fuenteVetada = [res.fuenteNoPermitida, fuenteElegida].find((f) => FUENTES[f] && !permitidas.includes(f));
+  if (res.estado === "no_permitido" && !fuenteVetada) res.estado = CONSULTAS[res.consulta] || EVENTOS[res.evento] ? "preguntas" : "no_soportado";
+  if (fuenteVetada) {
+    const fuente = fuenteVetada;
     return { estado: "no_permitido", mensaje: fuente ? mensajeSinPermiso(fuente) : "Por seguridad no puedes crear esta notificación: usa datos que tu rol no tiene habilitados." };
   }
   if (res.estado === "es_informe") {

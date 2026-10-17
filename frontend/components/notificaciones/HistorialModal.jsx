@@ -1,5 +1,7 @@
 "use client";
 
+import { Portal } from "@/components/notificaciones/ui";
+
 import { Fragment, useEffect, useState } from "react";
 import { listarEjecuciones } from "@/lib/notificacionesApi";
 import { RESULTADOS, CANALES } from "@/lib/notificacionesCatalogo";
@@ -27,6 +29,7 @@ export default function HistorialModal({ notificacion, onClose }) {
   const totalPages = Math.max(1, Math.ceil(data.total / size));
 
   return (
+    <Portal>
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal notif-modal-ancho" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Historial de envíos">
         <div className="modal-head">
@@ -97,5 +100,6 @@ export default function HistorialModal({ notificacion, onClose }) {
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

@@ -2865,7 +2865,7 @@ table.audit-log.mcp-tabla tbody td{ vertical-align:middle; white-space:nowrap; }
 .notif-confirmar{ max-width:480px; margin-top:12vh; }
 
 /* ========== Notificaciones · rediseño (nx-*) ========== */
-.nx-vista{ display:flex; flex-direction:column; gap:16px; animation:nxEntra .35s ease both; }
+.nx-vista{ display:flex; flex-direction:column; gap:16px; animation:nxEntra .35s ease backwards; }
 @keyframes nxEntra{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
 
 /* Pestañas de la página */
@@ -2919,7 +2919,7 @@ table.audit-log.mcp-tabla tbody td{ vertical-align:middle; white-space:nowrap; }
 
 /* Tarjetas */
 .nx-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(310px, 1fr)); gap:16px; }
-.nx-card{ position:relative; display:flex; flex-direction:column; gap:12px; padding:16px; border-radius:18px; background:var(--surface); border:1px solid var(--border); box-shadow:var(--shadow); transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease, opacity .2s ease; animation:nxEntra .35s ease both; }
+.nx-card{ position:relative; display:flex; flex-direction:column; gap:12px; padding:16px; border-radius:18px; background:var(--surface); border:1px solid var(--border); box-shadow:var(--shadow); transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease, opacity .2s ease; animation:nxEntra .35s ease backwards; }
 .nx-card:hover{ transform:translateY(-3px); border-color:color-mix(in srgb, var(--accent) 45%, var(--border)); box-shadow:0 16px 30px -18px color-mix(in srgb, var(--accent) 60%, transparent); }
 .nx-card.ocupada{ opacity:.6; pointer-events:none; }
 /* Encabezado de "Mis notificaciones": título corto, pedido a Nova e indicadores (tamaño medio; las tarjetas mandan) */
@@ -3021,7 +3021,7 @@ table.audit-log.mcp-tabla tbody td{ vertical-align:middle; white-space:nowrap; }
 .nx-dia{ display:flex; flex-direction:column; gap:8px; }
 .nx-dia-titulo{ margin:4px 0 0; font:800 12px "Roboto",sans-serif; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
 .nx-feed{ display:flex; flex-direction:column; gap:8px; }
-.nx-item{ position:relative; border-radius:16px; background:var(--surface); border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; transition:border-color .2s ease, box-shadow .2s ease; animation:nxEntra .3s ease both; }
+.nx-item{ position:relative; border-radius:16px; background:var(--surface); border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; transition:border-color .2s ease, box-shadow .2s ease; animation:nxEntra .3s ease backwards; }
 .nx-item:hover{ border-color:color-mix(in srgb, var(--accent) 40%, var(--border)); }
 .nx-item.no-leida{ background:linear-gradient(90deg, var(--accent-wash), var(--surface) 55%); }
 .nx-item.no-leida::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:linear-gradient(180deg, var(--accent), var(--secondary)); }
@@ -3041,7 +3041,7 @@ table.audit-log.mcp-tabla tbody td{ vertical-align:middle; white-space:nowrap; }
 .nx-item-total{ min-width:30px; text-align:center; font:800 14px "Nunito",sans-serif; padding:3px 8px; border-radius:9px; background:var(--accent-wash); color:var(--accent); }
 .nx-chevron{ color:var(--muted); transition:transform .2s ease; }
 .nx-item.abierta .nx-chevron{ transform:rotate(180deg); }
-.nx-item-detalle{ padding:0 16px 14px 72px; animation:nxEntra .25s ease both; }
+.nx-item-detalle{ padding:0 16px 14px 72px; animation:nxEntra .25s ease backwards; }
 .nx-item-pie{ display:flex; justify-content:flex-end; margin-top:6px; }
 
 /* Avisos en vivo (toasts) */
