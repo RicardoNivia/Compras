@@ -4,6 +4,9 @@
 // Este componente solo pone el encabezado (título/subtítulo/acciones) y el
 // contenido de la página — "user" se mantiene como prop aceptada por
 // compatibilidad con los llamadores existentes, pero ya no se usa acá.
+// La campana de notificaciones va siempre a la derecha; se oculta sola si la persona no tiene el permiso.
+import CampanaNotificaciones from "@/components/CampanaNotificaciones";
+
 export default function AppShell({ title, subtitle, actions, children }) {
   return (
     <>
@@ -17,12 +20,9 @@ export default function AppShell({ title, subtitle, actions, children }) {
             </>
           )}
         </div>
-        {actions && (
-          <>
-            <div className="spacer" />
-            {actions}
-          </>
-        )}
+        <div className="spacer" />
+        {actions}
+        <CampanaNotificaciones />
       </header>
       <main>{children}</main>
     </>

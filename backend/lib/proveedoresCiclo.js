@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { valoracionGeneralPorProveedor } from "@/lib/valoraciones";
+import { publicarEvento } from "@/lib/notificacionesEventos";
 import {
   logCicloEstado, logCicloDocumento, logCicloIniciado, logProveedorUpdate, logConfigProveedoresUpdate,
 } from "@/lib/audit";
@@ -287,6 +288,9 @@ export async function cambiarEstadoCiclo(nit, { estado }, actor) {
   // La fecha de última actualización es la base del cálculo del ciclo.
   if (estado === "actualizado") await prisma.proveedor.update({ where: { nit: p.nit }, data: { fechaActualizacion: data.aprobadoAt } });
   await logCicloEstado(actor, p, anio, { estado: antes.estado }, { estado }).catch(() => {});
+  if (antes.estado !== estado) {
+    publicarEvento("proveedor.ciclo_cambio", { entidadId: p.nit, clave: `proveedor.ciclo_cambio|${p.nit}|${anio}|${Date.now()}`, datos: { nit: p.nit, nombre: p.nombre, anio, de: antes.estado, a: estado }, actor });
+  }
   return { anio, ...resumenProveedor(p, anio, actualizado) };
 }
 

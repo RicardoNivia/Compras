@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { logCalificacionUpsert } from "@/lib/audit";
+import { publicarEvento, datosCompra } from "@/lib/notificacionesEventos";
 
 function badRequest(message) {
   const err = new Error(message);
@@ -91,5 +92,12 @@ export async function upsertCalificacion(recordId, body, actor) {
 
   const after = toClientCalificacion(row);
   await logCalificacionUpsert(actor, before, after).catch(() => {});
+  // Notificaciones por evento (fire-and-forget).
+  publicarEvento("compra.calificada", {
+    entidadId: recordId,
+    clave: `compra.calificada|${recordId}|${row.updatedAt.toISOString()}`,
+    datos: { ...datosCompra(record), estrellas, comentario, calificadoPor: actor?.nombre || null },
+    actor,
+  });
   return after;
 }

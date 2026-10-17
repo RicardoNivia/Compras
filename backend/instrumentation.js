@@ -14,6 +14,10 @@ export async function register() {
     const { startReportScheduler } = await import("@/lib/reportScheduler");
     startReportScheduler();
 
+    // Notificaciones configurables por prompt (app y Teams), ver lib/notificacionesScheduler.js.
+    const { startNotificacionesScheduler } = await import("@/lib/notificacionesScheduler");
+    startNotificacionesScheduler();
+
     // Valora en segundo plano las compras radicadas que aún no tienen valoración con IA (ver lib/valoracionAuto.js).
     const { startValoracionAutomatica } = await import("@/lib/valoracionAuto");
     startValoracionAutomatica();

@@ -403,7 +403,6 @@ export default function ConectarClaudeView({ initialTokens, user }) {
   const currentPage = Math.min(page, totalPages);
   const visibles = useMemo(() => filtrados.slice((currentPage - 1) * pageSize, currentPage * pageSize), [filtrados, currentPage, pageSize]);
 
-  const sinTokens = propios.length === 0;
   const tabla = (
     <section className="mcp-card flush" aria-labelledby="mcp-tok-t">
       <div className="mcp-card-head pad">
@@ -514,17 +513,9 @@ export default function ConectarClaudeView({ initialTokens, user }) {
     <div className="mcp-page">
       <Hero activos={activos} usos={usos} ultimoUso={ultimoUso} onCrear={() => setModal(true)} llenos={activos >= MAX_ACTIVOS} />
 
-      {sinTokens ? (
-        <>
-          <div className="mcp-dos"><Guia mcpUrl={mcpUrl} /><Capacidades user={user} /></div>
-          {tabla}
-        </>
-      ) : (
-        <>
-          {tabla}
-          <div className="mcp-dos"><Guia mcpUrl={mcpUrl} /><Capacidades user={user} /></div>
-        </>
-      )}
+      {/* La tabla de tokens va siempre primero; la guía y las capacidades quedan debajo. */}
+      {tabla}
+      <div className="mcp-dos"><Guia mcpUrl={mcpUrl} /><Capacidades user={user} /></div>
 
       <Seguridad />
 

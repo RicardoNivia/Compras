@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { logCreate, logUpdate, logDelete } from "@/lib/audit";
+import { publicarCambiosDeCompra, revisarUmbralPresupuesto } from "@/lib/notificacionesEventos";
 
 // Campos de Record respaldados por un Maestro genérico (area/estado/
 // categoria/medioPago/estadoLegalizacion) — a diferencia de proveedor
@@ -311,6 +312,9 @@ export async function createRecord(body, actor) {
   });
   const record = toClientRecord(row, { proveedorNombre: proveedor?.nombre, proveedorNit: proveedor?.nit, responsableNombre: maestroResponsable.valor });
   await logCreate(actor, record).catch(() => {});
+  // Notificaciones por evento (fire-and-forget: nunca bloquea ni hace fallar el guardado).
+  publicarCambiosDeCompra(null, record, actor);
+  revisarUmbralPresupuesto(record.area);
   if (feDuplicados > 0) {
     record.feWarning = `Ya existen ${feDuplicados} compra(s) registradas con el número de factura/referencia "${data.fe}".`;
   }
@@ -341,6 +345,8 @@ export async function updateRecord(id, body, actor, options = {}) {
   const row = await prisma.record.update({ where: { id }, data });
   const [after] = await hydrateConDatosActuales([row]);
   await logUpdate(actor, before ? toClientRecord(before) : null, after, "editar").catch(() => {});
+  publicarCambiosDeCompra(before ? toClientRecord(before) : null, after, actor);
+  if (before && (before.valorConIva !== after.valorConIva || before.area !== after.area || before.fechaSolicitud !== after.fechaSolicitud)) revisarUmbralPresupuesto(after.area);
   if (feDuplicados > 0) {
     after.feWarning = `Ya existen ${feDuplicados} compra(s) registradas con el número de factura/referencia "${data.fe}".`;
   }
@@ -372,6 +378,7 @@ export async function patchRecord(id, rawPartial, actor, options = {}) {
   const [after] = await hydrateConDatosActuales([row]);
   const action = Object.keys(partial).every((k) => k === "radicado") ? "radicar" : "editar";
   await logUpdate(actor, before ? toClientRecord(before) : null, after, action).catch(() => {});
+  publicarCambiosDeCompra(before ? toClientRecord(before) : null, after, actor);
   return after;
 }
 

@@ -98,6 +98,11 @@ export function canViewAlertas(role) {
   return ROLES_COMPRAS.includes(role) || role === ROLES.PROVEEDORES;
 }
 
+// Notificaciones configurables (app y Teams): cada persona arma las suyas sobre los datos que ya ve.
+export function canViewNotificaciones(role) {
+  return ROLES_COMPRAS.includes(role) || role === ROLES.PROVEEDORES;
+}
+
 export function canCreateRecord(role) {
   return role === ROLES.ADMIN || role === ROLES.REGISTRO;
 }
