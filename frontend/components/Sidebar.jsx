@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, ROLE_LABELS } from "@/lib/roles";
+import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, canViewNotificaciones, ROLE_LABELS } from "@/lib/roles";
+import { EVENTO_NO_LEIDAS } from "@/lib/notificacionesApi";
 import { IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail, IconBell, IconSearch, IconBuilding, IconEye } from "@/components/icons";
 import { fetchCompartidosApi } from "@/lib/api";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
@@ -14,7 +15,7 @@ import CommandPalette from "@/components/CommandPalette";
 // /api/auth/me), se usa eso; "show" queda como valor por defecto de respaldo.
 export const ALL_NAV_ITEMS = [
   { key: "dashboard", href: "/dashboard", label: "Dashboard de compras", Icon: IconDashboard, feature: "viewDashboard", show: canViewDashboard },
-  { key: "alertas", href: "/alertas", label: "Mi día y alertas", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas },
+  { key: "alertas", href: "/alertas", label: "Alertas y notificaciones", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas, alt: { feature: "viewNotificaciones", show: canViewNotificaciones } },
   { key: "registros", href: "/registros", label: "Registros", Icon: IconTable, feature: null, show: canViewRegistros },
   { key: "agente-ia", href: "/agente-ia", label: "Nova", Icon: IconSpark, feature: "viewAgenteIA", show: canViewAgenteIA },
   { key: "proveedores", href: "/proveedores", label: "Proveedores", Icon: IconBuilding, feature: "viewProveedores", show: canViewProveedores },
@@ -45,7 +46,17 @@ export default function Sidebar({ user }) {
   }, [pathname]);
   const router = useRouter();
 
-  const items = ALL_NAV_ITEMS.filter((item) => (item.feature ? (user.permissions?.[item.feature] ?? item.show(user.role)) : item.show(user.role)));
+  const permite = (feature, show) => (feature ? (user.permissions?.[feature] ?? show(user.role)) : show(user.role));
+  // "Alertas y notificaciones" aparece si la persona ve Mi día o puede configurar notificaciones.
+  const items = ALL_NAV_ITEMS.filter((item) => permite(item.feature, item.show) || (item.alt && permite(item.alt.feature, item.alt.show)));
+
+  // Punto rojo en "Alertas y notificaciones": solo notificaciones no leídas (la campana publica el número).
+  const [noLeidas, setNoLeidas] = useState(0);
+  useEffect(() => {
+    const alCambiar = (e) => setNoLeidas(Number(e.detail) || 0);
+    window.addEventListener(EVENTO_NO_LEIDAS, alCambiar);
+    return () => window.removeEventListener(EVENTO_NO_LEIDAS, alCambiar);
+  }, []);
 
   // Abrir la paleta de comandos con Ctrl/Cmd+K desde cualquier página — el
   // Sidebar vive en el layout persistente (app/(app)/layout.js), así que este
@@ -95,8 +106,10 @@ export default function Sidebar({ user }) {
             >
               <span className="sidebar-link-ic">
                 <Icon size={17} />
+                {key === "alertas" && noLeidas > 0 && <span className="notif-dot" aria-label={`${noLeidas} sin leer`} />}
               </span>
               <span className="label">{label}</span>
+              {key === "alertas" && noLeidas > 0 && <span className="notif-badge notif-badge-menu">{noLeidas > 99 ? "99+" : noLeidas}</span>}
             </Link>
           ))}
           {hayCompartidos && (

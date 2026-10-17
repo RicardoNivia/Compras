@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { FIELD_LABELS, TOKEN_FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS } from "@/lib/auditLabels";
+import { FIELD_LABELS, TOKEN_FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS, NOTIFICACION_FIELD_LABELS } from "@/lib/auditLabels";
 
 export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, TOKEN_FIELD_LABELS, ACTION_LABELS, ENTITY_LABELS } from "@/lib/auditLabels";
 
@@ -488,4 +488,45 @@ export async function logTokenRevoke(actor, before, after) {
 export async function logMcpConsulta(actor, tool, args) {
   const resumen = JSON.stringify(args || {}).slice(0, 300);
   await writeLog({ action: "consultar", entityType: "mcp", recordId: String(actor?.tokenId ?? "mcp"), recordInfo: `${tool} ${resumen}`, actor });
+}
+
+// ---------- Notificaciones configurables ----------
+// Los objetos vienen ya "aplanados" para auditoría (ver lib/notificaciones.js#paraAuditoria): textos legibles
+// para la programación, canales y destinatarios. Los envíos programados NO se auditan (volumen): su historial
+// está en NotificacionEjecucion/NotificacionEntrega. Sí se auditan las pruebas y los envíos manuales.
+
+const notificacionSummary = (n) => `Notificación "${n.nombre}"${n.propietarioNombre ? ` de ${n.propietarioNombre}` : ""}`;
+
+export async function logNotificacionCreate(actor, n) {
+  const changes = diffFields(null, n, NOTIFICACION_FIELD_LABELS);
+  await writeLog({ action: "crear", entityType: "notificacion", recordId: String(n.id), recordInfo: notificacionSummary(n), actor, changes });
+}
+
+export async function logNotificacionUpdate(actor, before, after) {
+  const changes = diffFields(before, after, NOTIFICACION_FIELD_LABELS);
+  if (!changes.length) return;
+  await writeLog({ action: "editar", entityType: "notificacion", recordId: String(after.id), recordInfo: notificacionSummary(after), actor, changes });
+}
+
+export async function logNotificacionDelete(actor, n) {
+  const changes = diffFields(n, null, NOTIFICACION_FIELD_LABELS);
+  await writeLog({ action: "eliminar", entityType: "notificacion", recordId: String(n.id), recordInfo: notificacionSummary(n), actor, changes });
+}
+
+// action: "pausar" | "reanudar". actor null = el sistema (pausa automática por permisos).
+export async function logNotificacionEstado(actor, n, action, before, after, motivo) {
+  const changes = [{ field: "estado", label: NOTIFICACION_FIELD_LABELS.estado, before, after }];
+  if (motivo) changes.push({ field: "motivoPausa", label: NOTIFICACION_FIELD_LABELS.motivoPausa, before: null, after: motivo });
+  await writeLog({ action, entityType: "notificacion", recordId: String(n.id), recordInfo: notificacionSummary(n), actor: actor || { nombre: "Sistema (permisos)" }, changes });
+}
+
+// action: "probar" | "enviar" (envío manual inmediato). detalle: resultado legible.
+export async function logNotificacionEnvio(actor, n, action, detalle) {
+  await writeLog({ action, entityType: "notificacion", recordId: String(n.id), recordInfo: `${notificacionSummary(n)} · ${detalle}`, actor, changes: null });
+}
+
+// action: "baja" (deja de recibir) | "alta" (vuelve a recibir).
+export async function logNotificacionSuscripcion(actor, n, action, personaNombre) {
+  const changes = [{ field: "destinatariosTexto", label: NOTIFICACION_FIELD_LABELS.destinatariosTexto, before: action === "baja" ? personaNombre : null, after: action === "alta" ? personaNombre : null }];
+  await writeLog({ action, entityType: "notificacion", recordId: String(n.id), recordInfo: `${notificacionSummary(n)} · ${personaNombre} ${action === "baja" ? "dejó de recibirla" : "vuelve a recibirla"}`, actor, changes });
 }

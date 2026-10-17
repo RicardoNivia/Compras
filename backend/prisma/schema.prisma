@@ -521,3 +521,134 @@ model TokenAcceso {
   @@index([userId])
   @@map("tokens_acceso")
 }
+
+// Notificaciones configurables por prompt (ver docs/notificaciones-diseno.md y lib/notificaciones*.js).
+// Nova convierte el pedido en esta regla; después se ejecuta sola, sin IA, con consultas deterministas.
+// La programación usa los mismos campos que ReportConfig para reutilizar lib/reportSchedule.js.
+model Notificacion {
+  id                Int       @id @default(autoincrement())
+  nombre            String
+  pedido            String    // lo que escribió la persona
+  aclaraciones      String?   // JSON: [{ pregunta, respuesta }] del diálogo con Nova
+  disparador        String    @default("programado") // "programado" | "evento"
+  evento            String?   // disparador "evento": "compra.radicada", "compra.valorada"… (catálogo EVENTOS)
+  agrupacion        String?   // disparador "evento": "inmediato" | "cada_15_min" | "resumen_diario"
+  fuente            String    // "compras" | "mi_dia" | "proveedores" | "presupuesto"
+  consulta          String    // clave del catálogo (lib/notificacionesCatalogo.js)
+  parametros        String    @default("{}") // JSON validado contra el catálogo
+  alcance           String    @default("general") // "general" | "personal"
+  condicion         String    @default("si_hay_resultados") // "siempre" | "si_hay_resultados" | "umbral"
+  umbral            Int?
+  frecuencia        String?   // mismas de lib/reportSchedule.js
+  diaSemana         Int?
+  diaMes            Int?
+  ordinal           Int?
+  fechaUnica        String?
+  hora              String?   // "HH:mm", hora de Colombia
+  siFestivo         String    @default("correr") // "correr" | "enviar" | "omitir"
+  sabadoHabil       Boolean   @default(false)
+  domingoHabil      Boolean   @default(false)
+  titulo            String
+  plantilla         String
+  canales           String    @default("[\"app\"]") // JSON: ["app","teams"]
+  estado            String    @default("activa") // "borrador" | "activa" | "pausada" | "pausada_por_permisos"
+  motivoPausa       String?
+  pausadaPorUserId  String?
+  pausadaPorNombre  String?
+  pausadaAt         DateTime?
+  propietarioUserId String    // dueño: los permisos de datos se evalúan con su rol
+  propietarioNombre String
+  ultimaEjecucionAt DateTime?
+  ultimoResultado   String?   // "enviada" | "omitida_sin_resultados" | "parcial" | "error"
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+  destinatarios     NotificacionDestinatario[]
+  ejecuciones       NotificacionEjecucion[]
+
+  @@index([estado, disparador])
+  @@index([propietarioUserId])
+  @@map("notificaciones")
+}
+
+model NotificacionDestinatario {
+  id              Int          @id @default(autoincrement())
+  notificacionId  Int
+  notificacion    Notificacion @relation(fields: [notificacionId], references: [id], onDelete: Cascade)
+  userId          String       // sin FK, igual que el resto de referencias a User
+  userNombre      String
+  deBaja          Boolean      @default(false) // "Dejar de recibir"
+  deBajaAt        DateTime?
+  createdAt       DateTime     @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@unique([notificacionId, userId])
+  @@index([userId])
+  @@map("notificacion_destinatarios")
+}
+
+// Cada vez que una notificación se evalúa (programada, recuperada o prueba). `clave` es única: evita envíos duplicados.
+model NotificacionEjecucion {
+  id              Int          @id @default(autoincrement())
+  notificacionId  Int
+  notificacion    Notificacion @relation(fields: [notificacionId], references: [id], onDelete: Cascade)
+  clave           String       @unique // "n12|2026-10-20" | "n12|prueba|<ts>"
+  origen          String       // "programado" | "recuperado" | "prueba"
+  estado          String       // "procesando" | "enviada" | "omitida_sin_resultados" | "parcial" | "error"
+  resultados      Int          @default(0)
+  contenido       String?      // JSON: { titulo, texto, items, total, enlace } tal como salió
+  error           String?
+  retrasoMin      Int?
+  createdAt       DateTime     @default(now())
+  creadoPorUserId String?      // null = programador
+  creadoPorNombre String?      // "Programador de notificaciones" o quien probó
+  entregas        NotificacionEntrega[]
+
+  @@index([notificacionId, createdAt])
+  @@map("notificacion_ejecuciones")
+}
+
+// Bandeja de salida de eventos (fase 2 de notificaciones, ver lib/notificacionesEventos.js): cada cambio relevante
+// (compra radicada, valorada, calificada, proveedor creado…) se anota aquí sin bloquear la escritura que lo originó, y
+// el procesador lo cruza con las notificaciones por evento. `clave` evita anotar dos veces el mismo hecho.
+model EventoNotificacion {
+  id              Int       @id @default(autoincrement())
+  tipo            String    // "compra.radicada", "proveedor.creado"…
+  clave           String    @unique
+  entidadId       String    // id del registro, NIT del proveedor o área
+  datos           String    // JSON con lo necesario para el mensaje y los filtros
+  procesadoAt     DateTime?
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?   // quien hizo el cambio (null = proceso automático)
+  creadoPorNombre String?
+
+  @@index([procesadoAt])
+  @@index([tipo, createdAt])
+  @@map("eventos_notificacion")
+}
+
+// Una entrega por destinatario y canal. Las de canal "app" son la bandeja de cada persona.
+model NotificacionEntrega {
+  id              Int                   @id @default(autoincrement())
+  ejecucionId     Int
+  ejecucion       NotificacionEjecucion @relation(fields: [ejecucionId], references: [id], onDelete: Cascade)
+  userId          String
+  userNombre      String
+  canal           String                // "app" | "teams"
+  estado          String                // "pendiente" | "enviada" | "error" | "omitida"
+  motivo          String?
+  contenido       String?               // JSON: lo que recibió esta persona (con alcance "personal" difiere por destinatario)
+  intentos        Int                   @default(0)
+  proximoIntento  DateTime?
+  enviadaAt       DateTime?
+  leidaAt         DateTime?             // solo canal "app"
+  createdAt       DateTime              @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@index([userId, canal, leidaAt])
+  @@index([estado, proximoIntento])
+  @@map("notificacion_entregas")
+}

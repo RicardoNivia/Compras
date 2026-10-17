@@ -196,3 +196,27 @@ export const ENTITY_LABELS = {
 // Conexión con Claude (MCP, solo admin): acciones y entidades que quedan en la auditoría.
 Object.assign(ACTION_LABELS, { revocar: "Revocó", consultar: "Consultó" });
 Object.assign(ENTITY_LABELS, { tokenAcceso: "Token de acceso a Claude", mcp: "Consulta desde Claude (MCP)" });
+
+// Notificaciones configurables (ver docs/notificaciones-diseno.md). Los destinatarios se registran como lista de nombres.
+export const NOTIFICACION_FIELD_LABELS = {
+  nombre: "Nombre",
+  pedido: "Lo que se pidió",
+  fuenteLabel: "Fuente de datos",
+  consultaLabel: "Qué consulta",
+  parametrosTexto: "Filtros",
+  alcance: "Alcance",
+  condicion: "Condición de envío",
+  umbral: "Umbral",
+  programacion: "Programación",
+  siFestivo: "Si cae en festivo",
+  titulo: "Título",
+  plantilla: "Mensaje",
+  canalesTexto: "Canales",
+  destinatariosTexto: "Destinatarios",
+  estado: "Estado",
+  motivoPausa: "Motivo de la pausa",
+  propietarioNombre: "Propietario",
+};
+
+Object.assign(ACTION_LABELS, { pausar: "Pausó", reanudar: "Reanudó", probar: "Probó", baja: "Dejó de recibir", alta: "Volvió a recibir" });
+Object.assign(ENTITY_LABELS, { notificacion: "Notificación" });

@@ -261,17 +261,8 @@ const SECCIONES = [
 
 const peorNivel = (items) => items.reduce((n, it) => (NIVEL_ORDEN[it.nivel] < NIVEL_ORDEN[n] ? it.nivel : n), "info");
 
-// Todo lo que le toca hoy a este usuario. user: { id, role, nombre }.
-export async function getPendientes(user) {
-  const rol = user.role;
-  const quiere = [];
-  for (const s of SECCIONES) {
-    if (!s.roles.includes(rol)) continue;
-    if (s.permiso && !(await isRoleAllowed(rol, s.permiso))) continue;
-    quiere.push(s);
-  }
-  const usa = (fuente) => quiere.some((s) => s.fuente === fuente);
-
+// Carga solo las fuentes que se van a usar y devuelve un constructor por sección.
+async function prepararConstructores(user, usa) {
   const records = usa("records") || usa("presupuesto") ? await listRecords() : [];
   let prov = null;
   let ctxProv = { diasParaCorte: null, diasAviso: 30, anio: null };
@@ -280,7 +271,6 @@ export async function getPendientes(user) {
     const cfg = await getConfigProveedores();
     ctxProv = { diasParaCorte: prov.diasParaCorte, diasAviso: cfg.diasAviso, anio: prov.anio };
   }
-
   const constructores = {
     atrasadas: () => atrasadas(records, user),
     porLegalizar: () => porLegalizar(records, user),
@@ -296,6 +286,29 @@ export async function getPendientes(user) {
     provPorRegistrar: () => provPorRegistrar(prov.rows),
     informesPorEnviar: () => informesPorEnviar(user),
   };
+  return { constructores, ctxProv };
+}
+
+// Ítems de UNA sección, con la misma lógica que Mi día (lo usan las notificaciones, ver lib/notificacionesConsultas.js).
+// No filtra por rol: quien llama ya validó que la persona puede ver esa fuente.
+export async function itemsDeSeccion(clave, user) {
+  const s = SECCIONES.find((x) => x.clave === clave);
+  if (!s) throw new Error(`Sección desconocida: ${clave}`);
+  const { constructores } = await prepararConstructores(user, (fuente) => fuente === s.fuente);
+  return constructores[clave]();
+}
+
+// Todo lo que le toca hoy a este usuario. user: { id, role, nombre }.
+export async function getPendientes(user) {
+  const rol = user.role;
+  const quiere = [];
+  for (const s of SECCIONES) {
+    if (!s.roles.includes(rol)) continue;
+    if (s.permiso && !(await isRoleAllowed(rol, s.permiso))) continue;
+    quiere.push(s);
+  }
+  const usa = (fuente) => quiere.some((s) => s.fuente === fuente);
+  const { constructores, ctxProv } = await prepararConstructores(user, usa);
 
   const secciones = [];
   for (const s of quiere) {

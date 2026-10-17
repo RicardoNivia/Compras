@@ -4,6 +4,7 @@ import { REVISIONES, normalizeNit, nitValido } from "@/lib/proveedoresCicloRegla
 
 export { normalizeNit, nitValido };
 import { asegurarCicloVigente, alertasPorProveedor, asegurarCicloDe } from "@/lib/proveedoresCiclo";
+import { publicarEvento } from "@/lib/notificacionesEventos";
 
 // El NIT es la llave primaria de Proveedor: todas las consultas, relaciones
 // (Record.proveedorNit, ProveedorCiclo.proveedorNit…) y validaciones van por
@@ -203,6 +204,7 @@ export async function createProveedor(body, actor) {
     });
     const proveedor = toClientProveedor(row, false);
     await logProveedorCreate(actor, proveedor).catch(() => {});
+    publicarEvento("proveedor.creado", { entidadId: nit, clave: `proveedor.creado|${nit}`, datos: { nit, nombre, area: proveedor.area || null, criticidad: proveedor.criticidad || proveedor.tipo || null }, actor });
     await asegurarCicloVigente();
     await asegurarCicloDe(row);
     return proveedor;

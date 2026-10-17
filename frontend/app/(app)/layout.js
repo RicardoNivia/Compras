@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import Sidebar from "@/components/Sidebar";
 import FloatingAgentChat from "@/components/FloatingAgentChat";
+import AvisosEnVivo from "@/components/notificaciones/AvisosEnVivo";
+import { canViewNotificaciones } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,7 @@ export default async function AppLayout({ children }) {
       <Sidebar user={user} />
       <div className="app-main">{children}</div>
       <FloatingAgentChat user={user} />
+      {(user.permissions?.viewNotificaciones ?? canViewNotificaciones(user.role)) && <AvisosEnVivo />}
     </div>
   );
 }
