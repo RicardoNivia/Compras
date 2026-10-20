@@ -138,7 +138,7 @@ function validate(body, { partial = false } = {}) {
       throw badRequest("Selecciona el día de la semana.");
     }
     if (body.frecuencia === "mensual_semana" && ![1, 2, 3, 4, -1].includes(out.ordinal)) throw badRequest("Indica si es el primer, segundo, tercer, cuarto o último día del mes.");
-    if (body.frecuencia === "unica" && !/^d{4}-d{2}-d{2}$/.test(out.fechaUnica)) throw badRequest("Indica la fecha del envío único.");
+    if (body.frecuencia === "unica" && !/^\d{4}-\d{2}-\d{2}$/.test(out.fechaUnica)) throw badRequest("Indica la fecha del envío único.");
     if (body.frecuencia === "mensual" && (Number.isNaN(out.diaMes) || out.diaMes < 1 || out.diaMes > 31)) {
       throw badRequest("Selecciona el día del mes (1 a 31).");
     }

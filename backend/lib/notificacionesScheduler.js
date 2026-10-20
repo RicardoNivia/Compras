@@ -59,6 +59,9 @@ export function startNotificacionesScheduler() {
   if (!process.env.TZ && process.env.NODE_ENV === "production") {
     console.warn("[notificaciones] TZ no está definida: las horas programadas usan la zona del servidor. Define TZ=America/Bogota.");
   }
+  if (!process.env.APP_URL && process.env.NODE_ENV === "production") {
+    console.warn("[notificaciones] APP_URL no está definida: los botones de las tarjetas de Teams apuntarán a http://localhost:3000. Define APP_URL con la dirección del panel en el backend.");
+  }
   setInterval(() => {
     ejecutarPendientes().catch(() => {});
     // Fase 2: eventos. Las valoraciones se detectan por barrido (las guarda la app, el proceso automático o un script).
