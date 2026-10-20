@@ -4,7 +4,7 @@ import { REVISIONES, normalizeNit, nitValido } from "@/lib/proveedoresCicloRegla
 
 export { normalizeNit, nitValido };
 import { asegurarCicloVigente, alertasPorProveedor, asegurarCicloDe } from "@/lib/proveedoresCiclo";
-import { publicarEvento } from "@/lib/notificacionesEventos";
+import { publicarEvento, publicarCambiosDeProveedor } from "@/lib/notificacionesEventos";
 
 // El NIT es la llave primaria de Proveedor: todas las consultas, relaciones
 // (Record.proveedorNit, ProveedorCiclo.proveedorNit…) y validaciones van por
@@ -267,6 +267,7 @@ export async function updateProveedor(nit, body, actor) {
     if (current.esExcepcion && !row.esExcepcion) await asegurarCicloDe(row);
     const after = toClientProveedor(row, await isProveedorInUse(row.nit));
     await logProveedorUpdate(actor, toClientProveedor(current, enUsoAntes), after).catch(() => {});
+    publicarCambiosDeProveedor(toClientProveedor(current, enUsoAntes), after, actor);
     return after;
   } catch (err) {
     if (err.code === "P2002") throw badRequest(`Ya existe un proveedor con el NIT ${nitNuevo}.`);
@@ -313,4 +314,6 @@ export async function deleteProveedor(nit, actor) {
     ...toClientProveedor(datos, false),
     datosBorrados: `${_count.ciclos} ciclo(s) con su checklist y ${_count.procesos} proceso(s) histórico(s)`,
   }).catch(() => {});
+  const borrado = toClientProveedor(datos, false);
+  publicarEvento("proveedor.eliminado", { entidadId: borrado.nit, clave: `proveedor.eliminado|${borrado.nit}|${Date.now()}`, datos: { nit: borrado.nit, nombre: borrado.nombre, area: borrado.area || null, criticidad: borrado.criticidad || null, eliminadoPor: actor?.nombre || null }, actor });
 }

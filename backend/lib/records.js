@@ -314,7 +314,7 @@ export async function createRecord(body, actor) {
   await logCreate(actor, record).catch(() => {});
   // Notificaciones por evento (fire-and-forget: nunca bloquea ni hace fallar el guardado).
   publicarCambiosDeCompra(null, record, actor);
-  revisarUmbralPresupuesto(record.area);
+  revisarUmbralPresupuesto(record.area, record.categoria);
   if (feDuplicados > 0) {
     record.feWarning = `Ya existen ${feDuplicados} compra(s) registradas con el número de factura/referencia "${data.fe}".`;
   }
@@ -346,7 +346,7 @@ export async function updateRecord(id, body, actor, options = {}) {
   const [after] = await hydrateConDatosActuales([row]);
   await logUpdate(actor, before ? toClientRecord(before) : null, after, "editar").catch(() => {});
   publicarCambiosDeCompra(before ? toClientRecord(before) : null, after, actor);
-  if (before && (before.valorConIva !== after.valorConIva || before.area !== after.area || before.fechaSolicitud !== after.fechaSolicitud)) revisarUmbralPresupuesto(after.area);
+  if (before && (before.valorConIva !== after.valorConIva || before.areaId !== after.areaId || before.categoriaId !== after.categoriaId || before.fechaSolicitud !== after.fechaSolicitud)) revisarUmbralPresupuesto(after.area, after.categoria);
   if (feDuplicados > 0) {
     after.feWarning = `Ya existen ${feDuplicados} compra(s) registradas con el número de factura/referencia "${data.fe}".`;
   }
