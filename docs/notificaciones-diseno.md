@@ -192,6 +192,7 @@ Se publican desde `lib/records.js`, `lib/valoraciones.js` y `lib/proveedoresCicl
 | `compra.valorada` | Se crea o se regenera su `ValoracionCompra` | #, puntaje de la compra y del proveedor, resumen |
 | `compra.entregada` | Se llena `fechaEntrega` | #, días hábiles que tomó, si fue fuera de plazo |
 | `compra.anulada` | `estado` pasa a "Anulado" | #, quién la anuló |
+| `compra.eliminada` | `deleteRecord` (solo admin) | Datos de la compra tal como estaban, quién la eliminó (sin enlace: el registro ya no existe) |
 | `proveedor.creado` | Alta en el catálogo | NIT, nombre, criticidad |
 | `proveedor.ciclo_cambio` | Cambia el estado del ciclo | NIT, de → a |
 | `presupuesto.umbral` | Un área cruza el 80 % o el 100 % | Área, ejecutado, presupuesto, % |

@@ -139,6 +139,8 @@ export function itemDeEvento(ev) {
       return { ref, titulo: d.descripcion || "(sin descripción)", contexto: [d.proveedor, d.area].filter(Boolean).join(" · "), detalle: d.diasHabiles != null ? `${d.diasHabiles} días hábiles${d.fueraDePlazo ? " · fuera del plazo de 8" : " · a tiempo"}` : "", dato: d.valorConIva != null ? fmtCOP(d.valorConIva) : null, href };
     case "compra.rechazada":
       return { ref, titulo: d.descripcion || "(sin descripción)", contexto: [d.proveedor, d.area].filter(Boolean).join(" · "), detalle: d.observaciones ? `Rechazada · ${d.observaciones}` : "Rechazada", dato: d.valorConIva != null ? fmtCOP(d.valorConIva) : null, href };
+    case "compra.eliminada":
+      return { ref, titulo: d.descripcion || "(sin descripción)", contexto: [d.proveedor, d.area].filter(Boolean).join(" · "), detalle: `Eliminada${d.eliminadaPor ? ` por ${d.eliminadaPor}` : ""}${d.estado ? ` · estaba ${d.estado}` : ""}`, dato: d.valorConIva != null ? fmtCOP(d.valorConIva) : null, href: null };
     case "proveedor.creado":
       return { ref: d.nit, titulo: d.nombre, contexto: [d.area, d.criticidad].filter(Boolean).join(" · "), detalle: "Nuevo en el catálogo", dato: null, href: `/proveedores?q=${encodeURIComponent(d.nit || "")}` };
     case "proveedor.ciclo_cambio":
