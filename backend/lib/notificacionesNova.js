@@ -224,6 +224,7 @@ function plantillaEvento(evento, agrupacion) {
     "compra.creada": ["Nueva compra {numero}", "{descripcion} · {area} · {valor}."],
     "compra.entregada": ["Compra entregada: {numero}", "{descripcion} · {detalle}."],
     "compra.anulada": ["Compra anulada: {numero}", "{descripcion} · {proveedor}."],
+    "compra.eliminada": ["Compra eliminada: {numero}", "{descripcion} · {proveedor} · {valor} · {detalle}."],
     "proveedor.creado": ["Nuevo proveedor: {proveedor}", "Se creó {proveedor} en el catálogo."],
     "proveedor.ciclo_cambio": ["Ciclo de proveedor: {proveedor}", "{proveedor}: {detalle}."],
     "presupuesto.umbral": ["Presupuesto de {area}", "{area}: {detalle}."],

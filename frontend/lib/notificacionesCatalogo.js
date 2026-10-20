@@ -127,6 +127,7 @@ export const EVENTOS = {
   "compra.calificada": { fuente: "compras", label: "Se califica al proveedor de una compra", accion: "se califica al proveedor de una compra", filtros: ["area", "estrellasMax"] },
   "compra.entregada": { fuente: "compras", label: "Se entrega una compra", accion: "se entrega una compra", filtros: ["area", "soloFueraDePlazo"] },
   "compra.anulada": { fuente: "compras", label: "Se anula una compra", accion: "se anula una compra", filtros: ["area"] },
+  "compra.eliminada": { fuente: "compras", label: "Se elimina una compra", accion: "se elimina una compra", filtros: ["area"] },
   "proveedor.creado": { fuente: "proveedores", label: "Se crea un proveedor", accion: "se crea un proveedor", filtros: [] },
   "proveedor.ciclo_cambio": { fuente: "proveedores", label: "Cambia el estado del ciclo de un proveedor", accion: "cambia el estado del ciclo de un proveedor", filtros: ["estadoCiclo"] },
   "presupuesto.umbral": { fuente: "presupuesto", label: "Un área supera el 80 % o el 100 % de su presupuesto", accion: "un área supera el 80 % o el 100 % de su presupuesto", filtros: ["area"] },

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { logCreate, logUpdate, logDelete } from "@/lib/audit";
-import { publicarCambiosDeCompra, revisarUmbralPresupuesto } from "@/lib/notificacionesEventos";
+import { publicarCambiosDeCompra, revisarUmbralPresupuesto, publicarEvento, datosCompra } from "@/lib/notificacionesEventos";
 
 // Campos de Record respaldados por un Maestro genérico (area/estado/
 // categoria/medioPago/estadoLegalizacion) — a diferencia de proveedor
@@ -385,5 +385,10 @@ export async function patchRecord(id, rawPartial, actor, options = {}) {
 export async function deleteRecord(id, actor) {
   const before = await prisma.record.findUnique({ where: { id } });
   await prisma.record.delete({ where: { id } });
-  if (before) await logDelete(actor, toClientRecord(before)).catch(() => {});
+  if (before) {
+    const r = toClientRecord(before);
+    await logDelete(actor, r).catch(() => {});
+    // Notificaciones por evento: la compra ya no existe, así que el evento lleva sus datos tal como estaban.
+    publicarEvento("compra.eliminada", { entidadId: id, clave: `compra.eliminada|${id}`, datos: { ...datosCompra(r), eliminadaPor: actor?.nombre || null }, actor });
+  }
 }
