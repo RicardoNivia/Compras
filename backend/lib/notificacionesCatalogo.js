@@ -119,18 +119,22 @@ export const CONSULTAS = {
 // ---------- Fase 2: notificaciones por evento ----------
 // Salen cuando el hecho ocurre (sin hora), salvo que se agrupen en un resumen diario. `filtros`: qué se puede filtrar.
 export const EVENTOS = {
-  "compra.creada": { fuente: "compras", label: "Se registra una compra", accion: "se registra una compra", filtros: ["area"] },
-  "compra.legalizada": { fuente: "compras", label: "Se legaliza una compra", accion: "se legaliza una compra", filtros: ["area"] },
-  "compra.rechazada": { fuente: "compras", label: "Se rechaza una legalización", accion: "se rechaza una legalización", filtros: ["area"] },
-  "compra.radicada": { fuente: "compras", label: "Se radica una compra", accion: "se radica una compra", filtros: ["area"] },
-  "compra.valorada": { fuente: "compras", label: "Nova valora una compra radicada", accion: "Nova valora una compra", filtros: ["area", "puntajeMax"] },
-  "compra.calificada": { fuente: "compras", label: "Se califica al proveedor de una compra", accion: "se califica al proveedor de una compra", filtros: ["area", "estrellasMax"] },
-  "compra.entregada": { fuente: "compras", label: "Se entrega una compra", accion: "se entrega una compra", filtros: ["area", "soloFueraDePlazo"] },
-  "compra.anulada": { fuente: "compras", label: "Se anula una compra", accion: "se anula una compra", filtros: ["area"] },
-  "compra.eliminada": { fuente: "compras", label: "Se elimina una compra", accion: "se elimina una compra", filtros: ["area"] },
+  "compra.creada": { fuente: "compras", label: "Se registra una compra", accion: "se registra una compra", filtros: ["area", "proveedor"] },
+  "compra.legalizada": { fuente: "compras", label: "Se legaliza una compra", accion: "se legaliza una compra", filtros: ["area", "proveedor"] },
+  "compra.rechazada": { fuente: "compras", label: "Se rechaza una legalización", accion: "se rechaza una legalización", filtros: ["area", "proveedor"] },
+  "compra.radicada": { fuente: "compras", label: "Se radica una compra", accion: "se radica una compra", filtros: ["area", "proveedor"] },
+  "compra.valorada": { fuente: "compras", label: "Nova valora una compra radicada", accion: "Nova valora una compra", filtros: ["area", "puntajeMax", "proveedor"] },
+  "compra.calificada": { fuente: "compras", label: "Se califica al proveedor de una compra", accion: "se califica al proveedor de una compra", filtros: ["area", "estrellasMax", "proveedor"] },
+  "compra.entregada": { fuente: "compras", label: "Se entrega una compra", accion: "se entrega una compra", filtros: ["area", "soloFueraDePlazo", "proveedor"] },
+  "compra.anulada": { fuente: "compras", label: "Se anula una compra", accion: "se anula una compra", filtros: ["area", "proveedor"] },
+  "compra.eliminada": { fuente: "compras", label: "Se elimina una compra", accion: "se elimina una compra", filtros: ["area", "proveedor"] },
+  "compra.actualizada": { fuente: "compras", label: "Se actualiza cualquier campo de una compra", accion: "se actualiza una compra", filtros: ["area", "proveedor"] },
   "proveedor.creado": { fuente: "proveedores", label: "Se crea un proveedor", accion: "se crea un proveedor", filtros: [] },
-  "proveedor.ciclo_cambio": { fuente: "proveedores", label: "Cambia el estado del ciclo de un proveedor", accion: "cambia el estado del ciclo de un proveedor", filtros: ["estadoCiclo"] },
-  "presupuesto.umbral": { fuente: "presupuesto", label: "Un área supera el 80 % o el 100 % de su presupuesto", accion: "un área supera el 80 % o el 100 % de su presupuesto", filtros: ["area"] },
+  "proveedor.actualizado": { fuente: "proveedores", label: "Se actualiza cualquier dato de un proveedor", accion: "se actualiza un proveedor", filtros: ["proveedor"] },
+  "proveedor.eliminado": { fuente: "proveedores", label: "Se elimina un proveedor", accion: "se elimina un proveedor", filtros: ["proveedor"] },
+  "proveedor.ciclo_cambio": { fuente: "proveedores", label: "Cambia el estado del ciclo de un proveedor", accion: "cambia el estado del ciclo de un proveedor", filtros: ["estadoCiclo", "proveedor"] },
+  "presupuesto.actualizado": { fuente: "presupuesto", label: "Se configura, modifica o elimina un presupuesto", accion: "se configura o modifica un presupuesto", filtros: ["area"] },
+  "presupuesto.umbral": { fuente: "presupuesto", label: "Se supera el 80 % o el 100 % del presupuesto (general, por área o por categoría)", accion: "se supera el 80 % o el 100 % de un presupuesto", filtros: ["nivel", "area", "soloExcedido"] },
 };
 
 export const AGRUPACIONES = {
@@ -138,6 +142,9 @@ export const AGRUPACIONES = {
   cada_15_min: "Agrupadas cada 15 minutos",
   resumen_diario: "En un resumen diario",
 };
+
+// Nivel del presupuesto que se supera ("categoria" solo existe si el año está configurado por categoría).
+export const NIVELES_PRESUPUESTO = { general: "Presupuesto general (todas las áreas)", area: "Presupuesto de un área", categoria: "Presupuesto de una categoría de un área" };
 
 export const ESTADOS_CICLO = { desactualizado: "Desactualizado", en_proceso: "En proceso", en_aprobacion: "En aprobación", actualizado: "Actualizado" };
 

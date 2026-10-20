@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { valoracionGeneralPorProveedor } from "@/lib/valoraciones";
-import { publicarEvento } from "@/lib/notificacionesEventos";
+import { publicarEvento, publicarCambiosDeProveedor } from "@/lib/notificacionesEventos";
 import {
   logCicloEstado, logCicloDocumento, logCicloIniciado, logProveedorUpdate, logConfigProveedoresUpdate,
 } from "@/lib/audit";
@@ -350,6 +350,7 @@ export async function cambiarClasificacion(nit, { accion, motivoExcepcionId, jus
   if (accion === "quitar-excepcion" || accion === "reactivar") await getOrCreateCiclo(row, anio);
 
   await logProveedorUpdate(actor, before, toClienteProveedor(row)).catch(() => {});
+  publicarCambiosDeProveedor(before, toClienteProveedor(row), actor);
   return getProveedorDetalle(nit);
 }
 

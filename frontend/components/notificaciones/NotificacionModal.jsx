@@ -7,7 +7,7 @@ import {
 } from "@/lib/notificacionesApi";
 import {
   LIMITES, FUENTES, CONSULTAS, PERIODOS, CAMPOS_FECHA, PRESETS_COMPRAS, PRESETS_PROVEEDORES, CONDICIONES, SI_FESTIVO, VARIABLES,
-  EVENTOS, AGRUPACIONES, ESTADOS_CICLO, VARIABLES_EVENTO,
+  EVENTOS, AGRUPACIONES, ESTADOS_CICLO, VARIABLES_EVENTO, NIVELES_PRESUPUESTO,
 } from "@/lib/notificacionesCatalogo";
 import { IconSpark, IconAlert, IconArrowRight, IconEdit } from "@/components/icons";
 import { canViewRegistros, canViewAlertas, canViewProveedores, canViewPresupuesto, ROLE_LABELS } from "@/lib/roles";
@@ -431,6 +431,24 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
                       )}
                       {def?.parametros.includes("area") && (
                         <div className="field"><label htmlFor="n-ev-area">Área (opcional)</label><input id="n-ev-area" value={regla.parametros?.area || ""} maxLength={100} onChange={(e) => setP("area", e.target.value)} placeholder="Todas" /></div>
+                      )}
+                      {def?.parametros.includes("proveedor") && (
+                        <div className="field"><label htmlFor="n-ev-prov">Solo de un proveedor (NIT o nombre, opcional)</label><input id="n-ev-prov" value={regla.parametros?.proveedor || ""} maxLength={100} onChange={(e) => setP("proveedor", e.target.value)} placeholder="Todos" /></div>
+                      )}
+                      {def?.parametros.includes("nivel") && (
+                        <div className="field">
+                          <label htmlFor="n-ev-nivel">Qué presupuesto</label>
+                          <select id="n-ev-nivel" value={regla.parametros?.nivel || ""} onChange={(e) => setP("nivel", e.target.value)}>
+                            <option value="">Cualquiera (general, área o categoría)</option>
+                            {Object.entries(NIVELES_PRESUPUESTO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                          </select>
+                        </div>
+                      )}
+                      {def?.parametros.includes("soloExcedido") && (
+                        <div className="field">
+                          <label>Cuándo</label>
+                          <label className="check-row"><input type="checkbox" checked={!!regla.parametros?.soloExcedido} onChange={(e) => setP("soloExcedido", e.target.checked || "")} /> <span>Solo cuando se excede (100 %), no al 80 %</span></label>
+                        </div>
                       )}
                       {def?.parametros.includes("puntajeMax") && (
                         <div className="field">

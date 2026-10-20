@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { FRECUENCIAS, esFechaDeEnvio, esHabil, describirProgramacion, formatoHora, ymd } from "@/lib/reportSchedule";
 import {
   LIMITES, FUENTES, CONSULTAS, PERIODOS, CAMPOS_FECHA, PRESETS_COMPRAS, PRESETS_PROVEEDORES,
-  CONDICIONES, SI_FESTIVO, CANALES, ESTADOS, EVENTOS, AGRUPACIONES, ESTADOS_CICLO, preguntasFaltantes,
+  CONDICIONES, SI_FESTIVO, CANALES, ESTADOS, EVENTOS, AGRUPACIONES, ESTADOS_CICLO, NIVELES_PRESUPUESTO, preguntasFaltantes,
 } from "@/lib/notificacionesCatalogo";
 import { puedeVerFuente, puedeUsarNotificaciones, puedeGestionar, mensajeSinPermiso } from "@/lib/notificacionesPermisos";
 import {
@@ -120,6 +120,11 @@ function validarFiltrosEvento(ev, p = {}) {
       if (!(n >= 1 && n <= 5)) throw err(400, "El puntaje debe estar entre 1 y 5.");
       out[k] = n;
     } else if (k === "soloFueraDePlazo") {
+      if (v === true || v === "true") out[k] = true;
+    } else if (k === "nivel") {
+      if (!NIVELES_PRESUPUESTO[v]) throw err(400, "Nivel de presupuesto no válido.");
+      out[k] = v;
+    } else if (k === "soloExcedido") {
       if (v === true || v === "true") out[k] = true;
     } else if (k === "estadoCiclo") {
       if (!ESTADOS_CICLO[v]) throw err(400, "Estado del ciclo no válido.");

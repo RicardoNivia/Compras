@@ -192,6 +192,10 @@ Se publican desde `lib/records.js`, `lib/valoraciones.js` y `lib/proveedoresCicl
 | `compra.valorada` | Se crea o se regenera su `ValoracionCompra` | #, puntaje de la compra y del proveedor, resumen |
 | `compra.entregada` | Se llena `fechaEntrega` | #, días hábiles que tomó, si fue fuera de plazo |
 | `compra.anulada` | `estado` pasa a "Anulado" | #, quién la anuló |
+| `compra.actualizada` | Cualquier campo cambia (`updateRecord`/`patchRecord`) | Lista de cambios campo: antes → después (etiquetas de la auditoría; los de catálogo solo si cambió el valor elegido), quién |
+| `proveedor.actualizado` | Cualquier dato del proveedor cambia (formulario o clasificación) | Lista de cambios campo: antes → después, quién |
+| `proveedor.eliminado` | `deleteProveedor` | NIT, nombre, área, criticidad, quién lo eliminó (sin enlace) |
+| `presupuesto.actualizado` | Se crea, modifica o elimina un presupuesto, o cambia el modo del año | Área, año, cambios (total y categorías: antes → después), quién |
 | `compra.eliminada` | `deleteRecord` (solo admin) | Datos de la compra tal como estaban, quién la eliminó (sin enlace: el registro ya no existe) |
 | `proveedor.creado` | Alta en el catálogo | NIT, nombre, criticidad |
 | `proveedor.ciclo_cambio` | Cambia el estado del ciclo | NIT, de → a |

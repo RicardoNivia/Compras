@@ -46,6 +46,9 @@ const SCHEMA = {
         estrellasMax: { type: "NUMBER", nullable: true },
         soloFueraDePlazo: { type: "BOOLEAN", nullable: true },
         estadoCiclo: { type: "STRING", nullable: true },
+        nivel: { type: "STRING", nullable: true },
+        proveedor: { type: "STRING", nullable: true },
+        soloExcedido: { type: "BOOLEAN", nullable: true },
       },
     },
     alcance: { type: "STRING", nullable: true },
@@ -103,7 +106,7 @@ A) "programado": a una hora/fecha, con una consulta. CONSULTAS DISPONIBLES para 
 ${catalogoTexto(permitidas) || "(ninguna)"}
 B) "evento": sale EN EL MOMENTO en que pasa algo ("cuando…", "apenas…", "cada vez que…"). EVENTOS DISPONIBLES (clave exacta en "evento"):
 ${eventosTexto(permitidas) || "(ninguno)"}
-   agrupacion: ${Object.entries(AGRUPACIONES).map(([k, v]) => `${k} = ${v}`).join("; ")}. Con evento NO hay hora ni festivo (no los preguntes), salvo con resumen_diario, que sí lleva "hora". Filtros: area (texto), puntajeMax 1-5 (valoración), estrellasMax 1-5 (calificación), soloFueraDePlazo (entregas), estadoCiclo (${Object.keys(ESTADOS_CICLO).join(", ")}). Variables del mensaje de un evento: ${VARIABLES_EVENTO.map((v) => `{${v}}`).join(" ")}.
+   agrupacion: ${Object.entries(AGRUPACIONES).map(([k, v]) => `${k} = ${v}`).join("; ")}. Con evento NO hay hora ni festivo (no los preguntes), salvo con resumen_diario, que sí lleva "hora". Filtros: area (texto), puntajeMax 1-5 (valoración), estrellasMax 1-5 (calificación), soloFueraDePlazo (entregas), estadoCiclo (${Object.keys(ESTADOS_CICLO).join(", ")}), nivel de presupuesto (general | area | categoria; "por ítem" = categoria), soloExcedido (true = solo al pasar el 100 %), proveedor (NIT o nombre de UN proveedor concreto, para eventos de compras o de proveedores: "cuando actualicen a AVIANCA", "compras radicadas de Cafam"). Variables del mensaje de un evento: ${VARIABLES_EVENTO.map((v) => `{${v}}`).join(" ")}.
 
 Valores válidos:
 - periodo: ${Object.keys(PERIODOS).join(", ")} (con ultimos_n_dias usa "dias").
@@ -225,9 +228,13 @@ function plantillaEvento(evento, agrupacion) {
     "compra.entregada": ["Compra entregada: {numero}", "{descripcion} · {detalle}."],
     "compra.anulada": ["Compra anulada: {numero}", "{descripcion} · {proveedor}."],
     "compra.eliminada": ["Compra eliminada: {numero}", "{descripcion} · {proveedor} · {valor} · {detalle}."],
+    "compra.actualizada": ["Compra actualizada: {numero}", "{descripcion}: {detalle}."],
+    "proveedor.actualizado": ["Proveedor actualizado: {proveedor}", "{proveedor}: {detalle}."],
+    "proveedor.eliminado": ["Proveedor eliminado: {proveedor}", "{proveedor} · {detalle}."],
     "proveedor.creado": ["Nuevo proveedor: {proveedor}", "Se creó {proveedor} en el catálogo."],
     "proveedor.ciclo_cambio": ["Ciclo de proveedor: {proveedor}", "{proveedor}: {detalle}."],
-    "presupuesto.umbral": ["Presupuesto de {area}", "{area}: {detalle}."],
+    "presupuesto.umbral": ["Alerta de presupuesto: {descripcion}", "{descripcion}: {detalle}."],
+    "presupuesto.actualizado": ["Cambio en el presupuesto: {descripcion}", "{descripcion}: {detalle}."],
   }[evento] || ["{evento}", "{evento}: {total}."];
   return lote ? { titulo: "{evento}: {total}", plantilla: "En este período: {total}. El detalle va abajo." } : { titulo: base[0], plantilla: base[1] };
 }
