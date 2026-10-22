@@ -36,6 +36,11 @@ export function fmtFecha(d) {
   return d ? new Date(d).toLocaleDateString("es-CO") : "—";
 }
 
+// Día (aaaa-mm-dd) en hora de Colombia, para inputs de tipo fecha.
+export function diaISO(d = new Date()) {
+  return d ? new Date(d).toLocaleDateString("en-CA", { timeZone: "America/Bogota" }) : "";
+}
+
 // Normalización del NIT (llave primaria) — copia de backend/lib/proveedores.js#normalizeNit.
 //   · "PENDIENTE-…" se conserva · NIT colombiano con DV ("900.123.456-7") → sin el DV
 //   · resto (incluye NIT extranjeros alfanuméricos) → mayúsculas, solo letras y dígitos.

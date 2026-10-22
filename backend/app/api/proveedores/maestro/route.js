@@ -15,6 +15,8 @@ import { listMaestroProveedores } from "@/lib/proveedoresCiclo";
  *       - { name: checklist, in: query, schema: { type: string }, description: "completo | incompleto" }
  *       - { name: criticidad, in: query, schema: { type: string } }
  *       - { name: areaId, in: query, schema: { type: string } }
+ *       - { name: registradoDesde, in: query, schema: { type: string }, description: "Fecha de registro desde (aaaa-mm-dd), incluida" }
+ *       - { name: registradoHasta, in: query, schema: { type: string }, description: "Fecha de registro hasta (aaaa-mm-dd), incluida" }
  *     responses:
  *       200: { description: Filas filtradas, conteos por clasificación y estado, y año del ciclo }
  */
@@ -34,6 +36,8 @@ export async function GET(request) {
       clasificacionMontoId: sp.get("clasificacionMontoId") || "",
       tipoServicioId: sp.get("tipoServicioId") || "",
       excepcion: sp.get("excepcion") || "",
+      registradoDesde: sp.get("registradoDesde") || "",
+      registradoHasta: sp.get("registradoHasta") || "",
     });
     return NextResponse.json(data);
   } catch (err) {

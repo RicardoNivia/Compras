@@ -226,6 +226,10 @@ export async function listMaestroProveedores(filtros = {}) {
   const tipoServicioId = filtros.tipoServicioId || "";
   const areaId = filtros.areaId || "";
   const excepcion = filtros.excepcion || "";
+  // Fecha de registro (aaaa-mm-dd, día de Colombia) desde / hasta, ambas incluidas.
+  const dia = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || "")) ? v : "");
+  const registradoDesde = dia(filtros.registradoDesde);
+  const registradoHasta = dia(filtros.registradoHasta);
 
   const filtrados = todos.filter((r) => {
     if (clasif.length && !clasif.includes(r.clasificacion)) return false;
@@ -239,6 +243,14 @@ export async function listMaestroProveedores(filtros = {}) {
     if (areaId && r.areaId !== areaId) return false;
     if (excepcion === "si" && !r.esExcepcion) return false;
     if (excepcion === "no" && r.esExcepcion) return false;
+    if (registradoDesde || registradoHasta) {
+      // Los "Por registrar" (NIT provisional) nunca se registraron: su createdAt es la fecha de la
+      // migración histórica, no un registro real, así que no entran en un filtro por fecha de registro.
+      if (r.clasificacion === "por_registrar") return false;
+      const diaRegistro = fechaDia(r.createdAt) || "";
+      if (registradoDesde && diaRegistro < registradoDesde) return false;
+      if (registradoHasta && diaRegistro > registradoHasta) return false;
+    }
     if (q && !`${r.nombre} ${r.nit}`.toLowerCase().includes(q)) return false;
     return true;
   });
@@ -252,7 +264,8 @@ export async function listMaestroProveedores(filtros = {}) {
     if (r.ciclo && conteos.estado[r.ciclo.estado] !== undefined) conteos.estado[r.ciclo.estado]++;
   }
 
-  return { anio, diasParaCorte: diasParaCorte(new Date(), await getConfigProveedores()), total: todos.length, conteos, rows: filtrados };
+  const cfg = await getConfigProveedores();
+  return { anio, diasParaCorte: diasParaCorte(new Date(), cfg), inicioCiclo: inicioCiclo(anio, cfg), total: todos.length, conteos, rows: filtrados };
 }
 
 // ---------- Cambios sobre el ciclo ----------
@@ -265,7 +278,23 @@ async function cicloVigenteDe(nit, anio) {
   return { p, ciclo: await prisma.proveedorCiclo.findUnique({ where: { id: ciclo.id }, include: { documentos: true } }) };
 }
 
-export async function cambiarEstadoCiclo(nit, { estado }, actor) {
+const fechaDia = (d) => (d ? new Date(new Date(d).getTime() - 5 * 3600 * 1000).toISOString().slice(0, 10) : null);
+
+// Fecha de actualización que se informa al aprobar (aaaa-mm-dd, día de Colombia). Debe caer dentro
+// del ciclo vigente (si no, el proveedor no contaría como actualizado) y no puede ser futura.
+async function fechaActualizacionDe(valor, anio) {
+  const m = String(valor || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) throw badRequest("Indica la fecha de actualización del proveedor.");
+  // Mediodía en Colombia, para no caer en el borde de un corte de ciclo.
+  const fecha = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 17));
+  if (fecha.getUTCDate() !== Number(m[3])) throw badRequest("La fecha de actualización no es válida.");
+  if (valor > fechaDia(new Date())) throw badRequest("La fecha de actualización no puede ser futura.");
+  const inicio = inicioCiclo(anio, await getConfigProveedores());
+  if (fecha < inicio) throw badRequest(`La fecha de actualización debe ser del ciclo ${anio} (desde el ${inicio.toLocaleDateString("es-CO", { timeZone: "America/Bogota" })}).`);
+  return fecha;
+}
+
+export async function cambiarEstadoCiclo(nit, { estado, fechaActualizacion }, actor) {
   const anio = await asegurarCicloVigente();
   const { p, ciclo } = await cicloVigenteDe(nit, anio);
   const checklist = checklistDe(p, documentosDe(ciclo));
@@ -277,7 +306,7 @@ export async function cambiarEstadoCiclo(nit, { estado }, actor) {
   if (estado === "actualizado") {
     data.aprobadoPorUserId = actor?.id || null;
     data.aprobadoPorNombre = actor?.nombre || null;
-    data.aprobadoAt = new Date();
+    data.aprobadoAt = await fechaActualizacionDe(fechaActualizacion, anio);
   } else {
     // Al salir de "actualizado" ya no hay aprobación vigente.
     data.aprobadoPorUserId = null;
@@ -287,11 +316,15 @@ export async function cambiarEstadoCiclo(nit, { estado }, actor) {
   const actualizado = await prisma.proveedorCiclo.update({ where: { id: ciclo.id }, data, include: { documentos: true } });
   // La fecha de última actualización es la base del cálculo del ciclo.
   if (estado === "actualizado") await prisma.proveedor.update({ where: { nit: p.nit }, data: { fechaActualizacion: data.aprobadoAt } });
-  await logCicloEstado(actor, p, anio, { estado: antes.estado }, { estado }).catch(() => {});
+  const fechaAntes = fechaDia(p.fechaActualizacion);
+  await logCicloEstado(actor, p, anio,
+    { estado: antes.estado, fechaActualizacion: fechaAntes },
+    { estado, fechaActualizacion: estado === "actualizado" ? fechaDia(data.aprobadoAt) : fechaAntes }).catch(() => {});
   if (antes.estado !== estado) {
     publicarEvento("proveedor.ciclo_cambio", { entidadId: p.nit, clave: `proveedor.ciclo_cambio|${p.nit}|${anio}|${Date.now()}`, datos: { nit: p.nit, nombre: p.nombre, anio, de: antes.estado, a: estado }, actor });
   }
-  return { anio, ...resumenProveedor(p, anio, actualizado) };
+  const fechaFinal = estado === "actualizado" ? data.aprobadoAt : p.fechaActualizacion;
+  return { anio, ...resumenProveedor({ ...p, fechaActualizacion: fechaFinal }, anio, actualizado) };
 }
 
 export async function setDocumentoCiclo(nit, { clave, cumple }, actor) {
@@ -428,7 +461,7 @@ export async function indicadoresCiclo() {
         criticos++;
         if (ciclo.estado !== "actualizado") {
           criticosPendientes++;
-          atencion.push({ id: p.nit, nombre: p.nombre, nit: p.nit, area: p.area, estado: ciclo.estado, estadoLabel: ESTADO_CICLO_LABELS[ciclo.estado] });
+          atencion.push({ id: p.nit, nombre: p.nombre, nit: p.nit, area: p.area, estado: ciclo.estado, estadoLabel: ESTADO_CICLO_LABELS[ciclo.estado], fechaActualizacion: p.fechaActualizacion });
         }
       }
     }
@@ -553,13 +586,13 @@ export async function setChecklistMasivo(ids, cumple, actor) {
 
 // Cambia el estado del ciclo de varios proveedores. "actualizado" solo aplica a los que ya
 // tienen el checklist completo; el resto se reporta en "omitidos" con su motivo.
-export async function cambiarEstadoMasivo(ids, estado, actor) {
+export async function cambiarEstadoMasivo(ids, estado, actor, fechaActualizacion) {
   const lista = idsDe(ids);
   let actualizados = 0;
   const omitidos = [];
   for (const id of lista) {
     try {
-      await cambiarEstadoCiclo(id, { estado }, actor);
+      await cambiarEstadoCiclo(id, { estado, fechaActualizacion }, actor);
       actualizados++;
     } catch (err) {
       omitidos.push({ id, motivo: err.message });

@@ -3109,3 +3109,14 @@ table.audit-log.mcp-tabla tbody td{ vertical-align:middle; white-space:nowrap; }
   .nx-vista, .nx-card, .nx-item, .nx-aviso, .nx-item-detalle{ animation:none; }
   .nx-aviso-barra, .notif-campana.con-nuevas svg{ animation:none; }
 }
+
+/* Gestión de proveedores: filtro por fecha de registro (desde / hasta) */
+.prov-maestro .prov-filtro-mes{
+  display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:0 4px 0 10px;
+  border:1px solid var(--border); border-radius:8px; background:var(--surface);
+  font-size:12.5px; color:var(--muted);
+}
+.prov-maestro .prov-filtro-mes input[type="date"]{
+  width:auto !important; min-height:28px; padding:2px 6px; font-size:12.5px; border:0; background:transparent;
+}
+.prov-maestro .prov-filtro-mes.activo{ border-color:var(--accent); color:var(--accent); background-color:var(--accent-wash); font-weight:600; }

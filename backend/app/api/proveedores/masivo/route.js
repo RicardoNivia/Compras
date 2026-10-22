@@ -26,7 +26,7 @@ export async function PATCH(request) {
   try {
     const body = await request.json().catch(() => ({}));
     if (body.tipo === "checklist") return NextResponse.json(await setChecklistMasivo(body.ids, body.cumple !== false, user));
-    if (body.tipo === "estado") return NextResponse.json(await cambiarEstadoMasivo(body.ids, body.estado, user));
+    if (body.tipo === "estado") return NextResponse.json(await cambiarEstadoMasivo(body.ids, body.estado, user, body.fechaActualizacion));
     return NextResponse.json({ error: "Tipo de acción inválido." }, { status: 400 });
   } catch (err) {
     return apiError(err);

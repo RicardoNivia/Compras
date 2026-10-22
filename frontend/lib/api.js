@@ -226,8 +226,8 @@ export async function updateConfigProveedoresApi(data) {
   return jsonFetch("/api/proveedores/config", "PUT", data);
 }
 
-export async function cambiarEstadoCicloApi(nit, estado) {
-  return jsonFetch(`${rutaProveedor(nit)}/ciclo/estado`, "PATCH", { estado });
+export async function cambiarEstadoCicloApi(nit, estado, fechaActualizacion) {
+  return jsonFetch(`${rutaProveedor(nit)}/ciclo/estado`, "PATCH", { estado, fechaActualizacion });
 }
 
 export async function setDocumentoCicloApi(nit, clave, cumple) {

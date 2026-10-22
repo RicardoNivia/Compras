@@ -93,6 +93,7 @@ export const PROVEEDOR_FIELD_LABELS = {
 export const CICLO_PROVEEDOR_FIELD_LABELS = {
   clasificacion: "Clasificación",
   estado: "Estado en el ciclo",
+  fechaActualizacion: "Fecha de actualización",
   rutVigente: "RUT vigente",
   certBancaria: "Certificación bancaria",
   listasRestr: "Consulta en listas restrictivas",
