@@ -6,10 +6,11 @@ import { fmtCOP } from "@/lib/format";
 import { fetchActividadApi, fetchParticipantesApi } from "@/lib/api";
 import ComparaPresupuesto from "@/components/bienestar/ComparaPresupuesto";
 import { Estrellas, AnalisisDeActividad } from "@/components/bienestar/CalificacionActividad";
+import ObservacionesActividad from "@/components/bienestar/ObservacionesActividad";
 import { EsqueletoFicha } from "@/components/bienestar/Esqueletos";
 import { estadoActividad, rangoHumano, diasDeActividad } from "@/components/bienestar/actividadesUi";
 
-const PAGE_SIZES = [25, 50, 100];
+const PAGE_SIZES = [10, 25, 50, 100];
 const entero = (v) => Math.round(v || 0).toLocaleString("es-CO");
 const pct = (v) => (v == null ? "—" : `${(Math.round(v * 1000) / 10).toString().replace(".", ",")} %`);
 const VISTAS = [["si", "Asistieron"], ["no", "No asistieron"], ["sin", "Sin registrar"]];
@@ -26,9 +27,9 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
   const [personas, setPersonas] = useState(null);
   const [error, setError] = useState("");
   const [vista, setVista] = useState("si");
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
-  const [areaSize, setAreaSize] = useState(25);
+  const [areaSize, setAreaSize] = useState(PAGE_SIZES[0]);
   const [areaPage, setAreaPage] = useState(1);
   const cerrar = useRef(null);
 
@@ -67,7 +68,7 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
 
   return (
     <div className="modal-overlay detalle-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={`modal detalle-modal tray-c-${a.estado}`} role="dialog" aria-modal="true" aria-labelledby="det-titulo">
+      <div className={`modal detalle-modal tray-c-${a.estado}${a.linea === "Fundación" ? " tray-fundacion" : ""}`} role="dialog" aria-modal="true" aria-labelledby="det-titulo">
         <header className="detalle-cabeza">
           <div>
             <h2 id="det-titulo">{a.nombre}</h2>
@@ -90,6 +91,8 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
                   <ComparaPresupuesto presupuesto={act.presupuesto || 0} gastado={act.gastado || 0} />
                   <span className="count-note">{entero(act.compras)} compra(s) asociada(s)</span>
                 </Tarjeta>
+                {act.aplicaParticipantes ? (
+                  <>
                 <Tarjeta titulo="Programados y asistentes">
                   <div className="compara-presu">
                     <dl>
@@ -107,15 +110,26 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
                   <strong>{asistieron && act.gastado ? fmtCOP(act.gastado / asistieron) : "—"}</strong>
                   <span className="count-note">Compras asociadas ÷ asistentes</span>
                 </Tarjeta>
+                  </>
+                ) : (
+                  <Tarjeta titulo="Participantes y asistencia">
+                    <strong>No aplica</strong>
+                    <span className="count-note">Esta actividad no los maneja</span>
+                  </Tarjeta>
+                )}
                 <Tarjeta titulo="Calificación">
                   <div className="detalle-estrellas"><span>Al cerrar</span>{act.calificacion != null ? <Estrellas valor={act.calificacion} /> : <span className="muted">Sin cerrar</span>}</div>
                   <div className="detalle-estrellas"><span>Nova</span>{act.analisisNova ? <Estrellas valor={act.analisisNova.puntaje} /> : <span className="muted">Sin análisis</span>}</div>
-                  <div className="detalle-estrellas"><span>Asistentes</span>{p.calificaciones ? <strong className="detalle-prom">{p.calificacionPromedio.toFixed(1).replace(".", ",")} / 5</strong> : <span className="muted">Sin datos</span>}</div>
+                  {act.aplicaParticipantes && <div className="detalle-estrellas"><span>Asistentes</span>{p.calificaciones ? <strong className="detalle-prom">{p.calificacionPromedio.toFixed(1).replace(".", ",")} / 5</strong> : <span className="muted">Sin datos</span>}</div>}
                 </Tarjeta>
               </div>
 
               <AnalisisDeActividad act={act} puedeEditar={!!editarHref} onCambio={cargar} />
 
+              <ObservacionesActividad act={act} enModal />
+
+              {act.aplicaParticipantes && (
+                <>
               <div className="detalle-indicadores">
                 <section className="resumen-card detalle-card" aria-labelledby="det-areas">
                   <h2 id="det-areas">Participación por área</h2>
@@ -228,6 +242,8 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
                   <span className="count-note">{entero(filas.length)} persona(s)</span>
                 </div>
               </section>
+                </>
+              )}
             </>
           )}
         </div>

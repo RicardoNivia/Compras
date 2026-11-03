@@ -27,6 +27,7 @@ const vacio = {
   inscritos: "",
   asistentes: "",
   enCronograma: true,
+  aplicaParticipantes: true,
   descripcion: "",
   observaciones: "",
 };
@@ -139,7 +140,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
     !form.responsableUserId && { paso: "actividad", texto: "Sin responsable" },
     presupuestoNum == null && { paso: "presupuesto", texto: "Sin presupuesto asignado" },
   ].filter(Boolean);
-  const completo = { actividad: faltan.length === 0, presupuesto: presupuestoNum != null, asistencia: inscritos != null || asistentes != null, compras: lista.length > 0 };
+  const completo = { actividad: faltan.length === 0, presupuesto: presupuestoNum != null, asistencia: form.aplicaParticipantes === false || inscritos != null || asistentes != null, compras: lista.length > 0 };
   const iPaso = PASOS.findIndex((p) => p.id === paso);
 
   function enfocar(id) {
@@ -164,8 +165,8 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
       const payload = {
         ...form,
         presupuesto: presupuestoNum,
-        inscritos,
-        asistentes,
+        // Sin participantes (o recién reactivada y aún en blanco) no se tocan los conteos guardados.
+        ...(form.aplicaParticipantes === false || (actividad?.aplicaParticipantes === false && inscritos == null && asistentes == null) ? { inscritos: undefined, asistentes: undefined } : { inscritos, asistentes }),
         fecha: form.fecha || null,
         fechaFin: variosDias ? form.fechaFin || null : null,
         responsableUserId: form.responsableUserId || null,
@@ -362,6 +363,12 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
             </section>
 
             <section className="af-panel" role="tabpanel" id="af-panel-asistencia" aria-labelledby="af-tab-asistencia" hidden={paso !== "asistencia"}>
+              <label htmlFor="act-aplica" className="actividad-check af-check">
+                <span>Aplica participantes y listas de asistencia</span>
+                <input id="act-aplica" type="checkbox" checked={form.aplicaParticipantes !== false} disabled={ro} onChange={(e) => update("aplicaParticipantes", e.target.checked)} />
+              </label>
+              {form.aplicaParticipantes !== false ? (
+                <>
               <div className="af-fila">
                 <div className="af-campo">
                   <label htmlFor="act-inscritos">Inscritos</label>
@@ -377,6 +384,11 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
                 <div className={inscritos && asistentes != null && inscritos - asistentes > 0 ? "aviso" : ""}><span>No asistieron</span><strong>{inscritos && asistentes != null ? Math.max(0, inscritos - asistentes) : "—"}</strong></div>
               </div>
               <p className="af-nota">{isEdit ? "¿Tienes la lista de personas? Impórtala desde Excel en la pestaña Participantes de la ficha: estos números se actualizan solos." : "Después de guardar podrás importar la lista de personas desde Excel, y estos números se actualizarán solos."}</p>
+                </>
+              ) : (
+                <p className="af-nota">Esta actividad no maneja participantes ni asistencia. No se mostrarán esos datos, no contarán en los dashboards y Nova no los tendrá en cuenta al calificarla.</p>
+              )}
+
               <div className="af-campo">
                 <label htmlFor="act-obs">Observaciones <small>(opcional)</small></label>
                 <textarea id="act-obs" rows={3} value={form.observaciones || ""} onChange={(e) => update("observaciones", e.target.value)} disabled={ro} placeholder="Motivos de inasistencia, sobrantes, satisfacción…" />
@@ -470,7 +482,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
                 <div><dt>Responsable</dt><dd>{opcionesResponsable.find((r) => r.userId === form.responsableUserId)?.nombre || "Sin asignar"}</dd></div>
                 <div><dt>Presupuesto</dt><dd>{presupuestoNum != null ? fmtCOP(presupuestoNum) : "Sin asignar"}</dd></div>
                 <div><dt>Compras</dt><dd>{lista.length ? `${lista.length} · ${fmtCOP(total)}` : "Ninguna"}</dd></div>
-                {(inscritos != null || asistentes != null) && <div><dt>Personas</dt><dd>{asistentes ?? "—"} de {inscritos ?? "—"}</dd></div>}
+                {form.aplicaParticipantes !== false && (inscritos != null || asistentes != null) && <div><dt>Personas</dt><dd>{asistentes ?? "—"} de {inscritos ?? "—"}</dd></div>}
               </dl>
             </div>
             {(faltan.length > 0 || sugerencias.length > 0) && (

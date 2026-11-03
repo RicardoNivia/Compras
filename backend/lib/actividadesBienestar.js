@@ -38,6 +38,7 @@ export function toClientActividad(a, gasto = null) {
     inscritos: a.inscritos,
     asistentes: a.asistentes,
     enCronograma: a.enCronograma,
+    aplicaParticipantes: a.aplicaParticipantes !== false,
     observaciones: a.observaciones,
     createdAt: a.createdAt,
     creadoPorNombre: a.creadoPorNombre,
@@ -77,7 +78,12 @@ export async function listActividades({ anio, linea } = {}) {
   }
   const rows = await prisma.actividadBienestar.findMany({ where, orderBy: [{ fecha: "asc" }, { nombre: "asc" }], include: { analisisNova: { select: { puntaje: true } } } });
   const gastos = await gastoPorActividad(rows.map((r) => r.id));
-  return rows.map((r) => toClientActividad(r, gastos.get(r.id)));
+  return rows.map((r) => sinConteosSiNoAplica(toClientActividad(r, gastos.get(r.id))));
+}
+
+// Una actividad sin participantes no muestra ni suma inscritos o asistentes. Lo guardado se conserva por si se vuelve a activar.
+function sinConteosSiNoAplica(a) {
+  return a.aplicaParticipantes ? a : { ...a, inscritos: null, asistentes: null };
 }
 
 export function toClientAnalisisActividad(r) {
@@ -100,11 +106,16 @@ export async function getActividad(id) {
     select: { id: true, localSeq: true, fechaSolicitud: true, descripcion: true, proveedor: true, valorConIva: true, estadoLegalizacion: true, radicado: true },
   });
   const gastado = compras.reduce((s, c) => s + (c.valorConIva || 0), 0);
+  const [notasEquipo, deParticipantes] = await Promise.all([
+    prisma.observacionActividad.count({ where: { actividadId: row.id } }),
+    row.aplicaParticipantes ? prisma.participanteActividad.count({ where: { actividadId: row.id, OR: [{ calificacion: { not: null } }, { observacion: { not: null } }] } }) : 0,
+  ]);
   const [participacion, inventario, fotos, analisisNova] = await Promise.all([resumenParticipacion(row.id), listInventario(row.id), prisma.fotoActividad.count({ where: { actividadId: row.id } }), prisma.analisisActividad.findUnique({ where: { actividadId: row.id } })]);
   return {
-    ...toClientActividad(row, { gastado, compras: compras.length }),
+    ...sinConteosSiNoAplica(toClientActividad(row, { gastado, compras: compras.length })),
     detalleCompras: compras,
     participacion,
+    totalObservaciones: notasEquipo + deParticipantes + (row.observaciones ? 1 : 0) + (row.comentarioCierre ? 1 : 0),
     fotos,
     analisisNova: toClientAnalisisActividad(analisisNova),
     inventario: { items: inventario, resumen: resumenInventario(inventario) },
@@ -177,6 +188,10 @@ async function leerDatos(body, { parcial = false, responsableActual = null } = {
   if (viene("inscritos")) data.inscritos = enteroONulo(body.inscritos, "Inscritos");
   if (viene("asistentes")) data.asistentes = enteroONulo(body.asistentes, "Asistentes");
   if (viene("enCronograma")) data.enCronograma = body.enCronograma ?? true;
+  if (viene("aplicaParticipantes")) {
+    data.aplicaParticipantes = body.aplicaParticipantes !== false;
+    if (!data.aplicaParticipantes) data.formularioAbierto = false; // sin participantes, no hay inscripción pública
+  }
   if (viene("responsableUserId")) Object.assign(data, await responsableDe(body.responsableUserId, responsableActual));
   return data;
 }
@@ -298,7 +313,7 @@ export async function resumenBienestar(anio, linea = "Bienestar", mes = null) {
 
   // Participación por área y motivos de inasistencia, de los participantes registrados en las actividades de la línea.
   const participantes = await prisma.participanteActividad.findMany({
-    where: { actividadId: { in: actividades.map((a) => a.id) } },
+    where: { actividadId: { in: actividades.filter((a) => a.aplicaParticipantes).map((a) => a.id) } },
     select: { area: true, inscrito: true, asistio: true, motivoInasistencia: true },
   });
   const porArea = new Map();
@@ -325,7 +340,7 @@ export async function resumenBienestar(anio, linea = "Bienestar", mes = null) {
     mes: m,
     linea,
     // Vista Mensual: cada actividad del mes con su gasto y sus asistentes (la gráfica de barras + línea).
-    porActividad: conFecha.map((a) => ({ id: a.id, nombre: a.nombre, fecha: a.fecha, fechaFin: a.fechaFin, estado: a.estado, gastado: a.gastado || 0, asistentes: a.asistentes || 0, inscritos: a.inscritos || 0, presupuesto: a.presupuesto || 0 })),
+    porActividad: conFecha.map((a) => ({ id: a.id, nombre: a.nombre, fecha: a.fecha, fechaFin: a.fechaFin, estado: a.estado, aplicaParticipantes: a.aplicaParticipantes, gastado: a.gastado || 0, asistentes: a.asistentes || 0, inscritos: a.inscritos || 0, presupuesto: a.presupuesto || 0 })),
     kpis: {
       actividades: actividades.length,
       porEstado: Object.fromEntries(ESTADOS.map((e) => [e, actividades.filter((a) => a.estado === e).length])),

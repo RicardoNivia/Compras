@@ -637,6 +637,10 @@ export const fetchMaestroTipoApi = (tipo) => fetch(`/api/maestros?tipo=${encodeU
 export const fetchAnalisisBienestarApi = (linea, anio, mes = 0) => fetch(`/api/actividades/analisis?linea=${encodeURIComponent(linea)}&anio=${encodeURIComponent(anio)}&mes=${mes}`, { cache: "no-store" }).then(handle);
 export const generarAnalisisBienestarApi = (data) => jsonPost("/api/actividades/analisis", "POST", data);
 
+export const fetchObservacionesApi = (actividadId) => fetch(`/api/actividades/${actividadId}/observaciones`, { cache: "no-store" }).then(handle);
+export const crearObservacionApi = (actividadId, data) => jsonPost(`/api/actividades/${actividadId}/observaciones`, "POST", data);
+export const eliminarObservacionApi = (actividadId, id) => fetch(`/api/actividades/${actividadId}/observaciones/${id}`, { method: "DELETE" }).then(handle);
+
 export const fetchInventarioApi = (actividadId) => fetch(`/api/actividades/${actividadId}/inventario`, { cache: "no-store" }).then(handle);
 export const crearItemApi = (actividadId, data) => jsonPost(`/api/actividades/${actividadId}/inventario`, "POST", data);
 export const actualizarItemApi = (actividadId, id, data) => jsonPost(`/api/actividades/${actividadId}/inventario/${id}`, "PUT", data);

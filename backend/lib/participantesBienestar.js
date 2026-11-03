@@ -344,7 +344,7 @@ export async function configurarFormulario(actividadId, body, actor) {
 
 async function actividadPorToken(token) {
   const a = await prisma.actividadBienestar.findUnique({ where: { formularioToken: String(token || "") } });
-  if (!a || !a.formularioAbierto || a.estado === "cerrada") throw badRequest("Este formulario no existe o ya no recibe inscripciones.", 404);
+  if (!a || !a.formularioAbierto || a.estado === "cerrada" || !a.aplicaParticipantes) throw badRequest("Este formulario no existe o ya no recibe inscripciones.", 404);
   return a;
 }
 

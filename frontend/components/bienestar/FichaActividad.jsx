@@ -18,6 +18,7 @@ import SolicitudesActividad from "@/components/bienestar/SolicitudesActividad";
 import { EsqueletoFicha, EsqueletoTabla } from "@/components/bienestar/Esqueletos";
 import { Estrellas, CalificacionModal, TabCalificaciones } from "@/components/bienestar/CalificacionActividad";
 import FotosActividad from "@/components/bienestar/FotosActividad";
+import ObservacionesActividad from "@/components/bienestar/ObservacionesActividad";
 import { IconPlus, IconTrash, IconDownload, IconCheck } from "@/components/icons";
 import { estadoActividad, pctClase, rangoFechas } from "@/components/bienestar/actividadesUi";
 
@@ -84,14 +85,18 @@ export default function FichaActividad({ actividadId, puedeEditar, basePath }) {
       <div className="resumen-kpis">
         <Kpi label="Presupuesto" valor={act.presupuesto != null ? <AnimatedNumber value={presupuesto} format={fmtCOP} /> : "Sin asignar"} sub={act.presupuesto != null ? `Disponible ${fmtCOP(disponible)}` : (cerrada ? "No se asignó" : "Asígnalo en Editar")} />
         <Kpi label="Gastado" valor={<AnimatedNumber value={act.gastado} format={fmtCOP} />} sub={act.pctPresupuesto != null ? `${pct(act.pctPresupuesto)} del presupuesto · ${act.compras} compra(s)` : `${act.compras} compra(s) asociada(s)`} clase={act.pctPresupuesto != null ? pctClase(act.pctPresupuesto) : ""} />
+        {act.aplicaParticipantes ? (
+          <>
         <Kpi label="Inscritos" valor={<AnimatedNumber value={p.inscritos || act.inscritos || 0} format={entero} />} sub={p.total ? `${p.sinRegistrar} sin asistencia registrada` : "Sin lista de inscritos"} />
         <Kpi label="Asistieron" valor={<AnimatedNumber value={p.total ? p.asistieron : act.asistentes || 0} format={entero} />} sub={`Participación ${pct(asistencia)}`} />
         <Kpi label="No asistieron" valor={<AnimatedNumber value={p.noAsistieron} format={entero} />} sub={p.motivos[0] ? `Más frecuente: ${p.motivos[0].motivo}` : "—"} clase={p.noAsistieron ? "warning" : ""} />
         <Kpi label="Costo por asistente" valor={(p.asistieron || act.asistentes) && act.gastado ? fmtCOP(act.gastado / (p.asistieron || act.asistentes)) : "—"} sub={p.calificacionPromedio ? `Calificación de asistentes ${p.calificacionPromedio.toFixed(1).replace(".", ",")} / 5 (${p.calificaciones})` : "Sin calificaciones de asistentes"} />
+          </>
+        ) : <Kpi label="Participantes y asistencia" valor="No aplica" sub="Esta actividad no los maneja" />}
       </div>
 
       <div className="dash-tabs ficha-tabs" role="tablist" aria-label="Secciones de la actividad">
-        {[["resumen", "Resumen"], ["calificaciones", "Calificación Nova y calificación usuario"], ["participantes", `Participantes (${p.total})`], ["inventario", `Inventario (${act.inventario.items.length})`], ["fotos", `Fotos (${act.fotos})`], ["compras", `Compras (${act.compras})`], ["formulario", "Formulario de inscripción"]].map(([k, l]) => (
+        {[["resumen", "Resumen"], ["calificaciones", "Calificación Nova y calificación usuario"], ...(act.aplicaParticipantes ? [["participantes", `Participantes (${p.total})`]] : []), ["observaciones", `Encuesta y observaciones (${act.totalObservaciones})`], ["inventario", `Inventario (${act.inventario.items.length})`], ["fotos", `Fotos (${act.fotos})`], ["compras", `Compras (${act.compras})`], ...(act.aplicaParticipantes ? [["formulario", "Formulario de inscripción"]] : [])].map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className="dash-tab" onClick={() => setTab(k)}>{l}</button>
         ))}
       </div>
@@ -99,6 +104,7 @@ export default function FichaActividad({ actividadId, puedeEditar, basePath }) {
       {tab === "resumen" && <TabResumen act={act} />}
       {tab === "calificaciones" && <TabCalificaciones act={act} puedeEditar={puedeEditar} onCambio={cargar} />}
       {tab === "participantes" && <TabParticipantes act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
+      {tab === "observaciones" && <ObservacionesActividad act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
       {tab === "inventario" && <TabInventario act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
       {tab === "fotos" && <FotosActividad actividadId={act.id} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
       {tab === "compras" && <TabCompras act={act} puedeEditar={puedeEditar} cerrada={cerrada} editarHref={`${basePath}/actividades/${act.id}/editar`} />}
@@ -125,7 +131,7 @@ function TabResumen({ act }) {
   const inv = act.inventario.resumen;
   return (
     <div className="resumen-bienestar">
-      <div className="resumen-fila">
+      {act.aplicaParticipantes && <div className="resumen-fila">
         <section className="resumen-card" aria-labelledby="f-area">
           <h2 id="f-area">Participación por área</h2>
           <p className="card-sub">Inscritos de cada área; al pasar el cursor, cuántos asistieron y cuántos no.</p>
@@ -144,7 +150,7 @@ function TabResumen({ act }) {
             <HBarChartSvg data={p.motivos.map((m) => ({ key: m.motivo, label: m.motivo, value: m.n }))} formatValue={entero} color="var(--warning)" />
           ) : <p className="count-note">Nadie registrado como ausente.</p>}
         </section>
-      </div>
+      </div>}
       <div className="resumen-fila">
         <section className="resumen-card" aria-labelledby="f-presu">
           <h2 id="f-presu">Gasto frente al presupuesto</h2>
@@ -268,7 +274,6 @@ function TabParticipantes({ act, puedeEditar, onCambio }) {
           {[
             ["programados", "Programados", "Quiénes se inscribieron o están citados"],
             ["asistentes", "Asistentes", "La planilla o lista de quiénes fueron"],
-            ["calificaciones", "Calificaciones", "La encuesta de satisfacción de la actividad"],
           ].map(([tipo, titulo, nota]) => (
             <label key={tipo} className="importar-tarjeta">
               <input type="file" accept=".xlsx,.xls" className="importar-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) { setError(""); setAviso(""); setImportar({ tipo, archivo: f }); } }} />

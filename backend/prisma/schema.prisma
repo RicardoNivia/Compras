@@ -71,6 +71,7 @@ model ActividadBienestar {
   inscritos         Int?
   asistentes        Int?
   enCronograma      Boolean  @default(true) // false = actividad extra, realizada fuera del cronograma planeado
+  aplicaParticipantes Boolean @default(true) // false = no maneja participantes ni asistencia: no cuentan en cifras ni en la calificación de Nova
   observaciones     String?
   createdAt         DateTime @default(now())
   creadoPorUserId   String?
@@ -90,6 +91,7 @@ model ActividadBienestar {
   participantes     ParticipanteActividad[]
   inventario        InventarioActividad[]
   fotos             FotoActividad[]
+  observacionesEquipo ObservacionActividad[]
   analisisNova      AnalisisActividad?
   solicitudesCompra SolicitudCompra[]
 
@@ -156,6 +158,21 @@ model FotoActividad {
   @@unique([actividadId, hash])
   @@index([actividadId])
   @@map("fotos_actividad")
+}
+
+// Observaciones que el equipo anota sobre una actividad (pestaña Encuesta y observaciones). Las de los participantes
+// siguen en ParticipanteActividad.observacion.
+model ObservacionActividad {
+  id              Int       @id @default(autoincrement())
+  actividadId     Int
+  actividad       ActividadBienestar @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  texto           String
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@index([actividadId])
+  @@map("observaciones_actividad")
 }
 
 // Inventario de una actividad: lo que se compró o se tenía (refrigerios, detalles, materiales…), cuánto se usó y

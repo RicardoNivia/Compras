@@ -133,6 +133,10 @@ export async function logInventario(actor, actividad, action, detalle) {
   await writeLog({ action, entityType: "inventario", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor, changes: [{ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle }] });
 }
 
+export async function logObservacionActividad(actor, actividad, action, detalle) {
+  await writeLog({ action, entityType: "observacionActividad", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
+}
+
 export async function logFotos(actor, actividad, action, detalle) {
   await writeLog({ action, entityType: "fotoActividad", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor, changes: [{ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle }] });
 }

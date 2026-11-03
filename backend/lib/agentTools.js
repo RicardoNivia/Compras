@@ -388,7 +388,7 @@ const puedeLinea = (user, linea, tipo = "lista") => {
 const filaActividad = (a) => ({
   id: a.id, nombre: a.nombre, linea: a.linea, fecha: a.fecha, fechaFin: a.fechaFin, estado: a.estado, responsable: a.responsableNombre,
   presupuesto: a.presupuesto, gastadoEnComprasAsociadas: a.gastado, compras: a.compras, inscritos: a.inscritos, asistentes: a.asistentes,
-  calificacionAlCerrar: a.calificacion, puntajeNova: a.puntajeNova,
+  aplicaParticipantes: a.aplicaParticipantes, calificacionAlCerrar: a.calificacion, puntajeNova: a.puntajeNova,
 });
 
 export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, user }) {
@@ -683,7 +683,7 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
         return {
           ...filaActividad(a), descripcion: a.descripcion, observaciones: a.observaciones, comentarioDeCierre: a.comentarioCierre,
           comprasAsociadas: a.detalleCompras.slice(0, 20).map((c) => ({ numero: c.localSeq, fecha: c.fechaSolicitud, descripcion: c.descripcion, proveedor: c.proveedor, valorConIva: c.valorConIva, legalizacion: c.estadoLegalizacion })),
-          participacion: { registrados: p.total, inscritos: p.inscritos, asistieron: p.asistieron, noAsistieron: p.noAsistieron, sinRegistrar: p.sinRegistrar, calificacionPromedio: p.calificacionPromedio, porArea: p.porArea.slice(0, 15), motivos: p.motivos },
+          participacion: !a.aplicaParticipantes ? "No aplica: esta actividad no maneja participantes ni asistencia." : { registrados: p.total, inscritos: p.inscritos, asistieron: p.asistieron, noAsistieron: p.noAsistieron, sinRegistrar: p.sinRegistrar, calificacionPromedio: p.calificacionPromedio, porArea: p.porArea.slice(0, 15), motivos: p.motivos },
           inventario: a.inventario.resumen,
           fotos: a.fotos,
           analisisNova: a.analisisNova ? { puntaje: a.analisisNova.puntaje, titulo: a.analisisNova.titulo, resumen: a.analisisNova.resumen } : null,

@@ -17,7 +17,7 @@ const hoyISO = () => {
 // Cronograma de Bienestar: vista anual (los 12 meses de un vistazo) y mensual (calendario con festivos). Cada
 // actividad abre su ficha; en la vista mensual, el "+" de un día crea una actividad en esa fecha. Una actividad de
 // varios días aparece en todos sus días y en todos los meses que toca.
-export default function CronogramaView({ anio, actividades, onNueva, fichaHref, editarHref, indicadores, selectorAnio, accion }) {
+export default function CronogramaView({ anio, actividades, onNueva, fichaHref, editarHref, linea, indicadores, selectorAnio, accion }) {
   const ahora = new Date();
   const [modo, setModo] = useState("trayectoria");
   const [detalle, setDetalle] = useState(null);
@@ -62,7 +62,7 @@ export default function CronogramaView({ anio, actividades, onNueva, fichaHref, 
 
       {modo !== "trayectoria" && indicadores}
       {modo === "trayectoria" ? (
-        <CronogramaTrayectoria anio={anio} actividades={visibles} onElegir={setDetalle} onMes={(i) => { setMes(i); setModo("mes"); }} />
+        <CronogramaTrayectoria anio={anio} linea={linea} actividades={visibles} onElegir={setDetalle} onMes={(i) => { setMes(i); setModo("mes"); }} />
       ) : modo === "anio" ? (
         <div className="cronograma-anio">
           {porMes.map((lista, i) => {

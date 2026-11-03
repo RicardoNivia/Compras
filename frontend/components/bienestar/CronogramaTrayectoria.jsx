@@ -49,7 +49,7 @@ function IconContraer() {
 // La vista más visual del cronograma: el año como una línea de metro que se dibuja al entrar. Cada actividad es una
 // parada (más grande entre más personas fueron) y la línea cambia de color según el estado de cada una. Al hacer clic
 // en una actividad se abre su detalle.
-export default function CronogramaTrayectoria({ anio, actividades, onElegir, onMes }) {
+export default function CronogramaTrayectoria({ anio, linea, actividades, onElegir, onMes }) {
   const [filtro, setFiltro] = useState(null); // estado resaltado desde la leyenda
   const [completa, setCompleta] = useState(false); // ver a pantalla completa
   useEffect(() => {
@@ -84,7 +84,7 @@ export default function CronogramaTrayectoria({ anio, actividades, onElegir, onM
   const alto = 2 * alcance + 110;
 
   return (
-    <section className={`tray${completa ? " pantalla-completa" : ""}`} aria-label={`Trayectoria de ${anio}`}>
+    <section className={`tray${linea === "Fundación" ? " tray-fundacion" : ""}${completa ? " pantalla-completa" : ""}`} aria-label={`Trayectoria de ${anio}`}>
       <div className="tray-cifras">
         <div className="tray-cifra tray-progreso">
           <svg viewBox="0 0 56 56" width="56" height="56" aria-hidden="true">

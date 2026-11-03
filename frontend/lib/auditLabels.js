@@ -237,6 +237,7 @@ export const ACTIVIDAD_FIELD_LABELS = {
   inscritos: "Inscritos",
   asistentes: "Asistentes",
   enCronograma: "En el cronograma",
+  aplicaParticipantes: "Aplica participantes y listas de asistencia",
   observaciones: "Observaciones",
   calificacion: "Calificación al cerrar",
   comentarioCierre: "Comentario de cierre",
@@ -258,7 +259,7 @@ Object.assign(ENTITY_LABELS, { rol: "Rol" });
 // lib/inventarioBienestar.js). Se registran como una línea legible por acción ("Marcó 12 como asistieron"…).
 export const DETALLE_FIELD_LABELS = { detalle: "Detalle" };
 Object.assign(ACTION_LABELS, { importar: "Importó" });
-Object.assign(ENTITY_LABELS, { participante: "Participantes de actividad", inventario: "Inventario de actividad", formularioActividad: "Formulario de inscripción", fotoActividad: "Fotos de actividad", analisisBienestar: "Análisis de Bienestar (Nova)", analisisActividad: "Análisis de actividad (Nova)", solicitudCompra: "Solicitud de compra", agenteEvaluacion: "Agente de evaluación de actividades" });
+Object.assign(ENTITY_LABELS, { participante: "Participantes de actividad", inventario: "Inventario de actividad", formularioActividad: "Formulario de inscripción", fotoActividad: "Fotos de actividad", observacionActividad: "Observaciones de actividad", analisisBienestar: "Análisis de Bienestar (Nova)", analisisActividad: "Análisis de actividad (Nova)", solicitudCompra: "Solicitud de compra", agenteEvaluacion: "Agente de evaluación de actividades" });
 
 export const SOLICITUD_COMPRA_FIELD_LABELS = {
   actividad: "Actividad",

@@ -12,11 +12,11 @@ import { logAgenteEvaluacion } from "@/lib/audit";
 // confirmar) con la lista de lo que se va a reevaluar. El estado vive en memoria, igual que lib/reportJobs.js.
 
 const CONCURRENCIA = 2;
-const ENTIDADES = ["actividad", "participante", "inventario", "record"];
+const ENTIDADES = ["actividad", "participante", "inventario", "observacionActividad", "record"];
 // Campos de la actividad y de sus compras que Nova tiene en cuenta (ver analisisActividad.js#datosParaNova).
-const CAMPOS_ACTIVIDAD = new Set(["nombre", "fecha", "fechaFin", "descripcion", "presupuesto", "inscritos", "asistentes", "calificacion", "comentarioCierre", "observaciones"]);
+const CAMPOS_ACTIVIDAD = new Set(["nombre", "fecha", "fechaFin", "descripcion", "presupuesto", "aplicaParticipantes", "inscritos", "asistentes", "calificacion", "comentarioCierre", "observaciones"]);
 const CAMPOS_COMPRA = new Set(["actividad", "actividadId", "descripcion", "proveedor", "valorConIva", "estadoLegalizacion"]);
-const MOTIVOS = { actividad: "datos de la actividad", participante: "participantes", inventario: "inventario", record: "compras" };
+const MOTIVOS = { actividad: "datos de la actividad", participante: "participantes", inventario: "inventario", observacionActividad: "observaciones", record: "compras" };
 
 const badRequest = (msg, status = 400) => Object.assign(new Error(msg), { status });
 const estadoGlobal = () => (globalThis.__agenteEvaluacion ||= { trabajo: null });

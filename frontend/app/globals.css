@@ -4052,3 +4052,25 @@ button.ficha-cierre:hover, button.ficha-cierre:focus-visible{ border-color: var(
 .calificacion-usuario{ display:flex; flex-direction:column; gap:8px; }
 .calificacion-usuario .card-sub{ margin:0; }
 .calificacion-valor{ display:flex; align-items:center; gap:10px; font-size:15px; color: var(--ink); }
+
+/* Fundación: la trayectoria y el detalle de sus actividades, en azul muy suave. Bienestar sigue en verde. */
+.tray-fundacion{ --accent:#1673b5; --accent-wash:#e4f1fb; --secondary:#4aa8dc; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .tray-fundacion{ --accent:#7cc0ee; --accent-wash:#16304a; --secondary:#5fb4e4; } }
+:root[data-theme="dark"] .tray-fundacion{ --accent:#7cc0ee; --accent-wash:#16304a; --secondary:#5fb4e4; }
+.tray.tray-fundacion, .tray-fundacion .detalle-cabeza{ --vivo-a: color-mix(in srgb, #1673b5 15%, #ffffff); --vivo-b: color-mix(in srgb, #4aa8dc 15%, #ffffff); --vivo-texto:#0a2a45; }
+.tray-fundacion .tray-mes{ border-left-color: rgba(10,42,69,.16); }
+.tray-fundacion .tray-mes.actual, .tray-fundacion .tray-hoy span{ background:#0a2a45; color:#fff; }
+.tray-fundacion .tray-pista{ background-image: linear-gradient(to right, rgba(10,42,69,.1) 1px, transparent 1px); }
+.tray-fundacion .tray-hoy{ border-left-color: rgba(10,42,69,.65); }
+.tray-fundacion .tray-tallo{ background: rgba(10,42,69,.45); }
+.tray-fundacion .tray-recorrido{ background: linear-gradient(to right, transparent, rgba(10,42,69,.05)); }
+.tray-fundacion .tray-linea{ background: rgba(10,42,69,.12); }
+
+/* Fondo de la trayectoria de Bienestar: 80 % más claro. El azul de Fundación no cambia. */
+.tray:not(.tray-fundacion), .detalle-modal:not(.tray-fundacion) .detalle-cabeza{ --vivo-a: color-mix(in srgb, var(--accent) 3%, #ffffff); --vivo-b: color-mix(in srgb, var(--secondary) 3%, #ffffff); }
+.tray:not(.tray-fundacion){ border:1px solid color-mix(in srgb, var(--accent) 14%, var(--border)); }
+
+/* Agregar observación (pestaña Encuesta y observaciones) */
+.observacion-form{ display:flex; flex-direction:column; gap:10px; align-items:flex-start; margin-top:10px; }
+.observacion-form .field{ width:100%; }
+.observacion-form textarea{ width:100%; resize:vertical; }

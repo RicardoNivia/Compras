@@ -36,7 +36,7 @@ export default function CerrarActividadModal({ act, onClose, onCerrada }) {
     await generarAnalisisActividadApi(act.id, "cierre").catch(() => {});
     onCerrada();
   }
-  const sinRegistrar = act.participacion?.sinRegistrar || 0;
+  const sinRegistrar = act.aplicaParticipantes === false ? 0 : act.participacion?.sinRegistrar || 0;
   return (
     <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="ce-t">

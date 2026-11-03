@@ -151,6 +151,7 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
           onAbrir={(a) => router.push(fichaDe(a.id))}
           onNueva={puedeEditar ? (fecha) => router.push(nuevaHref(fecha)) : null}
           fichaHref={(a) => fichaDe(a.id)}
+          linea={linea}
           indicadores={indicadores}
           selectorAnio={(
             <label className="cronograma-selector-anio">
@@ -219,8 +220,8 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
                         </td>
                         <td><span className={`pill ${est.pill}`}>{est.label}</span></td>
                         <td className="truncate">{a.responsableNombre || "—"}</td>
-                        <td className="num">{a.inscritos ?? "—"}</td>
-                        <td className="num">{a.asistentes ?? "—"}</td>
+                        <td className="num">{a.aplicaParticipantes ? a.inscritos ?? "—" : <span className="muted">No aplica</span>}</td>
+                        <td className="num">{a.aplicaParticipantes ? a.asistentes ?? "—" : <span className="muted">No aplica</span>}</td>
                         <td className="num">{a.presupuesto != null ? fmtCOP(a.presupuesto) : <span className="muted">Sin asignar</span>}</td>
                         <td className="num">{a.compras || "—"}</td>
                         <td className="num">

@@ -6,7 +6,7 @@ import { fetchAgenteEvaluacionApi, iniciarAgenteEvaluacionApi, detenerAgenteEval
 import { IconSpark, IconAlert } from "@/components/icons";
 import { EsqueletoLista } from "@/components/bienestar/Esqueletos";
 
-const PAGE_SIZES = [25, 50, 100];
+const PAGE_SIZES = [10, 25, 50, 100];
 const CADA_MS = 2500;
 
 // "Agente de evaluación de actividades": reevalúa con Nova solo las actividades que cambiaron después de su última
@@ -30,7 +30,7 @@ function ModalAgente({ onClose }) {
   const [trabajo, setTrabajo] = useState(null);
   const [error, setError] = useState("");
   const [iniciando, setIniciando] = useState(false);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
   const avisado = useRef(false);
 

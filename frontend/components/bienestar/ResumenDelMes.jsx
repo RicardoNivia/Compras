@@ -68,7 +68,9 @@ export default function ResumenDelMes({ mes, anio, porMes, porActividad, kpis, o
                     <span className="mes-actividad-nombre">{a.nombre}</span>
                     <span className="count-note">{rangoHumano(a)} <span className={`pill ${est.pill}`}>{est.label}</span></span>
                   </span>
-                  {yaOcurrio ? (
+                  {a.aplicaParticipantes === false ? (
+                    <div className="mes-medidor mes-medidor-pendiente"><span>Asistencia</span><strong>No aplica</strong></div>
+                  ) : yaOcurrio ? (
                     <Medidor
                       etiqueta="Asistencia"
                       valor={a.asistentes} total={a.inscritos || a.asistentes}
