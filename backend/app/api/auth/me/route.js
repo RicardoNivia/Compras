@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth-server";
 import { getEffectivePermissions } from "@/lib/permissions";
+import { nombreDeRol } from "@/lib/rolesCatalogo";
 
 /**
  * @openapi
@@ -36,6 +37,7 @@ export async function GET() {
   // Se entrega junto con el usuario para que el frontend (páginas server y
   // Sidebar) pueda reflejar la Matriz de permisos sin tener que consultar la
   // base de datos directamente — solo lee vía HTTP, igual que el resto.
-  const permissions = await getEffectivePermissions(user.role);
-  return NextResponse.json({ user: { ...user, permissions } });
+  // roleLabel: nombre del rol para mostrar (los personalizados no están en lib/roles.js del frontend).
+  const [permissions, roleLabel] = await Promise.all([getEffectivePermissions(user.role), nombreDeRol(user.role)]);
+  return NextResponse.json({ user: { ...user, roleLabel, permissions } });
 }

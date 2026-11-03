@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { solicitudesPendientes } from "@/lib/solicitudesCompra";
 import { listRecords } from "@/lib/records";
 import { getSolicitudesPendientes, getRiesgoPresupuesto, getRiesgoTiempos } from "@/lib/alerts";
 import { listMaestroProveedores, getConfigProveedores } from "@/lib/proveedoresCiclo";
@@ -241,7 +242,26 @@ async function informesPorEnviar(user) {
   });
 }
 
+async function solicitudesCompraPendientes() {
+  const lista = await solicitudesPendientes();
+  return lista.map((s) => {
+    const dias = Math.floor((Date.now() - new Date(s.createdAt).getTime()) / 86400000);
+    return {
+      id: `sol-${s.id}`,
+      ref: `Solicitud ${s.id}`,
+      titulo: s.descripcion,
+      contexto: `${s.actividad} · ${s.creadoPorNombre || "Bienestar"}`,
+      dias,
+      detalle: s.fechaRequerida ? `Para el ${s.fechaRequerida}` : "Sin fecha requerida",
+      nivel: dias >= 3 ? "atencion" : "info",
+      href: "/alertas?tab=solicitudes",
+      mio: true,
+    };
+  });
+}
+
 const SECCIONES = [
+  { clave: "solicitudesCompra", titulo: "Solicitudes de compra de Bienestar", descripcion: "Bienestar las pidió para una actividad: genera la compra con los datos ya llenos o recházala indicando por qué.", roles: ["admin", "registro"], fuente: "solicitudes", permiso: "createRecord" },
   { clave: "informesPorEnviar", titulo: "Informes listos para que los envíes", descripcion: "Se generaron a su hora con el PDF listo: descárgalo y envíalo desde Outlook con el correo ya escrito.", roles: ["admin", "registro", "legalizar", "radicar", "proveedores"], fuente: "informes", permiso: "viewReportes" },
   // Compras
   { clave: "atrasadas", titulo: "Solicitudes atrasadas", descripcion: "Compras sin fecha de entrega. Pasados 8 días hábiles incumplen el plazo; desde 5 ya conviene moverlas.", roles: ["admin", "registro"], fuente: "records" },
@@ -285,6 +305,7 @@ async function prepararConstructores(user, usa) {
     provChecklist: () => provChecklist(prov.rows),
     provPorRegistrar: () => provPorRegistrar(prov.rows),
     informesPorEnviar: () => informesPorEnviar(user),
+    solicitudesCompra: () => solicitudesCompraPendientes(),
   };
   return { constructores, ctxProv };
 }

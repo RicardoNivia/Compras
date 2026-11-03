@@ -1,6 +1,6 @@
-# Panel de Compras (Sinco)
+# Panel de Compras y Bienestar (Sinco)
 
-Dashboard de compras de Sinco. Migrado desde una app de un solo archivo HTML (jsPDF/jspdf-autotable/html2canvas vendorizados, datos JSON inline) hacia una arquitectura de dos aplicaciones Next.js independientes con una API REST real y base de datos.
+Aplicación de Sinco con dos módulos: **Compras** (registros, proveedores, presupuesto, informes) y **Bienestar** (actividades de Bienestar y Fundación: cronograma, participación, inventario, fotos y su costo cruzado con Compras). Migrado desde una app de un solo archivo HTML (jsPDF/jspdf-autotable/html2canvas vendorizados, datos JSON inline) hacia una arquitectura de dos aplicaciones Next.js independientes con una API REST real y base de datos.
 
 ## Tecnologías
 

@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { ROLES, ROLE_LIST } from "@/lib/roles";
+import { ROLES } from "@/lib/roles";
+import { esRolValido } from "@/lib/rolesCatalogo";
 import { logUserCreate, logUserUpdate, logUserDelete } from "@/lib/audit";
 
 export function toClientUser(u) {
@@ -31,11 +32,12 @@ function forbidden(message) {
   return err;
 }
 
-function validateShared(body) {
+// El rol puede ser uno del sistema o uno personalizado (Usuarios › Roles).
+async function validateShared(body) {
   if (!body.nombre?.trim() || !body.email?.trim() || !body.role) {
     throw badRequest("Nombre, correo y rol son obligatorios.");
   }
-  if (!ROLE_LIST.includes(body.role)) {
+  if (!(await esRolValido(body.role))) {
     throw badRequest("Rol inválido.");
   }
 }
@@ -64,7 +66,7 @@ async function assertKeepsAnActiveAdmin(existingUser, nextRole, nextActivo) {
 }
 
 export async function createUser(body, actor) {
-  validateShared(body);
+  await validateShared(body);
   assertCanAssignRole(actor, body.role);
   if (!body.password || body.password.length < 6) {
     throw badRequest("La contraseña debe tener al menos 6 caracteres.");
@@ -88,7 +90,7 @@ export async function createUser(body, actor) {
 }
 
 export async function updateUser(id, body, actor) {
-  validateShared(body);
+  await validateShared(body);
   assertCanAssignRole(actor, body.role);
   if (body.password && body.password.length < 6) {
     throw badRequest("La contraseña debe tener al menos 6 caracteres.");

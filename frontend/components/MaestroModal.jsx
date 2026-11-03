@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TIPO_LABELS, ESTRELLAS_CON_CAUSA } from "@/lib/maestrosTipos";
+import { TIPO_LABELS, ESTRELLAS_CON_CAUSA, TIPOS_USUARIO } from "@/lib/maestrosTipos";
 import { createMaestroApi, updateMaestroApi, fetchUsuariosDisponiblesApi } from "@/lib/api";
 
-const ES_RESPONSABLE = "responsable";
 const ES_CAUSA_CALIFICACION = "causaCalificacion";
 
 export default function MaestroModal({ tipo, maestro, onClose, onSaved }) {
   const isEdit = !!maestro;
-  const esResponsable = tipo === ES_RESPONSABLE;
+  const esResponsable = TIPOS_USUARIO.includes(tipo);
   const esCausaCalificacion = tipo === ES_CAUSA_CALIFICACION;
   // Si el valor ya está en uso en registros, no se puede renombrar (rompería
   // la referencia por texto).

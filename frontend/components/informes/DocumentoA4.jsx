@@ -193,7 +193,7 @@ export default function DocumentoA4({ informe, content, cargando, seleccion, onS
   return (
     <article className={`est-a4${cargando && !content ? " cargando" : ""}`} aria-label="Vista del informe">
       <header className="est-a4-head">
-        <small>Sinco · Panel de Compras</small>
+        <small>Sinco · Panel de Compras y Bienestar</small>
         <h2>{informe.nombre || "Informe sin título"}</h2>
         <p>{periodoCorto(informe.periodoGeneral)}{audiencia ? ` · Para ${audiencia}` : ""} · {hoy}</p>
       </header>

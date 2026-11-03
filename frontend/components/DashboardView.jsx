@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import DetailModal from "@/components/DetailModal";
 import BarChartSvg from "@/components/charts/BarChartSvg";
 import StackedBarChartSvg from "@/components/charts/StackedBarChartSvg";
@@ -13,8 +12,7 @@ import { AnimatedNumber } from "@/components/charts/chartKit";
 import { fmtCOP, fmtCompact, fmtNum, fmtPesos, fmtDateDisplay, monthKey, monthLabel } from "@/lib/format";
 import { businessDaysBetween, businessDaysElapsedToToday } from "@/lib/businessDays";
 import { getDiasInfo } from "@/lib/diasInfo";
-import { explainKpiApi } from "@/lib/api";
-import { renderMarkdown } from "@/lib/markdown";
+import KpiExplain from "@/components/KpiExplain";
 import { IconFile, IconMoney, IconClock, IconAlert, IconTrendUp, IconSpark } from "@/components/icons";
 
 const ESTADO_ORDER = ["Ejecutado", "Proceso", "Pendiente", "Anulado", "Sin estado"];
@@ -33,7 +31,7 @@ function sum(arr, fn) {
 }
 
 // Versión compacta de un registro, para mandarle solo lo necesario al backend
-// cuando se pide "Explícame este número" (ver KpiExplain más abajo).
+// cuando se pide "Explícame este número" (ver components/KpiExplain.jsx).
 function compactRecord(r, extra) {
   return {
     fecha: r.fechaSolicitud, entrega: r.fechaEntrega || null, area: r.area || "Sin área",
@@ -44,82 +42,6 @@ function compactRecord(r, extra) {
 
 function isAnulado(r) {
   return r.estado === "Anulado";
-}
-
-// Botón "Explícame este número": pide al Agente IA (Anthropic, sin streaming)
-// una explicación puntual del KPI a partir de los registros
-// que lo componen, y la muestra en un modal con el mismo renderizado
-// Markdown del chat — se calcula una sola vez y se cachea mientras el
-// componente esté montado con las mismas props.
-function KpiExplain({ label, value, comparisonLabel, comparisonValue, records }) {
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [text, setText] = useState("");
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  async function handleClick() {
-    setOpen(true);
-    if (text || loading) return;
-    setLoading(true);
-    setError("");
-    try {
-      const { explanation } = await explainKpiApi({ label, value, comparisonLabel, comparisonValue, records });
-      setText(explanation);
-    } catch (err) {
-      setError(err.message || "No se pudo generar la explicación.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="kpi-explain">
-      <button type="button" className="kpi-explain-btn" onClick={handleClick}>
-        <IconSpark size={11} /> Explicar
-      </button>
-      {open && createPortal(
-        <div className="modal-overlay kpi-explain-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
-          <div className="modal kpi-explain-modal" role="dialog" aria-modal="true" aria-label={`Explicación de ${label}`}>
-            <div className="kpi-explain-head">
-              <span className="kpi-explain-modal-ic"><IconSpark size={18} /></span>
-              <div className="kpi-explain-head-txt">
-                <small>Explícame este número</small>
-                <h3>{label}</h3>
-              </div>
-              <button type="button" className="btn-ghost icon-btn" onClick={() => setOpen(false)} aria-label="Cerrar">✕</button>
-            </div>
-            <div className="kpi-explain-cifras">
-              <span className="kpi-explain-valor">{value}</span>
-              {comparisonLabel && comparisonValue != null && (
-                <span className="kpi-explain-comp">{comparisonLabel}: <b>{comparisonValue}</b></span>
-              )}
-            </div>
-            <div className="kpi-explain-body">
-              {loading && (
-                <div className="kpi-explain-loading" role="status">
-                  <span className="spinner" /> Nova está analizando los registros…
-                </div>
-              )}
-              {!loading && error && <div className="modal-error"><IconAlert size={13} /> {error}</div>}
-              {!loading && !error && <div className="chat-markdown">{renderMarkdown(text)}</div>}
-            </div>
-            <div className="kpi-explain-foot">
-              <span>Generado por Nova con los registros del período.</span>
-              <button type="button" className="btn" onClick={() => setOpen(false)}>Cerrar</button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
-  );
 }
 
 function estadoLabel(estado) {

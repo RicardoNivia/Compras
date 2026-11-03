@@ -7,7 +7,7 @@ import { listarEjecuciones } from "@/lib/notificacionesApi";
 import { RESULTADOS, CANALES } from "@/lib/notificacionesCatalogo";
 import { Texto, fechaHora, OrigenPill } from "@/components/notificaciones/ContenidoNotificacion";
 
-const PAGE_SIZES = [25, 50, 100];
+const PAGE_SIZES = [10, 25, 50, 100];
 const ENTREGA = { enviada: ["good", "Enviada"], error: ["critical", "Error"], omitida: ["muted", "Omitida"], pendiente: ["warning", "Pendiente"] };
 
 // Historial de una notificación: cada ejecución (programada, manual, con retraso o prueba) y sus entregas.

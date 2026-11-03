@@ -50,7 +50,7 @@ export async function sendReportEmail({ to, cc, subject, text, html, attachments
   if (!transporter) {
     throw new Error("El correo saliente no está configurado (SMTP_HOST/SMTP_USER/SMTP_PASSWORD en .env).");
   }
-  const fromName = process.env.SMTP_FROM_NAME || "Panel de Compras Sinco";
+  const fromName = process.env.SMTP_FROM_NAME || "Panel de Compras y Bienestar Sinco";
   try {
     await transporter.sendMail({
       from: `"${fromName}" <${process.env.SMTP_USER}>`,

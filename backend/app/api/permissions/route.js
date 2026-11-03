@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getFullMatrix, setPermission } from "@/lib/permissions";
+import { todosLosRoles } from "@/lib/rolesCatalogo";
 import { requirePermission, apiError } from "@/lib/apiGuard";
 
 // La propia Matriz de permisos se administra desde la sección Usuarios, así
@@ -37,8 +38,8 @@ import { requirePermission, apiError } from "@/lib/apiGuard";
 export async function GET() {
   const { denied } = await requirePermission("viewUsuarios");
   if (denied) return denied;
-  const matrix = await getFullMatrix();
-  return NextResponse.json({ matrix });
+  const [matrix, roles] = await Promise.all([getFullMatrix(), todosLosRoles()]);
+  return NextResponse.json({ matrix, roles: roles.map(({ clave, nombre, sistema }) => ({ clave, nombre, sistema })) });
 }
 
 /**

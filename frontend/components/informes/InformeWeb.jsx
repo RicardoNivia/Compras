@@ -387,7 +387,7 @@ export default function InformeWeb({ informe, content, cargando, generadoAt, acc
     <article className={`inf-web${cargando && content ? " actualizando" : ""}`} aria-label={informe.nombre || "Informe"}>
       <header className="inf-hero">
         <div style={{ minWidth: 0 }}>
-          <small>Sinco · Panel de Compras</small>
+          <small>Sinco · Panel de Compras y Bienestar</small>
           <h1>{informe.nombre || "Informe sin título"}</h1>
           <p>
             {periodoCorto(informe.periodoGeneral)}{audiencia ? ` · Para ${audiencia}` : ""}{subtitulo ? ` · ${subtitulo}` : ""}

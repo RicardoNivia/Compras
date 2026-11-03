@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePermission, apiError } from "@/lib/apiGuard";
+import { requireAlgunPermiso, apiError } from "@/lib/apiGuard";
 
 // Lista mínima de usuarios de la aplicación (id + nombre) para el picker del
 // maestro "Responsable" (ver MaestroModal.jsx) — gateado por "viewMaestros" y
@@ -35,7 +35,7 @@ import { requirePermission, apiError } from "@/lib/apiGuard";
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function GET() {
-  const { denied } = await requirePermission("viewMaestros");
+  const { denied } = await requireAlgunPermiso(["viewMaestros", "viewMaestrosBienestar"]);
   if (denied) return denied;
   try {
     const usuarios = await prisma.user.findMany({

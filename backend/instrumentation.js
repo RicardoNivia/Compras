@@ -21,5 +21,9 @@ export async function register() {
     // Valora en segundo plano las compras radicadas que aún no tienen valoración con IA (ver lib/valoracionAuto.js).
     const { startValoracionAutomatica } = await import("@/lib/valoracionAuto");
     startValoracionAutomatica();
+
+    // Análisis de Nova del Resumen de Bienestar, el día 1 de cada mes (ver lib/analisisBienestar.js).
+    const { startAnalisisBienestarScheduler } = await import("@/lib/analisisBienestar");
+    startAnalisisBienestarScheduler();
   }
 }

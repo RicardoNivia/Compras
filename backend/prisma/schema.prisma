@@ -41,13 +41,161 @@ model Record {
   trm                 Float?   // TRM usada para convertir valorUsd a pesos — solo si moneda = "USD"
   observaciones       String?
   radicado            Boolean  @default(false)
+  actividad           String?  // nombre de la actividad de Bienestar — snapshot; al listar se reemplaza por el nombre ACTUAL si actividadId resuelve
+  actividadId         Int?     // actividad de Bienestar a la que se carga esta compra (FK): su gasto cuenta contra el presupuesto de la actividad
+  actividadRef        ActividadBienestar? @relation(fields: [actividadId], references: [id], onUpdate: Cascade, onDelete: Restrict)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   calificacion        CalificacionProveedor?
   valoracion          ValoracionCompra?
 
   @@index([proveedorNit])
+  @@index([actividadId])
   @@map("records")
+}
+
+// Actividad del módulo de Bienestar (cronograma anual): qué se hace, cuándo, con cuánto presupuesto y cuánta gente.
+// Las compras se le asocian desde el formulario de Compras (Record.actividadId); su gasto se suma contra "presupuesto".
+// Una actividad con compras asociadas no se puede eliminar (FK RESTRICT): primero se desasocian.
+model ActividadBienestar {
+  id                Int      @id @default(autoincrement())
+  nombre            String
+  fecha             String?  // YYYY-MM-DD (igual que las fechas de Record); null solo mientras está "creada". Es la fecha de inicio
+  fechaFin          String?  // YYYY-MM-DD, último día si dura varios días (null = un solo día); nunca antes de fecha
+  linea             String   @default("Bienestar") // "Bienestar" | "Fundación"
+  estado            String   @default("creada") // "creada" → "programada" → "ejecutada" → "cerrada" (cerrada: no recibe compras nuevas)
+  descripcion       String?
+  responsableUserId String?  // sin FK, igual que el resto de referencias a User
+  responsableNombre String?  // snapshot
+  presupuesto       Float?   // valor asignado en pesos; null = sin asignar
+  inscritos         Int?
+  asistentes        Int?
+  enCronograma      Boolean  @default(true) // false = actividad extra, realizada fuera del cronograma planeado
+  aplicaParticipantes Boolean @default(true) // false = no maneja participantes ni asistencia: no cuentan en cifras ni en la calificación de Nova
+  observaciones     String?
+  createdAt         DateTime @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?  // "Importación Excel" para las que vienen de la base de Bienestar
+  updatedAt         DateTime @updatedAt
+  // Cierre: al pasar a "cerrada" se califica la actividad (1 a 5) y queda quién y cuándo la cerró.
+  calificacion      Int?
+  comentarioCierre  String?
+  cerradaAt         DateTime?
+  cerradaPorUserId  String?
+  cerradaPorNombre  String?
+  // Formulario público de inscripción (enlace sin iniciar sesión, reemplaza Microsoft Forms): /inscripcion/<token>.
+  formularioToken   String?  @unique
+  formularioAbierto Boolean  @default(false)
+  formularioCampos  String?  // JSON: [{ clave, etiqueta, tipo: texto|numero|opcion|si_no|fecha|parrafo, opciones?, obligatorio, sensible }]
+  compras           Record[]
+  participantes     ParticipanteActividad[]
+  inventario        InventarioActividad[]
+  fotos             FotoActividad[]
+  observacionesEquipo ObservacionActividad[]
+  analisisNova      AnalisisActividad?
+  solicitudesCompra SolicitudCompra[]
+
+  @@index([fecha])
+  @@map("actividades_bienestar")
+}
+
+// Una persona inscrita (o registrada) en una actividad de Bienestar: primero se cargan los inscritos (formulario
+// público, Excel de Forms o a mano) y después se marca quién asistió. "datos" guarda los campos propios de la
+// actividad (distancia, talla, equipo, acompañantes, hijos, transporte…, incluidos los sensibles que traigan los
+// formularios); los sensibles solo los ve quien puede editar Bienestar (ver lib/participantesBienestar.js).
+model ParticipanteActividad {
+  id                 Int       @id @default(autoincrement())
+  actividadId        Int
+  actividad          ActividadBienestar @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  nombre             String
+  documento          String?   // sin puntos ni espacios; con él se evita inscribir dos veces a la misma persona
+  area               String?   // snapshot; areaId → Maestro "areaParticipante" (sin FK, igual que Record.areaId)
+  areaId             String?
+  correo             String?
+  inscrito           Boolean   @default(true)
+  asistio            Boolean?  // null = aún no se registra la asistencia
+  motivoInasistencia String?   // "Incapacidad médica" | "Compromisos laborales" | "Motivos personales" | "Calamidad familiar" | "Vacaciones" | "Viaje" | "Sin justificación" | "Otro"
+  motivoInasistenciaId String? // → Maestro "motivoInasistencia"
+  calificacion       Int?      // 1 a 5, la que da la persona a la actividad
+  observacion        String?
+  datos              String?   // JSON con los campos propios de la actividad
+  origen             String    @default("manual") // "formulario" | "importacion" | "manual"
+  autorizaDatos      Boolean   @default(false) // autorización de tratamiento de datos (Ley 1581), obligatoria en el formulario público
+  autorizaDatosAt    DateTime?
+  createdAt          DateTime  @default(now())
+  creadoPorUserId    String?
+  creadoPorNombre    String?   // "Formulario público" / "Importación Excel" cuando no lo creó una persona de la app
+  updatedAt          DateTime  @updatedAt
+
+  @@index([actividadId])
+  @@index([documento])
+  @@map("participantes_actividad")
+}
+
+// Material fotográfico de una actividad. La imagen se guarda ya reducida (máx. 1.600 px, JPEG) más una miniatura
+// (máx. 480 px) para la galería; las que se suben desde la app se reducen en el navegador. origen "informe" = sacada
+// de los informes mensuales en PDF (fuente dice de cuál y qué página). hash evita subir la misma foto dos veces.
+model FotoActividad {
+  id              Int       @id @default(autoincrement())
+  actividadId     Int
+  actividad       ActividadBienestar @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  nombre          String
+  descripcion     String?
+  mime            String    // "image/jpeg" | "image/png" | "image/webp"
+  ancho           Int
+  alto            Int
+  bytes           Int
+  datos           Bytes
+  miniatura       Bytes
+  hash            String    // sha1 de la imagen reducida
+  origen          String    @default("app") // "app" | "informe"
+  fuente          String?   // p. ej. "Informe Bienestar Junio.pdf · página 4"
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([actividadId, hash])
+  @@index([actividadId])
+  @@map("fotos_actividad")
+}
+
+// Observaciones que el equipo anota sobre una actividad (pestaña Encuesta y observaciones). Las de los participantes
+// siguen en ParticipanteActividad.observacion.
+model ObservacionActividad {
+  id              Int       @id @default(autoincrement())
+  actividadId     Int
+  actividad       ActividadBienestar @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  texto           String
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@index([actividadId])
+  @@map("observaciones_actividad")
+}
+
+// Inventario de una actividad: lo que se compró o se tenía (refrigerios, detalles, materiales…), cuánto se usó y
+// cuánto quedó. El sobrante es lo que permite medir la pérdida por ausentismo.
+model InventarioActividad {
+  id              Int       @id @default(autoincrement())
+  actividadId     Int
+  actividad       ActividadBienestar @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  item            String
+  unidad          String?   // snapshot; unidadId → Maestro "unidadInventario"
+  unidadId        String?
+  cantidad        Float     // lo que había al empezar
+  usado           Float?    // lo que se usó (null = aún no se registra)
+  costoUnitario   Float?
+  recordId        String?   // compra de la que salió (opcional, sin FK: la compra puede borrarse y el inventario queda)
+  observacion     String?
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime  @updatedAt
+
+  @@index([actividadId])
+  @@map("inventario_actividad")
 }
 
 // Calificación del proveedor para una compra puntual (estilo Uber/Rappi: 1 a
@@ -185,6 +333,8 @@ model Maestro {
   activo          Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  creadoPorUserId String?
+  creadoPorNombre String?
 
   @@unique([tipo, valor])
   @@map("maestros")
@@ -414,6 +564,23 @@ model RolePermission {
   @@map("role_permissions")
 }
 
+// Roles creados desde la interfaz (Usuarios › Roles), además de los 5 del sistema que viven en lib/roles.js (esos
+// tienen reglas propias en el código: campos de Legalizar, radicado, etc.). Un rol personalizado no tiene ningún
+// permiso por defecto: sus funcionalidades son filas de RolePermission (la misma Matriz de permisos). User.role
+// guarda la clave. Solo se puede eliminar si ningún usuario lo tiene.
+model RolPersonalizado {
+  id              Int      @id @default(autoincrement())
+  clave           String   @unique // lo que se guarda en User.role y RolePermission.role (minúsculas, sin espacios)
+  nombre          String
+  descripcion     String?
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("roles")
+}
+
 // Informe ejecutivo configurable por prompt (ver lib/reportContent.js): el
 // admin describe en lenguaje natural qué debe contener, el sistema genera una
 // vista previa con IA antes de guardar, y una vez guardado se envía por
@@ -632,8 +799,8 @@ model EventoNotificacion {
 // Una entrega por destinatario y canal. Las de canal "app" son la bandeja de cada persona.
 model NotificacionEntrega {
   id              Int                   @id @default(autoincrement())
-  ejecucionId     Int
-  ejecucion       NotificacionEjecucion @relation(fields: [ejecucionId], references: [id], onDelete: Cascade)
+  ejecucionId     Int?                  // null = aviso directo del sistema, sin regla configurada (p. ej. solicitudes de compra)
+  ejecucion       NotificacionEjecucion? @relation(fields: [ejecucionId], references: [id], onDelete: Cascade)
   userId          String
   userNombre      String
   canal           String                // "app" | "teams"
@@ -651,4 +818,76 @@ model NotificacionEntrega {
   @@index([userId, canal, leidaAt])
   @@index([estado, proximoIntento])
   @@map("notificacion_entregas")
+}
+
+// Análisis de Nova del Resumen de Bienestar (uno por línea, año y mes; mes 0 = el general del año). Se genera solo el
+// día 1 de cada mes (el del mes que terminó y el general hasta ese corte, ver lib/analisisBienestar.js) y a pedido
+// con "Resumir de nuevo", que lo reemplaza. puntos: [{ tipo: "logro"|"alerta"|"idea", texto }].
+model AnalisisBienestar {
+  id              Int      @id @default(autoincrement())
+  linea           String   // "Bienestar" | "Fundación"
+  anio            Int
+  mes             Int      @default(0) // 1-12; 0 = general del año
+  titulo          String
+  resumen         String
+  puntos          Json
+  corte           String   // YYYY-MM-DD: datos hasta ese día
+  origen          String   @default("automatico") // "automatico" | "manual"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@unique([linea, anio, mes])
+  @@map("analisis_bienestar")
+}
+
+// Análisis de Nova de una actividad, con su propio puntaje de 1 a 5 (ver lib/analisisActividad.js): se genera al cerrarla,
+// junto a la calificación de la persona (ActividadBienestar.calificacion), o a pedido; regenerarlo lo reemplaza.
+// puntos: [{ tipo: "logro"|"alerta"|"idea", texto }].
+model AnalisisActividad {
+  id              Int      @id @default(autoincrement())
+  actividadId     Int      @unique
+  actividad       ActividadBienestar @relation(fields: [actividadId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  puntaje         Int
+  titulo          String
+  resumen         String
+  puntos          Json
+  origen          String   @default("cierre") // "cierre" | "manual" | "automatico" | "agente"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@map("analisis_actividad")
+}
+
+// Bienestar le pide una compra a Compras desde una actividad ya registrada (ver lib/solicitudesCompra.js). Sale de la
+// lista cuando se genera la compra (recordId) o se rechaza (motivoRechazo).
+model SolicitudCompra {
+  id                Int      @id @default(autoincrement())
+  actividadId       Int
+  actividad         ActividadBienestar @relation(fields: [actividadId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  descripcion       String
+  valorEstimado     Float?
+  categoria         String?  // snapshot; categoriaId → Maestro "categoria"
+  categoriaId       String?
+  proveedorSugerido String?
+  fechaRequerida    String?  // YYYY-MM-DD
+  observaciones     String?
+  estado            String   @default("pendiente") // pendiente → generando → creada | rechazada | cancelada
+  motivoRechazo     String?
+  recordId          String?  // la compra generada (sin FK: la compra puede borrarse después)
+  recordSeq         Int?
+  atendidaAt        DateTime?
+  atendidaPorUserId String?
+  atendidaPorNombre String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+
+  @@index([estado])
+  @@index([actividadId])
+  @@map("solicitudes_compra")
 }

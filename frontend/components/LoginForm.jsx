@@ -6,9 +6,9 @@ import { IconArrowRight, IconCheck } from "@/components/icons";
 import ContactAdminModal from "@/components/ContactAdminModal";
 
 const FEATURES = [
-  "Aprobaciones más rápidas",
-  "Datos de compras siempre al día",
-  "Reportes y gráficos en un clic",
+  "Compras, proveedores y presupuesto al día",
+  "Actividades de Bienestar y Fundación, con su asistencia y su costo",
+  "Reportes y análisis de Nova en un clic",
 ];
 
 export default function LoginForm() {
@@ -52,12 +52,12 @@ export default function LoginForm() {
 
         <div className="login-side-top">
           <div className="login-side-mark">S</div>
-          <span className="login-side-brand">Sinco · Compras</span>
+          <span className="login-side-brand">Sinco · Panel de Compras y Bienestar</span>
         </div>
 
         <div className="login-side-copy">
-          <h1>Visibilidad total de tus compras.</h1>
-          <p>Un solo lugar para radicar, legalizar y hacer seguimiento a cada solicitud de compra, con reportes al instante.</p>
+          <h1>Tus compras y el bienestar de tu gente, en un solo lugar.</h1>
+          <p>Radica, legaliza y haz seguimiento a cada compra. Planea las actividades de Bienestar y Fundación, y mira cuánta gente participó y cuánto costó.</p>
         </div>
 
         <div className="login-side-features">

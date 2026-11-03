@@ -89,6 +89,23 @@ export function canViewPresupuesto(role) {
   return role === ROLES.ADMIN;
 }
 
+// Módulo de Bienestar: actividades del cronograma, su presupuesto y las compras asociadas.
+export function canViewBienestar(role) {
+  return role === ROLES.ADMIN || role === ROLES.REGISTRO;
+}
+
+export function canViewDashboardBienestar(role) {
+  return role === ROLES.ADMIN || role === ROLES.REGISTRO;
+}
+
+export function canViewMaestrosBienestar(role) {
+  return role === ROLES.ADMIN || role === ROLES.REGISTRO;
+}
+
+export function canEditBienestar(role) {
+  return role === ROLES.ADMIN || role === ROLES.REGISTRO;
+}
+
 export function canViewReportes(role) {
   return role === ROLES.ADMIN;
 }

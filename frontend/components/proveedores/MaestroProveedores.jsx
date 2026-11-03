@@ -9,11 +9,12 @@ import BuscarConNova from "@/components/proveedores/BuscarConNova";
 import ProveedorDetalleModal from "@/components/proveedores/ProveedorDetalleModal";
 import ProveedorFormModal from "@/components/proveedores/ProveedorFormModal";
 import InformeMensualModal from "@/components/proveedores/InformeMensualModal";
+import FechaActualizacionModal from "@/components/proveedores/FechaActualizacionModal";
 import { usePantallaNova } from "@/lib/novaPantalla";
 import ValoracionPuntaje from "@/components/ValoracionPuntaje";
 import { esCritico, claveCriticidad, fmtFecha } from "@/lib/proveedoresOpciones";
 
-const VACIO = { q: "", clasificacion: [], estado: [], checklist: "", criticidad: "", areaId: "", clasificacionMontoId: "", tipoServicioId: "", excepcion: "" };
+const VACIO = { q: "", clasificacion: [], estado: [], checklist: "", criticidad: "", areaId: "", clasificacionMontoId: "", tipoServicioId: "", excepcion: "", registradoDesde: "", registradoHasta: "" };
 const PAGE_SIZES = [25, 50, 100];
 
 // Misma nomenclatura de la página original de Gestión de Proveedores.
@@ -103,6 +104,8 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit, i
   const [seleccion, setSeleccion] = useState(() => new Set());
   const [estadoMasivo, setEstadoMasivo] = useState("en_proceso");
   const [ocupado, setOcupado] = useState(false);
+  // Aprobación pendiente de la fecha de actualización: { titulo, aplicar(fecha) }.
+  const [aprobando, setAprobando] = useState(null);
   // Proveedor a eliminar (confirmación). Solo se puede si ningún registro de compra lo usa.
   const [eliminando, setEliminando] = useState(null);
   const [borrando, setBorrando] = useState(false);
@@ -169,12 +172,16 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit, i
   }
 
   // Cambiar el estado de un proveedor directamente desde la tabla.
-  async function cambiarEstado(r, estado) {
+  async function cambiarEstado(r, estado, fechaActualizacion) {
+    if (estado === "actualizado" && !fechaActualizacion) {
+      setAprobando({ titulo: `«${r.nombre}» (NIT ${r.nit}) pasa a Actualizado.`, aplicar: (fecha) => cambiarEstado(r, estado, fecha) });
+      return;
+    }
     setError("");
     setAviso("");
     setOcupado(true);
     try {
-      await cambiarEstadoCicloApi(r.nit, estado);
+      await cambiarEstadoCicloApi(r.nit, estado, fechaActualizacion);
       setAviso(`«${r.nombre}» pasó a ${ESTADOS.find((e) => e.key === estado)?.label}.`);
     } catch (err) {
       setError(err.message || "No se pudo cambiar el estado.");
@@ -205,6 +212,15 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit, i
       setError(err.message || "No se pudo guardar el requisito.");
     }
     recargar();
+  }
+
+  function aplicarEstadoMasivo() {
+    const texto = `Estado «${ESTADOS.find((e) => e.key === estadoMasivo)?.label}»`;
+    if (estadoMasivo !== "actualizado") { accionMasiva({ tipo: "estado", estado: estadoMasivo }, texto); return; }
+    setAprobando({
+      titulo: `${seleccion.size} proveedor(es) seleccionado(s) pasan a Actualizado con la misma fecha.`,
+      aplicar: (fecha) => accionMasiva({ tipo: "estado", estado: estadoMasivo, fechaActualizacion: fecha }, texto),
+    });
   }
 
   async function accionMasiva(body, texto) {
@@ -243,7 +259,7 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit, i
   usePantallaNova(
     `Pantalla Gestión de proveedores (ciclo ${data.anio}, corte en ${data.diasParaCorte} días). Pestaña activa: ${actual.label} con ${filas.length} proveedores${conToggle && soloIncompletos[pestana] ? " (solo con checklist incompleto)" : ""}. Conteos por pestaña: ${PESTANAS.map((p) => `${p.label} ${conteos[p.key]}`).join(", ")}. Filtros activos: ${hayFiltros ? "sí" : "ninguno"}.${seleccion.size ? ` Seleccionados: ${seleccion.size}.` : ""}`
   );
-  const columnas = 6 + (esChecklist ? 12 : (conEstado ? 4 : 2) + 5) + (seleccionable ? 1 : 0);
+  const columnas = 6 + (esChecklist ? 13 : (conEstado ? 4 : 2) + 6) + (seleccionable ? 1 : 0);
 
   function alternarSeleccion(id) {
     const n = new Set(seleccion);
@@ -322,6 +338,12 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit, i
               <option value="completo">Checklist completo</option>
               <option value="incompleto">Checklist incompleto</option>
             </select>
+            <label className={`prov-filtro-mes${filters.registradoDesde || filters.registradoHasta ? " activo" : ""}`} title="Fecha en que se registró el proveedor (desde / hasta, ambas incluidas)">
+              Registrado
+              <input type="date" aria-label="Registrado desde" value={filters.registradoDesde} max={filters.registradoHasta || undefined} onChange={(e) => cambiar({ registradoDesde: e.target.value })} />
+              a
+              <input type="date" aria-label="Registrado hasta" value={filters.registradoHasta} min={filters.registradoDesde || undefined} onChange={(e) => cambiar({ registradoHasta: e.target.value })} />
+            </label>
           </div>
         )}
       </div>
@@ -359,7 +381,7 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit, i
               {ESTADOS.map((e) => <option key={e.key} value={e.key}>{e.label}</option>)}
             </select>
           </label>
-          <button type="button" className="btn small" disabled={ocupado} onClick={() => accionMasiva({ tipo: "estado", estado: estadoMasivo }, `Estado «${ESTADOS.find((e) => e.key === estadoMasivo)?.label}»`)}>Aplicar</button>
+          <button type="button" className="btn small" disabled={ocupado} onClick={() => aplicarEstadoMasivo()}>Aplicar</button>
           <div className="spacer" />
           <button type="button" className="btn small" onClick={() => setSeleccion(new Set())}>Quitar selección</button>
         </div>
@@ -388,10 +410,12 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit, i
                 {esChecklist && <th>Estado</th>}
                 {esChecklist && <th>Tipo</th>}
                 <th>Área</th>
+                {esChecklist && <th>Últ. actualización</th>}
                 {!esChecklist && <th>Tipo</th>}
                 {!esChecklist && <th>Clasificación por monto</th>}
                 {!esChecklist && <th>Tipo de servicio</th>}
                 {!esChecklist && <th>Excepción</th>}
+                {!esChecklist && <th title="Fecha en que se registró el proveedor">Registrado</th>}
                 {!esChecklist && <th>Últ. actualización</th>}
                 {!esChecklist && <th title="Calificación general de Nova: promedio del puntaje del proveedor en sus compras valoradas">Calificación Nova</th>}
                 {conEstado && <th>Estado</th>}
@@ -444,11 +468,13 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit, i
                     )}
                     {esChecklist && <td>{celdaCriticidad(r)}</td>}
                     <td className="truncate">{r.area || "—"}</td>
+                    {esChecklist && <td className="mono">{fmtFecha(r.fechaActualizacion)}</td>}
                     {!esChecklist && <td>{celdaCriticidad(r)}</td>}
                     {!esChecklist && <td className="truncate">{celdaTexto(r.clasificacionMonto)}</td>}
                     {!esChecklist && <td className="truncate">{celdaTexto(r.servicio)}</td>}
                     {!esChecklist && <td>{r.esExcepcion ? <span className="pill accent">Sí</span> : <span className="pill muted">No</span>}</td>}
-                    {!esChecklist && <td className="mono">{r.esExcepcion ? <span className="muted">No aplica</span> : fmtFecha(r.fechaActualizacion)}</td>}
+                    {!esChecklist && <td className="mono">{r.clasificacion === "por_registrar" ? <span className="muted">Sin registrar</span> : fmtFecha(r.createdAt)}</td>}
+                    {!esChecklist && <td className="mono">{fmtFecha(r.fechaActualizacion)}</td>}
                     {!esChecklist && (
                       <td>
                         {r.valoracionIA
@@ -567,12 +593,21 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit, i
         <ProveedorFormModal
           proveedor={editando}
           catalogos={catalogos}
+          inicioCiclo={data.inicioCiclo}
           onClose={() => setEditando(null)}
           onSaved={() => { setEditando(null); recargar(); }}
           onClasificado={() => { setEditando(null); recargar(); }}
         />
       )}
       {informe && <InformeMensualModal onClose={() => setInforme(false)} />}
+      {aprobando && (
+        <FechaActualizacionModal
+          titulo={aprobando.titulo}
+          inicioCiclo={data.inicioCiclo}
+          onCancel={() => setAprobando(null)}
+          onConfirm={async (fecha) => { const { aplicar } = aprobando; setAprobando(null); await aplicar(fecha); }}
+        />
+      )}
       {eliminando && (
         <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !borrando) setEliminando(null); }}>
           <div className="modal" role="alertdialog" aria-modal="true" aria-labelledby="prov-eliminar-t" style={{ maxWidth: 460 }}>

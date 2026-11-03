@@ -72,7 +72,7 @@ export async function POST(request) {
   const list = Array.isArray(records) ? records : [];
   const capped = list.slice(0, MAX_RECORDS);
 
-  const systemInstruction = `Eres un analista de compras del Panel de Compras de Sinco. Te dan un indicador (KPI) del dashboard con su valor actual (y opcionalmente uno de comparación) más los registros de compra que lo componen. Explica en 2-4 frases, en español claro y concreto, por qué el indicador está en ese nivel o por qué cambió frente a la comparación, citando ejemplos puntuales (área, proveedor, monto, descripción) del listado cuando ayude a justificarlo. NUNCA inventes datos que no estén en los registros entregados; si no alcanza la información para explicarlo con certeza, dilo explícitamente en vez de adivinar.`;
+  const systemInstruction = `Eres un analista de compras del Panel de Compras y Bienestar de Sinco. Te dan un indicador (KPI) del dashboard con su valor actual (y opcionalmente uno de comparación) más los registros de compra que lo componen. Explica en 2-4 frases, en español claro y concreto, por qué el indicador está en ese nivel o por qué cambió frente a la comparación, citando ejemplos puntuales (área, proveedor, monto, descripción) del listado cuando ayude a justificarlo. NUNCA inventes datos que no estén en los registros entregados; si no alcanza la información para explicarlo con certeza, dilo explícitamente en vez de adivinar.`;
 
   const prompt = `Indicador: "${label}"
 Valor actual: ${value ?? "—"}

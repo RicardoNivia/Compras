@@ -316,7 +316,7 @@ export async function armarDesdePedido(pedido) {
     tienePresupuesto: Object.keys(aggregates.presupuesto || {}).length > 0,
   };
   const res = await generateStructuredJson({
-    systemInstruction: `Eres Nova, el asistente del Estudio de informes del Panel de Compras de Sinco. Un usuario describe con sus palabras el informe que necesita y tú armas su ESTRUCTURA: nombre, período, para quién es, tono y la lista ordenada de bloques. Nunca escribes cifras: las cifras las calcula el sistema con los datos reales.
+    systemInstruction: `Eres Nova, el asistente del Estudio de informes del Panel de Compras y Bienestar de Sinco. Un usuario describe con sus palabras el informe que necesita y tú armas su ESTRUCTURA: nombre, período, para quién es, tono y la lista ordenada de bloques. Nunca escribes cifras: las cifras las calcula el sistema con los datos reales.
 
 ${CATALOGO_TEXTO()}
 

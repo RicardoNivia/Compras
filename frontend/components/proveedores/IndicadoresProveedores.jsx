@@ -10,6 +10,7 @@ import ExplicarProveedoresIA from "@/components/proveedores/ExplicarProveedoresI
 import { saveBlob } from "@/lib/exportHelpers";
 import { usePantallaNova } from "@/lib/novaPantalla";
 import { fmtCOP } from "@/lib/format";
+import { fmtFecha } from "@/lib/proveedoresOpciones";
 
 const entero = (v) => String(Math.round(v));
 const PDF = { navy: [12, 39, 72], blue: [27, 95, 184], ink: [11, 34, 57], muted: [100, 125, 151], good: [11, 107, 46], warn: [217, 119, 6], light: [79, 151, 232] };
@@ -295,10 +296,10 @@ export default function IndicadoresProveedores({ data }) {
           ) : (
             <div className="prov-scroll">
               <table className="prov-table">
-                <thead><tr><th scope="col">Proveedor</th><th scope="col">Estado</th></tr></thead>
+                <thead><tr><th scope="col">Proveedor</th><th scope="col">Estado</th><th scope="col">Últ. actualización</th></tr></thead>
                 <tbody>
                   {data.atencion.map((p) => (
-                    <tr key={p.id}><td><strong>{p.nombre}</strong><div className="mono muted">{p.area || p.nit}</div></td><td>{p.estadoLabel}</td></tr>
+                    <tr key={p.id}><td><strong>{p.nombre}</strong><div className="mono muted">{p.area || p.nit}</div></td><td>{p.estadoLabel}</td><td className="mono">{fmtFecha(p.fechaActualizacion)}</td></tr>
                   ))}
                 </tbody>
               </table>

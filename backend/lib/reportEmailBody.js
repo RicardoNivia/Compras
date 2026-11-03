@@ -65,7 +65,7 @@ export function buildDefaultEmailBody(content, { nombre, cuerpoModo }) {
   if (cuerpoModo === "resumen") {
     return `${saludo}\n\nResumen de "${nombre}":\n${summaryLines(content)}\n\nEncuentra el detalle completo, con gráficas, en el PDF adjunto.\n\n${cierre}`;
   }
-  return `${saludo}\n\nEncuentra adjunto el informe "${nombre}", generado automáticamente por el Panel de Compras de Sinco.\n\n${cierre}`;
+  return `${saludo}\n\nEncuentra adjunto el informe "${nombre}", generado automáticamente por el Panel de Compras y Bienestar de Sinco.\n\n${cierre}`;
 }
 
 // Cuerpo del correo en TEXTO PLANO (nunca HTML) — independiente del contenido

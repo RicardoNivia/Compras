@@ -41,7 +41,7 @@
     "aprobado": ["aprobado", "ok", "ok aprobado"],
     "en_aprobacion": ["en aprobacion"],
     "en_proceso": ["en proceso", "pendiente", "en revision", "solicitado", "en espera de respuesta"],
-    "inactivo": ["desvinculado", "no apto para actualizacion", "no apto", "anulado", "descarte"]
+    "inactivo": ["inactivo", "desvinculado", "no apto para actualizacion", "no apto", "anulado", "descarte"]
   },
 
   "_revision": "La columna de Revisión (Revisión Andrea / Yuli: Financiero, SRM) NO se migra. Estos valores solo sirven para detectar columnas corridas.",
@@ -88,7 +88,7 @@
       "crearNuevos": true,
       "compuestos": { "separador": "/", "unir": " / ", "ordenar": true },
       "valores": {
-        "Administrativo": [],
+        "Administrativo": ["adminsitrativo"],
         "Bienestar": [],
         "Bitakora": [],
         "Cosmos": [],
@@ -124,7 +124,7 @@
         "Conciliación extrajudicial": [],
         "Salud": []
       },
-      "invalidos": ["gentesoft"]
+      "invalidos": ["gentesoft", "critico"]
     }
   },
 

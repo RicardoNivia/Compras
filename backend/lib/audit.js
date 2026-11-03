@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { FIELD_LABELS, TOKEN_FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS, NOTIFICACION_FIELD_LABELS } from "@/lib/auditLabels";
+import { FIELD_LABELS, TOKEN_FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS, NOTIFICACION_FIELD_LABELS, ACTIVIDAD_FIELD_LABELS, SOLICITUD_COMPRA_FIELD_LABELS, ROL_FIELD_LABELS, DETALLE_FIELD_LABELS } from "@/lib/auditLabels";
 
 export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, TOKEN_FIELD_LABELS, ACTION_LABELS, ENTITY_LABELS } from "@/lib/auditLabels";
 
@@ -99,6 +99,78 @@ export async function logMaestroUpdate(actor, before, after) {
 export async function logMaestroDelete(actor, maestro) {
   const changes = diffFields(maestro, null, MAESTRO_FIELD_LABELS);
   await writeLog({ action: "eliminar", entityType: "maestro", recordId: maestro.id, recordInfo: maestroSummary(maestro), actor, changes });
+}
+
+// ---------- Actividades de Bienestar (ver lib/actividadesBienestar.js) ----------
+
+const actividadSummary = (a) => [a.fecha, a.nombre].filter(Boolean).join(" · ") || `Actividad ${a.id}`;
+
+export async function logActividadCreate(actor, a) {
+  const changes = diffFields(null, a, ACTIVIDAD_FIELD_LABELS);
+  await writeLog({ action: "crear", entityType: "actividad", recordId: String(a.id), recordInfo: actividadSummary(a), actor, changes });
+}
+
+export async function logActividadUpdate(actor, before, after) {
+  const changes = diffFields(before, after, ACTIVIDAD_FIELD_LABELS);
+  if (!changes.length) return;
+  await writeLog({ action: "editar", entityType: "actividad", recordId: String(after.id), recordInfo: actividadSummary(after), actor, changes });
+}
+
+export async function logActividadDelete(actor, a) {
+  const changes = diffFields(a, null, ACTIVIDAD_FIELD_LABELS);
+  await writeLog({ action: "eliminar", entityType: "actividad", recordId: String(a.id), recordInfo: actividadSummary(a), actor, changes });
+}
+
+// Participantes, inventario y formulario de una actividad: una entrada legible por acción, con la actividad como
+// recordId (así el historial de la actividad las reúne). Sin actor = el formulario público.
+const actorPublico = (actor) => actor || { nombre: "Formulario público" };
+
+export async function logParticipantes(actor, actividad, action, detalle) {
+  await writeLog({ action, entityType: "participante", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor: actorPublico(actor), changes: [{ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle }] });
+}
+
+export async function logInventario(actor, actividad, action, detalle) {
+  await writeLog({ action, entityType: "inventario", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor, changes: [{ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle }] });
+}
+
+export async function logObservacionActividad(actor, actividad, action, detalle) {
+  await writeLog({ action, entityType: "observacionActividad", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
+}
+
+export async function logFotos(actor, actividad, action, detalle) {
+  await writeLog({ action, entityType: "fotoActividad", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor, changes: [{ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle }] });
+}
+
+// Análisis de Nova del Resumen de Bienestar (lib/analisisBienestar.js): quién lo generó o lo regeneró y de qué período.
+export async function logAnalisisBienestar(actor, analisis, action, detalle) {
+  await writeLog({ action, entityType: "analisisBienestar", recordId: String(analisis.id), recordInfo: `${analisis.linea} · ${analisis.mes ? `${analisis.anio}-${String(analisis.mes).padStart(2, "0")}` : `${analisis.anio} (general)`}`, actor, changes: [{ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle }] });
+}
+
+export async function logAnalisisActividad(actor, actividad, action, detalle) {
+  await writeLog({ action, entityType: "analisisActividad", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor, changes: [{ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle }] });
+}
+
+const solicitudSummary = (s) => `${s.actividad || `Actividad ${s.actividadId}`} · ${String(s.descripcion).slice(0, 80)}`;
+
+export async function logSolicitudCompraCreada(actor, s) {
+  await writeLog({ action: "crear", entityType: "solicitudCompra", recordId: String(s.id), recordInfo: solicitudSummary(s), actor, changes: diffFields(null, s, SOLICITUD_COMPRA_FIELD_LABELS) });
+}
+
+export async function logSolicitudCompra(actor, s, action, detalle) {
+  await writeLog({ action, entityType: "solicitudCompra", recordId: String(s.id), recordInfo: solicitudSummary(s), actor, changes: [{ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle }] });
+}
+
+export async function logAgenteEvaluacion(actor, trabajoId, detalle) {
+  await writeLog({ action: "editar", entityType: "agenteEvaluacion", recordId: String(trabajoId), recordInfo: "Agente de evaluación de actividades", actor, changes: [{ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle }] });
+}
+
+// Asociar o quitar una compra desde la actividad: además de la entrada de la compra, queda en el historial de la actividad.
+export async function logCompraDeActividad(actor, actividad, detalle) {
+  await writeLog({ action: "editar", entityType: "actividad", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor, changes: [{ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle }] });
+}
+
+export async function logFormularioActividad(actor, actividad, verbo) {
+  await writeLog({ action: "editar", entityType: "formularioActividad", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor, changes: [{ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: `${verbo[0].toUpperCase()}${verbo.slice(1)} el formulario público de inscripción` }] });
 }
 
 // ---------- Proveedores ----------
@@ -238,6 +310,24 @@ export async function logPermissionChange(actor, role, roleLabel, featureLabel, 
     actor,
     changes,
   });
+}
+
+// ---------- Roles personalizados (ver lib/rolesPersonalizados.js) ----------
+
+export async function logRolCreate(actor, rol) {
+  const changes = diffFields(null, rol, ROL_FIELD_LABELS);
+  await writeLog({ action: "crear", entityType: "rol", recordId: rol.clave, recordInfo: `Rol "${rol.nombre}"`, actor, changes });
+}
+
+export async function logRolUpdate(actor, before, after) {
+  const changes = diffFields(before, after, { nombre: ROL_FIELD_LABELS.nombre, descripcion: ROL_FIELD_LABELS.descripcion });
+  if (!changes.length) return;
+  await writeLog({ action: "editar", entityType: "rol", recordId: after.clave, recordInfo: `Rol "${after.nombre}"`, actor, changes });
+}
+
+export async function logRolDelete(actor, rol) {
+  const changes = diffFields(rol, null, ROL_FIELD_LABELS);
+  await writeLog({ action: "eliminar", entityType: "rol", recordId: rol.clave, recordInfo: `Rol "${rol.nombre}"`, actor, changes });
 }
 
 // ---------- Informes automáticos ----------

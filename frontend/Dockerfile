@@ -1,4 +1,4 @@
-# Imagen de producción del frontend de Panel de Compras (Next.js).
+# Imagen de producción del frontend de Panel de Compras y Bienestar (Next.js).
 # Build context: frontend/ (docker build -f frontend/Dockerfile frontend)
 FROM node:20-alpine AS base
 

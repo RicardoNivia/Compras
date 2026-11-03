@@ -429,7 +429,7 @@ export function generateReportPdfBuffer(content, { nombre, dashboardLayout, estu
         doc.rect(0, 0, doc.page.width, headerH).fill(ACCENT_HEX);
       }
       doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(9)
-        .text("SINCO · PANEL DE COMPRAS", MARGIN, 24, { characterSpacing: 1 });
+        .text("SINCO · PANEL DE COMPRAS Y BIENESTAR", MARGIN, 24, { characterSpacing: 1 });
       doc.fontSize(17).text(asunto, MARGIN, tituloY, { width });
       doc.font("Helvetica").fontSize(9).fillColor("#eaf2fb").text(subtitulo ? `${subtitulo} · Generado el ${fecha}` : fecha, MARGIN, fechaY);
 
@@ -462,7 +462,7 @@ export function generateReportPdfBuffer(content, { nombre, dashboardLayout, estu
 
       doc.moveDown(1.5);
       doc.fillColor("#8795ab").font("Helvetica").fontSize(8)
-        .text("Generado automáticamente por el Panel de Compras de Sinco.", { width });
+        .text("Generado automáticamente por el Panel de Compras y Bienestar de Sinco.", { width });
 
       if (estudio) {
         // Pie con número de página en cada hoja (sin margen inferior, para que escribir ahí no abra una página nueva).
@@ -474,7 +474,7 @@ export function generateReportPdfBuffer(content, { nombre, dashboardLayout, estu
           const y = doc.page.height - 30;
           doc.moveTo(MARGIN, y - 8).lineTo(doc.page.width - MARGIN, y - 8).strokeColor("#e4ecf4").lineWidth(0.8).stroke();
           doc.font("Helvetica").fontSize(8).fillColor("#8795ab")
-            .text("Panel de Compras · Sinco", MARGIN, y, { width: width / 2, lineBreak: false });
+            .text("Panel de Compras y Bienestar · Sinco", MARGIN, y, { width: width / 2, lineBreak: false });
           doc.text(`Página ${i - range.start + 1} de ${range.count}`, MARGIN + width / 2, y, { width: width / 2, align: "right", lineBreak: false });
           doc.page.margins.bottom = bottom;
         }

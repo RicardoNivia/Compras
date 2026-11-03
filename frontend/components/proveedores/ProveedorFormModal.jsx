@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createProveedorApi, updateProveedorApi, parseProveedorTextoApi, cambiarClasificacionApi, cambiarEstadoCicloApi, verificarNitApi } from "@/lib/api";
-import { REVISIONES, ESTADOS_CICLO, maestroPorTexto, normalizeNit, nitValido } from "@/lib/proveedoresOpciones";
+import { REVISIONES, ESTADOS_CICLO, maestroPorTexto, normalizeNit, nitValido, diaISO, fmtFecha } from "@/lib/proveedoresOpciones";
 import ProveedorAccionesModal from "@/components/proveedores/ProveedorAccionesModal";
 import { IconSpark } from "@/components/icons";
 
@@ -29,7 +29,7 @@ function opciones(lista, actualId) {
 // contra el catálogo y no se puede guardar si ya existe (al crear o al cambiarlo).
 // Tipo, clasificación por monto, tipo de servicio, área y motivo de excepción son maestros.
 // Al crear, se puede pegar el correo de solicitud y Nova precarga los campos.
-export default function ProveedorFormModal({ proveedor, catalogos = {}, onClose, onSaved, onClasificado }) {
+export default function ProveedorFormModal({ proveedor, catalogos = {}, inicioCiclo: inicioCicloProp, onClose, onSaved, onClasificado }) {
   const { areas = [], tipos = [], clasificaciones = [], servicios = [], motivos = [] } = catalogos;
   const [inactivando, setInactivando] = useState(false);
   const [reactivando, setReactivando] = useState(false);
@@ -57,6 +57,12 @@ export default function ProveedorFormModal({ proveedor, catalogos = {}, onClose,
   const [justificacion, setJustificacion] = useState(proveedor?.justificacionExcepcion || "");
   const estadoActual = proveedor?.ciclo?.estado || "";
   const [estado, setEstado] = useState(estadoActual);
+  // Al aprobar (pasar a Actualizado) se pide la fecha de actualización: del ciclo vigente y no futura.
+  const aprobando = estado === "actualizado" && estado !== estadoActual;
+  const [fechaActualizacion, setFechaActualizacion] = useState(() => diaISO());
+  const inicioCiclo = proveedor?.inicioCiclo || inicioCicloProp;
+  const hoy = diaISO();
+  const minFecha = inicioCiclo ? diaISO(inicioCiclo) : undefined;
 
   // Validación del NIT en tiempo real: { estado: "vacio"|"invalido"|"verificando"|"libre"|"existe"|"error", proveedor }
   const [nitCheck, setNitCheck] = useState({ estado: editando ? "libre" : "vacio" });
@@ -159,6 +165,16 @@ export default function ProveedorFormModal({ proveedor, catalogos = {}, onClose,
       return;
     }
     if (nitCheck.estado === "verificando") { setError("Espera un momento: se está verificando el NIT."); return; }
+    if (aprobando && !esExcepcion) {
+      const motivo = !fechaActualizacion ? "Indica la fecha de actualización."
+        : fechaActualizacion > hoy ? "La fecha de actualización no puede ser futura."
+        : minFecha && fechaActualizacion < minFecha ? `La fecha de actualización debe ser del ciclo vigente (desde el ${fmtFecha(inicioCiclo)}).` : "";
+      if (motivo) {
+        setError(motivo);
+        document.getElementById("pf-fecha-act")?.focus();
+        return;
+      }
+    }
 
     const data = {
       nombre: nombre.trim(),
@@ -181,7 +197,7 @@ export default function ProveedorFormModal({ proveedor, catalogos = {}, onClose,
     try {
       const saved = editando ? await updateProveedorApi(proveedor.nit, data) : await createProveedorApi(data);
       // El estado del ciclo se guarda aparte (valida el checklist completo para "Actualizado").
-      if (editando && !esExcepcion && estadoActual && estado && estado !== estadoActual) await cambiarEstadoCicloApi(saved.nit, estado);
+      if (editando && !esExcepcion && estadoActual && estado && estado !== estadoActual) await cambiarEstadoCicloApi(saved.nit, estado, aprobando ? fechaActualizacion : undefined);
       onSaved(saved);
     } catch (err) {
       setError(err.message || "No se pudo guardar el proveedor.");
@@ -346,6 +362,13 @@ export default function ProveedorFormModal({ proveedor, catalogos = {}, onClose,
                       </select>
                     </div>
                   ) : <div />}
+                  {editando && estadoActual && !esExcepcion && aprobando && (
+                    <div className="field">
+                      <label htmlFor="pf-fecha-act">Fecha de actualización *</label>
+                      <input id="pf-fecha-act" type="date" value={fechaActualizacion} min={minFecha} max={hoy} required onChange={(e) => setFechaActualizacion(e.target.value)} />
+                      <span className="prov-form-hint">Queda como fecha de última actualización del proveedor (base del ciclo).</span>
+                    </div>
+                  )}
                   <div className="field span-2">
                     <label htmlFor="pf-obs">Observación</label>
                     <textarea id="pf-obs" rows={2} value={observacion} onChange={(e) => setObservacion(e.target.value)} />

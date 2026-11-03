@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { listMaestros, createMaestro, MODULO_POR_TIPO } from "@/lib/maestros";
-import { requirePermission, apiError } from "@/lib/apiGuard";
+import { requireAlgunPermiso, apiError } from "@/lib/apiGuard";
 import { getSessionUser } from "@/lib/auth-server";
 import { ROLES_COMPRAS } from "@/lib/roles";
 
@@ -93,7 +93,7 @@ export async function GET(request) {
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function POST(request) {
-  const { user, denied } = await requirePermission("viewMaestros");
+  const { user, denied } = await requireAlgunPermiso(["viewMaestros", "viewMaestrosBienestar"]);
   if (denied) return denied;
   try {
     const body = await request.json();

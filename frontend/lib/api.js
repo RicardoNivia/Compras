@@ -226,8 +226,8 @@ export async function updateConfigProveedoresApi(data) {
   return jsonFetch("/api/proveedores/config", "PUT", data);
 }
 
-export async function cambiarEstadoCicloApi(nit, estado) {
-  return jsonFetch(`${rutaProveedor(nit)}/ciclo/estado`, "PATCH", { estado });
+export async function cambiarEstadoCicloApi(nit, estado, fechaActualizacion) {
+  return jsonFetch(`${rutaProveedor(nit)}/ciclo/estado`, "PATCH", { estado, fechaActualizacion });
 }
 
 export async function setDocumentoCicloApi(nit, clave, cumple) {
@@ -503,4 +503,175 @@ export async function generarValoracionApi(recordId) {
 // Historial de compras de un proveedor con su valoración y la calificación general.
 export async function fetchComprasProveedorApi(nit) {
   return jsonFetch(`/api/proveedores/${encodeURIComponent(nit)}/compras`, "GET");
+}
+
+// ---------- Bienestar: actividades del cronograma (ver backend/lib/actividadesBienestar.js) ----------
+
+export async function fetchActividadesApi(anio) {
+  const res = await fetch(`/api/actividades${anio ? `?anio=${encodeURIComponent(anio)}` : ""}`, { cache: "no-store" });
+  return handle(res);
+}
+
+export async function fetchActividadApi(id) {
+  const res = await fetch(`/api/actividades/${id}`, { cache: "no-store" });
+  return handle(res);
+}
+
+export async function createActividadApi(data) {
+  const res = await fetch("/api/actividades", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handle(res);
+}
+
+export async function updateActividadApi(id, data) {
+  const res = await fetch(`/api/actividades/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handle(res);
+}
+
+export async function deleteActividadApi(id) {
+  const res = await fetch(`/api/actividades/${id}`, { method: "DELETE" });
+  return handle(res);
+}
+
+export async function fetchResumenBienestarApi(anio, linea = "Bienestar", mes = null) {
+  const res = await fetch(`/api/actividades/resumen?anio=${encodeURIComponent(anio)}&linea=${encodeURIComponent(linea)}${mes ? `&mes=${mes}` : ""}`, { cache: "no-store" });
+  return handle(res);
+}
+
+export async function fetchComprasDisponiblesApi(q) {
+  const res = await fetch(`/api/actividades/compras-disponibles?q=${encodeURIComponent(q || "")}`, { cache: "no-store" });
+  return handle(res);
+}
+
+export async function asociarCompraApi(actividadId, recordId) {
+  const res = await fetch(`/api/actividades/${actividadId}/compras`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recordId }),
+  });
+  return handle(res);
+}
+
+export async function desasociarCompraApi(actividadId, recordId) {
+  const res = await fetch(`/api/actividades/${actividadId}/compras?recordId=${encodeURIComponent(recordId)}`, { method: "DELETE" });
+  return handle(res);
+}
+
+// ---------- Roles personalizados (Usuarios › Roles) ----------
+
+export async function fetchRolesApi() {
+  const res = await fetch("/api/roles", { cache: "no-store" });
+  return handle(res);
+}
+
+export async function createRolApi(data) {
+  const res = await fetch("/api/roles", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handle(res);
+}
+
+export async function updateRolApi(clave, data) {
+  const res = await fetch(`/api/roles/${encodeURIComponent(clave)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handle(res);
+}
+
+export async function deleteRolApi(clave) {
+  const res = await fetch(`/api/roles/${encodeURIComponent(clave)}`, { method: "DELETE" });
+  return handle(res);
+}
+
+// ---------- Bienestar: participantes, inventario, formulario público ----------
+
+const jsonPost = (url, method, data) => fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(handle);
+
+export const fetchParticipantesApi = (actividadId) => fetch(`/api/actividades/${actividadId}/participantes`, { cache: "no-store" }).then(handle);
+export const crearParticipanteApi = (actividadId, data) => jsonPost(`/api/actividades/${actividadId}/participantes`, "POST", data);
+export const actualizarParticipanteApi = (actividadId, id, data) => jsonPost(`/api/actividades/${actividadId}/participantes/${id}`, "PUT", data);
+export const eliminarParticipanteApi = (actividadId, id) => fetch(`/api/actividades/${actividadId}/participantes/${id}`, { method: "DELETE" }).then(handle);
+
+export function importarParticipantesApi(actividadId, archivo, { modo = "inscripcion", noMarcadosNoAsistieron = false } = {}) {
+  const fd = new FormData();
+  fd.append("archivo", archivo);
+  fd.append("modo", modo);
+  if (noMarcadosNoAsistieron) fd.append("noMarcadosNoAsistieron", "1");
+  return fetch(`/api/actividades/${actividadId}/participantes/importar`, { method: "POST", body: fd }).then(handle);
+}
+
+// Excel con Nova: sin confirmar devuelve la vista previa (no escribe nada); al confirmar se reenvía con su mapeo.
+export function importarConNovaApi(actividadId, archivo, { tipo, mapeo, noMarcadosNoAsistieron = false, confirmar = false }) {
+  const fd = new FormData();
+  fd.append("archivo", archivo);
+  fd.append("tipo", tipo);
+  if (mapeo) fd.append("mapeo", JSON.stringify(mapeo));
+  if (noMarcadosNoAsistieron) fd.append("noMarcadosNoAsistieron", "1");
+  if (confirmar) fd.append("confirmar", "1");
+  return fetch(`/api/actividades/${actividadId}/participantes/importar-nova`, { method: "POST", body: fd }).then(handle);
+}
+
+export const generarAnalisisActividadApi = (actividadId, origen = "manual") => jsonPost(`/api/actividades/${actividadId}/analisis`, "POST", { origen });
+export const fetchSolicitudesActividadApi = (actividadId) => fetch(`/api/actividades/${actividadId}/solicitudes`, { cache: "no-store" }).then(handle);
+export const crearSolicitudCompraApi = (actividadId, data) => jsonPost(`/api/actividades/${actividadId}/solicitudes`, "POST", data);
+export const cancelarSolicitudCompraApi = (actividadId, id) => fetch(`/api/actividades/${actividadId}/solicitudes/${id}`, { method: "DELETE" }).then(handle);
+export const generarCompraDeSolicitudApi = (id, data) => jsonPost(`/api/solicitudes-compra/${id}/generar`, "POST", data);
+export const rechazarSolicitudApi = (id, motivo) => jsonPost(`/api/solicitudes-compra/${id}/rechazar`, "POST", { motivo });
+export const explicarIndicadorBienestarApi = (data) => jsonPost("/api/actividades/explicar", "POST", data);
+export const fetchAgenteEvaluacionApi = () => fetch("/api/actividades/agente-evaluacion", { cache: "no-store" }).then(handle);
+export const fetchEstadoAgenteEvaluacionApi = () => fetch("/api/actividades/agente-evaluacion?estado=1", { cache: "no-store" }).then(handle);
+export const iniciarAgenteEvaluacionApi = () => jsonPost("/api/actividades/agente-evaluacion", "POST", { confirmar: true });
+export const detenerAgenteEvaluacionApi = () => fetch("/api/actividades/agente-evaluacion", { method: "DELETE" }).then(handle);
+export const fetchMaestroTipoApi = (tipo) => fetch(`/api/maestros?tipo=${encodeURIComponent(tipo)}&onlyActive=1`, { cache: "no-store" }).then(handle);
+export const fetchAnalisisBienestarApi = (linea, anio, mes = 0) => fetch(`/api/actividades/analisis?linea=${encodeURIComponent(linea)}&anio=${encodeURIComponent(anio)}&mes=${mes}`, { cache: "no-store" }).then(handle);
+export const generarAnalisisBienestarApi = (data) => jsonPost("/api/actividades/analisis", "POST", data);
+
+export const fetchObservacionesApi = (actividadId) => fetch(`/api/actividades/${actividadId}/observaciones`, { cache: "no-store" }).then(handle);
+export const crearObservacionApi = (actividadId, data) => jsonPost(`/api/actividades/${actividadId}/observaciones`, "POST", data);
+export const eliminarObservacionApi = (actividadId, id) => fetch(`/api/actividades/${actividadId}/observaciones/${id}`, { method: "DELETE" }).then(handle);
+
+export const fetchInventarioApi = (actividadId) => fetch(`/api/actividades/${actividadId}/inventario`, { cache: "no-store" }).then(handle);
+export const crearItemApi = (actividadId, data) => jsonPost(`/api/actividades/${actividadId}/inventario`, "POST", data);
+export const actualizarItemApi = (actividadId, id, data) => jsonPost(`/api/actividades/${actividadId}/inventario/${id}`, "PUT", data);
+export const eliminarItemApi = (actividadId, id) => fetch(`/api/actividades/${actividadId}/inventario/${id}`, { method: "DELETE" }).then(handle);
+
+export function importarInventarioApi(actividadId, archivo) {
+  const fd = new FormData();
+  fd.append("archivo", archivo);
+  return fetch(`/api/actividades/${actividadId}/inventario/importar`, { method: "POST", body: fd }).then(handle);
+}
+
+export const fetchPlantillasFormularioApi = (actividadId) => fetch(`/api/actividades/${actividadId}/formulario`, { cache: "no-store" }).then(handle);
+export const configurarFormularioApi = (actividadId, data) => jsonPost(`/api/actividades/${actividadId}/formulario`, "PUT", data);
+
+export const fetchFormularioPublicoApi = (token) => fetch(`/api/publico/inscripcion/${encodeURIComponent(token)}`, { cache: "no-store" }).then(handle);
+export const inscribirPublicoApi = (token, data) => jsonPost(`/api/publico/inscripcion/${encodeURIComponent(token)}`, "POST", data);
+
+// ---------- Bienestar: fotos de las actividades ----------
+
+export const fetchFotosApi = (actividadId) => fetch(`/api/actividades/${actividadId}/fotos`, { cache: "no-store" }).then(handle);
+export const urlFoto = (actividadId, fotoId, mini = false) => `/api/actividades/${actividadId}/fotos/${fotoId}${mini ? "?t=mini" : ""}`;
+export const actualizarFotoApi = (actividadId, id, data) => jsonPost(`/api/actividades/${actividadId}/fotos/${id}`, "PUT", data);
+export const eliminarFotoApi = (actividadId, id) => fetch(`/api/actividades/${actividadId}/fotos/${id}`, { method: "DELETE" }).then(handle);
+
+export function subirFotoApi(actividadId, { imagen, miniatura, nombre, ancho, alto, descripcion }) {
+  const fd = new FormData();
+  fd.append("imagen", imagen, "imagen.jpg");
+  fd.append("miniatura", miniatura, "miniatura.jpg");
+  fd.append("nombre", nombre);
+  fd.append("ancho", String(ancho));
+  fd.append("alto", String(alto));
+  if (descripcion) fd.append("descripcion", descripcion);
+  return fetch(`/api/actividades/${actividadId}/fotos`, { method: "POST", body: fd }).then(handle);
 }

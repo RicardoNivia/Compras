@@ -1,5 +1,6 @@
 "use client";
 
+import { useModulo } from "@/components/ModuloShell";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { leerPantallaNova } from "@/lib/novaPantalla";
@@ -18,6 +19,12 @@ const CLOSE_ANIM_MS = 260;
 const SUGGESTIONS = [
   "¿Qué puedo hacer en esta sección?",
   "Dame un resumen general de compras",
+];
+
+const SUGERENCIAS_BIENESTAR = [
+  "¿Qué puedo hacer en esta sección?",
+  "Dame un resumen de la participación este año",
+  "¿Qué actividades vienen próximas?",
 ];
 
 // Encuentra en qué sección del menú está parado el usuario ahora mismo, para
@@ -44,7 +51,29 @@ function sectionLabelFor(pathname) {
 // lib/aiChatCascade.js/agentTools.js), pero no aparece en el historial de la
 // sección Agente IA ni se puede retomar después de cerrarla (ver
 // backend/lib/conversations.js#listConversations, que filtra "model: widget").
+// Nova en Bienestar: sin carrito, con un corazón en la mano. Cada cierto tiempo cambia de gesto (saluda, señala) y luego
+// entra en meditación: ojos cerrados, flotando sobre un loto. Todo es CSS (ver .nova-bien en globals.css).
+function NovaBienestar() {
+  return (
+    <span className="floating-agent-fab-icon nova-bien">
+      <span className="nova-aura" /><span className="nova-aura dos" />
+      <span className="nova-cuerpo">
+        <img className="pose frente" src="/nova/nova-bienestar-frente.png" alt="" />
+        <img className="pose saludo" src="/nova/nova-bienestar-saludo.png" alt="" />
+        <img className="pose presenta" src="/nova/nova-bienestar-presentando.png" alt="" />
+        <img className="pose medita" src="/nova/nova-bienestar-meditando.png" alt="" />
+        <svg className="nova-corazon" viewBox="0 0 32 30" aria-hidden="true"><path d="M16 29C7 22 1 17 1 9.500 1 4.800 4.700 1 9.200 1 12 1 14.600 2.500 16 4.800 17.400 2.500 20 1 22.800 1 27.300 1 31 4.800 31 9.500 31 17 25 22 16 29Z" /></svg>
+        <i className="nova-mini uno" /><i className="nova-mini dos" /><i className="nova-mini tres" />
+      </span>
+      <svg className="nova-loto" viewBox="0 0 80 30" aria-hidden="true">
+        <path d="M40 28C30 26 25 18 40 2 55 18 50 26 40 28Z" /><path d="M36 28C24 28 15 20 18 8 28 11 36 18 36 28Z" /><path d="M44 28C56 28 65 20 62 8 52 11 44 18 44 28Z" /><path d="M32 29C20 31 8 26 3 17 15 15 27 20 32 29Z" /><path d="M48 29C60 31 72 26 77 17 65 15 53 20 48 29Z" />
+      </svg>
+    </span>
+  );
+}
+
 export default function FloatingAgentChat({ user }) {
+  const modulo = useModulo();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -200,7 +229,7 @@ export default function FloatingAgentChat({ user }) {
                   guardo esta conversación en tu historial.
                 </p>
                 <div className="floating-agent-suggestions">
-                  {SUGGESTIONS.map((s) => (
+                  {(modulo === "bienestar" ? SUGERENCIAS_BIENESTAR : SUGGESTIONS).map((s) => (
                     <button key={s} type="button" className="floating-agent-suggestion" onClick={() => send(s)}>
                       {s}
                     </button>
@@ -259,10 +288,12 @@ export default function FloatingAgentChat({ user }) {
         {/* Nova se queda igual (tamaño, posición, sin círculo) esté abierto o
             cerrado el panel — a propósito no hay un ícono de "×" ni un
             círculo de fondo que la reemplace al abrir. */}
-        <span className="floating-agent-fab-icon">
-          <img className="nova-frente" src="/nova/nova-frente.png" alt="" />
-          <img className="nova-saludo" src="/nova/nova-saludo.png" alt="" />
-        </span>
+        {modulo === "bienestar" ? <NovaBienestar /> : (
+          <span className="floating-agent-fab-icon">
+            <img className="nova-frente" src="/nova/nova-frente.png" alt="" />
+            <img className="nova-saludo" src="/nova/nova-saludo.png" alt="" />
+          </span>
+        )}
       </button>
     </>
   );

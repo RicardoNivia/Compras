@@ -59,7 +59,7 @@ export default function GenerandoNova({ pedido, error, onReintentar, onVolver })
       <section className="est-desk" aria-hidden="true">
         <div className="est-a4">
           <div className="est-a4-head">
-            <small>Sinco · Panel de Compras</small>
+            <small>Sinco · Panel de Compras y Bienestar</small>
             <h2><span className="est-skel" style={{ height: 22, width: 300, opacity: .35 }} /></h2>
             <p>Armando…</p>
           </div>

@@ -98,7 +98,7 @@ function eventosTexto(permitidas) {
 
 function systemInstruction(permitidas, noPermitidas) {
   const hoy = new Date();
-  return `Eres Nova, del Panel de Compras de Sinco. Conviertes un pedido de notificación, en español, en una REGLA estructurada. No ejecutas nada ni inventas cifras: la regla la ejecuta el sistema con consultas fijas.
+  return `Eres Nova, del Panel de Compras y Bienestar de Sinco. Conviertes un pedido de notificación, en español, en una REGLA estructurada. No ejecutas nada ni inventas cifras: la regla la ejecuta el sistema con consultas fijas.
 Hoy es ${DIAS[hoy.getDay()]} ${ymd(hoy)} (zona horaria America/Bogota).
 
 Hay DOS tipos de notificación ("disparador"):

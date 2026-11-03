@@ -42,7 +42,7 @@ export async function POST() {
     return NextResponse.json({ resumen: "No tienes pendientes hoy: todo está al día.", prioridades: [], consejo: "Buen momento para revisar el Dashboard o adelantar algo del próximo ciclo." });
   }
 
-  const systemInstruction = `Eres Nova, el asistente del Panel de Compras de Sinco. Le hablas a ${user.nombre || "la persona"}, ${ROLES_TXT[user.role] || user.role}. Te dan SUS pendientes de hoy, ya calculados por el sistema (no recalcules nada, básate solo en ellos): secciones con su nivel (critico = urgente, atencion = conviene moverlo pronto, info = seguimiento), el total y los primeros ítems de cada una (con su referencia, qué es, días y detalle). "soloMio" indica que el registro es suyo como responsable.
+  const systemInstruction = `Eres Nova, el asistente del Panel de Compras y Bienestar de Sinco. Le hablas a ${user.nombre || "la persona"}, ${ROLES_TXT[user.role] || user.role}. Te dan SUS pendientes de hoy, ya calculados por el sistema (no recalcules nada, básate solo en ellos): secciones con su nivel (critico = urgente, atencion = conviene moverlo pronto, info = seguimiento), el total y los primeros ítems de cada una (con su referencia, qué es, días y detalle). "soloMio" indica que el registro es suyo como responsable.
 
 Devuelve:
 - "resumen": 2-3 frases, cálidas y directas, con el panorama de su día (cuántos pendientes, cuántos urgentes, qué área pesa más).

@@ -32,6 +32,8 @@ export const FIELD_LABELS = {
   trm: "TRM utilizada",
   observaciones: "Observaciones",
   radicado: "Radicado",
+  actividad: "Actividad de Bienestar",
+  actividadId: "Actividad de Bienestar (id)",
 };
 
 export const TOKEN_FIELD_LABELS = {
@@ -93,6 +95,7 @@ export const PROVEEDOR_FIELD_LABELS = {
 export const CICLO_PROVEEDOR_FIELD_LABELS = {
   clasificacion: "Clasificación",
   estado: "Estado en el ciclo",
+  fechaActualizacion: "Fecha de actualización",
   rutVigente: "RUT vigente",
   certBancaria: "Certificación bancaria",
   listasRestr: "Consulta en listas restrictivas",
@@ -220,3 +223,50 @@ export const NOTIFICACION_FIELD_LABELS = {
 
 Object.assign(ACTION_LABELS, { pausar: "Pausó", reanudar: "Reanudó", probar: "Probó", baja: "Dejó de recibir", alta: "Volvió a recibir" });
 Object.assign(ENTITY_LABELS, { notificacion: "Notificación" });
+
+// Módulo de Bienestar (ver lib/actividadesBienestar.js): actividades del cronograma.
+export const ACTIVIDAD_FIELD_LABELS = {
+  nombre: "Nombre",
+  fecha: "Fecha",
+  fechaFin: "Fecha de fin",
+  linea: "Línea",
+  estado: "Estado",
+  descripcion: "Descripción",
+  responsableNombre: "Responsable",
+  presupuesto: "Presupuesto asignado",
+  inscritos: "Inscritos",
+  asistentes: "Asistentes",
+  enCronograma: "En el cronograma",
+  aplicaParticipantes: "Aplica participantes y listas de asistencia",
+  observaciones: "Observaciones",
+  calificacion: "Calificación al cerrar",
+  comentarioCierre: "Comentario de cierre",
+  cerradaPorNombre: "Cerrada por",
+};
+
+Object.assign(ENTITY_LABELS, { actividad: "Actividad de Bienestar" });
+
+// Roles personalizados (Usuarios › Roles, ver lib/rolesPersonalizados.js). Cada cambio de funcionalidad queda además como "permiso".
+export const ROL_FIELD_LABELS = {
+  nombre: "Nombre",
+  descripcion: "Descripción",
+  funcionalidadesTexto: "Funcionalidades",
+};
+
+Object.assign(ENTITY_LABELS, { rol: "Rol" });
+
+// Participantes, inventario y formulario público de las actividades de Bienestar (ver lib/participantesBienestar.js,
+// lib/inventarioBienestar.js). Se registran como una línea legible por acción ("Marcó 12 como asistieron"…).
+export const DETALLE_FIELD_LABELS = { detalle: "Detalle" };
+Object.assign(ACTION_LABELS, { importar: "Importó" });
+Object.assign(ENTITY_LABELS, { participante: "Participantes de actividad", inventario: "Inventario de actividad", formularioActividad: "Formulario de inscripción", fotoActividad: "Fotos de actividad", observacionActividad: "Observaciones de actividad", analisisBienestar: "Análisis de Bienestar (Nova)", analisisActividad: "Análisis de actividad (Nova)", solicitudCompra: "Solicitud de compra", agenteEvaluacion: "Agente de evaluación de actividades" });
+
+export const SOLICITUD_COMPRA_FIELD_LABELS = {
+  actividad: "Actividad",
+  descripcion: "Qué se necesita",
+  valorEstimado: "Valor estimado",
+  categoria: "Categoría",
+  proveedorSugerido: "Proveedor sugerido",
+  fechaRequerida: "Para cuándo",
+  observaciones: "Observaciones",
+};

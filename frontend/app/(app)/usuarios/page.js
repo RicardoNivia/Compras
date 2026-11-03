@@ -12,16 +12,18 @@ export default async function UsuariosPage() {
   if (!user) redirect("/login");
   if (!(user.permissions?.viewUsuarios ?? canViewUsuarios(user.role))) redirect("/registros");
 
-  const [usersRes, permissionsRes] = await Promise.all([
+  const [usersRes, permissionsRes, rolesRes] = await Promise.all([
     backendFetch("/api/users"),
     backendFetch("/api/permissions"),
+    backendFetch("/api/roles"),
   ]);
   const { users } = await usersRes.json();
   const { matrix } = await permissionsRes.json();
+  const { roles } = await rolesRes.json();
 
   return (
     <AppShell user={user} title="Usuarios" subtitle={`${users.length} usuarios`}>
-      <UsuariosView initialUsers={users} initialPermissionsMatrix={matrix} />
+      <UsuariosView initialUsers={users} initialPermissionsMatrix={matrix} initialRoles={roles} />
     </AppShell>
   );
 }

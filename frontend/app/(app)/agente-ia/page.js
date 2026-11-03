@@ -12,7 +12,7 @@ export default async function AgenteIAPage() {
   if (!(user.permissions?.viewAgenteIA ?? canViewAgenteIA(user.role))) redirect("/registros");
 
   return (
-    <AppShell user={user} title="Nova" subtitle="Tu asistente de compras">
+    <AppShell user={user} title="Nova" subtitle="Tu asistente de IA">
       <AgenteChat userName={user.nombre} role={user.role} permissions={user.permissions} />
     </AppShell>
   );

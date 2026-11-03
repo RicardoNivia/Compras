@@ -6,6 +6,8 @@ import { listMaestroProveedores, getProveedorDetalle, indicadoresCiclo } from "@
 import { prisma } from "@/lib/prisma";
 import { getPendientesParaNova } from "@/lib/pendientes";
 import { CONSULTAR_REFERENCIA_TOOL, consultarReferencia } from "@/lib/referenciasNova";
+import { getActividad, listActividades, resumenBienestar } from "@/lib/actividadesBienestar";
+import { isRoleAllowed } from "@/lib/permissions";
 
 // Herramientas ("tool use" de Anthropic) que el Agente IA del chat puede
 // invocar bajo demanda en vez de recibir TODO el dataset de compras en cada
@@ -186,7 +188,7 @@ function buildAuditoriaResumen(logs) {
 // las herramientas de presupuesto/auditoría ni siquiera se le ofrecen al
 // modelo si el rol no tiene ese permiso, en vez de ofrecerlas y rechazarlas
 // después — así nunca "sabe" que existen si no puede usarlas.
-export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion }) {
+export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar }) {
   const tools = [
     CONSULTAR_REFERENCIA_TOOL,
     {
@@ -332,6 +334,27 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
     });
   }
 
+  if (canSeeBienestar) {
+    const LINEA = { type: "string", enum: ["Bienestar", "Fundación"], description: "Línea: Bienestar (actividades de los colaboradores) o Fundación (acompañamiento a la Fundación)." };
+    tools.push(
+      {
+        name: "resumen_bienestar",
+        description: "Cifras de una línea en un año (o un mes): actividades por estado, asistentes y porcentaje de asistencia, gasto en compras ASOCIADAS a actividades frente al presupuesto, costo por asistente, gasto por mes y categoría, participación por área, motivos de inasistencia y próximas actividades. Úsala para totales, comparaciones y gráficos de Bienestar o Fundación.",
+        input_schema: { type: "object", properties: { linea: LINEA, anio: { type: "integer", description: "Año (opcional, por defecto el actual)." }, mes: { type: "integer", description: "Mes de 1 a 12 (opcional; sin mes, el año completo)." } }, required: ["linea"] },
+      },
+      {
+        name: "buscar_actividades",
+        description: "Lista actividades de Bienestar o Fundación con su fecha, estado, responsable, presupuesto, gasto, inscritos, asistentes y calificaciones. Filtra por línea, año, estado o texto del nombre.",
+        input_schema: { type: "object", properties: { linea: LINEA, anio: { type: "integer", description: "Año (opcional)." }, estado: { type: "string", enum: ["creada", "programada", "ejecutada", "cerrada"], description: "Estado (opcional)." }, texto: { type: "string", description: "Parte del nombre (opcional)." }, limite: { type: "integer", description: "Máximo de filas (opcional, por defecto 30, máximo 60)." } } },
+      },
+      {
+        name: "detalle_actividad",
+        description: "Detalle de UNA actividad: fechas, presupuesto y gasto, sus compras, participación por área y motivos de inasistencia, inventario y lo que sobró, calificación al cerrar y el análisis de Nova. No trae nombres ni datos de personas.",
+        input_schema: { type: "object", properties: { id: { type: "integer", description: "Id de la actividad (opcional si das el nombre)." }, nombre: { type: "string", description: "Nombre o parte del nombre (opcional si das el id)." } } },
+      }
+    );
+  }
+
   if (canSeeAuditoria) {
     tools.push({
       name: "registro_auditoria",
@@ -355,6 +378,19 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
 // Fábrica del ejecutor: "records"/"presupuestos" se cargan como mucho una vez
 // por request de chat (memoizados aquí), sin importar cuántas veces el modelo
 // llame a una herramienta que los necesite en la misma conversación-turno.
+// Bienestar y Fundación tienen permisos separados: cada consulta valida el de su línea. A Nova solo le llegan cifras
+// agregadas: ni nombres de participantes ni los datos sensibles de los formularios.
+const puedeLinea = (user, linea, tipo = "lista") => {
+  const fundacion = linea === "Fundación";
+  const feature = tipo === "dashboard" ? (fundacion ? "viewDashboardFundacion" : "viewDashboardBienestar") : (fundacion ? "viewFundacion" : "viewBienestar");
+  return user ? isRoleAllowed(user.role, feature) : false;
+};
+const filaActividad = (a) => ({
+  id: a.id, nombre: a.nombre, linea: a.linea, fecha: a.fecha, fechaFin: a.fechaFin, estado: a.estado, responsable: a.responsableNombre,
+  presupuesto: a.presupuesto, gastadoEnComprasAsociadas: a.gastado, compras: a.compras, inscritos: a.inscritos, asistentes: a.asistentes,
+  aplicaParticipantes: a.aplicaParticipantes, calificacionAlCerrar: a.calificacion, puntajeNova: a.puntajeNova,
+});
+
 export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, user }) {
   let recordsPromise = null;
   const getRecords = () => (recordsPromise ??= listRecords());
@@ -604,6 +640,54 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
         if (!canSeePresupuesto) return { error: "No autorizado para consultar presupuesto." };
         const [records, presupuestos] = await Promise.all([getRecords(), getPresupuestos()]);
         return buildPresupuestoResumen(records, presupuestos, args);
+      }
+      case "resumen_bienestar": {
+        const linea = args.linea === "Fundación" ? "Fundación" : "Bienestar";
+        if (!(await puedeLinea(user, linea, "dashboard"))) return { error: `No autorizado para consultar el resumen de ${linea}.` };
+        const r = await resumenBienestar(args.anio || new Date().getFullYear(), linea, args.mes || null);
+        return {
+          nota: "Todo gasto es de compras asociadas a una actividad, en el mes de la actividad; las compras sin asociar no se muestran en Bienestar.",
+          linea, anio: r.anio, mes: r.mes, kpis: r.kpis,
+          porMes: r.mes ? undefined : r.porMes.map((m) => ({ mes: m.mes, actividades: m.actividades, asistentes: m.asistentes, gasto: m.gastoArea })),
+          actividades: r.porActividad.slice(0, 30),
+          categorias: r.categorias.slice(0, 10),
+          participacion: { ...r.participacion, porArea: r.participacion.porArea.slice(0, 15), motivos: r.participacion.motivos.slice(0, 8) },
+          presupuestoVsGasto: r.presupuestoVsGasto.slice(0, 15),
+          costoPorActividad: r.costoPorActividad.slice(0, 15),
+          proximas: r.proximas.map(filaActividad),
+        };
+      }
+      case "buscar_actividades": {
+        const lineas = [];
+        for (const l of args.linea ? [args.linea] : ["Bienestar", "Fundación"]) if (await puedeLinea(user, l)) lineas.push(l);
+        if (!lineas.length) return { error: "No autorizado para consultar esas actividades." };
+        const limite = Math.max(1, Math.min(60, Number(args.limite) || 30));
+        const q = String(args.texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const todas = (await listActividades({ anio: args.anio || undefined })).filter((a) => lineas.includes(a.linea) && (!args.estado || a.estado === args.estado) && (!q || a.nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(q)));
+        return { total: todas.length, actividades: todas.slice(0, limite).map(filaActividad) };
+      }
+      case "detalle_actividad": {
+        let id = Number(args.id) || null;
+        if (!id) {
+          const q = String(args.nombre || "").trim();
+          if (!q) return { error: "Indica el id o el nombre de la actividad." };
+          const hallada = await prisma.actividadBienestar.findMany({ where: { nombre: { contains: q, mode: "insensitive" } }, select: { id: true, nombre: true, fecha: true }, orderBy: { fecha: "desc" }, take: 6 });
+          if (!hallada.length) return { error: "No encontré una actividad con ese nombre." };
+          if (hallada.length > 1) return { varias: hallada, nota: "Hay varias con ese nombre: pregunta cuál es." };
+          id = hallada[0].id;
+        }
+        const a = await getActividad(id).catch(() => null);
+        if (!a) return { error: "Actividad no encontrada." };
+        if (!(await puedeLinea(user, a.linea))) return { error: `No autorizado para consultar actividades de ${a.linea}.` };
+        const p = a.participacion;
+        return {
+          ...filaActividad(a), descripcion: a.descripcion, observaciones: a.observaciones, comentarioDeCierre: a.comentarioCierre,
+          comprasAsociadas: a.detalleCompras.slice(0, 20).map((c) => ({ numero: c.localSeq, fecha: c.fechaSolicitud, descripcion: c.descripcion, proveedor: c.proveedor, valorConIva: c.valorConIva, legalizacion: c.estadoLegalizacion })),
+          participacion: !a.aplicaParticipantes ? "No aplica: esta actividad no maneja participantes ni asistencia." : { registrados: p.total, inscritos: p.inscritos, asistieron: p.asistieron, noAsistieron: p.noAsistieron, sinRegistrar: p.sinRegistrar, calificacionPromedio: p.calificacionPromedio, porArea: p.porArea.slice(0, 15), motivos: p.motivos },
+          inventario: a.inventario.resumen,
+          fotos: a.fotos,
+          analisisNova: a.analisisNova ? { puntaje: a.analisisNova.puntaje, titulo: a.analisisNova.titulo, resumen: a.analisisNova.resumen } : null,
+        };
       }
       case "registro_auditoria": {
         if (!canSeeAuditoria) return { error: "No autorizado para consultar auditoría." };

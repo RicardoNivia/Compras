@@ -387,7 +387,7 @@ Se usa la misma conexión ya probada (ver `docs/teams-notificaciones-fase2.md`):
 ### 10.1 Crear el flujo (una sola vez)
 
 1. En Teams, abre la aplicación **Flujos de trabajo** (Workflows) → **Crear** → plantilla **"Publicar en un chat cuando se recibe una solicitud de webhook"** (*Post to a chat when a webhook request is received*).
-2. Nombre: `Panel de Compras - Notificaciones`. Conecta tu cuenta y termina el asistente. Copia la **URL** que te muestra; es un secreto.
+2. Nombre: `Panel de Compras y Bienestar - Notificaciones`. Conecta tu cuenta y termina el asistente. Copia la **URL** que te muestra; es un secreto.
 3. Abre el flujo en **Power Automate** (make.powerautomate.com → Mis flujos → Editar) y ajústalo:
    1. **Disparador** "Cuando se recibe una solicitud de webhook de Teams": déjalo como está.
    2. Agrega antes del bucle una acción **Condición** (validación del secreto compartido):

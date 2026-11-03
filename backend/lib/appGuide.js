@@ -1,13 +1,17 @@
-// Guía de la aplicación "Panel de Compras" (Sinco), usada como tercera fuente
+// Guía de la aplicación "Panel de Compras y Bienestar" (Sinco), usada como tercera fuente
 // de contexto del Agente IA para que pueda explicar cómo funciona la app y
 // qué puede hacer el usuario actual según su rol. Mantenla al día si cambian
 // las secciones o los permisos (ver lib/roles.js, la fuente real de permisos).
 
 import { CRITERIOS_VALORACION } from "@/lib/valoracionIA";
 
-export const APP_GUIDE_TITLE = "Guía de uso del Panel de Compras";
+export const APP_GUIDE_TITLE = "Guía de uso del Panel de Compras y Bienestar";
 
-export const APP_GUIDE_TEXT = `El "Panel de Compras" de Sinco tiene hasta 10 secciones en el menú lateral (cada usuario solo ve las que su rol permite):
+export const APP_GUIDE_TEXT = `El "Panel de Compras y Bienestar" de Sinco tiene dos módulos, Compras y Bienestar, y secciones generales (Alertas, Nova, Usuarios, Auditoría); cada usuario solo ve lo que su rol permite. Si tiene ambos módulos, los cambia con el selector de la barra superior.
+
+MÓDULO BIENESTAR (y Fundación, que va aparte con sus propias páginas y permisos): Resumen (dashboard mensual y anual con el análisis de Nova, que se genera el día 1 de cada mes y se puede pedir con "Resumir de nuevo"), Actividades (tabla; crear o editar abre un formulario por pasos) y Cronograma (vistas Trayectoria, Año y Mes; al hacer clic en una actividad se ve su detalle). Cada actividad tiene ficha con Participantes (importar desde Excel programados, asistentes y calificaciones), Inventario, Fotos, Compras y Formulario público de inscripción. Al cerrarla, la persona la califica de 1 a 5 y Nova genera su análisis con su propio puntaje. Maestros de Bienestar: responsables de actividades, áreas, motivos de inasistencia, unidades y escala de calificación.
+
+MÓDULO COMPRAS, hasta 10 secciones en el menú lateral:
 
 1. DASHBOARD DE COMPRAS (roles: admin, registro)
    - Tiene dos pestañas: "Mensual" (por defecto, muestra el mes actual) y "Anual" (elige un año, por defecto el año en curso, y muestra el detalle mes a mes de ese año).
