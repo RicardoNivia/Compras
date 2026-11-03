@@ -8,6 +8,7 @@ import {
 import ProveedorFormModal from "@/components/proveedores/ProveedorFormModal";
 import ComprasProveedor from "@/components/proveedores/ComprasProveedor";
 import ValoracionPuntaje from "@/components/ValoracionPuntaje";
+import { crossfade } from "@/lib/crossfade";
 
 const TABS = [
   { key: "checklist", label: "Checklist" },
@@ -92,7 +93,7 @@ export default function ProveedorDetalle({ proveedorNit, catalogos = {}, canEdit
 
       <div role="tablist" aria-label="Secciones del proveedor" className="prov-tabs">
         {TABS.map((t) => (
-          <button key={t.key} role="tab" type="button" aria-selected={tab === t.key} className="prov-tab" onClick={() => setTab(t.key)}>
+          <button key={t.key} role="tab" type="button" aria-selected={tab === t.key} className="prov-tab" onClick={() => crossfade(() => setTab(t.key))}>
             {t.label}
           </button>
         ))}

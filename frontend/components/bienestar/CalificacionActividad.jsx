@@ -57,7 +57,9 @@ export function AnalisisDeActividad({ act, puedeEditar, onCambio, soloNova = fal
       {a ? (
         <>
           <div className="ficha-puntajes">
-            <div><span>Puntaje de Nova</span><Estrellas valor={a.puntaje} /><strong>{a.puntaje} de 5</strong></div>
+            {a.puntaje != null
+              ? <div><span>Puntaje de Nova</span><Estrellas valor={a.puntaje} /><strong>{a.puntaje} de 5</strong></div>
+              : <div><span>Puntaje de Nova</span><strong>Sin datos para calificar</strong></div>}
             {!soloNova && act.calificacion != null && <div><span>Calificación de {act.cerradaPorNombre || "quien la cerró"}</span><Estrellas valor={act.calificacion} /><strong>{act.calificacion} de 5</strong></div>}
           </div>
           <strong className="resumen-lectura-titulo">{a.titulo}</strong>

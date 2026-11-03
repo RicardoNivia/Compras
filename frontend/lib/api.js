@@ -512,6 +512,8 @@ export async function fetchActividadesApi(anio) {
   return handle(res);
 }
 
+export const fetchComprasSinActividadApi = (anio, mes) => fetch(`/api/actividades/compras-sin-actividad?anio=${encodeURIComponent(anio)}${mes ? `&mes=${mes}` : ""}`, { cache: "no-store" }).then(handle);
+
 export async function fetchActividadApi(id) {
   const res = await fetch(`/api/actividades/${id}`, { cache: "no-store" });
   return handle(res);
@@ -640,6 +642,17 @@ export const generarAnalisisBienestarApi = (data) => jsonPost("/api/actividades/
 export const fetchObservacionesApi = (actividadId) => fetch(`/api/actividades/${actividadId}/observaciones`, { cache: "no-store" }).then(handle);
 export const crearObservacionApi = (actividadId, data) => jsonPost(`/api/actividades/${actividadId}/observaciones`, "POST", data);
 export const eliminarObservacionApi = (actividadId, id) => fetch(`/api/actividades/${actividadId}/observaciones/${id}`, { method: "DELETE" }).then(handle);
+
+// Agente de importación: analizar no escribe nada; importar aplica el plan (con las respuestas) sin volver a llamar a Nova.
+function agenteImportacion(actividadId, archivo, accion, plan) {
+  const fd = new FormData();
+  fd.append("archivo", archivo);
+  fd.append("accion", accion);
+  if (plan) fd.append("plan", JSON.stringify(plan));
+  return fetch(`/api/actividades/${actividadId}/agente-importacion`, { method: "POST", body: fd }).then(handle);
+}
+export const analizarConAgenteApi = (actividadId, archivo, plan = null) => agenteImportacion(actividadId, archivo, "analizar", plan);
+export const importarConAgenteApi = (actividadId, archivo, plan) => agenteImportacion(actividadId, archivo, "importar", plan);
 
 export const fetchInventarioApi = (actividadId) => fetch(`/api/actividades/${actividadId}/inventario`, { cache: "no-store" }).then(handle);
 export const crearItemApi = (actividadId, data) => jsonPost(`/api/actividades/${actividadId}/inventario`, "POST", data);

@@ -19,8 +19,11 @@ import { EsqueletoFicha, EsqueletoTabla } from "@/components/bienestar/Esqueleto
 import { Estrellas, CalificacionModal, TabCalificaciones } from "@/components/bienestar/CalificacionActividad";
 import FotosActividad from "@/components/bienestar/FotosActividad";
 import ObservacionesActividad from "@/components/bienestar/ObservacionesActividad";
+import AgenteImportacion from "@/components/bienestar/AgenteImportacion";
+import { ComentarioConMano } from "@/components/bienestar/Sentimiento";
 import { IconPlus, IconTrash, IconDownload, IconCheck } from "@/components/icons";
 import { estadoActividad, pctClase, rangoFechas } from "@/components/bienestar/actividadesUi";
+import { crossfade } from "@/lib/crossfade";
 
 const PAGE_SIZES = [25, 50, 100];
 const entero = (v) => Math.round(v).toLocaleString("es-CO");
@@ -96,8 +99,8 @@ export default function FichaActividad({ actividadId, puedeEditar, basePath }) {
       </div>
 
       <div className="dash-tabs ficha-tabs" role="tablist" aria-label="Secciones de la actividad">
-        {[["resumen", "Resumen"], ["calificaciones", "Calificación Nova y calificación usuario"], ...(act.aplicaParticipantes ? [["participantes", `Participantes (${p.total})`]] : []), ["observaciones", `Encuesta y observaciones (${act.totalObservaciones})`], ["inventario", `Inventario (${act.inventario.items.length})`], ["fotos", `Fotos (${act.fotos})`], ["compras", `Compras (${act.compras})`], ...(act.aplicaParticipantes ? [["formulario", "Formulario de inscripción"]] : [])].map(([k, l]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} className="dash-tab" onClick={() => setTab(k)}>{l}</button>
+        {[["resumen", "Resumen"], ["calificaciones", "Calificación Nova y calificación usuario"], ...(act.aplicaParticipantes ? [["participantes", `Participantes (${p.total})`]] : []), ["observaciones", `Encuesta y observaciones (${act.totalObservaciones})`], ["inventario", `Inventario (${act.inventario.items.length})`], ["fotos", `Fotos (${act.fotos})`], ["compras", `Compras (${act.compras})`], ...(puedeEditar && !cerrada ? [["agente", "Agente de importación"]] : []), ...(act.aplicaParticipantes ? [["formulario", "Formulario de inscripción"]] : [])].map(([k, l]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className="dash-tab" onClick={() => crossfade(() => setTab(k))}>{l}</button>
         ))}
       </div>
 
@@ -105,6 +108,7 @@ export default function FichaActividad({ actividadId, puedeEditar, basePath }) {
       {tab === "calificaciones" && <TabCalificaciones act={act} puedeEditar={puedeEditar} onCambio={cargar} />}
       {tab === "participantes" && <TabParticipantes act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
       {tab === "observaciones" && <ObservacionesActividad act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
+      {tab === "agente" && <AgenteImportacion act={act} onCambio={cargar} />}
       {tab === "inventario" && <TabInventario act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
       {tab === "fotos" && <FotosActividad actividadId={act.id} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
       {tab === "compras" && <TabCompras act={act} puedeEditar={puedeEditar} cerrada={cerrada} editarHref={`${basePath}/actividades/${act.id}/editar`} />}
@@ -326,7 +330,7 @@ function TabParticipantes({ act, puedeEditar, onCambio }) {
                     ) : <span className="muted">—</span>}
                   </td>
                   <td className="num">{pp.calificacion ? `${pp.calificacion} ★` : "—"}</td>
-                  <td>{pp.observacion ? <span className="desc-tooltip-wrap"><span className="desc-text">{pp.observacion}</span><span className="desc-tooltip-bubble">{pp.observacion}</span></span> : "—"}</td>
+                  <td>{pp.observacion ? <ComentarioConMano texto={pp.observacion} sentimiento={pp.sentimiento} /> : "—"}</td>
                   <td><span className="pill muted">{{ formulario: "Formulario", importacion: "Excel", manual: "Manual" }[pp.origen] || pp.origen}</span></td>
                   <td className="actions-cell">
                     <div className="row-actions">
@@ -553,7 +557,7 @@ function TabCompras({ act, puedeEditar, cerrada, editarHref }) {
       <div className="ficha-import">
         <span className="ficha-import-titulo">{act.compras} compra(s) · {fmtCOP(act.gastado)}{act.presupuesto != null ? ` de ${fmtCOP(act.presupuesto)}` : ""}</span>
         <span className="spacer" />
-        {puedeEditar && !cerrada && <Link className="btn" href={editarHref}>Asociar compras</Link>}
+        {puedeEditar && !cerrada && <Link className="btn" href={`${editarHref}?paso=compras`}>Asociar compras</Link>}
       </div>
       <div className="field search-field" style={{ maxWidth: 360 }}>
         <label htmlFor="fc-buscar">Buscar compra</label>

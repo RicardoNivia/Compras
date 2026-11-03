@@ -3,6 +3,9 @@ import { listMaestros, createMaestro, MODULO_POR_TIPO } from "@/lib/maestros";
 import { requireAlgunPermiso, apiError } from "@/lib/apiGuard";
 import { getSessionUser } from "@/lib/auth-server";
 import { ROLES_COMPRAS } from "@/lib/roles";
+import { isRoleAllowed } from "@/lib/permissions";
+
+const FEATURES_BIENESTAR = ["viewBienestar", "editBienestar", "viewFundacion", "editFundacion", "viewMaestrosBienestar"];
 
 // Sin chequeo de rol más allá de estar autenticado (lo garantiza el
 // middleware): cualquier rol que pueda editar registros necesita leer estas
@@ -48,10 +51,16 @@ export async function GET(request) {
   try {
     const user = await getSessionUser();
     const maestros = await listMaestros({ tipo, onlyActive });
-    // El rol Proveedores solo ve los maestros de su módulo (los de Compras son de los roles de Compras).
-    const visibles = user && !ROLES_COMPRAS.includes(user.role)
-      ? maestros.filter((m) => MODULO_POR_TIPO[m.tipo] === "Proveedores")
-      : maestros;
+    // Los roles de Compras ven todos. Los demás ven los de Proveedores y, si tienen algo de Bienestar o Fundación,
+    // los de Bienestar (responsables, áreas, motivos, unidades y escala llenan los formularios de las actividades).
+    let visibles = maestros;
+    if (user && !ROLES_COMPRAS.includes(user.role)) {
+      const modulos = new Set(["Proveedores"]);
+      for (const f of FEATURES_BIENESTAR) {
+        if (await isRoleAllowed(user.role, f)) { modulos.add("Bienestar"); break; }
+      }
+      visibles = maestros.filter((m) => modulos.has(MODULO_POR_TIPO[m.tipo]));
+    }
     return NextResponse.json({ maestros: visibles });
   } catch (err) {
     return apiError(err);

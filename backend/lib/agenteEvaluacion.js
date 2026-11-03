@@ -171,19 +171,30 @@ async function ejecutar(t, lista, actor) {
   logAgenteEvaluacion(actor, t.id, `${t.detener ? "Detuvo" : "Terminó"} la reevaluación: ${t.resultados.length} de ${t.total} actividades y ${t.dashboardsHechos} análisis de dashboard${t.errores.length ? `, ${t.errores.length} con error` : ""}`).catch(() => {});
 }
 
+// Todas las realizadas, con o sin cambios (lo usa lib/agenteDespliegue.js una vez por despliegue).
+async function todasLasEvaluables(lineas) {
+  const actividades = await prisma.actividadBienestar.findMany({
+    where: { estado: { in: ["ejecutada", "cerrada"] }, linea: { in: lineas } },
+    select: { id: true, nombre: true, fecha: true, linea: true, analisisNova: { select: { puntaje: true } } },
+    orderBy: { fecha: "desc" },
+  });
+  return actividades.map((a) => ({ id: a.id, nombre: a.nombre, fecha: a.fecha, linea: a.linea, puntajeActual: a.analisisNova?.puntaje ?? null, motivos: ["Recalificación al desplegar"], ultimoCambio: null }));
+}
+
 // Exige confirmar: el aviso de costo se muestra antes. No hace nada si ya hay una en curso o no hay nada que reevaluar.
-export async function iniciarTrabajo(lineas, { confirmar }, actor) {
+// todas: recalifica todas las realizadas, no solo las que cambiaron.
+export async function iniciarTrabajo(lineas, { confirmar, todas = false }, actor) {
   if (confirmar !== true) throw badRequest("Confirma que aceptas el costo en IA antes de iniciar la evaluación.");
   const global = estadoGlobal();
   if (global.trabajo?.estado === "corriendo") throw badRequest("Ya hay una evaluación en curso.", 409);
-  const lista = await pendientesDeEvaluacion(lineas);
+  const lista = todas ? await todasLasEvaluables(lineas) : await pendientesDeEvaluacion(lineas);
   if (!lista.length) throw badRequest("No hay actividades con cambios para reevaluar.", 409);
   const t = {
     id: randomUUID(), estado: "corriendo", fase: "actividades", total: lista.length, hechas: 0, actual: [], resultados: [], errores: [],
     dashboards: 0, dashboardsHechos: 0, iniciadoPor: actor?.nombre || null, inicio: new Date(), fin: null, detener: false,
   };
   global.trabajo = t;
-  logAgenteEvaluacion(actor, t.id, `Inició la reevaluación de ${lista.length} actividad(es) con cambios`).catch(() => {});
+  logAgenteEvaluacion(actor, t.id, `Inició la reevaluación de ${lista.length} actividad(es) ${todas ? "(todas, al desplegar)" : "con cambios"}`).catch(() => {});
   ejecutar(t, lista, actor).catch((e) => {
     t.errores.push(e.message);
     t.estado = "terminado";

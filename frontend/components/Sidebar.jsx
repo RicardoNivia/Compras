@@ -4,12 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, canViewNotificaciones, canViewBienestar, ROLE_LABELS } from "@/lib/roles";
-import { EVENTO_NO_LEIDAS } from "@/lib/notificacionesApi";
+import { EVENTO_NO_LEIDAS, EVENTO_SOLICITUDES } from "@/lib/notificacionesApi";
 import { MODULOS } from "@/lib/modulos";
 import { useModulo } from "@/components/ModuloShell";
 import {
   IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail,
-  IconBell, IconSearch, IconBuilding, IconEye, IconCalendar, IconBag, IconHeart, IconList,
+  IconBell, IconBuilding, IconEye, IconCalendar, IconBag, IconHeart, IconList,
 } from "@/components/icons";
 import { fetchCompartidosApi } from "@/lib/api";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
@@ -17,7 +17,7 @@ import CommandPalette from "@/components/CommandPalette";
 
 // Menú compacto por módulos: un riel de íconos que se expande al pasar el mouse (sin quitarle espacio al contenido).
 // Solo muestra el menú del módulo activo más el grupo "General"; el módulo se cambia desde la barra superior
-// (components/SelectorModulo.jsx), que solo aparece si el rol tiene acceso a más de un módulo.
+// (arriba del menú, en el lugar del buscador), que solo aparece si el rol tiene acceso a más de un módulo.
 // El degradado del riel sale de --accent/--secondary, que cambian con el módulo (ver "Tema por módulo" en
 // globals.css): Compras azul → turquesa, Bienestar verde → turquesa. "feature" referencia la Matriz de permisos (si
 // el usuario trae user.permissions, que siempre debería, se usa eso; "show" es el respaldo de lib/roles.js).
@@ -79,7 +79,7 @@ const permiteA = (user, it) => (it.feature ? (user.permissions?.[it.feature] ?? 
 
 // Módulos que la persona puede usar: los que tienen al menos una opción permitida por su rol (Matriz de permisos).
 // { compras: "/dashboard", bienestar: "/bienestar" } — el valor es el primer destino al cambiar a ese módulo.
-// Lo usan el menú y el selector de módulo de la barra superior (components/SelectorModulo.jsx).
+// Lo usa el selector de módulo del menú.
 export function modulosDelUsuario(user) {
   const out = {};
   for (const [key, grupos] of Object.entries(GRUPOS)) {
@@ -130,15 +130,21 @@ export default function Sidebar({ user }) {
   }, [user, hayCompartidos]); // eslint-disable-line react-hooks/exhaustive-deps
   const generales = GENERALES.filter(permite);
   const modulosVisibles = Object.keys(menu);
+  const modulosPropios = Object.entries(modulosDelUsuario(user));
   const moduloMenu = menu[modulo] ? modulo : modulosVisibles[0];
   const itemsPaleta = [...Object.values(menu).flat().flatMap((g) => g.items), ...generales];
 
-  // Punto rojo en "Alertas y notificaciones": solo notificaciones no leídas (la campana publica el número).
-  const [noLeidas, setNoLeidas] = useState(0);
+  // Punto rojo en "Alertas y notificaciones": notificaciones no leídas + solicitudes de compra por atender (lo publica
+  // components/notificaciones/AvisosEnVivo.jsx).
+  const [sinLeer, setSinLeer] = useState(0);
+  const [solicitudes, setSolicitudes] = useState(0);
+  const noLeidas = sinLeer + solicitudes;
   useEffect(() => {
-    const alCambiar = (e) => setNoLeidas(Number(e.detail) || 0);
+    const alCambiar = (e) => setSinLeer(Number(e.detail) || 0);
+    const alCambiarSolicitudes = (e) => setSolicitudes(Number(e.detail) || 0);
     window.addEventListener(EVENTO_NO_LEIDAS, alCambiar);
-    return () => window.removeEventListener(EVENTO_NO_LEIDAS, alCambiar);
+    window.addEventListener(EVENTO_SOLICITUDES, alCambiarSolicitudes);
+    return () => { window.removeEventListener(EVENTO_NO_LEIDAS, alCambiar); window.removeEventListener(EVENTO_SOLICITUDES, alCambiarSolicitudes); };
   }, []);
 
   // Abrir la paleta de comandos con Ctrl/Cmd+K desde cualquier página — el
@@ -183,16 +189,28 @@ export default function Sidebar({ user }) {
   return (
     <div className="sidebar-track">
       <aside className="sidebar">
-        <div className="sidebar-head">
-          <span className="sidebar-brand-mark">S</span>
-          <span className="sidebar-brand-label">Sinco · {MODULOS[moduloMenu]?.nombre || "Panel"}</span>
-        </div>
-
-        <button type="button" className="sidebar-link sidebar-search-btn" onClick={() => setPaletteOpen(true)}>
-          <span className="sidebar-link-ic"><IconSearch size={15} /></span>
-          <span className="label">Buscar o ir a…</span>
-          <span className="sidebar-kbd">⌘K</span>
-        </button>
+        {/* Selector de módulo en la cabecera, en el lugar de la marca: colapsado se ve el activo y al expandir los dos,
+            lado a lado. Solo si el rol tiene más de uno; lleva a la primera página que puede ver de ese módulo. El buscador
+            sigue en Ctrl+K. */}
+        {modulosPropios.length < 2 ? (
+          <div className="sidebar-head">
+            <span className="sidebar-brand-mark">S</span>
+            <span className="sidebar-brand-label">Sinco · {MODULOS[moduloMenu]?.nombre || "Panel"}</span>
+          </div>
+        ) : (
+          <nav className="sidebar-modulos" aria-label="Cambiar de módulo">
+            {modulosPropios.map(([m, href]) => {
+              const Icono = ICONOS_MODULO[m];
+              const activo = m === moduloMenu;
+              return (
+                <Link key={m} href={href} className={`sidebar-link sidebar-modulo m-${m}${activo ? " activo" : ""}`} aria-current={activo ? "true" : undefined} title={MODULOS[m].descripcion}>
+                  <span className="sidebar-link-ic"><Icono size={16} /></span>
+                  <span className="label">{MODULOS[m].nombre}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         <nav className="sidebar-nav" aria-label="Navegación principal">
           {(menu[moduloMenu] || []).map((g) => (
@@ -212,32 +230,17 @@ export default function Sidebar({ user }) {
         <div className="sidebar-foot">
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">{initials(user.nombre)}</div>
-            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+            <div className="sidebar-user-txt">
               <span className="sidebar-user-name">{user.nombre}</span>
               <span className="sidebar-user-role">{user.roleLabel || ROLE_LABELS[user.role] || user.role}</span>
             </div>
+            <button type="button" className="sidebar-user-btn" onClick={() => setShowChangePassword(true)} title="Cambiar contraseña" aria-label="Cambiar contraseña">
+              <IconKey size={15} />
+            </button>
+            <button type="button" className="sidebar-user-btn" onClick={handleLogout} disabled={loggingOut} title="Cerrar sesión" aria-label="Cerrar sesión">
+              {loggingOut ? <span className="spinner" /> : <IconLogout size={15} />}
+            </button>
           </div>
-
-          <button
-            type="button"
-            className="sidebar-logout-btn"
-            onClick={() => setShowChangePassword(true)}
-            title="Cambiar contraseña"
-          >
-            <span className="sidebar-link-ic"><IconKey size={17} /></span>
-            <span className="label">Cambiar contraseña</span>
-          </button>
-
-          <button
-            type="button"
-            className="sidebar-logout-btn"
-            onClick={handleLogout}
-            disabled={loggingOut}
-            title="Cerrar sesión"
-          >
-            {loggingOut ? <span className="spinner" /> : <span className="sidebar-link-ic"><IconLogout size={17} /></span>}
-            <span className="label">{loggingOut ? "Saliendo…" : "Cerrar sesión"}</span>
-          </button>
         </div>
 
         {showChangePassword && (

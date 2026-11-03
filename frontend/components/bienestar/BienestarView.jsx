@@ -9,6 +9,7 @@ import CronogramaView from "@/components/bienestar/CronogramaView";
 import ResumenBienestar from "@/components/bienestar/ResumenBienestar";
 import ResumenFundacion from "@/components/bienestar/ResumenFundacion";
 import AgenteEvaluacion from "@/components/bienestar/AgenteEvaluacion";
+import DetalleActividadModal from "@/components/bienestar/DetalleActividadModal";
 import { Estrellas, CalificacionModal } from "@/components/bienestar/CalificacionActividad";
 import { ESTADOS_ACTIVIDAD, estadoActividad, pctClase, rangoFechas } from "@/components/bienestar/actividadesUi";
 
@@ -26,6 +27,7 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
   const router = useRouter();
   const actividades = initialActividades;
   const [verCalificacion, setVerCalificacion] = useState(null); // id de la actividad
+  const [comentarioDe, setComentarioDe] = useState(null); // actividad de un comentario destacado del Resumen
 
   const anios = useMemo(() => {
     const set = new Set(actividades.filter((a) => a.fecha).map((a) => Number(a.fecha.slice(0, 4))));
@@ -41,7 +43,7 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
   const [page, setPage] = useState(1);
 
   const delAnio = useMemo(
-    () => actividades.filter((a) => !a.fecha || a.fecha.startsWith(`${anio}-`)),
+    () => actividades.filter((a) => (a.fecha ? a.fecha.startsWith(`${anio}-`) : anio === new Date().getFullYear())),
     [actividades, anio]
   );
 
@@ -121,7 +123,19 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
         </div>
       )}
 
+      {puedeEditar && <ActividadesVencidas actividades={delAnio} fichaDe={fichaDe} />}
+
       {vista === "actividades" && indicadores}
+
+      {comentarioDe && (
+        <DetalleActividadModal
+          actividad={{ id: comentarioDe.actividadId, nombre: comentarioDe.actividad, fecha: comentarioDe.fecha, fechaFin: comentarioDe.fechaFin, estado: comentarioDe.estado, linea: comentarioDe.linea }}
+          tabInicial="comentarios"
+          fichaHref={(a) => fichaDe(a.id)}
+          editarHref={puedeEditar ? (a) => `${fichaDe(a.id)}/editar` : null}
+          onClose={() => setComentarioDe(null)}
+        />
+      )}
 
       {vista === "resumen" && linea === "Fundación" ? (
         <ResumenFundacion
@@ -131,6 +145,7 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
           puedeEditar={puedeEditar}
           accion={botonNueva}
           onAbrirActividad={(id) => router.push(fichaDe(id))}
+          onAbrirComentario={(c) => setComentarioDe(c)}
           onVerActividades={() => router.push(`${basePath}/actividades`)}
         />
       ) : vista === "resumen" ? (
@@ -141,6 +156,7 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
           puedeEditar={puedeEditar}
           accion={botonNueva}
           onAbrirActividad={(id) => router.push(fichaDe(id))}
+          onAbrirComentario={(c) => setComentarioDe(c)}
           linea={linea}
           onVerActividades={() => router.push(`${basePath}/actividades`)}
         />
@@ -272,6 +288,24 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
         </>
       )}
       {verCalificacion != null && <CalificacionModal actividadId={verCalificacion} puedeEditar={puedeEditar} onClose={() => setVerCalificacion(null)} onCambio={() => router.refresh()} />}
+    </div>
+  );
+}
+
+// Actividades cuya fecha ya pasó y siguen programadas (o creadas): no se sabe si se hicieron. Se avisa para que las
+// marquen como ejecutadas o les cambien la fecha. También salen en Mi día.
+function ActividadesVencidas({ actividades, fichaDe }) {
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+  const vencidas = actividades.filter((a) => (a.estado === "programada" || a.estado === "creada") && a.fecha && (a.fechaFin || a.fecha) < hoy);
+  if (!vencidas.length) return null;
+  return (
+    <div className="aviso-vencidas" role="status">
+      <strong>{vencidas.length} actividad(es) ya pasaron y siguen programadas.</strong>{" "}
+      Márcalas como ejecutadas (y carga la asistencia) o cámbiales la fecha si se movieron:{" "}
+      {vencidas.slice(0, 4).map((a, i) => (
+        <span key={a.id}>{i > 0 && ", "}<Link href={fichaDe(a.id)}>{a.nombre} ({a.fecha})</Link></span>
+      ))}
+      {vencidas.length > 4 && ` y ${vencidas.length - 4} más`}.
     </div>
   );
 }

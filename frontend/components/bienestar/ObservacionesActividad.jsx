@@ -8,6 +8,7 @@ import ImportarNovaModal from "@/components/bienestar/ImportarNovaModal";
 import PiePagina, { usePagina, PAGE_SIZES, PAGE_SIZES_MODAL } from "@/components/bienestar/PiePagina";
 import { EsqueletoTabla } from "@/components/bienestar/Esqueletos";
 import { IconDownload, IconPlus, IconTrash } from "@/components/icons";
+import { ComentarioConMano, ManoSentimiento } from "@/components/bienestar/Sentimiento";
 
 const ORIGENES = { equipo: "Equipo", participante: "Participante", cierre: "Cierre", actividad: "Actividad" };
 const entero = (v) => Math.round(v).toLocaleString("es-CO");
@@ -31,7 +32,7 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
 
   const filtradas = useMemo(() => {
     const q = buscar.trim().toLowerCase();
-    return (datos?.observaciones || []).filter((o) => (!filtro || (filtro === "comentario" ? !!o.texto : o.tipo === filtro))
+    return (datos?.observaciones || []).filter((o) => (!filtro || (filtro === "comentario" ? !!o.texto : filtro.startsWith("s:") ? o.sentimiento === filtro.slice(2) : o.tipo === filtro))
       && (!q || `${o.quien} ${o.area || ""} ${o.texto || ""}`.toLowerCase().includes(q)));
   }, [datos, buscar, filtro]);
   const pag = usePagina(filtradas, `${buscar}|${filtro}`, enModal ? PAGE_SIZES_MODAL[0] : PAGE_SIZES[0]);
@@ -72,13 +73,21 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
 
   return (
     <div className={enModal ? "ficha-seccion resumen-card" : "ficha-seccion"}>
-      {enModal && <h2>Encuesta y observaciones</h2>}
       {!enModal && act.aplicaParticipantes && (
         <div className="actividad-cifras">
           <div><span>Calificación promedio</span><strong>{resumen.promedio != null ? `${resumen.promedio.toFixed(1).replace(".", ",")} / 5` : "—"}</strong></div>
           <div><span>Calificaciones</span><strong>{entero(resumen.calificaciones)}</strong></div>
           <div><span>Comentarios de participantes</span><strong>{entero(resumen.comentarios)}</strong></div>
           <div><span>Observaciones del equipo</span><strong>{entero(resumen.notasEquipo)}</strong></div>
+          <div>
+            <span>Tono de los comentarios{resumen.sinClasificar ? ` · ${entero(resumen.sinClasificar)} por clasificar` : ""}</span>
+            <strong className="tono-resumen">
+              <span><ManoSentimiento valor="positivo" />{entero(resumen.sentimientos.positivo)}</span>
+              <span><ManoSentimiento valor="neutro" />{entero(resumen.sentimientos.neutro)}</span>
+              <span><ManoSentimiento valor="negativo" />{entero(resumen.sentimientos.negativo)}</span>
+              <span><ManoSentimiento valor="no_aplica" />{entero(resumen.sentimientos.no_aplica)}</span>
+            </strong>
+          </div>
         </div>
       )}
 
@@ -139,6 +148,10 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
           <select id="ob-filtro" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
             <option value="">Todas</option>
             <option value="comentario">Solo con comentario</option>
+            <option value="s:positivo">Positivos</option>
+            <option value="s:neutro">Neutros</option>
+            <option value="s:negativo">Negativos</option>
+            <option value="s:no_aplica">Que no aplican (N/A)</option>
             <option value="equipo">Del equipo</option>
             <option value="participante">De participantes</option>
             <option value="cierre">Del cierre</option>
@@ -161,7 +174,7 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
                   <td><span className="desc-tooltip-wrap"><span className="desc-text">{o.quien}</span><span className="desc-tooltip-bubble">{o.quien}</span></span></td>
                   <td className="truncate">{o.area || "—"}</td>
                   <td className="num">{o.calificacion ? `${o.calificacion} ★` : "—"}</td>
-                  <td>{o.texto ? <span className="desc-tooltip-wrap"><span className="desc-text">{o.texto}</span><span className="desc-tooltip-bubble">{o.texto}</span></span> : <span className="muted">Sin comentario</span>}</td>
+                  <td>{o.texto ? <ComentarioConMano texto={o.texto} sentimiento={o.sentimiento} /> : <span className="muted">Sin comentario</span>}</td>
                   <td>{o.fecha ? fmtDateTime(o.fecha) : "—"}</td>
                   {puedeEditar && (
                     <td className="actions-cell">

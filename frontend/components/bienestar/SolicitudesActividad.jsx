@@ -5,6 +5,7 @@ import { fmtCOP, fmtDateTime } from "@/lib/format";
 import { fetchSolicitudesActividadApi, crearSolicitudCompraApi, cancelarSolicitudCompraApi } from "@/lib/api";
 import { IconPlus } from "@/components/icons";
 import { EsqueletoLista } from "@/components/bienestar/Esqueletos";
+import { EVENTO_REVISAR } from "@/components/notificaciones/AvisosEnVivo";
 
 const ESTADOS = {
   pendiente: { label: "Pendiente", pill: "warning" },
@@ -90,6 +91,7 @@ export function ModalSolicitar({ actividadId, onClose, onCreada }) {
     setError("");
     try {
       await crearSolicitudCompraApi(actividadId, f);
+      window.dispatchEvent(new Event(EVENTO_REVISAR));
       onCreada();
     } catch (err) {
       setError(err.message || "No se pudo enviar la solicitud.");

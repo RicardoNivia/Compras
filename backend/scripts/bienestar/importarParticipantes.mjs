@@ -121,7 +121,7 @@ async function aplicar(actividad, lista, { modo = "inscripcion", noMarcadosNoAsi
       if (!actual.documento && p.documento) data.documento = p.documento;
       if (!actual.area && p.area) data.area = p.area;
       if (!actual.calificacion && p.calificacion) data.calificacion = p.calificacion;
-      if (p.observacion && !actual.observacion) data.observacion = p.observacion;
+      if (p.observacion && !actual.observacion) { data.observacion = p.observacion; data.sentimiento = null; }
       if (p.datos && Object.keys(p.datos).length) data.datos = JSON.stringify({ ...(actual.datos ? JSON.parse(actual.datos) : {}), ...p.datos });
       if (Object.keys(data).length) {
         if (confirmar) await prisma.participanteActividad.update({ where: { id: actual.id }, data });

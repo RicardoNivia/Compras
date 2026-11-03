@@ -6,6 +6,7 @@ import ConfigCicloProveedores from "@/components/proveedores/ConfigCicloProveedo
 import { TIPOS_MAESTRO, TIPO_LABELS, MODULO_POR_TIPO, TIPOS_USUARIO, TIPOS_FIJOS } from "@/lib/maestrosTipos";
 import { updateMaestroApi, deleteMaestroApi } from "@/lib/api";
 import { IconPlus, IconEdit, IconTrash, IconSearch, IconBuilding, IconUsers, IconFlag, IconMoney, IconFile, IconLayers, IconStar, IconClock } from "@/components/icons";
+import { crossfade } from "@/lib/crossfade";
 
 // Maestros de Compras y de Proveedores en una sola sección, agrupados por módulo.
 // El Ciclo de proveedores (fecha de corte) vive aquí, dentro del grupo Proveedores.
@@ -188,7 +189,7 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
                     key={t}
                     type="button"
                     className={`maestros-nav-item${tab === t ? " active" : ""}`}
-                    onClick={() => setTab(t)}
+                    onClick={() => crossfade(() => setTab(t))}
                   >
                     <span className="ic"><Icon size={16} /></span>
                     {TIPO_LABELS[t]}
@@ -199,7 +200,7 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
                 <button
                   type="button"
                   className={`maestros-nav-item${esCiclo ? " active" : ""}`}
-                  onClick={() => setTab(CICLO)}
+                  onClick={() => crossfade(() => setTab(CICLO))}
                 >
                   <span className="ic"><IconClock size={16} /></span>
                   Ciclo de proveedores

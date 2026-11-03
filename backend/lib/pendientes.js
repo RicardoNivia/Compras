@@ -7,6 +7,7 @@ import { esCritico } from "@/lib/proveedoresCicloReglas";
 import { isRoleAllowed } from "@/lib/permissions";
 import { businessDaysElapsedToToday } from "@/lib/businessDays";
 import { edicionesPorEnviar } from "@/lib/reportEdiciones";
+import { hoyColombia } from "@/lib/hoyColombia";
 
 // "Mi día": motor ÚNICO de lo que le toca hacer a cada persona según su rol. Alimenta la página
 // "Mi día y alertas", el contador del menú lateral y la herramienta "mis_pendientes" de Nova, así
@@ -260,9 +261,39 @@ async function solicitudesCompraPendientes() {
   });
 }
 
+// Bienestar: actividades que ya pasaron y siguen sin ejecutar, y ejecutadas que nadie cerró. Solo de las líneas que la
+// persona puede editar.
+const SIN_CERRAR_DIAS = 15;
+async function lineasEditables(user) {
+  const out = [];
+  if (await isRoleAllowed(user.role, "editBienestar")) out.push("Bienestar");
+  if (await isRoleAllowed(user.role, "editFundacion")) out.push("Fundación");
+  return out;
+}
+const diasDesde = (fecha) => Math.floor((Date.parse(hoyColombia()) - Date.parse(fecha)) / 86400000);
+const fichaDe = (a) => `${a.linea === "Fundación" ? "/bienestar/fundacion" : "/bienestar"}/actividades/${a.id}`;
+async function actividadesVencidas(user) {
+  const hoy = hoyColombia();
+  const rows = await prisma.actividadBienestar.findMany({ where: { linea: { in: await lineasEditables(user) }, estado: { in: ["creada", "programada"] }, fecha: { lt: hoy } }, orderBy: { fecha: "asc" } });
+  return rows.filter((a) => (a.fechaFin || a.fecha) < hoy).map((a) => {
+    const dias = diasDesde(a.fechaFin || a.fecha);
+    return { id: `act-${a.id}`, ref: a.linea, titulo: a.nombre, contexto: `${a.linea} · ${a.fecha}`, dias, detalle: "Sigue programada: márcala como ejecutada o cámbiale la fecha", nivel: dias > 7 ? "critico" : "atencion", href: fichaDe(a), mio: false };
+  });
+}
+async function actividadesSinCerrar(user) {
+  const rows = await prisma.actividadBienestar.findMany({ where: { linea: { in: await lineasEditables(user) }, estado: "ejecutada" }, orderBy: { fecha: "asc" } });
+  return rows.filter((a) => a.fecha && diasDesde(a.fechaFin || a.fecha) > SIN_CERRAR_DIAS).map((a) => ({
+    id: `cerrar-${a.id}`, ref: a.linea, titulo: a.nombre, contexto: `${a.linea} · ${a.fecha}`, dias: diasDesde(a.fechaFin || a.fecha),
+    detalle: "Ejecutada sin cerrar: califícala y ciérrala", nivel: "info", href: fichaDe(a), mio: false,
+  }));
+}
+
 const SECCIONES = [
   { clave: "solicitudesCompra", titulo: "Solicitudes de compra de Bienestar", descripcion: "Bienestar las pidió para una actividad: genera la compra con los datos ya llenos o recházala indicando por qué.", roles: ["admin", "registro"], fuente: "solicitudes", permiso: "createRecord" },
   { clave: "informesPorEnviar", titulo: "Informes listos para que los envíes", descripcion: "Se generaron a su hora con el PDF listo: descárgalo y envíalo desde Outlook con el correo ya escrito.", roles: ["admin", "registro", "legalizar", "radicar", "proveedores"], fuente: "informes", permiso: "viewReportes" },
+  // Bienestar ("*": cualquier rol, incluidos los creados en Usuarios › Roles, que pueda editar alguna línea)
+  { clave: "bienVencidas", titulo: "Actividades que ya pasaron y siguen programadas", descripcion: "Su fecha ya pasó: márcalas como ejecutadas y carga la asistencia, o cámbiales la fecha si se movieron.", roles: ["*"], fuente: "bienestar", permisosAlguno: ["editBienestar", "editFundacion"] },
+  { clave: "bienSinCerrar", titulo: "Actividades ejecutadas sin cerrar", descripcion: `Se ejecutaron hace más de ${SIN_CERRAR_DIAS} días y no se han cerrado con su calificación.`, roles: ["*"], fuente: "bienestar", permisosAlguno: ["editBienestar", "editFundacion"] },
   // Compras
   { clave: "atrasadas", titulo: "Solicitudes atrasadas", descripcion: "Compras sin fecha de entrega. Pasados 8 días hábiles incumplen el plazo; desde 5 ya conviene moverlas.", roles: ["admin", "registro"], fuente: "records" },
   { clave: "porLegalizar", titulo: "Compras por legalizar", descripcion: "Ya fueron entregadas o ejecutadas pero su legalización no se ha hecho. Los días cuentan desde la entrega.", roles: ["admin", "legalizar"], fuente: "records" },
@@ -306,6 +337,8 @@ async function prepararConstructores(user, usa) {
     provPorRegistrar: () => provPorRegistrar(prov.rows),
     informesPorEnviar: () => informesPorEnviar(user),
     solicitudesCompra: () => solicitudesCompraPendientes(),
+    bienVencidas: () => actividadesVencidas(user),
+    bienSinCerrar: () => actividadesSinCerrar(user),
   };
   return { constructores, ctxProv };
 }
@@ -324,8 +357,13 @@ export async function getPendientes(user) {
   const rol = user.role;
   const quiere = [];
   for (const s of SECCIONES) {
-    if (!s.roles.includes(rol)) continue;
+    if (!s.roles.includes(rol) && !s.roles.includes("*")) continue;
     if (s.permiso && !(await isRoleAllowed(rol, s.permiso))) continue;
+    if (s.permisosAlguno) {
+      let alguno = false;
+      for (const f of s.permisosAlguno) if (await isRoleAllowed(rol, f)) { alguno = true; break; }
+      if (!alguno) continue;
+    }
     quiere.push(s);
   }
   const usa = (fuente) => quiere.some((s) => s.fuente === fuente);
@@ -338,7 +376,7 @@ export async function getPendientes(user) {
       clave: s.clave,
       titulo: s.titulo,
       descripcion: s.descripcion,
-      dominio: s.fuente === "proveedores" ? "proveedores" : s.fuente === "presupuesto" ? "presupuesto" : s.fuente === "informes" ? "informes" : "compras",
+      dominio: s.fuente === "proveedores" ? "proveedores" : s.fuente === "presupuesto" ? "presupuesto" : s.fuente === "informes" ? "informes" : s.fuente === "bienestar" ? "bienestar" : "compras",
       total: items.length,
       criticos: items.filter((i) => i.nivel === "critico").length,
       nivel: items.length ? peorNivel(items) : "ok",

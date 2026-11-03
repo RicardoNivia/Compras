@@ -8,10 +8,13 @@ import { AnimatedNumber } from "@/components/charts/chartKit";
 import ComboChartSvg from "@/components/charts/ComboChartSvg";
 import HBarChartSvg from "@/components/charts/HBarChartSvg";
 import AnalisisNova from "@/components/bienestar/AnalisisNova";
+import ComentariosDestacados from "@/components/bienestar/ComentariosDestacados";
+import ComprasSinActividad from "@/components/bienestar/ComprasSinActividad";
 import ComparaPresupuesto from "@/components/bienestar/ComparaPresupuesto";
 import { EsqueletoResumen } from "@/components/bienestar/Esqueletos";
 import ResumenDelMes from "@/components/bienestar/ResumenDelMes";
 import { estadoActividad } from "@/components/bienestar/actividadesUi";
+import { crossfade } from "@/lib/crossfade";
 
 const pct = (v) => (v == null ? "—" : `${(Math.round(v * 1000) / 10).toString().replace(".", ",")} %`);
 const MES_CORTO = MESES.map((m) => m.slice(0, 3));
@@ -21,13 +24,14 @@ const entero = (v) => Math.round(v).toLocaleString("es-CO");
 // sale de Compras. Igual que el Dashboard de compras, tiene vista Mensual (un mes, gráfica por actividad) y Anual
 // (el año, gráfica por mes). Responde: cuánto se gastó frente a lo presupuestado, qué porcentaje participó, quiénes
 // se inscribieron y no asistieron (y por qué) y cómo participó cada área. Datos de /api/actividades/resumen.
-export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bienestar", puedeEditar, accion, onAbrirActividad, onVerActividades }) {
+export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bienestar", puedeEditar, accion, onAbrirActividad, onAbrirComentario, onVerActividades }) {
   const ahora = new Date();
   const [vista, setVista] = useState("anual"); // "mensual" | "anual"
   const [mes, setMes] = useState(ahora.getFullYear() === anio ? ahora.getMonth() + 1 : 1);
   const [resumen, setResumen] = useState(null);
   const [error, setError] = useState("");
   const [actualizando, setActualizando] = useState(false);
+  const [recarga, setRecarga] = useState(0);
 
   useEffect(() => {
     let vigente = true;
@@ -38,15 +42,15 @@ export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bi
       .catch((e) => { if (vigente) setError(e.message || "No se pudo cargar el resumen."); })
       .finally(() => { if (vigente) setActualizando(false); });
     return () => { vigente = false; };
-  }, [anio, linea, vista, mes]);
+  }, [recarga, anio, linea, vista, mes]);
 
   const periodo = vista === "mensual" ? `${MESES[mes - 1].toLowerCase()} de ${anio}` : String(anio);
 
   const controles = (
     <div className="resumen-periodo">
       <div className="dash-tabs" role="tablist" aria-label="Periodo del resumen">
-        <button type="button" role="tab" aria-selected={vista === "mensual"} className="dash-tab" onClick={() => setVista("mensual")}>Mensual</button>
-        <button type="button" role="tab" aria-selected={vista === "anual"} className="dash-tab" onClick={() => setVista("anual")}>Anual</button>
+        <button type="button" role="tab" aria-selected={vista === "mensual"} className="dash-tab" onClick={() => crossfade(() => setVista("mensual"))}>Mensual</button>
+        <button type="button" role="tab" aria-selected={vista === "anual"} className="dash-tab" onClick={() => crossfade(() => setVista("anual"))}>Anual</button>
       </div>
       <div className="field" style={{ width: vista === "anual" ? 140 : 110 }}>
         <label htmlFor="res-anio">Año</label>
@@ -66,10 +70,10 @@ export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bi
     </div>
   );
 
-  if (error) return <div className="resumen-bienestar">{controles}<div className="modal-error">{error}</div></div>;
-  if (!resumen) return <div className="resumen-bienestar">{controles}<EsqueletoResumen /></div>;
+  if (error) return <div className="resumen-bienestar" data-crossfade-raiz>{controles}<div className="modal-error">{error}</div></div>;
+  if (!resumen) return <div className="resumen-bienestar" data-crossfade-raiz>{controles}<EsqueletoResumen /></div>;
 
-  const { kpis, porMes, porActividad, categorias, costoPorActividad, proximas, participacion, presupuestoVsGasto } = resumen;
+  const { kpis, porMes, porActividad, categorias, costoPorActividad, proximas, participacion, presupuestoVsGasto, comentariosDestacados } = resumen;
   const lectura = vista === "anual" ? lecturaDelAnio(porMes, kpis) : lecturaDelMes(porActividad, kpis, participacion);
 
   // "Explicar" de cada tarjeta, igual que en el Dashboard de Compras; se reinicia al cambiar de período.
@@ -77,7 +81,7 @@ export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bi
     "Presupuesto y gasto": `Presupuesto ${fmtCOP(kpis.presupuestoAsignado)}, gastado ${fmtCOP(kpis.gastoActividades - kpis.gastoSinPresupuesto)}`,
     "Gasto en compras asociadas": fmtCOP(kpis.gastoArea),
     "Participación": pct(kpis.asistencia),
-    "Inscritos que no asistieron": entero(participacion.noAsistieron),
+    "No asistieron o sin registrar": `${entero(participacion.noAsistieron + (participacion.sinRegistrar || 0))} (${entero(participacion.noAsistieron)} ausentes, ${entero(participacion.sinRegistrar || 0)} sin asistencia registrada, de ${entero(participacion.inscritos)} inscritos)`,
     "Actividades ejecutadas": entero(kpis.porEstado.ejecutada + kpis.porEstado.cerrada),
     "Costo por asistente": kpis.costoPorAsistente ? fmtCOP(kpis.costoPorAsistente) : "—",
   };
@@ -89,17 +93,19 @@ export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bi
   });
 
   return (
-    <div className={`resumen-bienestar${actualizando ? " actualizando" : ""}`} aria-busy={actualizando}>
+    <div className={`resumen-bienestar${actualizando ? " actualizando" : ""}`} aria-busy={actualizando} data-crossfade-raiz>
       {controles}
 
       <div className="resumen-kpis">
         <Kpi {...explica("Presupuesto y gasto")} label="Presupuesto y gasto" fuente="cruce"><ComparaPresupuesto presupuesto={kpis.presupuestoAsignado} gastado={kpis.gastoActividades} gastoSinPresupuesto={kpis.gastoSinPresupuesto} /></Kpi>
         <Kpi {...explica("Gasto en compras asociadas")} label="Gasto en compras asociadas" valor={<AnimatedNumber value={kpis.gastoArea} format={fmtCOP} />} sub={`${kpis.comprasArea} compras asociadas a actividades · ${periodo}`} fuente="compras" />
         <Kpi {...explica("Participación")} label="Participación" valor={kpis.asistencia == null ? "—" : <AnimatedNumber value={Math.round(kpis.asistencia * 1000)} format={(v) => pct(v / 1000)} />} sub={`${entero(kpis.asistentes)} asistentes en ${kpis.actividades} actividades`} fuente="bienestar" />
-        <Kpi {...explica("Inscritos que no asistieron")} label="Inscritos que no asistieron" valor={<AnimatedNumber value={participacion.noAsistieron} format={entero} />} sub={participacion.motivos[0] ? `Motivo más frecuente: ${participacion.motivos[0].motivo}` : `De ${entero(participacion.inscritos)} inscritos registrados`} fuente="bienestar" />
+        <Kpi {...explica("No asistieron o sin registrar")} label="No asistieron o sin registrar" valor={<AnimatedNumber value={participacion.noAsistieron + (participacion.sinRegistrar || 0)} format={entero} />} sub={`${entero(participacion.noAsistieron)} ausentes · ${entero(participacion.sinRegistrar || 0)} sin asistencia registrada${participacion.motivos[0] ? ` · motivo más frecuente: ${participacion.motivos[0].motivo}` : ""}`} fuente="bienestar" />
         <Kpi {...explica("Actividades ejecutadas")} label="Actividades ejecutadas" valor={<AnimatedNumber value={kpis.porEstado.ejecutada + kpis.porEstado.cerrada} format={entero} />} sub={`De ${kpis.actividades}: ${kpis.porEstado.programada} programadas, ${kpis.porEstado.creada} sin programar`} fuente="bienestar" />
         <Kpi {...explica("Costo por asistente")} label="Costo por asistente" valor={kpis.costoPorAsistente ? <AnimatedNumber value={kpis.costoPorAsistente} format={fmtCOP} /> : "—"} sub="Compras asociadas ÷ asistentes de esas actividades" fuente="cruce" />
       </div>
+
+      <ComprasSinActividad datos={resumen.comprasSinActividad} anio={anio} mes={vista === "mensual" ? mes : null} linea={linea} periodo={periodo} puedeEditar={puedeEditar} onCambio={() => setRecarga((n) => n + 1)} />
 
       <AnalisisNova linea={linea} anio={anio} mes={vista === "mensual" ? mes : 0} puedeEditar={puedeEditar} respaldo={lectura} />
 
@@ -214,6 +220,8 @@ export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bi
           )}
         </section>
       </div>
+
+      <ComentariosDestacados comentarios={comentariosDestacados} periodo={periodo} onAbrir={onAbrirComentario} />
     </div>
   );
 }

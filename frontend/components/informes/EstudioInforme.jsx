@@ -13,6 +13,7 @@ import VistaConsulta from "@/components/informes/VistaConsulta";
 import AccesoPanel from "@/components/informes/AccesoPanel";
 import FotosPanel from "@/components/informes/FotosPanel";
 import { informeBase, soloGuardable } from "@/components/informes/estudioUtils";
+import { crossfade } from "@/lib/crossfade";
 
 // Un informe del Estudio: crea el borrador (desde el pedido a Nova, una plantilla o en blanco), lo guarda solo a
 // medida que se edita, mantiene el contenido calculado con los datos reales para el documento y reparte el trabajo
@@ -252,7 +253,7 @@ export default function EstudioInforme({ initialReport, plantilla, pedido, nombr
         <div className="spacer" />
         <nav className="est-tabs" role="tablist" aria-label="Secciones del informe">
           {TABS.map((t) => (
-            <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>{t.label}</button>
+            <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => crossfade(() => setTab(t.id))}>{t.label}</button>
           ))}
         </nav>
         <button type="button" className="btn" onClick={() => setVista(true)} disabled={!content}><IconEye size={14} /> Vista previa</button>
@@ -260,7 +261,7 @@ export default function EstudioInforme({ initialReport, plantilla, pedido, nombr
           <button type="button" className="btn" onClick={() => cambiarProposito("enviar")} title="Pasar a un informe que se programa y se envía">Convertir en informe para enviar</button>
         ) : (
           <>
-            {tab !== "programacion" && <button type="button" className="btn btn-primary" onClick={() => setTab("programacion")}>{informe.esBorrador ? "Programar envío" : "Programación"}</button>}
+            {tab !== "programacion" && <button type="button" className="btn btn-primary" onClick={() => crossfade(() => setTab("programacion"))}>{informe.esBorrador ? "Programar envío" : "Programación"}</button>}
             {informe.esBorrador && <button type="button" className="btn btn-ghost est-ghost" onClick={() => cambiarProposito("consulta")} title="Dejarlo solo para verlo en la app">Usar solo para consultar</button>}
           </>
         )}

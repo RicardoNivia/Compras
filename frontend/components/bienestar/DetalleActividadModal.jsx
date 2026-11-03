@@ -9,6 +9,7 @@ import { Estrellas, AnalisisDeActividad } from "@/components/bienestar/Calificac
 import ObservacionesActividad from "@/components/bienestar/ObservacionesActividad";
 import { EsqueletoFicha } from "@/components/bienestar/Esqueletos";
 import { estadoActividad, rangoHumano, diasDeActividad } from "@/components/bienestar/actividadesUi";
+import { crossfade } from "@/lib/crossfade";
 
 const PAGE_SIZES = [10, 25, 50, 100];
 const entero = (v) => Math.round(v || 0).toLocaleString("es-CO");
@@ -21,11 +22,13 @@ function Tarjeta({ titulo, children }) {
 }
 
 // Mini dashboard de una actividad, al hacer clic en ella en el cronograma: presupuesto y gasto, programados contra
-// asistentes, quién fue, por qué no fueron los demás, calificación y el análisis de Nova.
-export default function DetalleActividadModal({ actividad: resumen, fichaHref, editarHref, onClose }) {
+// asistentes, quién fue, por qué no fueron los demás, calificación y el análisis de Nova. Va en pestañas para que cada
+// parte quepa sin bajar por todo el modal.
+export default function DetalleActividadModal({ actividad: resumen, fichaHref, editarHref, onClose, tabInicial = "resumen" }) {
   const [act, setAct] = useState(null);
   const [personas, setPersonas] = useState(null);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState(tabInicial);
   const [vista, setVista] = useState("si");
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
@@ -81,10 +84,22 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
           <button ref={cerrar} type="button" className="btn-ghost icon-btn" onClick={onClose} aria-label="Cerrar">✕</button>
         </header>
 
+        {act && (
+          <div className="dash-tabs detalle-tabs" role="tablist" aria-label="Secciones de la actividad">
+            {[
+              ["resumen", "Resumen"],
+              ...(act.aplicaParticipantes ? [["participacion", "Participación por área"], ["quien", `Quién fue (${entero(asistieron)})`]] : []),
+              ["comentarios", `Comentarios y observaciones (${entero(act.totalObservaciones)})`],
+            ].map(([k, l]) => (
+              <button key={k} type="button" role="tab" aria-selected={tab === k} className="dash-tab" onClick={() => crossfade(() => setTab(k))}>{l}</button>
+            ))}
+          </div>
+        )}
+
         <div className="detalle-cuerpo">
           {error && <div className="modal-error">{error}</div>}
           {!act && !error && <EsqueletoFicha />}
-          {act && (
+          {act && tab === "resumen" && (
             <>
               <div className="detalle-kpis">
                 <Tarjeta titulo="Presupuesto y gasto">
@@ -119,17 +134,15 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
                 )}
                 <Tarjeta titulo="Calificación">
                   <div className="detalle-estrellas"><span>Al cerrar</span>{act.calificacion != null ? <Estrellas valor={act.calificacion} /> : <span className="muted">Sin cerrar</span>}</div>
-                  <div className="detalle-estrellas"><span>Nova</span>{act.analisisNova ? <Estrellas valor={act.analisisNova.puntaje} /> : <span className="muted">Sin análisis</span>}</div>
+                  <div className="detalle-estrellas"><span>Nova</span>{act.analisisNova?.puntaje != null ? <Estrellas valor={act.analisisNova.puntaje} /> : act.analisisNova ? <span className="muted">Sin datos para calificar</span> : <span className="muted">Sin análisis</span>}</div>
                   {act.aplicaParticipantes && <div className="detalle-estrellas"><span>Asistentes</span>{p.calificaciones ? <strong className="detalle-prom">{p.calificacionPromedio.toFixed(1).replace(".", ",")} / 5</strong> : <span className="muted">Sin datos</span>}</div>}
                 </Tarjeta>
               </div>
 
               <AnalisisDeActividad act={act} puedeEditar={!!editarHref} onCambio={cargar} />
-
-              <ObservacionesActividad act={act} enModal />
-
-              {act.aplicaParticipantes && (
-                <>
+            </>
+          )}
+          {act && tab === "participacion" && (
               <div className="detalle-indicadores">
                 <section className="resumen-card detalle-card" aria-labelledby="det-areas">
                   <h2 id="det-areas">Participación por área</h2>
@@ -197,13 +210,14 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
                   ) : <p className="count-note">Nadie registrado como ausente.</p>}
                 </section>
               </div>
-
+          )}
+          {act && tab === "quien" && (
               <section className="resumen-card" aria-labelledby="det-quien">
                 <div className="resumen-card-head">
                   <h2 id="det-quien">Quién fue</h2>
                   <div className="dash-tabs" role="tablist" aria-label="Asistencia">
                     {VISTAS.map(([k, l]) => (
-                      <button key={k} type="button" role="tab" aria-selected={vista === k} className="dash-tab" onClick={() => setVista(k)}>
+                      <button key={k} type="button" role="tab" aria-selected={vista === k} className="dash-tab" onClick={() => crossfade(() => setVista(k))}>
                         {l} ({entero((personas || []).filter(cuadra[k]).length)})
                       </button>
                     ))}
@@ -242,10 +256,8 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
                   <span className="count-note">{entero(filas.length)} persona(s)</span>
                 </div>
               </section>
-                </>
-              )}
-            </>
           )}
+          {act && tab === "comentarios" && <ObservacionesActividad act={act} enModal />}
         </div>
 
         <footer className="modal-foot">

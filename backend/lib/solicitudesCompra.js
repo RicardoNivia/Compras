@@ -6,7 +6,8 @@ import { logSolicitudCompra, logSolicitudCompraCreada } from "@/lib/audit";
 // atiende en Alertas y notificaciones › Solicitudes de compra: "Generar compra" abre el formulario de Compras con los
 // datos ya llenos y al crear la compra queda asociada a la actividad; "Rechazar" exige decir por qué, y quien la pidió lo
 // ve en la pestaña Compras de la actividad. Mientras no se atienda sigue pendiente.
-// A quien la pidió le llega un aviso a su Bandeja cuando se registra la compra o la rechazan (avisarSolicitante).
+// Las pendientes suman en la campana de quien puede crear compras y la llevan a la pestaña Solicitudes de compra (no a la
+// Bandeja). A quien la pidió le llega un aviso a su Bandeja cuando se registra la compra o la rechazan (avisarSolicitante).
 // Estados: pendiente → generando (solo mientras se crea la compra) → creada | rechazada | cancelada.
 
 const badRequest = (msg, status = 400) => Object.assign(new Error(msg), { status });

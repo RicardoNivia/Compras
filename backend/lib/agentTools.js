@@ -166,9 +166,22 @@ function buildPresupuestoResumen(records, presupuestos, filters) {
       };
     });
 
+  // Totales y ranking ya calculados: Nova no debe sumar ni calcular porcentajes por su cuenta.
+  const porAnio = new Map();
+  for (const a of areas) {
+    const t = porAnio.get(a.anio) || { anio: a.anio, presupuestoTotal: 0, gastado: 0, areas: 0 };
+    t.presupuestoTotal += a.presupuestoTotal || 0;
+    t.gastado += a.gastadoAcumulado || 0;
+    t.areas++;
+    porAnio.set(a.anio, t);
+  }
+  const totalesPorAnio = [...porAnio.values()].map((t) => ({ ...t, disponible: t.presupuestoTotal - t.gastado, pctConsumido: t.presupuestoTotal ? Number(((t.gastado / t.presupuestoTotal) * 100).toFixed(1)) : null }));
+  const masConsumidas = [...areas].filter((a) => a.pctConsumido != null).sort((a, b) => b.pctConsumido - a.pctConsumido).slice(0, 10).map((a) => ({ area: a.area, anio: a.anio, pctConsumido: a.pctConsumido }));
   return {
+    totalesPorAnio,
+    masConsumidas,
     areas,
-    nota: "Cada entrada tiene su propio año ('anio'). Si un área/año no aparece aquí, es porque no se le ha configurado presupuesto — dilo así, no asumas que es cero.",
+    nota: "Usa totalesPorAnio y masConsumidas tal cual (ya están calculados). Cada entrada tiene su propio año ('anio'). Si un área/año no aparece aquí, es porque no se le ha configurado presupuesto — dilo así, no asumas que es cero. Este es el presupuesto de COMPRAS por área; el presupuesto de cada actividad de Bienestar está en resumen_bienestar (presupuestoDeActividades).",
   };
 }
 
@@ -323,7 +336,7 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
   if (canSeePresupuesto) {
     tools.push({
       name: "resumen_presupuesto",
-      description: "Presupuesto configurado por área y año (total, o desglosado por categoría según cómo se haya configurado) y cuánto lleva gastado cada una — solo para preguntas de presupuesto/gasto disponible.",
+      description: "Presupuesto de COMPRAS configurado por área y año (total, o desglosado por categoría) y cuánto lleva gastado cada área, con totales por año ya calculados. NO es el presupuesto de las actividades de Bienestar o Fundación: para el costo de un plan de actividades o el presupuesto asignado a cada actividad usa resumen_bienestar.",
       input_schema: {
         type: "object",
         properties: {
@@ -339,8 +352,8 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
     tools.push(
       {
         name: "resumen_bienestar",
-        description: "Cifras de una línea en un año (o un mes): actividades por estado, asistentes y porcentaje de asistencia, gasto en compras ASOCIADAS a actividades frente al presupuesto, costo por asistente, gasto por mes y categoría, participación por área, motivos de inasistencia y próximas actividades. Úsala para totales, comparaciones y gráficos de Bienestar o Fundación.",
-        input_schema: { type: "object", properties: { linea: LINEA, anio: { type: "integer", description: "Año (opcional, por defecto el actual)." }, mes: { type: "integer", description: "Mes de 1 a 12 (opcional; sin mes, el año completo)." } }, required: ["linea"] },
+        description: "Presupuesto asignado a las actividades del año (el costo del plan, también de años futuros: cifras.presupuestoDeActividades) y Cifras de una línea en un año (o un mes): actividades por estado, asistentes y porcentaje de asistencia, gasto en compras ASOCIADAS a actividades frente al presupuesto, costo por asistente, gasto por mes y categoría, participación por área, motivos de inasistencia y próximas actividades. Úsala para totales, comparaciones y gráficos de Bienestar o Fundación.",
+        input_schema: { type: "object", properties: { linea: LINEA, anio: { type: "integer", description: "Año (opcional, por defecto el actual)." }, mes: { type: "integer", description: "Mes de 1 a 12 (opcional; sin mes, el año completo)." }, compararCon: { type: "integer", description: "Otro año para comparar (opcional): devuelve las dos cifras y las diferencias ya calculadas." } }, required: ["linea"] },
       },
       {
         name: "buscar_actividades",
@@ -645,8 +658,24 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
         const linea = args.linea === "Fundación" ? "Fundación" : "Bienestar";
         if (!(await puedeLinea(user, linea, "dashboard"))) return { error: `No autorizado para consultar el resumen de ${linea}.` };
         const r = await resumenBienestar(args.anio || new Date().getFullYear(), linea, args.mes || null);
+        const cifras = (x) => ({
+          anio: x.anio, actividades: x.kpis.actividades, ejecutadasOCerradas: (x.kpis.porEstado.ejecutada || 0) + (x.kpis.porEstado.cerrada || 0),
+          // Sin ninguna actividad con lista de asistencia el número de asistentes no existe (no es 0).
+          asistentes: x.participacion.registrados || x.kpis.asistentes ? x.kpis.asistentes : null, inscritosConLista: x.participacion.inscritos, asistencia: x.kpis.asistencia,
+          presupuestoDeActividades: x.kpis.presupuestoAsignado, gastoAsociadoAActividades: x.kpis.gastoArea, costoPorAsistente: x.kpis.costoPorAsistente,
+          comprasDelAreaSinActividad: x.comprasSinActividad,
+        });
+        let comparacion;
+        if (args.compararCon && Number(args.compararCon) !== r.anio) {
+          const otro = cifras(await resumenBienestar(args.compararCon, linea, args.mes || null));
+          const actual = cifras(r);
+          const dif = (k) => (actual[k] == null || otro[k] == null ? "sin dato" : actual[k] - otro[k]);
+          comparacion = { [r.anio]: actual, [otro.anio]: otro, diferencias: { asistentes: dif("asistentes"), gastoAsociadoAActividades: dif("gastoAsociadoAActividades"), presupuestoDeActividades: dif("presupuestoDeActividades"), actividades: dif("actividades") } };
+        }
         return {
-          nota: "Todo gasto es de compras asociadas a una actividad, en el mes de la actividad; las compras sin asociar no se muestran en Bienestar.",
+          nota: "Todo gasto del módulo es de compras ASOCIADAS a una actividad, en el mes de la actividad. Las compras del área Bienestar sin actividad van aparte en comprasDelAreaSinActividad: menciónalas cuando hables de cuánto se gasta. presupuestoDeActividades es lo asignado a cada actividad (distinto del presupuesto de Compras por área). Usa las cifras tal cual vienen; si algo es null o falta, di 'sin dato'.",
+          cifras: cifras(r),
+          ...(comparacion ? { comparacion } : {}),
           linea, anio: r.anio, mes: r.mes, kpis: r.kpis,
           porMes: r.mes ? undefined : r.porMes.map((m) => ({ mes: m.mes, actividades: m.actividades, asistentes: m.asistentes, gasto: m.gastoArea })),
           actividades: r.porActividad.slice(0, 30),

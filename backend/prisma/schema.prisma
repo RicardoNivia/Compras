@@ -71,6 +71,8 @@ model ActividadBienestar {
   inscritos         Int?
   asistentes        Int?
   enCronograma      Boolean  @default(true) // false = actividad extra, realizada fuera del cronograma planeado
+  sentimientoObservaciones String? // de "observaciones", según Nova (ver lib/sentimientoComentarios.js)
+  sentimientoCierre        String? // de "comentarioCierre", según Nova
   aplicaParticipantes Boolean @default(true) // false = no maneja participantes ni asistencia: no cuentan en cifras ni en la calificación de Nova
   observaciones     String?
   createdAt         DateTime @default(now())
@@ -118,6 +120,7 @@ model ParticipanteActividad {
   motivoInasistenciaId String? // → Maestro "motivoInasistencia"
   calificacion       Int?      // 1 a 5, la que da la persona a la actividad
   observacion        String?
+  sentimiento        String?   // "positivo" | "neutro" | "negativo" | "no_aplica" de la observación, según Nova (null = sin clasificar)
   datos              String?   // JSON con los campos propios de la actividad
   origen             String    @default("manual") // "formulario" | "importacion" | "manual"
   autorizaDatos      Boolean   @default(false) // autorización de tratamiento de datos (Ley 1581), obligatoria en el formulario público
@@ -167,6 +170,7 @@ model ObservacionActividad {
   actividadId     Int
   actividad       ActividadBienestar @relation(fields: [actividadId], references: [id], onDelete: Cascade)
   texto           String
+  sentimiento     String?   // "positivo" | "neutro" | "negativo" | "no_aplica", según Nova (null = sin clasificar)
   createdAt       DateTime  @default(now())
   creadoPorUserId String?
   creadoPorNombre String?
@@ -849,7 +853,7 @@ model AnalisisActividad {
   id              Int      @id @default(autoincrement())
   actividadId     Int      @unique
   actividad       ActividadBienestar @relation(fields: [actividadId], references: [id], onUpdate: Cascade, onDelete: Cascade)
-  puntaje         Int
+  puntaje         Int?     // null = sin datos para calificar (no se inventa un puntaje)
   titulo          String
   resumen         String
   puntos          Json

@@ -8,10 +8,13 @@ import { AnimatedNumber } from "@/components/charts/chartKit";
 import ComboChartSvg from "@/components/charts/ComboChartSvg";
 import HBarChartSvg from "@/components/charts/HBarChartSvg";
 import AnalisisNova from "@/components/bienestar/AnalisisNova";
+import ComentariosDestacados from "@/components/bienestar/ComentariosDestacados";
+import ComprasSinActividad from "@/components/bienestar/ComprasSinActividad";
 import ComparaPresupuesto from "@/components/bienestar/ComparaPresupuesto";
 import { EsqueletoResumen } from "@/components/bienestar/Esqueletos";
 import ResumenDelMes from "@/components/bienestar/ResumenDelMes";
 import { estadoActividad, rangoFechas } from "@/components/bienestar/actividadesUi";
+import { crossfade } from "@/lib/crossfade";
 
 const pct = (v) => (v == null ? "—" : `${(Math.round(v * 1000) / 10).toString().replace(".", ",")} %`);
 const entero = (v) => Math.round(v).toLocaleString("es-CO");
@@ -22,11 +25,12 @@ const JORNADAS_VISIBLES = 6;
 // colaboradores a la Fundación (a quiénes atiende, cuántas jornadas, cuántas personas fueron, qué áreas se suman) sin
 // dejar de lado la asistencia y lo que cuesta. Las cifras son las de la plataforma (/api/actividades/resumen, las mismas
 // de Bienestar); de los beneficiarios no hay datos registrados, así que no se muestra ninguna cifra sobre ellos.
-export default function ResumenFundacion({ anio, anios = [], onAnio, puedeEditar, accion, onAbrirActividad, onVerActividades }) {
+export default function ResumenFundacion({ anio, anios = [], onAnio, puedeEditar, accion, onAbrirActividad, onAbrirComentario, onVerActividades }) {
   const ahora = new Date();
   const [vista, setVista] = useState("anual");
   const [mes, setMes] = useState(ahora.getFullYear() === anio ? ahora.getMonth() + 1 : 1);
   const [resumen, setResumen] = useState(null);
+  const [recarga, setRecarga] = useState(0);
   const [error, setError] = useState("");
   const [actualizando, setActualizando] = useState(false);
 
@@ -39,7 +43,7 @@ export default function ResumenFundacion({ anio, anios = [], onAnio, puedeEditar
       .catch((e) => { if (vigente) setError(e.message || "No se pudo cargar el resumen."); })
       .finally(() => { if (vigente) setActualizando(false); });
     return () => { vigente = false; };
-  }, [anio, vista, mes]);
+  }, [recarga, anio, vista, mes]);
 
   const periodo = vista === "mensual" ? `${MESES[mes - 1].toLowerCase()} de ${anio}` : String(anio);
 
@@ -50,8 +54,8 @@ export default function ResumenFundacion({ anio, anios = [], onAnio, puedeEditar
       <div className="fundacion-hero-controles">
         <div className="resumen-periodo">
           <div className="dash-tabs" role="tablist" aria-label="Periodo del resumen">
-            <button type="button" role="tab" aria-selected={vista === "mensual"} className="dash-tab" onClick={() => setVista("mensual")}>Mensual</button>
-            <button type="button" role="tab" aria-selected={vista === "anual"} className="dash-tab" onClick={() => setVista("anual")}>Anual</button>
+            <button type="button" role="tab" aria-selected={vista === "mensual"} className="dash-tab" onClick={() => crossfade(() => setVista("mensual"))}>Mensual</button>
+            <button type="button" role="tab" aria-selected={vista === "anual"} className="dash-tab" onClick={() => crossfade(() => setVista("anual"))}>Anual</button>
           </div>
           <div className="field" style={{ width: 110 }}>
             <label htmlFor="fund-anio">Año</label>
@@ -73,10 +77,10 @@ export default function ResumenFundacion({ anio, anios = [], onAnio, puedeEditar
     </header>
   );
 
-  if (error) return <div className="resumen-bienestar resumen-fundacion">{cabecera}<div className="modal-error">{error}</div></div>;
-  if (!resumen) return <div className="resumen-bienestar resumen-fundacion">{cabecera}<EsqueletoResumen /></div>;
+  if (error) return <div className="resumen-bienestar resumen-fundacion" data-crossfade-raiz>{cabecera}<div className="modal-error">{error}</div></div>;
+  if (!resumen) return <div className="resumen-bienestar resumen-fundacion" data-crossfade-raiz>{cabecera}<EsqueletoResumen /></div>;
 
-  const { kpis, porMes, porActividad, categorias, costoPorActividad, proximas, participacion, presupuestoVsGasto } = resumen;
+  const { kpis, porMes, porActividad, categorias, costoPorActividad, proximas, participacion, presupuestoVsGasto, comentariosDestacados } = resumen;
   const realizadas = kpis.porEstado.ejecutada + kpis.porEstado.cerrada;
   const porAcompanamiento = [...participacion.porArea].filter((a) => a.asistieron > 0).sort((a, b) => b.asistieron - a.asistieron);
   const jornadas = [...porActividad].sort((a, b) => b.fecha.localeCompare(a.fecha));
@@ -97,16 +101,18 @@ export default function ResumenFundacion({ anio, anios = [], onAnio, puedeEditar
   });
 
   return (
-    <div className={`resumen-bienestar resumen-fundacion${actualizando ? " actualizando" : ""}`} aria-busy={actualizando}>
+    <div className={`resumen-bienestar resumen-fundacion${actualizando ? " actualizando" : ""}`} aria-busy={actualizando} data-crossfade-raiz>
       {cabecera}
 
       <div className="fundacion-impacto">
         <Cifra {...explica("Personas que acompañaron")} grande etiqueta="Personas que acompañaron" valor={<AnimatedNumber value={kpis.asistentes} format={entero} />} nota={`En ${realizadas} jornada(s) realizadas · ${periodo}`} />
         <Cifra {...explica("Aporte en compras asociadas")} grande etiqueta="Aporte en compras asociadas" valor={<AnimatedNumber value={kpis.gastoArea} format={fmtCOP} />} nota={`${kpis.comprasArea} compra(s) asociadas a jornadas`} />
-        <Cifra {...explica("Asistencia")} etiqueta="Asistencia" valor={kpis.asistencia == null ? "—" : pct(kpis.asistencia)} nota={`${entero(participacion.noAsistieron)} inscrito(s) no pudieron ir`} />
+        <Cifra {...explica("Asistencia")} etiqueta="Asistencia" valor={kpis.asistencia == null ? "—" : pct(kpis.asistencia)} nota={`${entero(participacion.noAsistieron)} no pudieron ir · ${entero(participacion.sinRegistrar || 0)} sin asistencia registrada`} />
         <Cifra {...explica("Costo por persona")} etiqueta="Costo por persona" valor={kpis.costoPorAsistente ? fmtCOP(kpis.costoPorAsistente) : "—"} nota="Aporte ÷ personas de esas jornadas" />
         <Cifra {...explica("Presupuesto y gasto")} etiqueta="Presupuesto y gasto"><ComparaPresupuesto presupuesto={kpis.presupuestoAsignado} gastado={kpis.gastoActividades} gastoSinPresupuesto={kpis.gastoSinPresupuesto} /></Cifra>
       </div>
+
+      <ComprasSinActividad datos={resumen.comprasSinActividad} anio={anio} mes={vista === "mensual" ? mes : null} linea="Fundación" periodo={periodo} puedeEditar={puedeEditar} onCambio={() => setRecarga((n) => n + 1)} />
 
       <AnalisisNova linea="Fundación" anio={anio} mes={vista === "mensual" ? mes : 0} puedeEditar={puedeEditar} />
 
@@ -207,6 +213,8 @@ export default function ResumenFundacion({ anio, anios = [], onAnio, puedeEditar
           )}
         </section>
       </div>
+
+      <ComentariosDestacados comentarios={comentariosDestacados} periodo={periodo} onAbrir={onAbrirComentario} />
     </div>
   );
 }
