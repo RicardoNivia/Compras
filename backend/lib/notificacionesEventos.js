@@ -40,7 +40,7 @@ const legible = (v) => {
 };
 // Campos de catálogo de una compra: el texto guardado es una foto y al leer se muestra el nombre actual, así que solo
 // cuenta como cambio si cambió el valor elegido (su id). Los ids nunca se muestran.
-const ID_DE_CAMPO = { area: "areaId", responsable: "responsableUserId", estado: "estadoId", categoria: "categoriaId", medioPago: "medioPagoId", estadoLegalizacion: "estadoLegalizacionId", proveedor: "proveedorNit" };
+const ID_DE_CAMPO = { area: "areaId", responsable: "responsableUserId", estado: "estadoId", categoria: "categoriaId", medioPago: "medioPagoId", estadoLegalizacion: "estadoLegalizacionId", proveedor: "proveedorNit", actividad: "actividadId" };
 const SOLO_INTERNOS = new Set([...Object.values(ID_DE_CAMPO), "nit"]);
 
 export function cambiosEntre(antes, despues, etiquetas) {

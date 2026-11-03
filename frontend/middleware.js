@@ -6,7 +6,8 @@ const PUBLIC_PATHS = new Set(["/login"]);
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  if (PUBLIC_PATHS.has(pathname)) {
+  // El formulario público de inscripción a actividades de Bienestar no pide sesión (enlace con token).
+  if (PUBLIC_PATHS.has(pathname) || pathname.startsWith("/inscripcion/")) {
     return NextResponse.next();
   }
 

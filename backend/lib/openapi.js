@@ -9,10 +9,10 @@ const options = {
   definition: {
     openapi: "3.0.3",
     info: {
-      title: "Panel de Compras (Sinco) — API",
+      title: "Panel de Compras y Bienestar (Sinco) — API",
       version: "1.0.0",
       description:
-        "API del backend del Panel de Compras. Todas las rutas (salvo /api/auth/login) requieren la cookie de sesión httpOnly \"session\" — inicia sesión desde la app (POST /api/auth/login) y el navegador la mandará automáticamente en cada request de este mismo origen. Para probar aquí mismo (\"Try it out\"), primero inicia sesión en la app en otra pestaña del mismo navegador.",
+        "API del backend del Panel de Compras y Bienestar. Todas las rutas (salvo /api/auth/login) requieren la cookie de sesión httpOnly \"session\" — inicia sesión desde la app (POST /api/auth/login) y el navegador la mandará automáticamente en cada request de este mismo origen. Para probar aquí mismo (\"Try it out\"), primero inicia sesión en la app en otra pestaña del mismo navegador.",
     },
     servers: [{ url: "/", description: "Mismo origen (backend, puerto 3001)" }],
     components: {

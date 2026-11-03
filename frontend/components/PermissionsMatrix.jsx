@@ -1,11 +1,11 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { ROLES, ROLE_LIST, ROLE_LABELS, ROLE_COLOR_VARS } from "@/lib/roles";
+import { ROLES, ROLE_COLOR_VARS } from "@/lib/roles";
 import { setPermissionApi } from "@/lib/api";
 import { IconCheck, IconAlert } from "@/components/icons";
 
-function Cell({ row, role, allowed, onRequestChange }) {
+function Cell({ row, role, label, allowed, onRequestChange }) {
   const locked = role === ROLES.ADMIN;
 
   return (
@@ -15,8 +15,8 @@ function Cell({ row, role, allowed, onRequestChange }) {
         className={`perm-toggle${allowed ? " on" : ""}${locked ? " locked" : ""}`}
         onClick={() => !locked && onRequestChange(row, role, !allowed)}
         disabled={locked}
-        title={locked ? "El rol Administrador siempre tiene todos los permisos." : `${allowed ? "Quitar" : "Dar"} "${row.label}" a ${ROLE_LABELS[role]}`}
-        aria-label={`${row.label} — ${ROLE_LABELS[role]}: ${allowed ? "permitido" : "no permitido"}`}
+        title={locked ? "El rol Administrador siempre tiene todos los permisos." : `${allowed ? "Quitar" : "Dar"} "${row.label}" a ${label}`}
+        aria-label={`${row.label} — ${label}: ${allowed ? "permitido" : "no permitido"}`}
       >
         {allowed ? <IconCheck size={13} /> : <span className="perm-dash">—</span>}
       </button>
@@ -24,8 +24,13 @@ function Cell({ row, role, allowed, onRequestChange }) {
   );
 }
 
-export default function PermissionsMatrix({ initialMatrix }) {
+// roles: [{ clave, nombre }] — los del sistema y los personalizados (Usuarios › Roles), en ese orden.
+const MODULOS_MATRIZ = [["Compras", "Compras"], ["Bienestar", "Bienestar y Fundación"], ["General", "Generales"], ["", "Todos"]];
+
+export default function PermissionsMatrix({ initialMatrix, roles = [], onChanged }) {
   const [matrix, setMatrix] = useState(initialMatrix || []);
+  const [modulo, setModulo] = useState("Compras");
+  useEffect(() => { setMatrix(initialMatrix || []); }, [initialMatrix]);
   // { row, role, allowed } — el cambio propuesto, pendiente de confirmar en el modal.
   const [pending, setPending] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -35,6 +40,9 @@ export default function PermissionsMatrix({ initialMatrix }) {
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
+  const claves = roles.map((r) => r.clave);
+  const nombre = (clave) => roles.find((r) => r.clave === clave)?.nombre || clave;
+
   function showToast(message) {
     setToast(message);
     clearTimeout(toastTimer.current);
@@ -43,12 +51,13 @@ export default function PermissionsMatrix({ initialMatrix }) {
 
   const sections = useMemo(() => {
     const map = new Map();
-    for (const row of matrix) {
-      if (!map.has(row.section)) map.set(row.section, []);
-      map.get(row.section).push(row);
+    for (const row of matrix.filter((r) => !modulo || r.modulo === modulo)) {
+      const k = modulo ? row.section : `${row.modulo} · ${row.section}`;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(row);
     }
     return Array.from(map.entries());
-  }, [matrix]);
+  }, [matrix, modulo]);
 
   function handleRequestChange(row, role, allowed) {
     setError("");
@@ -61,10 +70,12 @@ export default function PermissionsMatrix({ initialMatrix }) {
     setError("");
     try {
       await setPermissionApi(pending.role, pending.row.key, pending.allowed);
-      setMatrix((prev) => prev.map((r) => (
+      const next = matrix.map((r) => (
         r.key === pending.row.key ? { ...r, roles: { ...r.roles, [pending.role]: pending.allowed } } : r
-      )));
-      showToast(`Guardado: ${ROLE_LABELS[pending.role]} ${pending.allowed ? "ahora tiene" : "ya no tiene"} "${pending.row.label}".`);
+      ));
+      setMatrix(next);
+      onChanged?.(next);
+      showToast(`Guardado: ${nombre(pending.role)} ${pending.allowed ? "ahora tiene" : "ya no tiene"} "${pending.row.label}".`);
       setPending(null);
     } catch (err) {
       setError(err.message || "No se pudo guardar el permiso.");
@@ -80,17 +91,22 @@ export default function PermissionsMatrix({ initialMatrix }) {
           Marca o quita el acceso de un rol a una funcionalidad, agrupadas por sección. Cada cambio pide confirmación y queda registrado en Auditoría. El rol Administrador siempre tiene todos los permisos.
         </p>
       </div>
+      <div className="dash-tabs perm-modulos" role="tablist" aria-label="Módulo">
+        {MODULOS_MATRIZ.map(([k, l]) => (
+          <button key={l} type="button" role="tab" aria-selected={modulo === k} className="dash-tab" onClick={() => setModulo(k)}>{l}</button>
+        ))}
+      </div>
       <div className="scroll-x">
         <table className="plain-table perm-matrix">
           <thead>
             <tr>
               <th>Funcionalidad</th>
-              {ROLE_LIST.map((role) => (
+              {claves.map((role) => (
                 <th key={role} className="perm-role-col">
-                  <span className="perm-role-badge" style={{ "--rc": `var(${ROLE_COLOR_VARS[role]})` }}>
-                    {ROLE_LABELS[role][0]}
+                  <span className="perm-role-badge" style={{ "--rc": `var(${ROLE_COLOR_VARS[role] || "--sOther"})` }}>
+                    {nombre(role)[0]}
                   </span>
-                  <div>{ROLE_LABELS[role]}</div>
+                  <div>{nombre(role)}</div>
                 </th>
               ))}
             </tr>
@@ -99,13 +115,13 @@ export default function PermissionsMatrix({ initialMatrix }) {
             {sections.map(([section, rows]) => (
               <Fragment key={section}>
                 <tr className="perm-section-row">
-                  <td colSpan={ROLE_LIST.length + 1}>{section}</td>
+                  <td colSpan={claves.length + 1}>{section}</td>
                 </tr>
                 {rows.map((row) => (
                   <tr key={row.key}>
                     <td>{row.label}</td>
-                    {ROLE_LIST.map((role) => (
-                      <Cell key={role} row={row} role={role} allowed={row.roles[role]} onRequestChange={handleRequestChange} />
+                    {claves.map((role) => (
+                      <Cell key={role} row={row} role={role} label={nombre(role)} allowed={!!row.roles[role]} onRequestChange={handleRequestChange} />
                     ))}
                   </tr>
                 ))}
@@ -127,7 +143,7 @@ export default function PermissionsMatrix({ initialMatrix }) {
             <div className="modal-body">
               <p>
                 {pending.allowed ? "Vas a dar" : "Vas a quitar"} el permiso de <strong>&quot;{pending.row.label}&quot;</strong> al rol{" "}
-                <strong>{ROLE_LABELS[pending.role]}</strong>.
+                <strong>{nombre(pending.role)}</strong>.
                 {pending.allowed
                   ? " Ese rol podrá usar esta funcionalidad de inmediato."
                   : " Ese rol dejará de poder usar esta funcionalidad de inmediato."}

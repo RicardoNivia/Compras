@@ -71,6 +71,10 @@ export function toClientRecord(r, actual = {}) {
     // Valoración con IA de la compra radicada (solo los puntajes; el detalle se pide aparte, GET
     // /api/records/[id]/valoracion) — null si todavía no se valoró.
     valoracion: actual.valoracion ?? null,
+    // Actividad de Bienestar a la que se carga la compra (ver lib/actividadesBienestar.js): referencia por id, el
+    // nombre guardado es solo una foto y al listar se muestra el actual.
+    actividadId: r.actividadId ?? null,
+    actividad: actual.actividad ?? r.actividad ?? null,
   };
 }
 
@@ -88,13 +92,16 @@ async function hydrateConDatosActuales(rows) {
     rows.flatMap((r) => MAESTRO_CAMPOS.map((c) => r[c.idField])).filter(Boolean)
   )];
   const recordIds = rows.map((r) => r.id);
-  const [proveedores, usuarios, maestros, calificaciones, valoraciones] = await Promise.all([
+  const actividadIds = [...new Set(rows.map((r) => r.actividadId).filter(Boolean))];
+  const [proveedores, usuarios, maestros, calificaciones, valoraciones, actividades] = await Promise.all([
     proveedorNits.length ? prisma.proveedor.findMany({ where: { nit: { in: proveedorNits } } }) : [],
     userIds.length ? prisma.user.findMany({ where: { id: { in: userIds } } }) : [],
     maestroIds.length ? prisma.maestro.findMany({ where: { id: { in: maestroIds } } }) : [],
     recordIds.length ? prisma.calificacionProveedor.findMany({ where: { recordId: { in: recordIds } }, select: { recordId: true, estrellas: true } }) : [],
     recordIds.length ? prisma.valoracionCompra.findMany({ where: { recordId: { in: recordIds } }, select: { recordId: true, puntajeCompra: true, puntajeProveedor: true } }) : [],
+    actividadIds.length ? prisma.actividadBienestar.findMany({ where: { id: { in: actividadIds } }, select: { id: true, nombre: true } }) : [],
   ]);
+  const actividadPorId = new Map(actividades.map((a) => [a.id, a.nombre]));
   const valoracionPorRecordId = new Map(valoraciones.map((v) => [v.recordId, { puntajeCompra: v.puntajeCompra, puntajeProveedor: v.puntajeProveedor }]));
   const proveedorPorNit = new Map(proveedores.map((p) => [p.nit, p]));
   const usuarioPorId = new Map(usuarios.map((u) => [u.id, u]));
@@ -109,6 +116,7 @@ async function hydrateConDatosActuales(rows) {
       responsableNombre: u?.nombre,
       calificacionEstrellas: calificacionPorRecordId.get(r.id),
       valoracion: valoracionPorRecordId.get(r.id),
+      actividad: r.actividadId ? actividadPorId.get(r.actividadId) : undefined,
     };
     for (const campo of MAESTRO_CAMPOS) {
       const m = r[campo.idField] ? maestroPorId.get(r[campo.idField]) : null;
@@ -181,6 +189,7 @@ const FIELD_SANITIZERS = {
   trm: numOrNull,
   observaciones: textOrNull(4000),
   radicado: (v) => !!v,
+  actividadId: (v) => (v === "" || v === null || v === undefined || !Number.isInteger(Number(v)) ? null : Number(v)),
 };
 
 export function sanitizeInput(body) {
@@ -231,6 +240,34 @@ async function requireProveedorDelCatalogo(data) {
   data.nit = proveedor.nit;
   data.proveedor = proveedor.nombre;
   return proveedor;
+}
+
+// La actividad de Bienestar es opcional. Si viene, debe existir en el cronograma (nunca texto libre): el nombre
+// guardado se recalcula del catálogo, igual que el proveedor. Una actividad cerrada no recibe compras nuevas,
+// pero una compra que ya estaba en ella puede seguir ahí.
+async function requireActividadDelCatalogo(data, actualId = null) {
+  // Una compra no se saca de una actividad cerrada.
+  if (actualId && Number(data.actividadId) !== Number(actualId)) {
+    const actual = await prisma.actividadBienestar.findUnique({ where: { id: Number(actualId) }, select: { estado: true } });
+    if (actual?.estado === "cerrada") {
+      const err = new Error("La compra está asociada a una actividad cerrada: no se puede cambiar de actividad.");
+      err.status = 409;
+      throw err;
+    }
+  }
+  if (!data.actividadId) {
+    data.actividadId = null;
+    data.actividad = null;
+    return null;
+  }
+  const actividad = await prisma.actividadBienestar.findUnique({ where: { id: data.actividadId }, select: { id: true, nombre: true, estado: true } });
+  if (!actividad || (actividad.estado === "cerrada" && actividad.id !== actualId)) {
+    const err = new Error("La actividad de Bienestar seleccionada no existe o ya está cerrada. Elige otra del cronograma.");
+    err.status = 400;
+    throw err;
+  }
+  data.actividad = actividad.nombre;
+  return actividad;
 }
 
 // El responsable debe ser siempre un usuario real de la app, nunca texto
@@ -296,6 +333,7 @@ export async function createRecord(body, actor) {
   let proveedor = null;
   if (data.proveedorNit) proveedor = await requireProveedorDelCatalogo(data);
   else Object.assign(data, { proveedorNit: null, nit: null, proveedor: null });
+  await requireActividadDelCatalogo(data);
   const maestroResponsable = await requireResponsableDelCatalogo(data);
   const feDuplicados = await countOtrosConFe(data.fe, null);
   // Asigna el siguiente número autoincremental visible (localSeq) desde Meta,
@@ -341,6 +379,7 @@ export async function updateRecord(id, body, actor, options = {}) {
   for (const campo of MAESTRO_CAMPOS) {
     if (campo.idField in data) await requireMaestroCampo(campo, data);
   }
+  if ("actividadId" in data) await requireActividadDelCatalogo(data, before?.actividadId ?? null);
   const feDuplicados = "fe" in data ? await countOtrosConFe(data.fe, id) : 0;
   const row = await prisma.record.update({ where: { id }, data });
   const [after] = await hydrateConDatosActuales([row]);
@@ -391,4 +430,46 @@ export async function deleteRecord(id, actor) {
     // Notificaciones por evento: la compra ya no existe, así que el evento lleva sus datos tal como estaban.
     publicarEvento("compra.eliminada", { entidadId: id, clave: `compra.eliminada|${id}`, datos: { ...datosCompra(r), eliminadaPor: actor?.nombre || null }, actor });
   }
+}
+
+// Asocia (o desasocia, con actividadId null) una compra a una actividad de Bienestar desde el módulo de Bienestar
+// (requiere editBienestar, no editRecord): solo toca actividadId/actividad, con las mismas validaciones que el
+// formulario de compras, y queda en la auditoría de la compra.
+export async function asignarActividadACompra(recordId, actividadId, actor) {
+  const before = await prisma.record.findUnique({ where: { id: String(recordId) } });
+  if (!before) {
+    const err = new Error("Compra no encontrada.");
+    err.status = 404;
+    throw err;
+  }
+  const data = { actividadId: actividadId ? Number(actividadId) : null };
+  await requireActividadDelCatalogo(data, before.actividadId);
+  const row = await prisma.record.update({ where: { id: before.id }, data });
+  const [after] = await hydrateConDatosActuales([row]);
+  await logUpdate(actor, toClientRecord(before), after, "editar").catch(() => {});
+  publicarCambiosDeCompra(toClientRecord(before), after, actor);
+  return after;
+}
+
+// Compras que aún no tienen actividad, para asociarlas desde Bienestar: búsqueda por número, descripción o
+// proveedor; las más recientes primero.
+export async function comprasSinActividad({ q = "", limite = 20 } = {}) {
+  const texto = String(q).trim();
+  const numero = Number(texto.replace(/^#/, ""));
+  const where = { actividadId: null };
+  if (texto) {
+    where.OR = [
+      { descripcion: { contains: texto, mode: "insensitive" } },
+      { proveedor: { contains: texto, mode: "insensitive" } },
+      { area: { contains: texto, mode: "insensitive" } },
+      ...(Number.isInteger(numero) && numero > 0 ? [{ localSeq: numero }] : []),
+    ];
+  }
+  const rows = await prisma.record.findMany({
+    where,
+    orderBy: [{ fechaSolicitud: "desc" }, { localSeq: "desc" }],
+    take: Math.min(300, Number(limite) || 20),
+    select: { id: true, localSeq: true, fechaSolicitud: true, descripcion: true, proveedor: true, area: true, valorConIva: true, estadoLegalizacion: true },
+  });
+  return rows;
 }

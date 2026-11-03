@@ -15,7 +15,9 @@ const PUBLIC_PATHS = new Set(["/api/auth/login", "/api/mcp"]);
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  if (PUBLIC_PATHS.has(pathname)) {
+  // Formularios públicos de inscripción a actividades de Bienestar (enlace con token, sin sesión). El trigger de la
+  // BD igual rechaza un U+FFFD en lo que escriban.
+  if (PUBLIC_PATHS.has(pathname) || pathname.startsWith("/api/publico/")) {
     return NextResponse.next();
   }
 

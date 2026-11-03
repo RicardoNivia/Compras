@@ -91,7 +91,7 @@ export async function POST(request) {
     ? actors.map((a) => `${a.id} — ${a.nombre}${a.email ? ` (${a.email})` : ""}`).join("\n")
     : "(sin datos)";
 
-  const systemInstruction = `Traduces una búsqueda en lenguaje natural sobre la Auditoría del Panel de Compras de Sinco (quién hizo qué, cuándo, sobre qué) a un objeto JSON de filtros EXACTOS. Responde solo con los datos del esquema, sin inventar campos.
+  const systemInstruction = `Traduces una búsqueda en lenguaje natural sobre la Auditoría del Panel de Compras y Bienestar de Sinco (quién hizo qué, cuándo, sobre qué) a un objeto JSON de filtros EXACTOS. Responde solo con los datos del esquema, sin inventar campos.
 
 Reglas:
 - "userId": si mencionan a una persona por nombre, apellido o correo, busca la coincidencia más cercana en la lista de usuarios de abajo y responde EXACTAMENTE su id (el texto antes del "—"). Si no mencionan a nadie o no hay coincidencia clara, null. Nunca inventes un id.

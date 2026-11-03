@@ -11,7 +11,7 @@ export default function ContactAdminModal({ onClose }) {
         <div className="modal-body">
           <p className="field full">
             Por seguridad, el restablecimiento de contraseña debe hacerlo un administrador de la aplicación.
-            Contacta a tu administrador de Sinco Compras para que te ayude a recuperar el acceso.
+            Contacta a tu administrador del Panel de Compras y Bienestar para que te ayude a recuperar el acceso.
           </p>
         </div>
         <div className="modal-foot">

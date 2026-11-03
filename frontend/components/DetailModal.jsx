@@ -74,6 +74,7 @@ export default function DetailModal({ record, onClose }) {
 
           <Item label="Nit"><EmptyOr value={record.nit} /></Item>
           <Item label="Proveedor"><EmptyOr value={record.proveedor} /></Item>
+          <Item label="Actividad de Bienestar"><EmptyOr value={record.actividad} /></Item>
           <Item label="Licitación"><EmptyOr value={record.licitacion} /></Item>
 
           <Item label="Estado legalización">

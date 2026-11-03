@@ -77,7 +77,7 @@ export async function POST(request) {
     return jsonError("Escribe una observación antes de revisarla.", 400);
   }
 
-  const systemInstruction = `Eres un auxiliar de legalización de compras del Panel de Compras de Sinco. Te dan el campo "Observaciones" que un usuario escribió para justificar el estado de legalización de una compra, junto con el contexto de esa compra. Evalúa si el texto es una justificación completa y clara (debe explicar el motivo del estado actual — por qué está pendiente, qué falta, qué documento/fecha la respalda, etc., según corresponda).
+  const systemInstruction = `Eres un auxiliar de legalización de compras del Panel de Compras y Bienestar de Sinco. Te dan el campo "Observaciones" que un usuario escribió para justificar el estado de legalización de una compra, junto con el contexto de esa compra. Evalúa si el texto es una justificación completa y clara (debe explicar el motivo del estado actual — por qué está pendiente, qué falta, qué documento/fecha la respalda, etc., según corresponda).
 
 Devuelve:
 - "suficiente": true si el texto ya justifica adecuadamente el estado, false si falta información relevante (ej. no dice qué falta, no menciona fecha ni documento de respaldo, es demasiado vago).

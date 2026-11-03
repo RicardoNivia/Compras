@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { useModulo } from "@/components/ModuloShell";
 import { sendAgentChatApi } from "@/lib/api";
 import AssistantContent, { ThinkingLabel } from "@/components/AgentMessageContent";
 import { IconSend, IconPlus, IconTrash } from "@/components/icons";
@@ -36,6 +37,13 @@ const SUGGESTIONS = [
   { prompt: "Muéstrame un gráfico de compras por área", title: "Gráfico por área", sub: "Desglose visual con datos reales", icon: "chart" },
   { prompt: "¿A partir de qué monto se requiere cuadro comparativo?", title: "Procedimiento de compras", sub: "Umbrales, aprobaciones y plazos", icon: "doc" },
   { prompt: "¿Qué puedo hacer en esta aplicación según mi rol?", title: "Qué puedo hacer aquí", sub: "Según tu rol en la aplicación", icon: "user" },
+];
+
+const SUGGESTIONS_BIENESTAR = [
+  { prompt: "Dame un resumen de la participación en las actividades de Bienestar este año", title: "Participación del año", sub: "Asistentes, asistencia y actividades", icon: "user" },
+  { prompt: "Muéstrame un gráfico de asistentes por mes en Bienestar", title: "Asistentes por mes", sub: "Desglose visual con datos reales", icon: "chart" },
+  { prompt: "¿Cuánto se ha gastado frente a lo presupuestado en las actividades de Bienestar y Fundación?", title: "Gasto frente a presupuesto", sub: "Compras asociadas a las actividades", icon: "money" },
+  { prompt: "¿Qué actividades vienen próximas y cuáles no tienen presupuesto?", title: "Próximas actividades", sub: "Fechas, estado y presupuesto", icon: "doc" },
 ];
 
 const SUGGESTION_ICONS = {
@@ -83,6 +91,9 @@ function groupConversationsByDate(conversations) {
 }
 
 export default function AgenteChat({ userName }) {
+  const modulo = useModulo();
+  const enBienestar = modulo === "bienestar";
+  const textoEntrada = enBienestar ? "Pregunta algo sobre las actividades de Bienestar o Fundación…" : "Pregunta algo sobre los datos de compras…";
   const [messages, setMessages] = useState([]); // { role: "user" | "model", text }
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -243,17 +254,19 @@ export default function AgenteChat({ userName }) {
           ) : isEmpty ? (
             <div className="agent-hero-centered">
               <div className="agent-empty">
-                <div className="agent-empty-mark"><img src="/nova/nova-saludo.png" alt="" /></div>
-                <h2>Hola{userName ? `, ${userName.split(" ")[0]}` : ""}. Soy Nova, tu asistente de IA de compras.</h2>
-                <p>Respondo preguntas sobre los datos de compras, el procedimiento oficial de compras (ADM-P-01) y cómo usar esta aplicación según tu rol — no invento información y no puedo crear, modificar ni aprobar nada.</p>
+                <div className="agent-empty-mark"><img src={modulo === "bienestar" ? "/nova/nova-bienestar-saludo.png" : "/nova/nova-saludo.png"} alt="" /></div>
+                <h2>Hola{userName ? `, ${userName.split(" ")[0]}` : ""}. Soy Nova, tu asistente de IA de {enBienestar ? "Bienestar" : "compras"}.</h2>
+                {enBienestar
+                  ? <p>Respondo preguntas sobre las actividades de Bienestar y Fundación: participación, asistencia, inventario, calificaciones y su costo en compras asociadas. No invento información y no puedo crear, modificar ni aprobar nada.</p>
+                  : <p>Respondo preguntas sobre los datos de compras, el procedimiento oficial de compras (ADM-P-01) y cómo usar esta aplicación según tu rol — no invento información y no puedo crear, modificar ni aprobar nada.</p>}
               </div>
               <ChatInputBar
                 input={input} setInput={setInput} sending={sending}
                 onSend={() => send()} onKeyDown={handleKeyDown}
-                placeholder="Pregunta algo sobre los datos de compras…"
+                placeholder={textoEntrada}
               />
               <div className="agent-suggestions">
-                {SUGGESTIONS.map((s, i) => (
+                {(enBienestar ? SUGGESTIONS_BIENESTAR : SUGGESTIONS).map((s, i) => (
                   <button
                     key={s.prompt} type="button" className="agent-suggestion-card"
                     style={{ animationDelay: `${i * 0.05}s` }}
@@ -297,7 +310,7 @@ export default function AgenteChat({ userName }) {
           <ChatInputBar
             input={input} setInput={setInput} sending={sending}
             onSend={() => send()} onKeyDown={handleKeyDown}
-            placeholder="Pregunta algo sobre los datos de compras…"
+            placeholder={textoEntrada}
           />
         )}
       </div>

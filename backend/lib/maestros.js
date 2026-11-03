@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { logMaestroCreate, logMaestroUpdate, logMaestroDelete } from "@/lib/audit";
 import { isRoleAllowed } from "@/lib/permissions";
-import { ROLES_COMPRAS } from "@/lib/roles";
+import { ROLES, ROLES_COMPRAS } from "@/lib/roles";
 
 // tipo -> nombre del campo correspondiente en Record (coinciden 1:1).
 // "causaCalificacion" es la excepción: no referencia un campo de Record, sino
@@ -9,7 +9,7 @@ import { ROLES_COMPRAS } from "@/lib/roles";
 // areaProveedor / tipoProveedor / clasificacionMonto / tipoServicio /
 // motivoExcepcion los usa Proveedor (ver USOS_POR_TIPO y MODULO_POR_TIPO).
 // Duplicado (sin Prisma) en frontend/lib/maestrosTipos.js — mantener ambos en sync.
-export const TIPOS_MAESTRO = ["area", "responsable", "estado", "categoria", "medioPago", "estadoLegalizacion", "causaCalificacion", "areaProveedor", "tipoProveedor", "clasificacionMonto", "tipoServicio", "motivoExcepcion"];
+export const TIPOS_MAESTRO = ["area", "responsable", "estado", "categoria", "medioPago", "estadoLegalizacion", "causaCalificacion", "areaProveedor", "tipoProveedor", "clasificacionMonto", "tipoServicio", "motivoExcepcion", "responsableBienestar", "areaParticipante", "motivoInasistencia", "unidadInventario", "escalaCalificacion"];
 
 export const TIPO_LABELS = {
   area: "Área",
@@ -24,6 +24,11 @@ export const TIPO_LABELS = {
   tipoProveedor: "Tipo de proveedor (criticidad)",
   clasificacionMonto: "Clasificación por monto",
   tipoServicio: "Tipo de servicio",
+  responsableBienestar: "Responsables de actividades",
+  areaParticipante: "Áreas de participantes",
+  motivoInasistencia: "Motivos de inasistencia",
+  unidadInventario: "Unidades de inventario",
+  escalaCalificacion: "Escala de calificación",
 };
 
 // Módulo dueño de cada maestro. Las áreas de Compras ("area") y de
@@ -41,7 +46,17 @@ export const MODULO_POR_TIPO = {
   clasificacionMonto: "Proveedores",
   tipoServicio: "Proveedores",
   motivoExcepcion: "Proveedores",
+  responsableBienestar: "Bienestar",
+  areaParticipante: "Bienestar",
+  motivoInasistencia: "Bienestar",
+  unidadInventario: "Bienestar",
+  escalaCalificacion: "Bienestar",
 };
+
+// Maestros cuyo valor es un usuario de la aplicación, no un texto libre.
+export const TIPOS_USUARIO = ["responsable", "responsableBienestar"];
+// Maestros con filas fijas: solo se les cambia el nombre (la escala de 1 a 5 no gana ni pierde puntos).
+export const TIPOS_FIJOS = ["escalaCalificacion"];
 
 // Dónde se usa cada maestro (referencia por id), por módulo.
 const USOS_POR_TIPO = {
@@ -57,6 +72,9 @@ const USOS_POR_TIPO = {
   motivoExcepcion: [{ modelo: "proveedor", campo: "motivoExcepcionId", modulo: "Proveedores" }],
   tipoProveedor: [{ modelo: "proveedor", campo: "tipoProveedorId", modulo: "Proveedores" }],
   clasificacionMonto: [{ modelo: "proveedor", campo: "clasificacionMontoId", modulo: "Proveedores" }],
+  areaParticipante: [{ modelo: "participanteActividad", campo: "areaId", modulo: "Bienestar" }],
+  motivoInasistencia: [{ modelo: "participanteActividad", campo: "motivoInasistenciaId", modulo: "Bienestar" }],
+  unidadInventario: [{ modelo: "inventarioActividad", campo: "unidadId", modulo: "Bienestar" }],
   tipoServicio: [
     { modelo: "proveedor", campo: "tipoServicioId", modulo: "Proveedores" },
     { modelo: "proveedorProceso", campo: "servicioId", modulo: "Proveedores" },
@@ -84,7 +102,10 @@ export const ESTRELLAS_CON_CAUSA = [1, 2, 3, 4];
 export async function puedeAdministrarTipo(actor, tipo) {
   if (!actor) return false;
   if (MODULO_POR_TIPO[tipo] === "Proveedores") return isRoleAllowed(actor.role, "editProveedores");
-  return ROLES_COMPRAS.includes(actor.role);
+  if (MODULO_POR_TIPO[tipo] === "Bienestar") return isRoleAllowed(actor.role, "viewMaestrosBienestar");
+  if (ROLES_COMPRAS.includes(actor.role)) return true;
+  // Un rol personalizado no está en ROLES_COMPRAS: administra los de Compras si la Matriz le da los maestros.
+  return !Object.values(ROLES).includes(actor.role) && isRoleAllowed(actor.role, "viewMaestros");
 }
 
 async function exigirModulo(actor, tipo) {
@@ -111,6 +132,7 @@ export function toClientMaestro(m, enUso = false, usadoEn = []) {
     enUso,
     usadoEn, // módulos donde está en uso: ["Compras"] o ["Proveedores"]
     modulo: MODULO_POR_TIPO[m.tipo] || "Compras",
+    creadoPorNombre: m.creadoPorNombre || null,
     createdAt: m.createdAt,
   };
 }
@@ -155,6 +177,10 @@ async function usedCausaIds() {
 
 // Módulos (Compras / Proveedores) donde está en uso este maestro.
 export async function modulosDondeSeUsa(maestro) {
+  if (maestro.tipo === "responsableBienestar") {
+    if (!maestro.userId) return [];
+    return (await prisma.actividadBienestar.count({ where: { responsableUserId: maestro.userId } })) > 0 ? ["Bienestar"] : [];
+  }
   if (maestro.tipo === "responsable") {
     if (!maestro.userId) return [];
     return (await prisma.record.count({ where: { responsableUserId: maestro.userId } })) > 0 ? ["Compras"] : [];
@@ -185,6 +211,15 @@ async function usedIdsByTipo(tipo) {
   };
   if (tipo === "causaCalificacion") {
     for (const id of await usedCausaIds()) marcar(id, "Compras");
+    return out;
+  }
+  if (tipo === "responsableBienestar") {
+    const rows = await prisma.actividadBienestar.findMany({
+      where: { responsableUserId: { not: null } },
+      select: { responsableUserId: true },
+      distinct: ["responsableUserId"],
+    });
+    for (const r of rows) marcar(r.responsableUserId, "Bienestar");
     return out;
   }
   if (tipo === "responsable") {
@@ -222,7 +257,7 @@ export async function listMaestros({ tipo, onlyActive } = {}) {
   for (const row of rows) {
     if (!usedCache.has(row.tipo)) usedCache.set(row.tipo, await usedIdsByTipo(row.tipo));
     const idsUsados = usedCache.get(row.tipo);
-    const clave = row.tipo === "responsable" ? row.userId : row.id;
+    const clave = TIPOS_USUARIO.includes(row.tipo) ? row.userId : row.id;
     const modulos = clave && idsUsados.has(clave) ? [...idsUsados.get(clave)] : [];
     out.push(toClientMaestro(row, modulos.length > 0, modulos));
   }
@@ -242,10 +277,11 @@ export async function createMaestro(body, actor) {
   const tipo = body.tipo;
   if (!TIPOS_MAESTRO.includes(tipo)) throw badRequest("Tipo de maestro inválido.");
   await exigirModulo(actor, tipo);
+  if (TIPOS_FIJOS.includes(tipo)) throw badRequest("Este maestro tiene valores fijos: solo se les puede cambiar el nombre.");
 
   let valor;
   let userId = null;
-  if (tipo === "responsable") {
+  if (TIPOS_USUARIO.includes(tipo)) {
     const user = await resolveResponsableUser(body.userId);
     userId = user.id;
     valor = user.nombre;
@@ -257,7 +293,7 @@ export async function createMaestro(body, actor) {
 
   try {
     const row = await prisma.maestro.create({
-      data: { tipo, valor, userId, aplicaEstrellas, activo: body.activo ?? true },
+      data: { tipo, valor, userId, aplicaEstrellas, activo: body.activo ?? true, creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null },
     });
     const maestro = toClientMaestro(row, false);
     await logMaestroCreate(actor, maestro).catch(() => {});
@@ -283,9 +319,10 @@ export async function updateMaestro(id, body, actor) {
     throw errorEnUso(current, modulosAntes, "modificar");
   }
   const data = {};
+  if (TIPOS_FIJOS.includes(current.tipo) && body.activo === false) throw badRequest("Este maestro tiene valores fijos: no se pueden inactivar.");
   if (body.activo !== undefined) data.activo = !!body.activo;
 
-  if (current.tipo === "responsable") {
+  if (TIPOS_USUARIO.includes(current.tipo)) {
     // Caso distinto al resto: reasignar a otro usuario SÍ se bloquea si está
     // en uso, porque Record referencia directo al User (responsableUserId),
     // no a esta fila — cambiar el usuario aquí no actualizaría los registros
@@ -348,6 +385,7 @@ export async function deleteMaestro(id, actor) {
     throw err;
   }
   await exigirModulo(actor, current.tipo);
+  if (TIPOS_FIJOS.includes(current.tipo)) throw badRequest("Este maestro tiene valores fijos: no se pueden eliminar.");
   const modulos = await modulosDondeSeUsa(current);
   if (modulos.length) throw errorEnUso(current, modulos, "eliminar");
   await prisma.maestro.delete({ where: { id } });

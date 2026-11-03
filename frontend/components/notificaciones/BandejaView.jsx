@@ -131,7 +131,7 @@ export default function BandejaView() {
                       </div>
                       {it.contenido?.texto && <p>{it.contenido.texto}</p>}
                       <span className="nx-item-de">
-                        De la notificación <b>«{it.notificacionNombre || "eliminada"}»</b>
+                        {it.contenido?.sistema ? "Aviso de solicitudes de compra" : <>De la notificación <b>«{it.notificacionNombre || "eliminada"}»</b></>}
                         {it.propietarioNombre ? <> · configurada por {it.deOtro ? it.propietarioNombre : "ti"}</> : null}
                         {it.cuando ? <> · <IconClock size={11} /> {it.cuando}</> : null}
                       </span>

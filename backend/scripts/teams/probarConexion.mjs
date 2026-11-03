@@ -22,7 +22,7 @@ const card = {
   type: "AdaptiveCard",
   version: "1.4",
   body: [
-    { type: "TextBlock", text: "Prueba de conexión · Panel de Compras", weight: "Bolder", size: "Medium", wrap: true },
+    { type: "TextBlock", text: "Prueba de conexión · Panel de Compras y Bienestar", weight: "Bolder", size: "Medium", wrap: true },
     { type: "TextBlock", text: "Si ves bien las tildes y la eñe (José, compañía, ñandú, acción), el flujo de notificaciones está listo.", wrap: true },
     { type: "TextBlock", text: new Date().toLocaleString("es-CO"), isSubtle: true, size: "Small" },
   ],

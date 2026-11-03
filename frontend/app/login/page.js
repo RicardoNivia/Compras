@@ -4,7 +4,7 @@ import { canViewDashboard } from "@/lib/roles";
 import LoginForm from "@/components/LoginForm";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Iniciar sesión · Sinco Compras" };
+export const metadata = { title: "Iniciar sesión · Panel de Compras y Bienestar" };
 
 export default async function LoginPage() {
   const user = await getSessionUser();

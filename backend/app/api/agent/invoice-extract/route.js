@@ -11,7 +11,7 @@ function jsonError(message, status) {
 // factura, pero evita que alguien mande un archivo enorme al endpoint de IA.
 const MAX_BASE64_LENGTH = 6 * 1024 * 1024;
 
-const SYSTEM_INSTRUCTION = `Eres un lector de facturas para el formulario de Registros de compra del Panel de Compras de Sinco. Te dan la imagen de una factura o recibo (puede venir en español o inglés, de cualquier proveedor). Tu trabajo es decidir si la imagen realmente es una factura/recibo de compra y, si lo es, extraer los datos que coinciden con los campos de ese formulario.
+const SYSTEM_INSTRUCTION = `Eres un lector de facturas para el formulario de Registros de compra del Panel de Compras y Bienestar de Sinco. Te dan la imagen de una factura o recibo (puede venir en español o inglés, de cualquier proveedor). Tu trabajo es decidir si la imagen realmente es una factura/recibo de compra y, si lo es, extraer los datos que coinciden con los campos de ese formulario.
 
 Reglas:
 - "esFactura": false si la imagen no es una factura, recibo o documento de cobro reconocible (ej. es una foto random, un documento de otro tipo, o está ilegible) — en ese caso deja todos los demás campos en null y no inventes nada.

@@ -279,3 +279,49 @@ export function IconEye(props) {
     </Svg>
   );
 }
+
+export function IconCalendar(props) {
+  return (
+    <Svg {...props}>
+      <rect x="1.8" y="3" width="13.4" height="12.2" rx="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M1.8 7h13.4M5.3 1.5v3M11.7 1.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function IconBag(props) {
+  return (
+    <Svg {...props}>
+      <path d="M3.2 5.5h10.6l-.8 9.2a1 1 0 0 1-1 .9H5a1 1 0 0 1-1-.9z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M6 7.5V4.6a2.5 2.5 0 0 1 5 0v2.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function IconHeart(props) {
+  return (
+    <Svg {...props}>
+      <path d="M8.5 14.6S2 10.8 2 6.4A3.4 3.4 0 0 1 8.5 4.9a3.4 3.4 0 0 1 6.5 1.5c0 4.4-6.5 8.2-6.5 8.2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconPanel(props) {
+  return (
+    <Svg {...props}>
+      <rect x="1.8" y="2.5" width="13.4" height="12" rx="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M6.3 2.5v12" stroke="currentColor" strokeWidth="1.3" />
+    </Svg>
+  );
+}
+
+export function IconList(props) {
+  return (
+    <Svg {...props}>
+      <path d="M6 4.5h8.5M6 8.5h8.5M6 12.5h8.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <circle cx="3" cy="4.5" r="0.9" fill="currentColor" />
+      <circle cx="3" cy="8.5" r="0.9" fill="currentColor" />
+      <circle cx="3" cy="12.5" r="0.9" fill="currentColor" />
+    </Svg>
+  );
+}

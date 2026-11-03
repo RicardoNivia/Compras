@@ -50,6 +50,7 @@ async function purgar() {
   globalThis.__notificacionesPurga = hoy;
   const limite = new Date(Date.now() - RETENCION_DIAS * 86400000);
   await prisma.notificacionEjecucion.deleteMany({ where: { createdAt: { lt: limite } } }).catch(() => {});
+  await prisma.notificacionEntrega.deleteMany({ where: { ejecucionId: null, createdAt: { lt: limite } } }).catch(() => {});
   await purgarEventos();
 }
 

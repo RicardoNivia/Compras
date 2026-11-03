@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth-server";
 import { isRoleAllowed } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
 
 // Centraliza el patrón repetido en los route handlers: obtener el usuario de
 // sesión y validar un permiso de la Matriz de permisos (lib/permissions.js)
@@ -15,6 +16,27 @@ export async function requirePermission(feature) {
     return { user: null, denied: NextResponse.json({ error: "No autorizado." }, { status: 403 }) };
   }
   return { user, denied: null };
+}
+
+// Igual que requirePermission, para lo que sirve a más de un módulo (p. ej. los maestros de Compras y los de Bienestar).
+export async function requireAlgunPermiso(features) {
+  const user = await getSessionUser();
+  const permitido = user && (await Promise.all(features.map((f) => isRoleAllowed(user.role, f)))).some(Boolean);
+  if (!permitido) return { user: null, denied: NextResponse.json({ error: "No autorizado." }, { status: 403 }) };
+  return { user, denied: null };
+}
+
+// Bienestar y Fundación tienen permisos separados: el de una actividad depende de su línea.
+const FEATURE_POR_LINEA = {
+  ver: { Bienestar: "viewBienestar", "Fundación": "viewFundacion" },
+  editar: { Bienestar: "editBienestar", "Fundación": "editFundacion" },
+  dashboard: { Bienestar: "viewDashboardBienestar", "Fundación": "viewDashboardFundacion" },
+};
+export const featureDeLinea = (accion, linea) => FEATURE_POR_LINEA[accion][linea === "Fundación" ? "Fundación" : "Bienestar"];
+
+export async function requirePermisoActividad(actividadId, accion) {
+  const a = await prisma.actividadBienestar.findUnique({ where: { id: Number(actividadId) || 0 }, select: { linea: true } });
+  return requirePermission(featureDeLinea(accion, a?.linea));
 }
 
 // Centraliza el formato de respuesta de error usado por los route handlers:

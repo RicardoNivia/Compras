@@ -1,4 +1,4 @@
-# Imagen de producción del backend de Panel de Compras (Next.js API-only + Prisma/PostgreSQL).
+# Imagen de producción del backend de Panel de Compras y Bienestar (Next.js API-only + Prisma/PostgreSQL).
 # Build context: backend/ (docker build -f backend/Dockerfile backend)
 FROM node:20-alpine AS base
 # Prisma necesita OpenSSL en Alpine para elegir el query engine correcto.

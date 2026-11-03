@@ -55,10 +55,10 @@ export default function ContenidoNotificacion({ c }) {
           {c.mas > 0 && <p className="count-note">y {c.mas} más · <Link href={c.enlace || "/alertas"}>Ver todas</Link></p>}
         </>
       )}
-      <p className="count-note" style={{ margin: 0 }}>
+      {!c.sistema && <p className="count-note" style={{ margin: 0 }}>
         {c.notificacionNombre ? <>Notificación «{c.notificacionNombre}» · </> : null}Configurada por {c.configuradaPor}
         {c.notificacionId ? <> · <Link href={`/alertas?tab=notificaciones&n=${c.notificacionId}`}>Ver la notificación</Link></> : null}
-      </p>
+      </p>}
     </div>
   );
 }

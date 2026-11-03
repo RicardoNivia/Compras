@@ -128,6 +128,27 @@ export function smoothPath(pts) {
   return d;
 }
 
+// Curva monótona (Fritsch-Carlson): pasa por todos los puntos sin subir ni bajar más allá de ellos, así una línea de
+// cantidades nunca dibuja valores por debajo de cero entre dos meses.
+export function monotonePath(pts) {
+  if (pts.length < 2) return "";
+  const n = pts.length;
+  const dx = pts.slice(1).map((p, i) => p[0] - pts[i][0]);
+  const m = pts.slice(1).map((p, i) => (p[1] - pts[i][1]) / dx[i]);
+  const t = pts.map((_, i) => (i === 0 ? m[0] : i === n - 1 ? m[n - 2] : m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2));
+  for (let i = 0; i < n - 1; i++) {
+    if (m[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
+    const a = t[i] / m[i], b = t[i + 1] / m[i], h = a * a + b * b;
+    if (h > 9) { const k = 3 / Math.sqrt(h); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; }
+  }
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < n - 1; i++) {
+    const c = dx[i] / 3;
+    d += ` C${pts[i][0] + c},${pts[i][1] + t[i] * c} ${pts[i + 1][0] - c},${pts[i + 1][1] - t[i + 1] * c} ${pts[i + 1][0]},${pts[i + 1][1]}`;
+  }
+  return d;
+}
+
 // Cifra que cuenta de 0 al valor al entrar en pantalla y se desliza al nuevo valor cuando cambia (p. ej. al filtrar).
 // \`format\` recibe un número entero y devuelve el texto (fmtPesos, fmtNum, etc.).
 export function AnimatedNumber({ value, format = (v) => String(v), duration = 1000 }) {

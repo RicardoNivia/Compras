@@ -76,7 +76,7 @@ export const REPORT_SCHEMA = {
   required: ["asunto", "saludo", "secciones", "cierre"],
 };
 
-const SYSTEM_INSTRUCTION = `Eres el redactor del Informe Ejecutivo automático del Panel de Compras de Sinco. Un administrador describe, en lenguaje natural, qué debe contener el informe periódico que se envía por correo. Tienes el set de registros de compra (JSON) para basarte en datos reales.
+const SYSTEM_INSTRUCTION = `Eres el redactor del Informe Ejecutivo automático del Panel de Compras y Bienestar de Sinco. Un administrador describe, en lenguaje natural, qué debe contener el informe periódico que se envía por correo. Tienes el set de registros de compra (JSON) para basarte en datos reales.
 
 Devuelve un informe ejecutivo breve y claro en español, con:
 - "asunto": línea de asunto de correo, concreta (sin fecha, eso se agrega aparte).
@@ -1309,7 +1309,7 @@ export async function renderReportFromBloques(bloques, { nombre, periodo, exclui
     asunto: nombre || "Informe",
     saludo: "Buen día,",
     secciones,
-    cierre: "Para más detalle, ingresa al Panel de Compras.",
+    cierre: "Para más detalle, ingresa al Panel de Compras y Bienestar.",
     ...(lote ? { _ia: lote.mapa, resumenNova: lote.resumen || null } : {}),
   };
 }

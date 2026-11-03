@@ -68,7 +68,7 @@ function sortValue(r, key) {
   return v;
 }
 
-export default function RegistrosView({ records, setRecords, onFilteredChange, currentUser, maestros, proveedores = [], alertasProveedores = {}, presupuestos = [] }) {
+export default function RegistrosView({ records, setRecords, onFilteredChange, currentUser, maestros, proveedores = [], alertasProveedores = {}, presupuestos = [], actividades = [], nuevaCompraActividad = null }) {
   const role = currentUser?.role;
   const permissions = currentUser?.permissions;
   const allowCreate = permissions?.createRecord ?? canCreateRecord(role);
@@ -126,6 +126,15 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
   const [page, setPage] = useState(1);
 
   const [modalRecord, setModalRecord] = useState(undefined); // undefined = closed, null = new
+  // "Solicitar compra para esta actividad" (Bienestar) llega con ?nuevaCompraActividad=<id>: abre el formulario nuevo
+  // con esa actividad ya elegida.
+  const [prefillCompra, setPrefillCompra] = useState(null);
+  useEffect(() => {
+    if (nuevaCompraActividad && allowCreate) {
+      setPrefillCompra({ actividadId: nuevaCompraActividad });
+      setModalRecord(null);
+    }
+  }, [nuevaCompraActividad, allowCreate]);
   const [ratingRecord, setRatingRecord] = useState(null);
   // Valoración de Nova: { record, auto } — auto=true se abre al radicar y genera la valoración de una vez.
   const [valoracionModal, setValoracionModal] = useState(null);
@@ -721,14 +730,16 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
         <RecordModal
           record={modalRecord}
           records={records}
-          onClose={() => setModalRecord(undefined)}
-          onSaved={handleSaved}
+          onClose={() => { setModalRecord(undefined); setPrefillCompra(null); }}
+          onSaved={(...a) => { setPrefillCompra(null); handleSaved(...a); }}
+          prefill={modalRecord ? null : prefillCompra}
           onDeleted={handleDeletedFromModal}
           allowDelete={allowDelete}
           editableFields={modalRecord ? editableFields : null}
           maestros={maestros}
           proveedores={proveedores}
           presupuestos={presupuestos}
+          actividades={actividades}
         />
       )}
 

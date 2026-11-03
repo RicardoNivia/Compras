@@ -26,7 +26,7 @@ const MAX_CHARS_MENSAJE_VIEJO = 1500;
 // pagar ese costo de nuevo en cada llamada.
 const NUMEROS_TEXTO = ["", "UNA", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO"];
 
-function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion) {
+function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar) {
   const sourceList = [
     "Los datos transaccionales de compras (registros de solicitudes) — se consultan con las herramientas \"resumen_compras\" (cifras exactas/agregadas) y \"buscar_registros\" (registros puntuales). Lo que le toca hacer HOY a quien te escribe (pendientes según su rol: compras por legalizar o radicar, solicitudes atrasadas, proveedores por actualizar, etc.) se consulta con \"mis_pendientes\" — úsala ante \"¿qué me toca hoy?\" o \"¿por dónde empiezo?\" y prioriza primero lo urgente. Las valoraciones de Nova de las compras radicadas (puntaje de la compra y del proveedor, y por qué se calificó así) se consultan con \"consultar_valoraciones\"; los PARÁMETROS con los que se califican compras y proveedores están en la guía (C), sección 9 — explícalos con esa sección, y para el porqué de un puntaje concreto cita la valoración guardada.",
     `El texto de referencia de "${PROCUREMENT_POLICY_TITLE}" — el procedimiento oficial de compras de la compañía (roles y responsabilidades, plazos, umbrales de cuadro comparativo, debida diligencia, aprobaciones por monto, flujo de actividades, etc.). Se consulta por secciones con la herramienta "consultar_referencia" (documento "procedimiento"); su índice está más abajo.`,
@@ -41,17 +41,21 @@ function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSee
   if (canSeeAuditoria) {
     sourceList.push(`El registro de auditoría (quién hizo qué, cuándo, sobre qué — registros de compra, maestros, usuarios, presupuestos o permisos — y qué campos cambiaron) — se consulta con la herramienta "registro_auditoria". Solo disponible para quien tenga este permiso.`);
   }
+  if (canSeeBienestar) {
+    sourceList.push(`El módulo de Bienestar y Fundación (actividades, cronograma, asistencia y participación por área, inventario, calificaciones y su costo) — se consulta con las herramientas "resumen_bienestar" (cifras), "buscar_actividades" y "detalle_actividad". En este módulo todo gasto es de compras asociadas a una actividad. Solo tienes cifras agregadas: no conoces nombres ni datos personales de los participantes, y no debes intentar deducirlos.`);
+  }
   const restricciones = [];
   if (!canSeeProveedoresGestion) restricciones.push("gestión de proveedores");
   if (!canSeePresupuesto) restricciones.push("presupuesto");
   if (!canSeeAuditoria) restricciones.push("auditoría");
+  if (!canSeeBienestar) restricciones.push("Bienestar y Fundación");
 
   const letras = "ABCDEFGH";
   const fuentesTexto = sourceList.map((s, i) => `${letras[i]}) ${s}`).join("\n");
   const fuentes = `Tienes acceso a ${NUMEROS_TEXTO[sourceList.length] || sourceList.length} fuentes de información:
 ${fuentesTexto}${restricciones.length ? `\nEl tema de ${restricciones.join(", de ")} es exclusivo de quien tenga ese permiso: si te preguntan por eso, aclara que esa información no está disponible para su rol (y no verás esas herramientas en tu lista).` : ""}`;
 
-  return `Eres "Nova", el asistente de IA del Panel de Compras de Sinco.
+  return `Eres "Nova", el asistente de IA del Panel de Compras y Bienestar de Sinco.
 
 SOBRE TU NOMBRE (solo cuéntalo si te preguntan explícitamente qué significa "Nova", por qué te llamas así, o de dónde viene tu nombre — no lo menciones por iniciativa propia en una respuesta normal):
 "Nova" es una sigla de tu función estratégica dentro de la compañía:
@@ -177,6 +181,7 @@ export async function POST(request) {
   const canSeePresupuesto = await isRoleAllowed(user.role, "viewPresupuesto");
   const canSeeAuditoria = await isRoleAllowed(user.role, "viewAuditoria");
   const canSeeProveedoresGestion = await isRoleAllowed(user.role, "viewProveedores");
+  const canSeeBienestar = (await Promise.all(["viewBienestar", "viewFundacion", "viewDashboardBienestar", "viewDashboardFundacion"].map((f) => isRoleAllowed(user.role, f)))).some(Boolean);
 
   const body = await request.json().catch(() => ({}));
   const message = (body.message || "").toString().trim();
@@ -227,10 +232,10 @@ export async function POST(request) {
   const jobId = createJob(async () => {
     let fullText = "";
     try {
-      const tools = buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion });
+      const tools = buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar });
       const executeTool = buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, user });
       for await (const chunk of streamChatCascade({
-        staticPrefix: buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion),
+        staticPrefix: buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar),
         systemInstruction: buildDynamicInstructionSuffix(user, section, contexto),
         contents,
         tools,

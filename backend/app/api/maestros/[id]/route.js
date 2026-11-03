@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { updateMaestro, deleteMaestro } from "@/lib/maestros";
-import { requirePermission, apiError } from "@/lib/apiGuard";
+import { requireAlgunPermiso, apiError } from "@/lib/apiGuard";
 
 /**
  * @openapi
@@ -47,7 +47,7 @@ import { requirePermission, apiError } from "@/lib/apiGuard";
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function PATCH(request, { params }) {
-  const { user, denied } = await requirePermission("viewMaestros");
+  const { user, denied } = await requireAlgunPermiso(["viewMaestros", "viewMaestrosBienestar"]);
   if (denied) return denied;
   try {
     const body = await request.json();
@@ -89,7 +89,7 @@ export async function PATCH(request, { params }) {
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 export async function DELETE(_request, { params }) {
-  const { user, denied } = await requirePermission("viewMaestros");
+  const { user, denied } = await requireAlgunPermiso(["viewMaestros", "viewMaestrosBienestar"]);
   if (denied) return denied;
   try {
     await deleteMaestro(params.id, user);

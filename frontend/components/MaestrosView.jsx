@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import MaestroModal from "@/components/MaestroModal";
 import ConfigCicloProveedores from "@/components/proveedores/ConfigCicloProveedores";
-import { TIPOS_MAESTRO, TIPO_LABELS, MODULO_POR_TIPO } from "@/lib/maestrosTipos";
+import { TIPOS_MAESTRO, TIPO_LABELS, MODULO_POR_TIPO, TIPOS_USUARIO, TIPOS_FIJOS } from "@/lib/maestrosTipos";
 import { updateMaestroApi, deleteMaestroApi } from "@/lib/api";
 import { IconPlus, IconEdit, IconTrash, IconSearch, IconBuilding, IconUsers, IconFlag, IconMoney, IconFile, IconLayers, IconStar, IconClock } from "@/components/icons";
 
@@ -13,7 +13,7 @@ import { IconPlus, IconEdit, IconTrash, IconSearch, IconBuilding, IconUsers, Ico
 // eliminar; sí se puede inactivar para que deje de ofrecerse en los formularios.
 
 const CICLO = "cicloProveedores";
-const MODULOS = ["Compras", "Proveedores"];
+const MODULOS = ["Compras", "Proveedores", "Bienestar"];
 
 const TIPO_ICONS = {
   area: IconBuilding,
@@ -28,6 +28,11 @@ const TIPO_ICONS = {
   clasificacionMonto: IconMoney,
   tipoServicio: IconLayers,
   motivoExcepcion: IconFile,
+  responsableBienestar: IconUsers,
+  areaParticipante: IconBuilding,
+  motivoInasistencia: IconFile,
+  unidadInventario: IconLayers,
+  escalaCalificacion: IconStar,
 };
 
 const COLUMN_LABELS = {
@@ -43,6 +48,11 @@ const COLUMN_LABELS = {
   clasificacionMonto: "Clasificación por monto",
   tipoServicio: "Tipo de servicio",
   motivoExcepcion: "Motivo de excepción",
+  responsableBienestar: "Responsable de actividades",
+  areaParticipante: "Área",
+  motivoInasistencia: "Motivo de inasistencia",
+  unidadInventario: "Unidad",
+  escalaCalificacion: "Nombre de la calificación",
 };
 
 const PAGE_SIZES = [25, 50, 100];
@@ -101,7 +111,7 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
     return maestros
       .filter((m) => m.tipo === tab)
       .filter((m) => !q || m.valor.toLowerCase().includes(q))
-      .sort((a, b) => a.valor.localeCompare(b.valor, "es"));
+      .sort((a, b) => (tab === "escalaCalificacion" ? a.aplicaEstrellas - b.aplicaEstrellas : a.valor.localeCompare(b.valor, "es")));
   }, [maestros, tab, search]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -160,7 +170,9 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
   }
 
   const esCiclo = tab === CICLO;
-  const colSpan = tab === "causaCalificacion" ? 5 : 4;
+  const conEstrellas = tab === "causaCalificacion" || tab === "escalaCalificacion";
+  const colSpan = conEstrellas ? 5 : 4;
+  const esFijo = TIPOS_FIJOS.includes(tab);
 
   return (
     <div className="maestros-shell">
@@ -196,6 +208,11 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
             </nav>
           </div>
         ))}
+        {modulos.Bienestar && (
+          <p className="maestros-nav-nota">
+            Los estados de una actividad y las líneas Bienestar y Fundación son fijos: de ellos dependen reglas como no recibir compras al cerrar o las páginas de cada línea.
+          </p>
+        )}
       </aside>
 
       <section className="maestros-main">
@@ -213,18 +230,22 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
                 <span className="ic"><IconSearch size={14} /></span>
               </div>
               <div className="spacer" />
-              <button type="button" className="btn btn-primary" onClick={openCreate}>
-                <IconPlus size={13} /> Crear nuevo
-              </button>
+              {!esFijo && (
+                <button type="button" className="btn btn-primary" onClick={openCreate}>
+                  <IconPlus size={13} /> Crear nuevo
+                </button>
+              )}
             </div>
 
+            {esFijo && <p className="card-sub" style={{ margin: "0 0 10px" }}>La escala siempre va de 1 a 5 estrellas: aquí solo se cambia cómo se llama cada puntaje.</p>}
+            {tab === "responsableBienestar" && <p className="card-sub" style={{ margin: "0 0 10px" }}>Solo estas personas se pueden elegir como responsables de una actividad de Bienestar o Fundación.</p>}
             {error && <div className="modal-error" style={{ marginBottom: 10 }}>{error}</div>}
 
             <table className="maestros-table">
               <thead>
                 <tr>
                   <th>{COLUMN_LABELS[tab]}</th>
-                  {tab === "causaCalificacion" && <th className="col-estrellas">Aplica a estrellas</th>}
+                  {conEstrellas && <th className="col-estrellas">{tab === "causaCalificacion" ? "Aplica a estrellas" : "Estrellas"}</th>}
                   <th className="col-uso">En uso</th>
                   <th className="col-activo">Activo</th>
                   <th className="col-acciones"></th>
@@ -249,13 +270,13 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
                           <span className="desc-tooltip-bubble">{m.valor}</span>
                         </span>
                       </td>
-                      {tab === "causaCalificacion" && <td>{"★".repeat(m.aplicaEstrellas || 0)}</td>}
+                      {conEstrellas && <td>{"★".repeat(m.aplicaEstrellas || 0)}</td>}
                       <td>{m.enUso ? <span className="pill accent" title={enUsoTitle(m)}>{m.usadoEn?.join(" · ") || "Sí"}</span> : <span className="pill good" title="Sin uso: se puede editar o eliminar">Libre</span>}</td>
                       <td>
                         <ToggleSwitch
                           checked={m.activo}
                           onChange={() => toggleActivo(m)}
-                          disabled={togglingId === m.id}
+                          disabled={togglingId === m.id || esFijo}
                           title={m.activo ? "Inactivar" : "Activar"}
                         />
                       </td>
@@ -273,7 +294,7 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
                           </div>
                         ) : (
                           <>
-                            {tab !== "responsable" && (
+                            {!TIPOS_USUARIO.includes(tab) && (
                               <button
                                 type="button"
                                 className="icon-action-btn edit"
@@ -284,15 +305,17 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
                                 <IconEdit size={13} />
                               </button>
                             )}
-                            <button
-                              type="button"
-                              className="icon-action-btn delete"
-                              onClick={() => setConfirmDeleteId(m.id)}
-                              title={locked ? enUsoTitle(m) : "Eliminar"}
-                              disabled={locked}
-                            >
-                              <IconTrash size={13} />
-                            </button>
+                            {!esFijo && (
+                              <button
+                                type="button"
+                                className="icon-action-btn delete"
+                                onClick={() => setConfirmDeleteId(m.id)}
+                                title={locked ? enUsoTitle(m) : "Eliminar"}
+                                disabled={locked}
+                              >
+                                <IconTrash size={13} />
+                              </button>
+                            )}
                           </>
                         )}
                       </td>

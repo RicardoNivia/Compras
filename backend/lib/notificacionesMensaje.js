@@ -78,7 +78,7 @@ export function tarjetaTeams(c, { redirigidaDesde } = {}) {
     });
   }
   if (c.mas) body.push({ type: "TextBlock", text: `y ${c.mas} más`, isSubtle: true, size: "Small" });
-  body.push({ type: "TextBlock", text: `Notificación «${c.notificacionNombre || c.titulo}» · configurada por ${c.configuradaPor} · Panel de Compras`, isSubtle: true, size: "Small", wrap: true, spacing: "Medium" });
+  body.push({ type: "TextBlock", text: `Notificación «${c.notificacionNombre || c.titulo}» · configurada por ${c.configuradaPor} · Panel de Compras y Bienestar`, isSubtle: true, size: "Small", wrap: true, spacing: "Medium" });
   return {
     $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
     type: "AdaptiveCard",

@@ -51,9 +51,10 @@ const emptyForm = {
   valorUsd: "",
   trm: "",
   observaciones: "",
+  actividadId: "",
 };
 
-export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true, editableFields = null, maestros = [], proveedores = [], presupuestos = [] }) {
+export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true, editableFields = null, maestros = [], proveedores = [], presupuestos = [], actividades = [], crear = null, actividadFija = null, prefill = null }) {
   const isEdit = !!record;
   // editableFields null = todos los campos editables (admin, registro).
   // Con lista (p.ej. legalizar), los demás campos quedan solo-lectura.
@@ -64,7 +65,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
     // defecto histórico) si existe — si no, queda sin estado hasta que el
     // usuario elija uno.
     const pendienteId = maestros.find((m) => m.tipo === "estado" && m.valor === "Pendiente")?.id || "";
-    return { ...emptyForm, estadoId: pendienteId };
+    return { ...emptyForm, estadoId: pendienteId, ...(prefill || {}) };
   });
 
   // Todo campo con maestro se guarda y referencia por id, nunca por texto
@@ -227,6 +228,20 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
     });
   }, [form.fechaSolicitud, form.fechaEntrega, form.estado]);
 
+  // Actividades de Bienestar agrupadas por mes. Las cerradas no reciben compras nuevas, salvo la que ya tiene esta compra.
+  const actividadOptions = useMemo(() => {
+    const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const grupos = new Map();
+    for (const a of actividades) {
+      if (a.estado === "cerrada" && a.id !== record?.actividadId) continue;
+      const label = a.fecha ? `${MESES[Number(a.fecha.slice(5, 7)) - 1]} ${a.fecha.slice(0, 4)}` : "Sin fecha";
+      if (!grupos.has(label)) grupos.set(label, []);
+      grupos.get(label).push({ id: a.id, label: `${a.fecha ? `${Number(a.fecha.slice(8, 10))} · ` : ""}${a.nombre} (${a.linea})` });
+    }
+    return [...grupos].map(([label, items]) => ({ label, items }));
+  }, [actividades, record?.actividadId]);
+  const actividadElegida = actividades.find((a) => a.id === Number(form.actividadId)) || null;
+
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
   }
@@ -253,7 +268,8 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
       if (isEdit) {
         saved = await updateRecordApi(record.id, payload);
       } else {
-        saved = await createRecordApi(payload);
+        // crear: quien abre el formulario decide cómo se crea (p. ej. desde una solicitud de compra).
+        saved = await (crear || createRecordApi)(payload);
       }
       onSaved(saved, isEdit);
     } catch (err) {
@@ -451,6 +467,31 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 disabled={!isEditable("proveedor")}
                 onChange={({ nombre, nit, proveedorNit }) => setForm((f) => ({ ...f, proveedor: nombre, nit, proveedorNit }))}
               />
+            </div>
+            <div className="field full">
+              <label htmlFor="f-actividad">Actividad de Bienestar <span className="muted">(opcional)</span></label>
+              {actividadFija ? (
+                <div className="dvalue actividad-fija" id="f-actividad">{actividadFija}</div>
+              ) : (
+              <select
+                id="f-actividad"
+                value={form.actividadId || ""}
+                onChange={(e) => update("actividadId", e.target.value ? Number(e.target.value) : "")}
+                disabled={!isEditable("actividadId")}
+              >
+                <option value="">Ninguna — la compra no es de una actividad</option>
+                {actividadOptions.map((g) => (
+                  <optgroup key={g.label} label={g.label}>
+                    {g.items.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+              )}
+              {actividadElegida?.presupuesto ? (
+                <span className="card-sub" style={{ margin: 0 }}>
+                  Presupuesto de la actividad: {fmtCOP(actividadElegida.gastado)} de {fmtCOP(actividadElegida.presupuesto)} ya comprometidos en {actividadElegida.compras} compra(s).
+                </span>
+              ) : null}
             </div>
 
             {presupuestoInfo && (
