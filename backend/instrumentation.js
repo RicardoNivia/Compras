@@ -25,5 +25,13 @@ export async function register() {
     // Análisis de Nova del Resumen de Bienestar, el día 1 de cada mes (ver lib/analisisBienestar.js).
     const { startAnalisisBienestarScheduler } = await import("@/lib/analisisBienestar");
     startAnalisisBienestarScheduler();
+
+    // Manito arriba / al medio / abajo de los comentarios de Bienestar que aún no la tienen (ver lib/sentimientoComentarios.js).
+    const { startClasificacionSentimientos } = await import("@/lib/sentimientoComentarios");
+    startClasificacionSentimientos();
+
+    // Una vez por despliegue: manito de todos los comentarios y recalificación de todas las actividades (ver lib/agenteDespliegue.js).
+    const { startAgenteAlDesplegar } = await import("@/lib/agenteDespliegue");
+    startAgenteAlDesplegar();
   }
 }

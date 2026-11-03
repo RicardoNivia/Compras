@@ -135,7 +135,7 @@ button{ font-family: inherit; }
   padding: 16px 12px; gap:4px; overflow:hidden; box-sizing:border-box;
   transition: width .16s ease; z-index:50;
 }
-.sidebar-track:hover .sidebar{ width:232px; overflow-y:auto; box-shadow:16px 0 36px -14px rgba(0,0,0,0.45); }
+.sidebar-track:hover .sidebar{ width:264px; overflow-y:auto; box-shadow:16px 0 36px -14px rgba(0,0,0,0.45); }
 
 .sidebar-head{ display:flex; align-items:center; gap:10px; padding:4px 6px 20px; flex:none; }
 .sidebar-brand-mark{
@@ -166,9 +166,15 @@ button{ font-family: inherit; }
 .sidebar-link .label, .sidebar-logout-btn .label, .sidebar-collapse-btn .label{ overflow:hidden; text-overflow:ellipsis; opacity:0; transition:opacity .08s ease; }
 .sidebar-track:hover .sidebar-link .label, .sidebar-track:hover .sidebar-logout-btn .label, .sidebar-track:hover .sidebar-collapse-btn .label{ opacity:1; transition:opacity .1s ease .09s; }
 
-.sidebar-search-btn{ margin-bottom:6px; border:1px solid var(--sb-border); }
-.sidebar-kbd{ margin-left:auto; font-size:10px; font-weight:700; color: var(--sb-ink); opacity:0; transition:opacity .08s ease; flex:none; }
-.sidebar-track:hover .sidebar-kbd{ opacity:1; transition:opacity .1s ease .09s; }
+/* Selector de módulo arriba del menú: cada módulo con su degradado fijo (Compras azul → turquesa, Bienestar verde →
+   turquesa). Colapsado se ven los dos íconos; al expandir, el nombre. */
+.sidebar-modulos{ display:flex; flex-direction:column; gap:4px; margin-bottom:6px; padding:4px; border:1px solid var(--sb-border); border-radius:12px; background: rgba(0,0,0,0.14); }
+.sidebar-modulo .sidebar-link-ic{ color:#fff; opacity:.72; transition: opacity .15s ease, transform .15s ease; }
+.sidebar-modulo.m-compras .sidebar-link-ic{ background: linear-gradient(135deg, #2063a0, #00bcd4); }
+.sidebar-modulo.m-bienestar .sidebar-link-ic{ background: linear-gradient(135deg, #1f7a4d, #14b8a6); }
+.sidebar-modulo:hover .sidebar-link-ic{ opacity:1; }
+.sidebar-modulo.activo{ background: rgba(255,255,255,0.18); color:#fff; font-weight:700; }
+.sidebar-modulo.activo .sidebar-link-ic{ opacity:1; box-shadow: 0 0 0 2px rgba(255,255,255,0.85); }
 
 .sidebar-foot{ display:flex; flex-direction:column; gap:8px; margin-top:auto; padding-top:12px; border-top:1px solid var(--sb-border); flex:none; }
 .sidebar-user{ display:flex; align-items:center; gap:10px; padding:8px 8px; border-radius:10px; background: rgba(255,255,255,0.06); margin-bottom: 4px; }
@@ -3301,26 +3307,6 @@ table.roles-table td{ white-space:nowrap; }
 }
 :root[data-theme="dark"] .app-shell[data-modulo="bienestar"]{ --accent:#4fd18c; --accent-wash:#173a2a; --accent-ink:#0b1220; --secondary:#2dd4bf; --s1:#4fd18c; }
 
-/* ===== Selector de módulo en la barra superior (components/SelectorModulo.jsx) =====
-   Cada módulo con su degradado de siempre (fijo, no depende del tema activo): Compras azul → turquesa, Bienestar
-   verde → turquesa. El activo va relleno; el otro, con su ícono en el degradado. */
-.selector-modulo{ display:inline-flex; gap:4px; padding:4px; border-radius:12px; background: var(--surface-2); border:1px solid var(--border); flex:none; }
-.selector-modulo-opcion{
-  display:inline-flex; align-items:center; gap:8px; min-height:34px; padding:0 14px 0 6px; border-radius:9px;
-  font-size:13px; font-weight:700; color: var(--ink-2); text-decoration:none; white-space:nowrap;
-  transition: background .18s ease, color .18s ease, box-shadow .18s ease;
-}
-.selector-modulo-opcion svg{ flex:none; width:26px; height:26px; padding:5px; box-sizing:border-box; border-radius:7px; color:#fff; }
-.selector-modulo-opcion.m-compras svg{ background: linear-gradient(135deg, #2063a0, #00bcd4); }
-.selector-modulo-opcion.m-bienestar svg{ background: linear-gradient(135deg, #1f7a4d, #14b8a6); }
-.selector-modulo-opcion:hover{ background: var(--surface); color: var(--ink); }
-.selector-modulo-opcion.activo{ color:#fff; box-shadow: 0 4px 12px -4px rgba(16,24,64,0.35); }
-.selector-modulo-opcion.activo.m-compras{ background: linear-gradient(135deg, #2063a0, #00a5bd); }
-.selector-modulo-opcion.activo.m-bienestar{ background: linear-gradient(135deg, #1f7a4d, #0f9f8f); }
-.selector-modulo-opcion.activo svg{ background: rgba(255,255,255,0.2); }
-.selector-modulo-opcion:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
-@media (max-width: 760px){ .selector-modulo-opcion span{ display:none; } .selector-modulo-opcion{ padding:0 4px; } }
-
 /* ===== Bienestar: periodo del resumen, ficha de actividad y formulario público ===== */
 .resumen-periodo{ display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
 .resumen-periodo-accion{ margin-left:auto; }
@@ -4074,3 +4060,123 @@ button.ficha-cierre:hover, button.ficha-cierre:focus-visible{ border-color: var(
 .observacion-form{ display:flex; flex-direction:column; gap:10px; align-items:flex-start; margin-top:10px; }
 .observacion-form .field{ width:100%; }
 .observacion-form textarea{ width:100%; resize:vertical; }
+
+/* Detalle del cronograma en pestañas: altura fija para que no salte al cambiar de pestaña. */
+.detalle-modal{ height:calc(100vh - 36px); }
+.detalle-tabs{ flex:none; margin:0; padding:8px 22px; border-radius:0; border:0; border-bottom:1px solid var(--border); background: var(--surface); overflow-x:auto; }
+.detalle-tabs .dash-tab{ white-space:nowrap; }
+/* Más compacto dentro del detalle, para que cada pestaña quepa sin bajar. */
+.detalle-cabeza{ padding:12px 22px 10px; }
+.detalle-cabeza h2{ font-size:20px; margin-bottom:2px; }
+.detalle-tabs{ padding:6px 22px; }
+.detalle-cuerpo{ padding:12px 22px; gap:10px; }
+.detalle-modal > .modal-foot{ padding:10px 22px; }
+.detalle-kpi{ padding:10px 12px; gap:4px; }
+.detalle-modal .records th, .detalle-modal .records td{ padding-top:6px; padding-bottom:6px; }
+.detalle-modal .table-footer{ padding-top:6px; padding-bottom:6px; }
+.detalle-modal .resumen-card{ padding:12px 14px; }
+.detalle-modal .toolbar{ padding:8px 12px; }
+.detalle-modal .toolbar .field label{ margin-bottom:2px; }
+.detalle-modal .resumen-lectura{ padding:12px 14px; }
+.detalle-modal .resumen-lectura-puntos{ gap:8px; }
+.detalle-modal .resumen-lectura-puntos li{ padding:6px 10px; }
+@media (max-height:800px){ .detalle-modal .resumen-lectura p, .detalle-modal .resumen-lectura-puntos li{ font-size:12.5px; line-height:1.4; } }
+
+/* Manito del tono de cada comentario, según Nova */
+.mano{ display:inline-flex; align-items:center; justify-content:center; flex:none; width:22px; height:22px; border-radius:50%; }
+.mano-positivo{ color:#1d8a4e; background: color-mix(in srgb, #1d8a4e 13%, transparent); }
+.mano-neutro{ color:#8a6d1c; background: color-mix(in srgb, #c99a2e 16%, transparent); }
+.mano-negativo{ color:#c23b3b; background: color-mix(in srgb, #c23b3b 13%, transparent); }
+.mano-pendiente{ background:transparent; }
+.celda-mano{ display:flex; align-items:center; gap:6px; min-width:0; }
+.celda-mano .desc-tooltip-wrap{ min-width:0; flex:1; }
+.tono-resumen{ display:flex; gap:12px; align-items:center; font-size:18px; }
+.tono-resumen > span{ display:inline-flex; align-items:center; gap:4px; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .mano-positivo{ color:#5fd08f; } :root:not([data-theme="light"]) .mano-neutro{ color:#e6c46a; } :root:not([data-theme="light"]) .mano-negativo{ color:#f08a8a; } }
+:root[data-theme="dark"] .mano-positivo{ color:#5fd08f; } :root[data-theme="dark"] .mano-neutro{ color:#e6c46a; } :root[data-theme="dark"] .mano-negativo{ color:#f08a8a; }
+.mano-na{ width:auto; min-width:22px; padding:0 5px; border-radius:6px; font-size:10px; font-weight:700; letter-spacing:.02em; color: var(--ink-3, #8a8f98); background: color-mix(in srgb, var(--ink-3, #8a8f98) 12%, transparent); }
+
+/* Top 5 de comentarios del Resumen */
+.comentarios-top-lista{ list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
+.comentarios-top-lista button{ width:100%; display:flex; align-items:flex-start; gap:10px; padding:8px 10px; text-align:left; border:1px solid var(--border); border-radius:12px; background: var(--surface); color: var(--ink); cursor:pointer; font:inherit; transition: border-color .15s ease, background .15s ease; }
+.comentarios-top-lista button:hover, .comentarios-top-lista button:focus-visible{ border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.comentarios-top-texto{ display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
+.comentarios-top-cita{ font-size:13.5px; line-height:1.4; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.comentarios-top-texto .count-note{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.comentarios-top-positivos h2{ color:#1d8a4e; } .comentarios-top-negativos h2{ color:#c23b3b; }
+
+/* Agente de importación */
+.agente-imp h2{ display:flex; align-items:center; gap:6px; }
+.agente-imp-zona{ display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px; margin-top:12px; padding:22px 16px; border:2px dashed color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius:14px; background: color-mix(in srgb, var(--accent) 5%, var(--surface)); color: var(--ink-2); text-align:center; transition: background .15s ease, border-color .15s ease; }
+.agente-imp-zona.activa{ border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.agente-imp-zona .count-note{ flex-basis:100%; }
+.agente-imp-lista{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.agente-imp-item{ display:flex; flex-direction:column; gap:6px; padding:12px 14px; border:1px solid var(--border); border-left:4px solid var(--border); border-radius:12px; background: var(--surface); }
+.agente-imp-item.estado-listo{ border-left-color: var(--accent); }
+.agente-imp-item.estado-importado{ border-left-color:#1d8a4e; }
+.agente-imp-item.estado-error, .agente-imp-item.estado-rechazado{ border-left-color:#c23b3b; }
+.agente-imp-cabeza{ display:flex; align-items:center; gap:8px; min-width:0; }
+.agente-imp-nombre{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; max-width:46%; font-size:13.5px; }
+.agente-imp-texto{ margin:0; font-size:13px; color: var(--ink-2); line-height:1.45; }
+.agente-imp-pregunta{ margin:4px 0 0; padding:10px 12px; border:1px solid color-mix(in srgb, #c99a2e 45%, var(--border)); border-radius:10px; background: color-mix(in srgb, #c99a2e 8%, var(--surface)); }
+.agente-imp-pregunta legend{ display:flex; align-items:center; gap:6px; padding:0 4px; font-size:13px; font-weight:700; color: var(--ink); }
+.agente-imp-opciones{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+.agente-imp-opcion{ display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--border); border-radius:999px; background: var(--surface); font-size:12.5px; cursor:pointer; }
+.agente-imp-opcion.elegida{ border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); font-weight:600; }
+.agente-imp-ok{ margin:0; display:flex; align-items:center; gap:6px; font-size:13px; color:#1d8a4e; font-weight:600; }
+.agente-imp-pie{ position:sticky; bottom:0; display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid var(--border); border-radius:12px; background: var(--surface); box-shadow: var(--shadow); }
+.agente-imp-pill-listo{ background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.agente-imp-pill-importado{ background: color-mix(in srgb, #1d8a4e 14%, transparent); color:#1d8a4e; }
+.agente-imp-pill-error, .agente-imp-pill-rechazado{ background: color-mix(in srgb, #c23b3b 13%, transparent); color:#c23b3b; }
+
+/* Crossfade al cambiar de pestaña (lib/crossfade.js) */
+::view-transition-old(root), ::view-transition-new(root){ animation-duration:.24s; animation-timing-function: ease; }
+
+/* ===== Menú lateral sin scroll =====
+   El selector de módulo va en la cabecera (fila con los dos módulos; colapsado solo el activo) y
+   el pie es una sola fila (usuario + cambiar contraseña + salir). Las opciones se compactan en pantallas bajas. */
+.sidebar-modulos{ flex-direction:row; gap:6px; margin:0 0 14px; padding:4px; flex:none; overflow:hidden; }
+.sidebar-modulo{ flex:1 1 0; min-width:0; }
+/* Colapsado solo se ve el módulo activo; al expandir, los dos en su orden de siempre. */
+.sidebar-track:not(:hover) .sidebar-modulo:not(.activo){ display:none; }
+/* Colapsado no hay caja alrededor: solo el ícono del módulo activo, sin nada que se corte en el borde del riel. */
+.sidebar-track:not(:hover) .sidebar-modulos{ border-color:transparent; background:transparent; padding:4px 0; }
+.sidebar-track:not(:hover) .sidebar-modulo.activo{ background:transparent; }
+.sidebar-modulo .label{ min-width:0; }
+.sidebar-link{ padding:5px 6px; }
+.sidebar-grupo + .sidebar-grupo{ margin-top:6px; }
+.sidebar-foot{ padding-top:10px; gap:0; }
+.sidebar-user{ margin:0; padding:6px; gap:8px; }
+.sidebar-user-txt{ display:flex; flex-direction:column; min-width:0; flex:1; }
+.sidebar-user-btn{ flex:none; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--sb-border); border-radius:8px; background: var(--sb-bg-2); color: var(--sb-ink); cursor:pointer; opacity:0; pointer-events:none; transition: opacity .08s ease, color .15s ease; }
+.sidebar-track:hover .sidebar-user-btn, .sidebar-user-btn:focus-visible{ opacity:1; pointer-events:auto; transition: opacity .1s ease .09s, color .15s ease; }
+.sidebar-user-btn:hover{ color: var(--sb-ink-active); }
+.sidebar-user-btn:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+.sidebar-user-btn:disabled{ opacity:.6; cursor:not-allowed; }
+@media (max-height: 820px){
+  .sidebar{ padding-top:12px; padding-bottom:12px; }
+  .sidebar-link{ padding:3px 6px; }
+  .sidebar-link-ic{ width:28px; height:28px; }
+  .sidebar-modulos{ margin-bottom:10px; }
+  .sidebar-grupo + .sidebar-grupo{ margin-top:4px; }
+}
+@media (max-height: 700px){
+  .sidebar-nav, .sidebar-grupo{ gap:1px; }
+  .sidebar-link{ padding:2px 6px; }
+  .sidebar-link-ic{ width:26px; height:26px; }
+}
+
+/* Compras del área sin actividad (Resumen de Bienestar y Fundación) */
+.sin-actividad{ display:flex; flex-wrap:wrap; align-items:center; gap:12px 16px; border-left:4px solid var(--warning, #c99a2e); }
+.sin-actividad-texto{ flex:1 1 360px; min-width:0; }
+.sin-actividad-texto h2{ margin:0; }
+.sin-actividad-texto .card-sub{ margin:4px 0 0; }
+.sin-actividad-modal{ width:min(980px, 100%); max-width:980px; }
+.sin-actividad-modal .ficha-tabla{ table-layout:auto; }
+.sin-actividad-modal .ficha-tabla td:nth-child(3){ max-width:280px; }
+.sin-actividad-modal .ficha-tabla td:nth-child(5){ min-width:260px; }
+.sin-actividad-modal select{ width:100%; min-width:240px; }
+
+/* Actividades que ya pasaron y siguen programadas */
+.aviso-vencidas{ padding:10px 14px; border-radius:12px; border:1px solid color-mix(in srgb, #c99a2e 50%, var(--border)); background: color-mix(in srgb, #c99a2e 10%, var(--surface)); color: var(--ink); font-size:13.5px; line-height:1.5; }
+.aviso-vencidas a{ font-weight:600; }

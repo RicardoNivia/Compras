@@ -93,6 +93,18 @@ export function IconPlus(props) {
   );
 }
 
+// Manito: arriba (positivo), al medio (neutro, de lado) o abajo (negativo).
+export function IconMano({ sentido = "arriba", ...props }) {
+  const giro = { arriba: 0, medio: 90, abajo: 180 }[sentido] ?? 0;
+  return (
+    <Svg {...props}>
+      <g transform={`rotate(${giro} 8.5 8.5)`}>
+        <path d="M5.2 7.6v7H3a.9.9 0 0 1-.9-.9V8.5a.9.9 0 0 1 .9-.9h2.2Zm0 0 2.7-5.2a1.5 1.5 0 0 1 2.8.9l-.6 3.1h3.6a1.4 1.4 0 0 1 1.4 1.7l-1.1 5.3a1.4 1.4 0 0 1-1.4 1.2H5.2" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="currentColor" fillOpacity=".14" />
+      </g>
+    </Svg>
+  );
+}
+
 export function IconDownload(props) {
   return (
     <Svg {...props} viewBox="0 0 13 13">

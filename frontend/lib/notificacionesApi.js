@@ -35,6 +35,11 @@ export const marcarLeidas = (body) => post("/api/notificaciones/bandeja/leer", b
 
 // La campana y el menú lateral comparten el contador sin pedirlo dos veces.
 export const EVENTO_NO_LEIDAS = "notificaciones:no-leidas";
+// Solicitudes de compra pendientes (solo para quien puede crear compras): también suman en la campana y el menú.
+export const EVENTO_SOLICITUDES = "notificaciones:solicitudes";
+export function avisarSolicitudes(n) {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVENTO_SOLICITUDES, { detail: n }));
+}
 export function avisarNoLeidas(n) {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVENTO_NO_LEIDAS, { detail: n }));
 }

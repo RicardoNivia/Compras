@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { logActividadCreate, logActividadUpdate, logActividadDelete, logCompraDeActividad } from "@/lib/audit";
 import { resumenParticipacion } from "@/lib/participantesBienestar";
 import { listInventario, resumenInventario } from "@/lib/inventarioBienestar";
+import { clasificarEnSegundoPlano } from "@/lib/sentimientoComentarios";
+import { hoyColombia } from "@/lib/hoyColombia";
 
 // Módulo de Bienestar: actividades del cronograma (ActividadBienestar). Cada compra se le puede asociar desde el
 // formulario de Compras (Record.actividadId, ver lib/records.js#requireActividadDelCatalogo); aquí se suma ese gasto
@@ -71,7 +73,9 @@ async function gastoPorActividad(ids) {
 // Las del año (por su fecha) más las que aún no tienen fecha; sin año, todas. Con línea, solo las de esa línea
 // (Bienestar y Fundación se manejan muy aparte: cada una tiene su menú, su resumen y su cronograma).
 export async function listActividades({ anio, linea } = {}) {
-  const where = anio ? { OR: [{ fecha: { startsWith: `${Number(anio)}-` } }, { fecha: null }] } : {};
+  // Las que aún no tienen fecha (por planear) son del plan en curso: solo entran en el año actual, no en todos.
+  const conSinFecha = Number(anio) === Number(hoyColombia().slice(0, 4));
+  const where = anio ? { OR: [{ fecha: { startsWith: `${Number(anio)}-` } }, ...(conSinFecha ? [{ fecha: null }] : [])] } : {};
   if (linea) {
     if (!LINEAS.includes(linea)) throw badRequest(`Línea inválida. Opciones: ${LINEAS.join(", ")}.`);
     where.linea = linea;
@@ -176,7 +180,10 @@ async function leerDatos(body, { parcial = false, responsableActual = null } = {
     if (!ESTADOS.includes(data.estado)) throw badRequest(`Estado inválido. Opciones: ${ESTADOS.join(", ")}.`);
   }
   if (viene("descripcion")) data.descripcion = texto(body.descripcion, 2000);
-  if (viene("observaciones")) data.observaciones = texto(body.observaciones, 4000);
+  if (viene("observaciones")) {
+    data.observaciones = texto(body.observaciones, 4000);
+    data.sentimientoObservaciones = null; // Nova lo vuelve a leer (lib/sentimientoComentarios.js)
+  }
   if (viene("presupuesto")) {
     if (body.presupuesto === "" || body.presupuesto === null || body.presupuesto === undefined) data.presupuesto = null;
     else {
@@ -200,6 +207,13 @@ function exigirFechaSegunEstado(estado, fecha) {
   if (estado !== "creada" && !fecha) throw badRequest(`Una actividad ${ESTADO_LABELS[estado].toLowerCase()} debe tener fecha.`);
 }
 
+// Una actividad que aún no llega no puede quedar ejecutada ni cerrada (evita registrar asistencias y cierres por error).
+function exigirQueYaPaso(estado, fecha) {
+  if ((estado === "ejecutada" || estado === "cerrada") && fecha && fecha > hoyColombia()) {
+    throw badRequest(`La actividad es del ${fecha} y esa fecha aún no llega: no se puede marcar como ${ESTADO_LABELS[estado].toLowerCase()}.`);
+  }
+}
+
 // Actividades de varios días: fechaFin va con una fecha de inicio y nunca antes de ella; igual a la de inicio = un día.
 function normalizarFechaFin(fecha, fechaFin) {
   if (!fechaFin) return null;
@@ -211,12 +225,14 @@ function normalizarFechaFin(fecha, fechaFin) {
 export async function createActividad(body, actor) {
   const data = await leerDatos(body || {});
   exigirFechaSegunEstado(data.estado, data.fecha);
+  exigirQueYaPaso(data.estado, data.fecha);
   data.fechaFin = normalizarFechaFin(data.fecha, data.fechaFin);
   const row = await prisma.actividadBienestar.create({
     data: { ...data, creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null },
   });
   const cliente = toClientActividad(row);
   logActividadCreate(actor, cliente).catch(() => {});
+  if (row.observaciones) clasificarEnSegundoPlano(row.id);
   return cliente;
 }
 
@@ -226,6 +242,7 @@ export async function updateActividad(id, body, actor) {
   if (before.estado === "cerrada") throw badRequest("La actividad está cerrada: ya no se puede modificar.", 409);
   const data = await leerDatos(body || {}, { parcial: true, responsableActual: before.responsableUserId });
   exigirFechaSegunEstado(data.estado ?? before.estado, "fecha" in data ? data.fecha : before.fecha);
+  if ("estado" in data || "fecha" in data) exigirQueYaPaso(data.estado ?? before.estado, "fecha" in data ? data.fecha : before.fecha);
   if ("fecha" in data || "fechaFin" in data) {
     data.fechaFin = normalizarFechaFin("fecha" in data ? data.fecha : before.fecha, "fechaFin" in data ? data.fechaFin : before.fechaFin);
   }
@@ -237,6 +254,7 @@ export async function updateActividad(id, body, actor) {
     Object.assign(data, {
       calificacion: n,
       comentarioCierre: texto(body?.comentarioCierre, 2000),
+      sentimientoCierre: null,
       cerradaAt: new Date(),
       cerradaPorUserId: actor?.id || null,
       cerradaPorNombre: actor?.nombre || null,
@@ -249,6 +267,7 @@ export async function updateActividad(id, body, actor) {
     const r = await prisma.solicitudCompra.updateMany({ where: { actividadId: row.id, estado: "pendiente" }, data: { estado: "cancelada", atendidaAt: new Date(), atendidaPorUserId: actor?.id || null, atendidaPorNombre: actor?.nombre || null } });
     if (r.count) logCompraDeActividad(actor, row, `Al cerrarla se cancelaron ${r.count} solicitud(es) de compra sin atender`).catch(() => {});
   }
+  if ((data.sentimientoObservaciones === null && row.observaciones) || (data.sentimientoCierre === null && row.comentarioCierre)) clasificarEnSegundoPlano(row.id);
   const gastos = await gastoPorActividad([row.id]);
   const after = toClientActividad(row, gastos.get(row.id));
   // Si cambió el nombre, las compras asociadas lo muestran al instante (se resuelve por id al listar, ver
@@ -276,6 +295,73 @@ export async function deleteActividad(id, actor) {
 
 // mes (1-12, opcional): vista Mensual, como el Dashboard de compras — KPIs, participación, categorías y costos solo
 // de ese mes (actividades por su fecha, compras por su fecha de solicitud); porMes sigue siendo el año completo.
+// Los 5 comentarios más a favor y los 5 más en contra del período, según la manito de Nova (lib/sentimientoComentarios.js).
+// Sin el nombre de quien lo escribió. Las actividades sin participantes solo aportan las notas del equipo.
+async function comentariosDestacados(actividades) {
+  if (!actividades.length) return { positivos: [], negativos: [], totalPositivos: 0, totalNegativos: 0 };
+  const deActividad = new Map(actividades.map((a) => [a.id, a]));
+  const conParticipantes = actividades.filter((a) => a.aplicaParticipantes).map((a) => a.id);
+  const tonos = { in: ["positivo", "negativo"] };
+  const [participantes, notas] = await Promise.all([
+    prisma.participanteActividad.findMany({ where: { actividadId: { in: conParticipantes }, sentimiento: tonos, observacion: { not: null } }, select: { id: true, actividadId: true, observacion: true, calificacion: true, sentimiento: true } }),
+    prisma.observacionActividad.findMany({ where: { actividadId: { in: [...deActividad.keys()] }, sentimiento: tonos }, select: { id: true, actividadId: true, texto: true, sentimiento: true } }),
+  ]);
+  const todos = [
+    ...participantes.map((p) => ({ clave: `p${p.id}`, actividadId: p.actividadId, texto: p.observacion, calificacion: p.calificacion, sentimiento: p.sentimiento })),
+    ...notas.map((n) => ({ clave: `n${n.id}`, actividadId: n.actividadId, texto: n.texto, calificacion: null, sentimiento: n.sentimiento })),
+  ].map((c) => {
+    const a = deActividad.get(c.actividadId);
+    return { ...c, texto: c.texto.slice(0, 500), actividad: a.nombre, fecha: a.fecha, fechaFin: a.fechaFin, estado: a.estado, linea: a.linea };
+  });
+  // Más a favor: la mejor calificación y, a igual, el comentario más completo; más en contra: la peor calificación.
+  const largo = (c) => Math.min(c.texto.length, 300);
+  // Un "a favor" con 1-2 estrellas o un "en contra" con 4-5 se contradicen: no van en el destacado.
+  const positivos = todos.filter((c) => c.sentimiento === "positivo" && !(c.calificacion != null && c.calificacion <= 2));
+  const negativos = todos.filter((c) => c.sentimiento === "negativo" && !(c.calificacion != null && c.calificacion >= 4));
+  // El mismo comentario (copiado en varias encuestas) sale una sola vez.
+  const unicos = (lista) => {
+    const vistos = new Set();
+    return lista.filter((c) => {
+      const k = c.texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      if (vistos.has(k)) return false;
+      vistos.add(k);
+      return true;
+    });
+  };
+  return {
+    positivos: unicos([...positivos].sort((a, b) => (b.calificacion ?? 0) - (a.calificacion ?? 0) || largo(b) - largo(a))).slice(0, 5),
+    negativos: unicos([...negativos].sort((a, b) => (a.calificacion ?? 6) - (b.calificacion ?? 6) || largo(b) - largo(a))).slice(0, 5),
+    totalPositivos: positivos.length,
+    totalNegativos: negativos.length,
+  };
+}
+
+// Compras del área Bienestar sin actividad asociada: no suman en el módulo (solo cuenta lo asociado), pero se muestran
+// aparte para que se vea cuánto gasto del área falta por asociar. prefijo: "2026-" o "2026-06".
+export const AREAS_BIENESTAR = ["Bienestar"];
+const filtroSinActividad = (prefijo) => ({
+  actividadId: null,
+  fechaSolicitud: { startsWith: prefijo },
+  estado: { not: "Anulado" },
+  OR: AREAS_BIENESTAR.map((a) => ({ area: { equals: a, mode: "insensitive" } })),
+});
+
+export async function resumenComprasSinActividad(prefijo) {
+  const r = await prisma.record.aggregate({ where: filtroSinActividad(prefijo), _count: true, _sum: { valorConIva: true } });
+  return { compras: r._count, valor: r._sum.valorConIva || 0, areas: AREAS_BIENESTAR };
+}
+
+export async function listComprasSinActividad({ anio, mes } = {}) {
+  const y = Number(anio) || Number(hoyColombia().slice(0, 4));
+  const m = Number(mes) >= 1 && Number(mes) <= 12 ? Number(mes) : null;
+  const rows = await prisma.record.findMany({
+    where: filtroSinActividad(m ? `${y}-${String(m).padStart(2, "0")}` : `${y}-`),
+    select: { id: true, localSeq: true, fechaSolicitud: true, descripcion: true, proveedor: true, valorConIva: true, categoria: true, area: true },
+    orderBy: [{ fechaSolicitud: "desc" }, { localSeq: "desc" }],
+  });
+  return rows;
+}
+
 export async function resumenBienestar(anio, linea = "Bienestar", mes = null) {
   const y = Number(anio) || new Date().getFullYear();
   const m = Number(mes) >= 1 && Number(mes) <= 12 ? Number(mes) : null;
@@ -361,6 +447,7 @@ export async function resumenBienestar(anio, linea = "Bienestar", mes = null) {
       inscritos: participantes.filter((p) => p.inscrito).length,
       asistieron: participantes.filter((p) => p.asistio === true).length,
       noAsistieron: participantes.filter((p) => p.asistio === false).length,
+      sinRegistrar: participantes.filter((p) => p.inscrito && p.asistio == null).length,
       porArea: [...porArea.values()].sort((a, b) => b.inscritos - a.inscritos),
       motivos: [...motivos].map(([motivo, n]) => ({ motivo, n })).sort((a, b) => b.n - a.n),
     },
@@ -375,5 +462,7 @@ export async function resumenBienestar(anio, linea = "Bienestar", mes = null) {
     proximas: conFecha
       .filter((a) => (a.fechaFin || a.fecha) >= hoy && (a.estado === "creada" || a.estado === "programada"))
       .slice(0, 8),
+    comentariosDestacados: await comentariosDestacados(actividades),
+    comprasSinActividad: await resumenComprasSinActividad(prefijoPeriodo),
   };
 }

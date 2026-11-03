@@ -43,7 +43,8 @@ export async function POST(request) {
   if (denied) return denied;
   try {
     const body = await request.json().catch(() => ({}));
-    return NextResponse.json({ trabajo: await iniciarTrabajo(await lineasDe(user), body, user) }, { status: 202 });
+    // "todas" solo se usa al desplegar (lib/agenteDespliegue.js): desde la pantalla, solo lo que cambió.
+    return NextResponse.json({ trabajo: await iniciarTrabajo(await lineasDe(user), { confirmar: body.confirmar }, user) }, { status: 202 });
   } catch (err) {
     return apiError(err);
   }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { logObservacionActividad } from "@/lib/audit";
+import { clasificarEnSegundoPlano } from "@/lib/sentimientoComentarios";
 
 // Encuesta y observaciones de una actividad: reúne en una sola lista lo que el equipo anota (ObservacionActividad) con
 // lo que ya estaba en otras partes: la calificación y el comentario de cada participante, las observaciones del
@@ -26,7 +27,7 @@ async function actividadEditable(id) {
   return a;
 }
 
-const toClientNota = (n) => ({ clave: `equipo-${n.id}`, id: n.id, tipo: "equipo", quien: n.creadoPorNombre || "—", area: null, calificacion: null, texto: n.texto, fecha: n.createdAt });
+const toClientNota = (n) => ({ clave: `equipo-${n.id}`, id: n.id, tipo: "equipo", quien: n.creadoPorNombre || "—", area: null, calificacion: null, texto: n.texto, sentimiento: n.sentimiento, fecha: n.createdAt });
 
 export async function listObservaciones(actividadId) {
   const a = await actividadOError(actividadId);
@@ -35,21 +36,23 @@ export async function listObservaciones(actividadId) {
     a.aplicaParticipantes
       ? prisma.participanteActividad.findMany({
         where: { actividadId: a.id, OR: [{ calificacion: { not: null } }, { observacion: { not: null } }] },
-        select: { id: true, nombre: true, area: true, calificacion: true, observacion: true },
+        select: { id: true, nombre: true, area: true, calificacion: true, observacion: true, sentimiento: true },
         orderBy: { nombre: "asc" },
       })
       : [],
   ]);
-  const deParticipantes = participantes.map((p) => ({ clave: `participante-${p.id}`, id: p.id, tipo: "participante", quien: p.nombre, area: p.area, calificacion: p.calificacion, texto: p.observacion, fecha: null }));
+  const deParticipantes = participantes.map((p) => ({ clave: `participante-${p.id}`, id: p.id, tipo: "participante", quien: p.nombre, area: p.area, calificacion: p.calificacion, texto: p.observacion, sentimiento: p.observacion ? p.sentimiento : null, fecha: null }));
   const observaciones = [
     ...notas.map(toClientNota),
-    ...(a.comentarioCierre ? [{ clave: "cierre", id: null, tipo: "cierre", quien: a.cerradaPorNombre || "—", area: null, calificacion: a.calificacion, texto: a.comentarioCierre, fecha: a.cerradaAt }] : []),
-    ...(a.observaciones ? [{ clave: "actividad", id: null, tipo: "actividad", quien: "—", area: null, calificacion: null, texto: a.observaciones, fecha: null }] : []),
+    ...(a.comentarioCierre ? [{ clave: "cierre", id: null, tipo: "cierre", quien: a.cerradaPorNombre || "—", area: null, calificacion: a.calificacion, texto: a.comentarioCierre, sentimiento: a.sentimientoCierre, fecha: a.cerradaAt }] : []),
+    ...(a.observaciones ? [{ clave: "actividad", id: null, tipo: "actividad", quien: "—", area: null, calificacion: null, texto: a.observaciones, sentimiento: a.sentimientoObservaciones, fecha: null }] : []),
     // Primero quienes dejaron comentario: una calificación sola dice menos.
     ...deParticipantes.filter((p) => p.texto),
     ...deParticipantes.filter((p) => !p.texto),
   ];
   const calificaciones = participantes.filter((p) => p.calificacion);
+  const sentimientos = { positivo: 0, neutro: 0, negativo: 0, no_aplica: 0 };
+  for (const o of observaciones) if (o.texto && sentimientos[o.sentimiento] !== undefined) sentimientos[o.sentimiento]++;
   return {
     observaciones,
     resumen: {
@@ -58,6 +61,8 @@ export async function listObservaciones(actividadId) {
       distribucion: [5, 4, 3, 2, 1].map((estrellas) => ({ estrellas, n: calificaciones.filter((p) => p.calificacion === estrellas).length })),
       comentarios: deParticipantes.filter((p) => p.texto).length,
       notasEquipo: notas.length,
+      sentimientos,
+      sinClasificar: observaciones.filter((o) => o.texto && !o.sentimiento).length,
     },
   };
 }
@@ -71,6 +76,7 @@ export async function crearObservacion(actividadId, body, actor) {
     data: { actividadId: a.id, texto, creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null },
   });
   logObservacionActividad(actor, a, "crear", `Agregó: ${texto.slice(0, 200)}`).catch(() => {});
+  clasificarEnSegundoPlano(a.id);
   return toClientNota(row);
 }
 

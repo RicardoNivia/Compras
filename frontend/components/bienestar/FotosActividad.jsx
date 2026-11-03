@@ -10,7 +10,7 @@ const MAX_MINI = 480;
 
 // Reduce la foto en el navegador antes de subirla (la de un celular pesa 3-8 MB; reducida, unos 200-400 KB):
 // imagen ≤ 1.600 px y miniatura ≤ 480 px, en JPEG.
-async function reducir(file) {
+export async function reducir(file) {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => null);
   if (!bitmap) throw new Error(`"${file.name}" no es una imagen que se pueda leer.`);
   const lienzo = (max, calidad) => new Promise((resolve) => {

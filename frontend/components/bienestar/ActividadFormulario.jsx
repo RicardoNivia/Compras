@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { fmtCOP, fmtDateTime } from "@/lib/format";
 import {
   createActividadApi, updateActividadApi, deleteActividadApi, fetchActividadApi,
@@ -11,10 +11,11 @@ import {
 import MoneyInput from "@/components/MoneyInput";
 import { EsqueletoLista } from "@/components/bienestar/Esqueletos";
 import CerrarActividadModal, { razonParaNoCerrar } from "@/components/bienestar/CerrarActividadModal";
-import PiePagina, { usePagina } from "@/components/bienestar/PiePagina";
+import PiePagina, { usePagina, PAGE_SIZES_MODAL } from "@/components/bienestar/PiePagina";
 import { ModalSolicitar } from "@/components/bienestar/SolicitudesActividad";
 import { IconTrash, IconSearch, IconPlus, IconCheck, IconHeart, IconUsers, IconAlert } from "@/components/icons";
 import { ESTADOS_ACTIVIDAD, LINEAS_ACTIVIDAD, estadoActividad, pctClase, rangoHumano, diasDeActividad } from "@/components/bienestar/actividadesUi";
+import { crossfade } from "@/lib/crossfade";
 
 const vacio = {
   nombre: "",
@@ -54,7 +55,9 @@ const AYUDA_ESTADO = {
 export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bienestar", lineasPermitidas = LINEAS_ACTIVIDAD, fechaInicial, responsables = [], puedeEditar, basePath = "/bienestar" }) {
   const router = useRouter();
   const isEdit = !!actividad;
-  const [paso, setPaso] = useState("actividad");
+  // ?paso=compras (botón "Asociar compras" de la ficha) abre directo en esa pestaña.
+  const pasoPedido = useSearchParams().get("paso");
+  const [paso, setPaso] = useState(PASOS.some((p) => p.id === pasoPedido) ? pasoPedido : "actividad");
   const primerosDatos = useMemo(() => {
     if (!actividad) return { ...vacio, linea: lineaPorDefecto, fecha: fechaInicial || "", estado: fechaInicial ? "programada" : "creada" };
     const out = { ...vacio };
@@ -127,7 +130,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
     const q = buscarCompra.trim().toLowerCase();
     return !q || [c.localSeq, c.descripcion, c.proveedor, c.estadoLegalizacion, c.fechaSolicitud].some((v) => String(v ?? "").toLowerCase().includes(q));
   });
-  const pagCompras = usePagina(comprasVisibles, buscarCompra);
+  const pagCompras = usePagina(comprasVisibles, buscarCompra, PAGE_SIZES_MODAL[0]);
   const est = estadoActividad(form.estado);
   const fechaRequerida = form.estado !== "creada";
 
@@ -251,17 +254,17 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
 
       <form onSubmit={handleSubmit} noValidate>
         <div className="af-cuerpo">
-          <div className="af-principal">
+          <div className="af-principal" data-crossfade-raiz>
             <div className="af-pasos" role="tablist" aria-label="Secciones del formulario">
               {PASOS.map((p, i) => (
-                <button key={p.id} type="button" role="tab" id={`af-tab-${p.id}`} aria-selected={paso === p.id} aria-controls={`af-panel-${p.id}`} className={`af-paso${paso === p.id ? " activo" : ""}${completo[p.id] ? " listo" : ""}`} onClick={() => setPaso(p.id)}>
+                <button key={p.id} type="button" role="tab" id={`af-tab-${p.id}`} aria-selected={paso === p.id} aria-controls={`af-panel-${p.id}`} className={`af-paso${paso === p.id ? " activo" : ""}${completo[p.id] ? " listo" : ""}`} onClick={() => crossfade(() => setPaso(p.id))}>
                   <span className="af-paso-num" aria-hidden="true">{completo[p.id] ? <IconCheck size={13} /> : i + 1}</span>
                   <span className="af-paso-txt"><b>{p.label}{p.id === "compras" && lista.length ? ` (${lista.length})` : ""}</b><small>{p.ayuda}</small></span>
                 </button>
               ))}
             </div>
 
-            <section className="af-panel" role="tabpanel" id="af-panel-actividad" aria-labelledby="af-tab-actividad" hidden={paso !== "actividad"}>
+            <section className="af-panel" data-crossfade role="tabpanel" id="af-panel-actividad" aria-labelledby="af-tab-actividad" hidden={paso !== "actividad"}>
               <div className={`af-campo af-nombre${errores.nombre ? " con-error" : ""}`}>
                 <label htmlFor="act-nombre">¿Cómo se llama la actividad? *</label>
                 <input id="act-nombre" type="text" autoFocus={!isEdit} value={form.nombre} onChange={(e) => update("nombre", e.target.value)} disabled={ro} maxLength={200} placeholder="Ej.: Fiesta de fin de año" aria-invalid={!!errores.nombre} />
@@ -338,7 +341,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
               </div>
             </section>
 
-            <section className="af-panel" role="tabpanel" id="af-panel-presupuesto" aria-labelledby="af-tab-presupuesto" hidden={paso !== "presupuesto"}>
+            <section className="af-panel" data-crossfade role="tabpanel" id="af-panel-presupuesto" aria-labelledby="af-tab-presupuesto" hidden={paso !== "presupuesto"}>
               <div className="af-campo af-monto">
                 <label htmlFor="act-presupuesto">¿Cuánto se le asigna?</label>
                 <MoneyInput id="act-presupuesto" value={form.presupuesto ?? ""} onChange={(v) => update("presupuesto", v)} disabled={ro} placeholder="Sin asignar" />
@@ -362,7 +365,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
               </div>
             </section>
 
-            <section className="af-panel" role="tabpanel" id="af-panel-asistencia" aria-labelledby="af-tab-asistencia" hidden={paso !== "asistencia"}>
+            <section className="af-panel" data-crossfade role="tabpanel" id="af-panel-asistencia" aria-labelledby="af-tab-asistencia" hidden={paso !== "asistencia"}>
               <label htmlFor="act-aplica" className="actividad-check af-check">
                 <span>Aplica participantes y listas de asistencia</span>
                 <input id="act-aplica" type="checkbox" checked={form.aplicaParticipantes !== false} disabled={ro} onChange={(e) => update("aplicaParticipantes", e.target.checked)} />
@@ -395,7 +398,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
               </div>
             </section>
 
-            <section className="af-panel" role="tabpanel" id="af-panel-compras" aria-labelledby="af-tab-compras" hidden={paso !== "compras"}>
+            <section className="af-panel" data-crossfade role="tabpanel" id="af-panel-compras" aria-labelledby="af-tab-compras" hidden={paso !== "compras"}>
               {solicitudEnviada && <div className="ficha-aviso" role="status">Solicitud enviada a Compras. Te avisaremos en tu Bandeja cuando la registren o la rechacen.</div>}
               {isEdit && puedeEditar && !cerrada && (
                 <button type="button" className="btn actividad-btn-compras af-solicitar" onClick={() => setSolicitar(true)}>
@@ -429,7 +432,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
                     </li>
                   ))}
                 </ul>
-                <PiePagina id="af-compras-size" p={pagCompras} total={comprasVisibles.length} etiqueta="compra(s) asociada(s)" />
+                <PiePagina id="af-compras-size" tamanos={PAGE_SIZES_MODAL} p={pagCompras} total={comprasVisibles.length} etiqueta="compra(s) asociada(s)" />
                 </>
               )}
               {!ro && !cerrada && <BuscadorCompras yaElegidas={lista} onElegir={asociar} />}
@@ -437,8 +440,8 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
             </section>
 
             <div className="af-navegar">
-              <button type="button" className="btn" disabled={iPaso === 0} onClick={() => setPaso(PASOS[iPaso - 1].id)}>‹ Anterior</button>
-              <button type="button" className="btn" disabled={iPaso === PASOS.length - 1} onClick={() => setPaso(PASOS[iPaso + 1].id)}>Siguiente ›</button>
+              <button type="button" className="btn" disabled={iPaso === 0} onClick={() => crossfade(() => setPaso(PASOS[iPaso - 1].id))}>‹ Anterior</button>
+              <button type="button" className="btn" disabled={iPaso === PASOS.length - 1} onClick={() => crossfade(() => setPaso(PASOS[iPaso + 1].id))}>Siguiente ›</button>
             </div>
 
             {error && <div className="modal-error af-error-general" role="alert">{error}</div>}
@@ -487,8 +490,8 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
             </div>
             {(faltan.length > 0 || sugerencias.length > 0) && (
               <ul className="af-pendientes">
-                {faltan.map((f) => <li key={f.texto} className="falta"><button type="button" onClick={() => setPaso(f.paso)}><IconAlert size={12} /> {f.texto}</button></li>)}
-                {sugerencias.map((f) => <li key={f.texto}><button type="button" onClick={() => setPaso(f.paso)}>{f.texto}</button></li>)}
+                {faltan.map((f) => <li key={f.texto} className="falta"><button type="button" onClick={() => crossfade(() => setPaso(f.paso))}><IconAlert size={12} /> {f.texto}</button></li>)}
+                {sugerencias.map((f) => <li key={f.texto}><button type="button" onClick={() => crossfade(() => setPaso(f.paso))}>{f.texto}</button></li>)}
               </ul>
             )}
           </aside>
@@ -536,7 +539,7 @@ function BuscadorCompras({ yaElegidas, onElegir }) {
   }, [q]);
 
   const disponibles = resultados.filter((c) => !elegidas.has(c.id));
-  const pag = usePagina(disponibles, q);
+  const pag = usePagina(disponibles, q, PAGE_SIZES_MODAL[0]);
 
   return (
     <div className="actividad-buscador">
@@ -564,7 +567,7 @@ function BuscadorCompras({ yaElegidas, onElegir }) {
           </li>
         ))}
       </ul>
-      {disponibles.length > 0 && <PiePagina id="af-disponibles-size" p={pag} total={disponibles.length} etiqueta="compra(s) sin actividad" />}
+      {disponibles.length > 0 && <PiePagina id="af-disponibles-size" tamanos={PAGE_SIZES_MODAL} p={pag} total={disponibles.length} etiqueta="compra(s) sin actividad" />}
     </div>
   );
 }

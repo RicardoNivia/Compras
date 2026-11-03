@@ -258,8 +258,8 @@ Object.assign(ENTITY_LABELS, { rol: "Rol" });
 // Participantes, inventario y formulario público de las actividades de Bienestar (ver lib/participantesBienestar.js,
 // lib/inventarioBienestar.js). Se registran como una línea legible por acción ("Marcó 12 como asistieron"…).
 export const DETALLE_FIELD_LABELS = { detalle: "Detalle" };
-Object.assign(ACTION_LABELS, { importar: "Importó" });
-Object.assign(ENTITY_LABELS, { participante: "Participantes de actividad", inventario: "Inventario de actividad", formularioActividad: "Formulario de inscripción", fotoActividad: "Fotos de actividad", observacionActividad: "Observaciones de actividad", analisisBienestar: "Análisis de Bienestar (Nova)", analisisActividad: "Análisis de actividad (Nova)", solicitudCompra: "Solicitud de compra", agenteEvaluacion: "Agente de evaluación de actividades" });
+Object.assign(ACTION_LABELS, { importar: "Importó", clasificar: "Clasificó", rechazar: "Rechazó" });
+Object.assign(ENTITY_LABELS, { participante: "Participantes de actividad", inventario: "Inventario de actividad", formularioActividad: "Formulario de inscripción", fotoActividad: "Fotos de actividad", observacionActividad: "Observaciones de actividad", sentimientoComentario: "Sentimiento de comentarios (Nova)", agenteImportacion: "Agente de importación", analisisBienestar: "Análisis de Bienestar (Nova)", analisisActividad: "Análisis de actividad (Nova)", solicitudCompra: "Solicitud de compra", agenteEvaluacion: "Agente de evaluación de actividades" });
 
 export const SOLICITUD_COMPRA_FIELD_LABELS = {
   actividad: "Actividad",

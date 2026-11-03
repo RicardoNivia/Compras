@@ -49,6 +49,7 @@ function SeccionTabla({ items, dominio, onEnviarInforme }) {
   const current = Math.min(page, totalPages);
   const visibles = items.slice((current - 1) * pageSize, current * pageSize);
   const esProv = dominio === "proveedores";
+  const esBienestar = dominio === "bienestar";
   const esPresupuesto = dominio === "presupuesto";
   const esInformes = dominio === "informes";
 
@@ -61,10 +62,10 @@ function SeccionTabla({ items, dominio, onEnviarInforme }) {
         <table className="audit-log mi-dia-tabla">
           <thead>
             <tr>
-              <th>{esProv ? "NIT" : esPresupuesto ? "" : esInformes ? "Período" : "#"}</th>
-              <th>{esProv ? "Proveedor" : esPresupuesto ? "Área" : esInformes ? "Informe" : "Descripción"}</th>
-              <th>{esPresupuesto ? "Período" : esProv ? "Área · tipo" : esInformes ? "Para" : "Proveedor · área"}</th>
-              <th>{esPresupuesto ? "% consumido" : esProv || esInformes ? "Días" : "Días háb."}</th>
+              <th>{esProv ? "NIT" : esPresupuesto ? "" : esInformes ? "Período" : esBienestar ? "Línea" : "#"}</th>
+              <th>{esProv ? "Proveedor" : esPresupuesto ? "Área" : esInformes ? "Informe" : esBienestar ? "Actividad" : "Descripción"}</th>
+              <th>{esPresupuesto ? "Período" : esProv ? "Área · tipo" : esInformes ? "Para" : esBienestar ? "Línea · fecha" : "Proveedor · área"}</th>
+              <th>{esPresupuesto ? "% consumido" : esProv || esInformes || esBienestar ? "Días" : "Días háb."}</th>
               <th>Detalle</th>
               <th></th>
             </tr>

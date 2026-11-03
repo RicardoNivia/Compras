@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { novedades, avisarNoLeidas, marcarLeidas } from "@/lib/notificacionesApi";
+import { novedades, avisarNoLeidas, avisarSolicitudes, marcarLeidas } from "@/lib/notificacionesApi";
 import { FuenteIcono } from "@/components/notificaciones/ui";
 
 const CADA_MS = 20 * 1000;
@@ -35,6 +35,7 @@ export default function AvisosEnVivo() {
     try {
       const r = await novedades(ultimo.current);
       avisarNoLeidas(r.noLeidas);
+      avisarSolicitudes(r.solicitudes || 0);
       if (ultimo.current != null && r.nuevas?.length) {
         setAvisos((a) => [...r.nuevas.slice().reverse(), ...a].slice(0, 4));
         r.nuevas.forEach((n) => programarCierre(n.id));

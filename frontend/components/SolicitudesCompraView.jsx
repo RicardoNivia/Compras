@@ -6,6 +6,7 @@ import { fmtDateTime } from "@/lib/format";
 import { generarCompraDeSolicitudApi, rechazarSolicitudApi } from "@/lib/api";
 import RecordModal from "@/components/RecordModal";
 import { IconCheck } from "@/components/icons";
+import { EVENTO_REVISAR } from "@/components/notificaciones/AvisosEnVivo";
 
 const PAGE_SIZES = [25, 50, 100];
 const hoyISO = () => {
@@ -144,7 +145,7 @@ export default function SolicitudesCompraView({ initialSolicitudes = [], records
           actividades={actividades}
           actividadFija={`${generar.actividad} · ${generar.linea}`}
           prefill={datosDelFormulario(generar, maestros, proveedores)}
-          crear={(payload) => generarCompraDeSolicitudApi(generar.id, payload)}
+          crear={(payload) => generarCompraDeSolicitudApi(generar.id, payload).then((r) => { window.dispatchEvent(new Event(EVENTO_REVISAR)); return r; })}
           onClose={() => setGenerar(null)}
           onSaved={(saved) => {
             const id = generar.id;
@@ -176,6 +177,7 @@ function ModalRechazar({ solicitud, onClose, onRechazada }) {
     setError("");
     try {
       await rechazarSolicitudApi(solicitud.id, motivo);
+      window.dispatchEvent(new Event(EVENTO_REVISAR));
       onRechazada();
     } catch (err) {
       setError(err.message || "No se pudo rechazar la solicitud.");

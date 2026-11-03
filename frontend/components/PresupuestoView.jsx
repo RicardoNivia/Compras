@@ -66,7 +66,7 @@ function BudgetDonut({ pct, size = 132, stroke = 14 }) {
         style={{ filter: `drop-shadow(0 0 6px color-mix(in srgb, ${color} 45%, transparent))` }}
       />
       <text x="50%" y="48%" textAnchor="middle" dominantBaseline="central" fontSize={size * 0.2} fontWeight="800" fill="var(--ink)">
-        {pct === null ? "—" : `${tween(Math.round(vis), t)}%`}
+        {pct === null ? "—" : `${tween(Math.round(pct), t)}%`}
       </text>
       <text x="50%" y="68%" textAnchor="middle" dominantBaseline="central" fontSize={size * 0.075} fontWeight="700" fill="var(--muted)" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
         consumido

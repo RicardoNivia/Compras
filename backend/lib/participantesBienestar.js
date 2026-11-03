@@ -4,6 +4,7 @@ import { isRoleAllowed } from "@/lib/permissions";
 import { leerParticipantesExcel, normalizarDocumento, buscarPorNombre } from "@/lib/bienestarExcel";
 import { logParticipantes, logFormularioActividad } from "@/lib/audit";
 import { areaDelCatalogo, motivoDelCatalogo, valoresActivos, resolvedoresImportacion } from "@/lib/catalogosBienestar";
+import { clasificarEnSegundoPlano } from "@/lib/sentimientoComentarios";
 
 // Participantes de las actividades de Bienestar: inscritos (formulario público, Excel de Forms o a mano) y su
 // asistencia. Con participantes, los conteos de la actividad (inscritos / asistentes) salen de aquí.
@@ -86,6 +87,7 @@ export function toClientParticipante(p, { verSensibles = false, sensibles = new 
     motivoInasistencia: p.motivoInasistencia,
     calificacion: p.calificacion,
     observacion: p.observacion,
+    sentimiento: p.sentimiento,
     datos: visibles,
     datosOcultos: ocultos,
     origen: p.origen,
@@ -208,6 +210,7 @@ export async function crearParticipante(actividadId, body, actor) {
   });
   await sincronizarConteos(actividad.id);
   logParticipantes(actor, actividad, "crear", `Agregó a ${row.nombre}`).catch(() => {});
+  if (row.observacion) clasificarEnSegundoPlano(actividad.id);
   return toClientParticipante(row, { verSensibles: true });
 }
 
@@ -216,9 +219,11 @@ export async function actualizarParticipante(actividadId, id, body, actor) {
   const before = await prisma.participanteActividad.findFirst({ where: { id: Number(id), actividadId: actividad.id } });
   if (!before) throw badRequest("Participante no encontrado.", 404);
   const data = await aplicarCatalogos(leerParticipante(body || {}, { parcial: true }));
+  if ("observacion" in data && data.observacion !== before.observacion) data.sentimiento = null;
   if ("nombre" in data || "documento" in data) await exigirNoRepetido(actividad.id, data.documento ?? before.documento, data.nombre ?? before.nombre, before.id);
   const row = await prisma.participanteActividad.update({ where: { id: before.id }, data });
   await sincronizarConteos(actividad.id);
+  if (data.sentimiento === null && row.observacion) clasificarEnSegundoPlano(actividad.id);
   const cambios = [];
   if ("asistio" in data && data.asistio !== before.asistio) cambios.push(`asistencia: ${data.asistio === true ? "asistió" : data.asistio === false ? "no asistió" : "sin registrar"}`);
   if ("motivoInasistencia" in data && data.motivoInasistencia !== before.motivoInasistencia) cambios.push(`motivo: ${data.motivoInasistencia || "—"}`);
@@ -273,7 +278,7 @@ export async function aplicarParticipantes(actividad, lista, { modo = "inscripci
       if (!actual.documento && p.documento) data.documento = p.documento;
       if (!actual.area && p.area) data.area = p.area;
       if (p.calificacion && (modo === "calificaciones" ? p.calificacion !== actual.calificacion : !actual.calificacion)) data.calificacion = p.calificacion;
-      if (p.observacion && (modo === "calificaciones" ? p.observacion !== actual.observacion : !actual.observacion)) data.observacion = p.observacion;
+      if (p.observacion && (modo === "calificaciones" ? p.observacion !== actual.observacion : !actual.observacion)) { data.observacion = p.observacion; data.sentimiento = null; }
       if (modo === "calificaciones" && p.calificacion && actual.asistio !== true) data.asistio = true;
       if (p.datos && Object.keys(p.datos).length) data.datos = JSON.stringify({ ...parse(actual.datos, {}), ...p.datos });
       if ("motivoInasistencia" in data) Object.assign(data, cat.motivo(data.motivoInasistencia));
@@ -308,7 +313,10 @@ export async function aplicarParticipantes(actividad, lista, { modo = "inscripci
     const where = { actividadId: actividad.id, inscrito: true, asistio: null, id: { notIn: [...vistos].filter((id) => typeof id === "number") } };
     marcadosNo = simular ? await prisma.participanteActividad.count({ where }) : (await prisma.participanteActividad.updateMany({ where, data: { asistio: false } })).count;
   }
-  if (!simular) await sincronizarConteos(actividad.id);
+  if (!simular) {
+    await sincronizarConteos(actividad.id);
+    clasificarEnSegundoPlano(actividad.id);
+  }
   return { leidos: lista.length, creados, actualizados, sinCoincidencia, marcadosNo, nuevos, sinCoincidir };
 }
 
@@ -383,5 +391,6 @@ export async function inscribirPublico(token, body) {
   });
   await sincronizarConteos(a.id);
   logParticipantes(null, a, "crear", `Inscripción por formulario: ${row.nombre}`).catch(() => {});
+  if (row.observacion) clasificarEnSegundoPlano(a.id);
   return { ok: true, actividad: a.nombre };
 }

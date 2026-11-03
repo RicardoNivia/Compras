@@ -273,6 +273,19 @@ function resolveAplicaEstrellas(tipo, raw) {
   return n;
 }
 
+// "Sistemas de Gestión", "Sistema de Gestion" y "SISTEMA DE GESTIÓN" son el mismo valor: se comparan sin tildes,
+// mayúsculas, signos ni la s final de cada palabra. Así no vuelven a aparecer áreas duplicadas (y presupuestos partidos).
+export function claveMaestro(valor) {
+  return String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ").replace(/s\b/g, "").replace(/\s+/g, "");
+}
+async function exigirNoParecido(tipo, valor, exceptoId = null) {
+  const k = claveMaestro(valor);
+  const otros = await prisma.maestro.findMany({ where: { tipo, ...(exceptoId ? { id: { not: exceptoId } } : {}) }, select: { valor: true } });
+  const igual = otros.find((o) => claveMaestro(o.valor) === k);
+  if (igual) throw badRequest(`Ya existe «${igual.valor}» en este maestro (es el mismo escrito de otra forma). Usa ese.`);
+}
+
 export async function createMaestro(body, actor) {
   const tipo = body.tipo;
   if (!TIPOS_MAESTRO.includes(tipo)) throw badRequest("Tipo de maestro inválido.");
@@ -288,6 +301,7 @@ export async function createMaestro(body, actor) {
   } else {
     valor = (body.valor || "").trim();
     if (!valor) throw badRequest("El valor es obligatorio.");
+    await exigirNoParecido(tipo, valor);
   }
   const aplicaEstrellas = resolveAplicaEstrellas(tipo, body.aplicaEstrellas);
 
@@ -362,6 +376,7 @@ export async function updateMaestro(id, body, actor) {
     // Solo se llega aquí si no está en uso (ver errorEnUso arriba).
     const valor = String(body.valor).trim();
     if (!valor) throw badRequest("El valor es obligatorio.");
+    if (valor !== current.valor) await exigirNoParecido(current.tipo, valor, current.id);
     data.valor = valor;
   }
 

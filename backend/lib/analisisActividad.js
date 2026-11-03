@@ -60,9 +60,11 @@ async function datosParaNova(a) {
   const p = a.participacion;
   const comentarios = await prisma.participanteActividad.findMany({
     where: { actividadId: a.id, observacion: { not: null } },
-    select: { calificacion: true, observacion: true },
+    select: { calificacion: true, observacion: true, sentimiento: true },
     orderBy: { calificacion: { sort: "desc", nulls: "last" } },
   });
+  const tono = { positivos: 0, neutros: 0, negativos: 0 };
+  for (const c of comentarios) if (["positivo", "neutro", "negativo"].includes(c.sentimiento)) tono[`${c.sentimiento}s`]++;
   const notasDelEquipo = await prisma.observacionActividad.findMany({ where: { actividadId: a.id }, select: { texto: true }, orderBy: { createdAt: "desc" }, take: 20 });
   return {
     actividad: a.nombre,
@@ -79,6 +81,7 @@ async function datosParaNova(a) {
       calificacionPromedioDeAsistentes: p.calificacionPromedio, calificaciones: p.calificaciones,
       porArea: p.porArea.slice(0, 10), motivosDeInasistencia: p.motivos.slice(0, 6),
     },
+    tonoDeLasObservaciones: tono,
     observacionesDeColaboradores: comentarios.filter((c) => comentarioUtil(c.observacion)).slice(0, MAX_COMENTARIOS).map((c) => ({ calificacion: c.calificacion, comentario: c.observacion.slice(0, 300) })),
     } : { participantes: "No aplica: esta actividad no maneja participantes ni listas de asistencia." }),
     inventario: a.inventario.resumen,
@@ -89,10 +92,31 @@ async function datosParaNova(a) {
   };
 }
 
+// Nada medible (sin participantes, presupuesto, compras, inventario, cierre ni notas): no se califica. Antes Nova
+// ponía un 3 que parecía real.
+async function sinDatosParaCalificar(a) {
+  const conParticipantes = a.aplicaParticipantes && (a.participacion?.total || a.inscritos || a.asistentes);
+  if (conParticipantes || a.presupuesto || a.gastado || a.inventario?.items?.length || a.calificacion != null || a.comentarioCierre) return false;
+  return (await prisma.observacionActividad.count({ where: { actividadId: a.id } })) === 0;
+}
+
 // actor null = la revisión automática. Regenerar reemplaza el anterior.
 export async function generarAnalisisActividad(id, { actor = null, origen = "manual" } = {}) {
   const a = await getActividad(id);
   if (a.estado !== "ejecutada" && a.estado !== "cerrada") throw badRequest("Nova analiza la actividad cuando ya se realizó (ejecutada o cerrada).");
+  if (await sinDatosParaCalificar(a)) {
+    const quien = actor || NOVA_AUTO;
+    const data = {
+      puntaje: null,
+      titulo: "Sin datos para calificar",
+      resumen: "Esta actividad no tiene participantes, presupuesto, compras, inventario ni calificación de cierre registrados, así que no hay con qué calificarla. Cuando cargues la asistencia o asocies sus compras, Nova la califica.",
+      puntos: [], origen, creadoPorUserId: actor?.id || null, creadoPorNombre: quien.nombre,
+    };
+    const antes = await prisma.analisisActividad.findUnique({ where: { actividadId: a.id }, select: { id: true } });
+    const row = await prisma.analisisActividad.upsert({ where: { actividadId: a.id }, create: { actividadId: a.id, ...data }, update: data });
+    logAnalisisActividad(quien, a, antes ? "editar" : "crear", "Sin datos para calificar: no se le pone puntaje").catch(() => {});
+    return toClientAnalisisActividad(row);
+  }
   const ia = await generateStructuredJson({
     systemInstruction: SISTEMA,
     prompt: `Datos de la actividad (JSON):\n${JSON.stringify(await datosParaNova(a))}`,

@@ -70,7 +70,7 @@ export function leerAsistencia(v) {
   return { asistio: null, motivo: null };
 }
 
-function campoDe(encabezado) {
+export function campoDe(encabezado) {
   const h = sinTildes(encabezado).replace(/\s+/g, " ");
   if (!h || IGNORAR.some((re) => re.test(h))) return null;
   for (const c of CAMPOS) if (c.re.some((re) => re.test(h))) return c.campo;

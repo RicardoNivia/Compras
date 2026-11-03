@@ -6,6 +6,7 @@ import PermissionsMatrix from "@/components/PermissionsMatrix";
 import RolesView from "@/components/RolesView";
 import { fetchRolesApi, fetchPermissionsMatrix } from "@/lib/api";
 import { ROLE_LABELS, ROLE_LIST, ROLE_COLOR_VARS, ROLE_ICONS } from "@/lib/roles";
+import { crossfade } from "@/lib/crossfade";
 
 function initials(name) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -87,13 +88,13 @@ export default function UsuariosView({ initialUsers, initialPermissionsMatrix, i
   return (
     <div>
       <div className="dash-tabs" role="tablist" aria-label="Vista de usuarios" style={{ marginBottom: 16 }}>
-        <button type="button" role="tab" aria-selected={tab === "usuarios"} className="dash-tab" onClick={() => setTab("usuarios")}>
+        <button type="button" role="tab" aria-selected={tab === "usuarios"} className="dash-tab" onClick={() => crossfade(() => setTab("usuarios"))}>
           Usuarios
         </button>
-        <button type="button" role="tab" aria-selected={tab === "roles"} className="dash-tab" onClick={() => setTab("roles")}>
+        <button type="button" role="tab" aria-selected={tab === "roles"} className="dash-tab" onClick={() => crossfade(() => setTab("roles"))}>
           Roles
         </button>
-        <button type="button" role="tab" aria-selected={tab === "permisos"} className="dash-tab" onClick={() => setTab("permisos")}>
+        <button type="button" role="tab" aria-selected={tab === "permisos"} className="dash-tab" onClick={() => crossfade(() => setTab("permisos"))}>
           Matriz de permisos
         </button>
       </div>
