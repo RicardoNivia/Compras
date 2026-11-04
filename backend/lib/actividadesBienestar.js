@@ -297,7 +297,7 @@ export async function deleteActividad(id, actor) {
 // de ese mes (actividades por su fecha, compras por su fecha de solicitud); porMes sigue siendo el año completo.
 // Los 5 comentarios más a favor y los 5 más en contra del período, según la manito de Nova (lib/sentimientoComentarios.js).
 // Sin el nombre de quien lo escribió. Las actividades sin participantes solo aportan las notas del equipo.
-async function comentariosDestacados(actividades) {
+export async function comentariosDestacados(actividades) {
   if (!actividades.length) return { positivos: [], negativos: [], totalPositivos: 0, totalNegativos: 0 };
   const deActividad = new Map(actividades.map((a) => [a.id, a]));
   const conParticipantes = actividades.filter((a) => a.aplicaParticipantes).map((a) => a.id);

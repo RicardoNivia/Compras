@@ -10,22 +10,14 @@ import { ALL_NAV_ITEMS } from "@/components/Sidebar";
 import { useAutoGrow } from "@/lib/useAutoGrow";
 import AssistantContent, { ThinkingLabel } from "@/components/AgentMessageContent";
 import { IconSpark, IconSend, IconPlus } from "@/components/icons";
+import { PREGUNTAS_BIENESTAR, PREGUNTAS_COMPRAS, preguntasAlAzar } from "@/lib/preguntasGerente";
 
 // Duración de la animación de cierre (debe calzar con la transición de
 // .floating-agent-panel en globals.css) — el panel se queda montado hasta que
 // termina de encogerse, si no la transición de salida nunca se vería.
 const CLOSE_ANIM_MS = 260;
 
-const SUGGESTIONS = [
-  "¿Qué puedo hacer en esta sección?",
-  "Dame un resumen general de compras",
-];
-
-const SUGERENCIAS_BIENESTAR = [
-  "¿Qué puedo hacer en esta sección?",
-  "Dame un resumen de la participación este año",
-  "¿Qué actividades vienen próximas?",
-];
+const PRIMERA = "¿Qué puedo hacer en esta sección?";
 
 // Encuentra en qué sección del menú está parado el usuario ahora mismo, para
 // que el Agente IA interprete "aquí"/"esta pantalla" correctamente (ver
@@ -85,6 +77,11 @@ export default function FloatingAgentChat({ user }) {
   const [conversationId, setConversationId] = useState(null);
   const scrollRef = useRef(null);
   const closeTimerRef = useRef(null);
+  // Dos preguntas de gerente al azar (se eligen al abrir, en el cliente, para no descuadrar el render del servidor).
+  const [alAzar, setAlAzar] = useState([]);
+  useEffect(() => {
+    if (open) setAlAzar(preguntasAlAzar(modulo === "bienestar" ? PREGUNTAS_BIENESTAR : PREGUNTAS_COMPRAS, 2).map((p) => p.prompt));
+  }, [open, modulo]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -229,7 +226,7 @@ export default function FloatingAgentChat({ user }) {
                   guardo esta conversación en tu historial.
                 </p>
                 <div className="floating-agent-suggestions">
-                  {(modulo === "bienestar" ? SUGERENCIAS_BIENESTAR : SUGGESTIONS).map((s) => (
+                  {[PRIMERA, ...alAzar].map((s) => (
                     <button key={s} type="button" className="floating-agent-suggestion" onClick={() => send(s)}>
                       {s}
                     </button>

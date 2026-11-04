@@ -858,6 +858,11 @@ model AnalisisActividad {
   resumen         String
   puntos          Json
   origen          String   @default("cierre") // "cierre" | "manual" | "automatico" | "agente"
+  // Título y frase de cierre que Nova escribe para Historias de Fundación (ver lib/historiasFundacion.js): emocionales,
+  // sin gasto ni presupuesto. La huella guarda los datos con que se escribieron: si cambian, se vuelven a escribir.
+  tituloHistoria    String?
+  fraseHistoria     String?
+  fraseHistoriaHash String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   creadoPorUserId String?

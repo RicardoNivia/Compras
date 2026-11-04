@@ -7,6 +7,7 @@ import { fetchActividadApi, fetchParticipantesApi } from "@/lib/api";
 import ComparaPresupuesto from "@/components/bienestar/ComparaPresupuesto";
 import { Estrellas, AnalisisDeActividad } from "@/components/bienestar/CalificacionActividad";
 import ObservacionesActividad from "@/components/bienestar/ObservacionesActividad";
+import FotosEnChat from "@/components/FotosEnChat";
 import { EsqueletoFicha } from "@/components/bienestar/Esqueletos";
 import { estadoActividad, rangoHumano, diasDeActividad } from "@/components/bienestar/actividadesUi";
 import { crossfade } from "@/lib/crossfade";
@@ -90,6 +91,7 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
               ["resumen", "Resumen"],
               ...(act.aplicaParticipantes ? [["participacion", "Participación por área"], ["quien", `Quién fue (${entero(asistieron)})`]] : []),
               ["comentarios", `Comentarios y observaciones (${entero(act.totalObservaciones)})`],
+              ["fotos", `Registro fotográfico (${entero(act.fotos)})`],
             ].map(([k, l]) => (
               <button key={k} type="button" role="tab" aria-selected={tab === k} className="dash-tab" onClick={() => crossfade(() => setTab(k))}>{l}</button>
             ))}
@@ -258,6 +260,11 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
               </section>
           )}
           {act && tab === "comentarios" && <ObservacionesActividad act={act} enModal />}
+          {act && tab === "fotos" && (
+            <section className="resumen-card" aria-label="Registro fotográfico">
+              <FotosEnChat spec={{ actividadId: act.id }} grande />
+            </section>
+          )}
         </div>
 
         <footer className="modal-foot">

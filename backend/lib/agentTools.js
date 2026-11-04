@@ -8,6 +8,8 @@ import { getPendientesParaNova } from "@/lib/pendientes";
 import { CONSULTAR_REFERENCIA_TOOL, consultarReferencia } from "@/lib/referenciasNova";
 import { getActividad, listActividades, resumenBienestar } from "@/lib/actividadesBienestar";
 import { isRoleAllowed } from "@/lib/permissions";
+import { listFotos } from "@/lib/fotosBienestar";
+import { hoyColombia } from "@/lib/hoyColombia";
 
 // Herramientas ("tool use" de Anthropic) que el Agente IA del chat puede
 // invocar bajo demanda en vez de recibir TODO el dataset de compras en cada
@@ -357,12 +359,17 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
       },
       {
         name: "buscar_actividades",
-        description: "Lista actividades de Bienestar o Fundación con su fecha, estado, responsable, presupuesto, gasto, inscritos, asistentes y calificaciones. Filtra por línea, año, estado o texto del nombre.",
-        input_schema: { type: "object", properties: { linea: LINEA, anio: { type: "integer", description: "Año (opcional)." }, estado: { type: "string", enum: ["creada", "programada", "ejecutada", "cerrada"], description: "Estado (opcional)." }, texto: { type: "string", description: "Parte del nombre (opcional)." }, limite: { type: "integer", description: "Máximo de filas (opcional, por defecto 30, máximo 60)." } } },
+        description: "Lista actividades de Bienestar o Fundación con su fecha, estado, responsable, presupuesto, gasto, inscritos, asistentes y calificaciones, con los conteos por línea y estado ya calculados. Filtra por línea, año, estado, rango de fechas o texto del nombre. Para \"qué actividades se han realizado / hecho a la fecha\" usa realizadas: true (ejecutadas o cerradas con fecha hasta hoy).",
+        input_schema: { type: "object", properties: { linea: LINEA, anio: { type: "integer", description: "Año (opcional)." }, estado: { type: "string", enum: ["creada", "programada", "ejecutada", "cerrada"], description: "Estado (opcional)." }, realizadas: { type: "boolean", description: "Solo las ya realizadas: ejecutadas o cerradas con fecha hasta hoy (opcional)." }, desde: { type: "string", description: "Fecha mínima AAAA-MM-DD (opcional)." }, hasta: { type: "string", description: "Fecha máxima AAAA-MM-DD (opcional)." }, texto: { type: "string", description: "Parte del nombre (opcional)." }, limite: { type: "integer", description: "Máximo de filas (opcional, por defecto 30, máximo 60)." } } },
       },
       {
         name: "detalle_actividad",
         description: "Detalle de UNA actividad: fechas, presupuesto y gasto, sus compras, participación por área y motivos de inasistencia, inventario y lo que sobró, calificación al cerrar y el análisis de Nova. No trae nombres ni datos de personas.",
+        input_schema: { type: "object", properties: { id: { type: "integer", description: "Id de la actividad (opcional si das el nombre)." }, nombre: { type: "string", description: "Nombre o parte del nombre (opcional si das el id)." } } },
+      },
+      {
+        name: "fotos_actividad",
+        description: "Material fotográfico (fotos) de UNA actividad de Bienestar o Fundación: cuántas hay, su descripción y el bloque que debes poner en tu respuesta para que el usuario las vea en el chat.",
         input_schema: { type: "object", properties: { id: { type: "integer", description: "Id de la actividad (opcional si das el nombre)." }, nombre: { type: "string", description: "Nombre o parte del nombre (opcional si das el id)." } } },
       }
     );
@@ -400,9 +407,27 @@ const puedeLinea = (user, linea, tipo = "lista") => {
 };
 const filaActividad = (a) => ({
   id: a.id, nombre: a.nombre, linea: a.linea, fecha: a.fecha, fechaFin: a.fechaFin, estado: a.estado, responsable: a.responsableNombre,
-  presupuesto: a.presupuesto, gastadoEnComprasAsociadas: a.gastado, compras: a.compras, inscritos: a.inscritos, asistentes: a.asistentes,
+  // Sin compras asociadas el gasto no es $0 sino que no hay dato (las compras pueden estar sin asociar).
+  presupuesto: a.presupuesto, gastadoEnComprasAsociadas: a.compras ? a.gastado : null, compras: a.compras, inscritos: a.inscritos, asistentes: a.asistentes,
   aplicaParticipantes: a.aplicaParticipantes, calificacionAlCerrar: a.calificacion, puntajeNova: a.puntajeNova,
 });
+
+// Encuentra la actividad por id o por parte del nombre (sin tildes ni mayúsculas). Si hay varias, devuelve la lista
+// para que Nova pregunte cuál es; si el nombre coincide exacto con una, se queda con esa.
+async function actividadPorIdONombre(args) {
+  const id = Number(args.id) || null;
+  if (id) return { id };
+  const q = String(args.nombre || "").trim();
+  if (!q) return { respuesta: { error: "Indica el id o el nombre de la actividad." } };
+  const sin = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const filas = await prisma.actividadBienestar.findMany({ select: { id: true, nombre: true, fecha: true, linea: true }, orderBy: { fecha: "desc" } });
+  const hallada = filas.filter((a) => sin(a.nombre).includes(sin(q)));
+  if (!hallada.length) return { respuesta: { error: "No encontré una actividad con ese nombre. Usa buscar_actividades para ver los nombres." } };
+  const exacta = hallada.filter((a) => sin(a.nombre) === sin(q));
+  if (exacta.length === 1) return { id: exacta[0].id };
+  if (hallada.length > 1) return { respuesta: { varias: hallada.slice(0, 8), nota: "Hay varias con ese nombre: pregunta cuál es (muestra nombre y fecha)." } };
+  return { id: hallada[0].id };
+}
 
 export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, user }) {
   let recordsPromise = null;
@@ -686,26 +711,42 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
           proximas: r.proximas.map(filaActividad),
         };
       }
+      case "fotos_actividad": {
+        const hallada = await actividadPorIdONombre(args);
+        if (hallada.respuesta) return hallada.respuesta;
+        const a = await prisma.actividadBienestar.findUnique({ where: { id: hallada.id }, select: { id: true, nombre: true, fecha: true, linea: true } });
+        if (!a) return { error: "Actividad no encontrada." };
+        if (!(await puedeLinea(user, a.linea))) return { error: `No autorizado para consultar actividades de ${a.linea}.` };
+        const fotos = await listFotos(a.id);
+        if (!fotos.length) return { actividad: a, totalFotos: 0, nota: "Esta actividad no tiene fotos cargadas. Dilo así; se cargan en la pestaña Fotos de la actividad." };
+        return {
+          actividad: a, totalFotos: fotos.length,
+          descripciones: fotos.map((f) => f.descripcion).filter(Boolean).slice(0, 20),
+          bloque: "```fotos\n" + JSON.stringify({ actividadId: a.id }) + "\n```",
+          nota: "Copia el bloque tal cual en tu respuesta: la interfaz muestra ahí las fotos (miniaturas que se amplían al hacer clic). No describas lo que hay en las fotos más allá de sus descripciones.",
+        };
+      }
       case "buscar_actividades": {
         const lineas = [];
         for (const l of args.linea ? [args.linea] : ["Bienestar", "Fundación"]) if (await puedeLinea(user, l)) lineas.push(l);
         if (!lineas.length) return { error: "No autorizado para consultar esas actividades." };
         const limite = Math.max(1, Math.min(60, Number(args.limite) || 30));
         const q = String(args.texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-        const todas = (await listActividades({ anio: args.anio || undefined })).filter((a) => lineas.includes(a.linea) && (!args.estado || a.estado === args.estado) && (!q || a.nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(q)));
-        return { total: todas.length, actividades: todas.slice(0, limite).map(filaActividad) };
+        const hoy = hoyColombia();
+        const hasta = args.realizadas ? [args.hasta, hoy].filter(Boolean).sort()[0] : args.hasta;
+        const todas = (await listActividades({ anio: args.anio || undefined })).filter((a) => lineas.includes(a.linea) && (!args.estado || a.estado === args.estado)
+          && (!args.realizadas || a.estado === "ejecutada" || a.estado === "cerrada")
+          && (!args.desde || (a.fecha && (a.fechaFin || a.fecha) >= args.desde)) && (!hasta || (a.fecha && a.fecha <= hasta))
+          && (!q || a.nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(q)));
+        todas.sort((x, y) => String(y.fecha || "").localeCompare(String(x.fecha || "")));
+        const porLinea = {}, porEstado = {};
+        for (const a of todas) { porLinea[a.linea] = (porLinea[a.linea] || 0) + 1; porEstado[a.estado] = (porEstado[a.estado] || 0) + 1; }
+        return { hoy, total: todas.length, porLinea, porEstado, devueltas: Math.min(limite, todas.length), actividades: todas.slice(0, limite).map(filaActividad), nota: todas.length > limite ? `Solo se listan las ${limite} más recientes de ${todas.length}; los conteos son sobre el total.` : undefined };
       }
       case "detalle_actividad": {
-        let id = Number(args.id) || null;
-        if (!id) {
-          const q = String(args.nombre || "").trim();
-          if (!q) return { error: "Indica el id o el nombre de la actividad." };
-          const hallada = await prisma.actividadBienestar.findMany({ where: { nombre: { contains: q, mode: "insensitive" } }, select: { id: true, nombre: true, fecha: true }, orderBy: { fecha: "desc" }, take: 6 });
-          if (!hallada.length) return { error: "No encontré una actividad con ese nombre." };
-          if (hallada.length > 1) return { varias: hallada, nota: "Hay varias con ese nombre: pregunta cuál es." };
-          id = hallada[0].id;
-        }
-        const a = await getActividad(id).catch(() => null);
+        const hallada = await actividadPorIdONombre(args);
+        if (hallada.respuesta) return hallada.respuesta;
+        const a = await getActividad(hallada.id).catch(() => null);
         if (!a) return { error: "Actividad no encontrada." };
         if (!(await puedeLinea(user, a.linea))) return { error: `No autorizado para consultar actividades de ${a.linea}.` };
         const p = a.participacion;

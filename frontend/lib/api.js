@@ -673,6 +673,7 @@ export const inscribirPublicoApi = (token, data) => jsonPost(`/api/publico/inscr
 
 // ---------- Bienestar: fotos de las actividades ----------
 
+export const fetchHistoriasApi = (anio) => fetch(`/api/actividades/historias?anio=${encodeURIComponent(anio)}`, { cache: "no-store" }).then(handle);
 export const fetchFotosApi = (actividadId) => fetch(`/api/actividades/${actividadId}/fotos`, { cache: "no-store" }).then(handle);
 export const urlFoto = (actividadId, fotoId, mini = false) => `/api/actividades/${actividadId}/fotos/${fotoId}${mini ? "?t=mini" : ""}`;
 export const actualizarFotoApi = (actividadId, id, data) => jsonPost(`/api/actividades/${actividadId}/fotos/${id}`, "PUT", data);
