@@ -21,6 +21,7 @@ export default function HistoriasFundacion() {
   const [error, setError] = useState("");
   const [reproduce, setReproduce] = useState(null); // { modo: "jornada", id } | { modo: "anio" }
   const [pdf, setPdf] = useState(false);
+  const [abriendo, setAbriendo] = useState(false);
 
   useEffect(() => {
     setDatos(null);
@@ -45,6 +46,21 @@ export default function HistoriasFundacion() {
     }
   }
 
+  // "¿Qué es Conectando Corazones?": fotos al azar de las jornadas del año (y del anterior si hay pocas), barajadas
+  // cada vez que se abre.
+  async function abrirPrograma() {
+    setAbriendo(true);
+    let jornadas = datos?.jornadas || [];
+    const contar = (js) => js.reduce((s, j) => s + j.fotos.length, 0);
+    if (contar(jornadas) < 13) {
+      try { jornadas = [...jornadas, ...((await fetchHistoriasApi(anio - 1)).jornadas || [])]; } catch { /* con las que haya */ }
+    }
+    const fotos = jornadas.flatMap((j) => j.fotos.map((f) => ({ actividadId: j.id, id: f.id })));
+    for (let i = fotos.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [fotos[i], fotos[k]] = [fotos[k], fotos[i]]; }
+    setAbriendo(false);
+    setReproduce({ modo: "programa", fotos });
+  }
+
   const t = datos?.totales;
   return (
     <div className="hist">
@@ -52,6 +68,10 @@ export default function HistoriasFundacion() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="hist-logo" src={LOGO} alt="Conectando Corazones con propósito" />
         <div className="hist-acciones">
+          <button type="button" className="btn hist-btn-programa" onClick={abrirPrograma} disabled={!datos || abriendo}>
+            {abriendo ? <span className="spinner" /> : <Corazon size={15} className="hist-late" />}
+            ¿Qué es Conectando Corazones?
+          </button>
           <button type="button" className="btn" onClick={descargarPdf} disabled={!datos?.jornadas.length || pdf}>
             {pdf ? <><span className="spinner" /> Armando el PDF…</> : "Descargar PDF del año"}
           </button>
@@ -153,6 +173,7 @@ export default function HistoriasFundacion() {
           datos={datos}
           modo={reproduce.modo}
           jornadaId={reproduce.id}
+          fotosPrograma={reproduce.fotos}
           onClose={() => setReproduce(null)}
         />
       )}

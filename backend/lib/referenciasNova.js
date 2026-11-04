@@ -1,5 +1,6 @@
 import { PROCUREMENT_POLICY_TITLE, PROCUREMENT_POLICY_TEXT } from "@/lib/procurementPolicy";
 import { APP_GUIDE_TITLE, APP_GUIDE_TEXT } from "@/lib/appGuide";
+import { CONECTANDO_CORAZONES_TITULO, CONECTANDO_CORAZONES_TEXTO } from "@/lib/conectandoCorazones";
 
 // El procedimiento de compras (B) y la guía de la app (C) ya no van completos en el system prompt de Nova (eran ~12.000
 // tokens que se pagaban en CADA pregunta, aunque la mayoría son de datos): Nova recibe solo su índice y pide las
@@ -8,7 +9,11 @@ import { APP_GUIDE_TITLE, APP_GUIDE_TEXT } from "@/lib/appGuide";
 const DOCUMENTOS = {
   procedimiento: { titulo: PROCUREMENT_POLICY_TITLE, texto: PROCUREMENT_POLICY_TEXT, inicio: (l) => esTituloMayusculas(l) },
   guia: { titulo: APP_GUIDE_TITLE, texto: APP_GUIDE_TEXT, inicio: (l) => /^\d{1,2}\. [A-ZÁÉÍÓÚÑ]/.test(l) },
+  fundacion: { titulo: CONECTANDO_CORAZONES_TITULO, texto: CONECTANDO_CORAZONES_TEXTO.replace(/^## /gm, ""), inicio: (l) => TITULOS_FUNDACION.has(l) },
 };
+
+// Títulos de sección de Conectando Corazones (líneas "## " de lib/conectandoCorazones.js).
+const TITULOS_FUNDACION = new Set([...CONECTANDO_CORAZONES_TEXTO.matchAll(/^## (.+)$/gm)].map((m) => m[1].trim()));
 
 const MAX_CHARS_RESPUESTA = 9000;
 const VACIAS = new Set(["que", "como", "cual", "cuales", "para", "por", "con", "los", "las", "del", "una", "uno", "este", "esta", "esto", "hay", "puedo", "debo", "hace", "hacer", "donde", "cuando", "segun", "sobre", "entre", "sus", "mis", "tiene", "son", "the"]);
@@ -47,10 +52,10 @@ export function indiceReferencia(documento) {
   return seccionesDe(documento).map((s, i) => `${i + 1}. ${s.titulo.replace(/^\d{1,2}\.\s*/, "")}`).join("\n");
 }
 
-// documento: "procedimiento" | "guia". consulta: palabras clave o la pregunta. secciones: números o títulos del índice.
+// documento: "procedimiento" | "guia" | "fundacion". consulta: palabras clave o la pregunta. secciones: números o títulos del índice.
 export function consultarReferencia({ documento, consulta, secciones } = {}) {
   const doc = DOCUMENTOS[documento];
-  if (!doc) return { error: 'documento debe ser "procedimiento" o "guia".' };
+  if (!doc) return { error: 'documento debe ser "procedimiento", "guia" o "fundacion".' };
   const todas = seccionesDe(documento);
 
   let elegidas = [];
@@ -94,11 +99,11 @@ export function consultarReferencia({ documento, consulta, secciones } = {}) {
 
 export const CONSULTAR_REFERENCIA_TOOL = {
   name: "consultar_referencia",
-  description: "Consulta el procedimiento oficial de compras (fuente B, documento \"procedimiento\") o la guía de uso de la app (fuente C, documento \"guia\") y devuelve SOLO las secciones pedidas o las más relacionadas con la consulta. Úsala SIEMPRE antes de explicar reglas del procedimiento (plazos, montos, aprobaciones, documentos, roles del proceso) o cómo se usa la app / qué puede hacer un rol, y cita lo que dice. Si ya sabes qué secciones necesitas por el índice, pídelas por número en \"secciones\".",
+  description: "Consulta el procedimiento oficial de compras (fuente B, documento \"procedimiento\"), la guía de uso de la app (fuente C, documento \"guia\") o qué es el programa Conectando Corazones de la línea Fundación (documento \"fundacion\": propósito, misión, visión, valores, componentes, alianza con Sincosoft y apoyo corporativo) y devuelve SOLO las secciones pedidas o las más relacionadas con la consulta. Úsala SIEMPRE antes de explicar reglas del procedimiento (plazos, montos, aprobaciones, documentos, roles del proceso) o cómo se usa la app / qué puede hacer un rol, y cita lo que dice. Úsala también (documento \"fundacion\") cuando pregunten qué es Conectando Corazones, su propósito, sus valores, sus componentes, la Fundación Proyecto Unión o la alianza con Sincosoft. Si ya sabes qué secciones necesitas por el índice, pídelas por número en \"secciones\".",
   input_schema: {
     type: "object",
     properties: {
-      documento: { type: "string", enum: ["procedimiento", "guia"], description: "\"procedimiento\" (B) o \"guia\" (C)." },
+      documento: { type: "string", enum: ["procedimiento", "guia", "fundacion"], description: "\"procedimiento\" (B), \"guia\" (C) o \"fundacion\" (Conectando Corazones)." },
       consulta: { type: "string", description: "Palabras clave o la pregunta del usuario, para buscar las secciones relevantes (opcional si das \"secciones\")." },
       secciones: { type: "array", items: { type: "string" }, description: "Números o títulos de secciones del índice (opcional, máximo 3)." },
     },

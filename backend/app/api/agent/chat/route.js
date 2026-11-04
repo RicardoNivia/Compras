@@ -9,6 +9,7 @@ import { createConversation, getConversation, appendMessages, makeTitle } from "
 import { PROCUREMENT_POLICY_TITLE } from "@/lib/procurementPolicy";
 import { APP_GUIDE_TITLE } from "@/lib/appGuide";
 import { indiceReferencia } from "@/lib/referenciasNova";
+import { CONECTANDO_CORAZONES_RESUMEN } from "@/lib/conectandoCorazones";
 import { ROLE_LABELS } from "@/lib/roles";
 import { hoyColombia } from "@/lib/hoyColombia";
 
@@ -43,7 +44,7 @@ function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSee
     sourceList.push(`El registro de auditoría (quién hizo qué, cuándo, sobre qué — registros de compra, maestros, usuarios, presupuestos o permisos — y qué campos cambiaron) — se consulta con la herramienta "registro_auditoria". Solo disponible para quien tenga este permiso.`);
   }
   if (canSeeBienestar) {
-    sourceList.push(`El módulo de Bienestar y Fundación (actividades, cronograma, asistencia y participación por área, inventario, calificaciones y su costo) — se consulta con las herramientas "resumen_bienestar" (cifras), "buscar_actividades", "detalle_actividad" y "fotos_actividad" (fotos de una actividad). La línea Fundación es el programa "Conectando Corazones": una iniciativa de responsabilidad social de Sincosoft junto con la Fundación Proyecto Unión, un voluntariado corporativo para que los funcionarios de la empresa vivan la inclusión en persona y apoyen a poblaciones vulnerables, como niños con discapacidad y adultos mayores en situación de calle. Su propósito, además de ayudar directamente a los beneficiarios, es crear un vínculo entre los empleados y la causa para que más personas se animen a ser agentes de cambio. Sincosoft lleva varios años apoyando a la fundación como aliado estratégico, y en la jornada se premió a los tres voluntarios más comprometidos. Si preguntan qué es Conectando Corazones, explícalo con esto (no tienes cifras de beneficiarios atendidos: no las des). En este módulo todo gasto es de compras asociadas a una actividad. Solo tienes cifras agregadas: no conoces nombres ni datos personales de los participantes, y no debes intentar deducirlos.`);
+    sourceList.push(`El módulo de Bienestar y Fundación (actividades, cronograma, asistencia y participación por área, inventario, calificaciones y su costo) — se consulta con las herramientas "resumen_bienestar" (cifras), "buscar_actividades", "detalle_actividad" y "fotos_actividad" (fotos de una actividad). ${CONECTANDO_CORAZONES_RESUMEN} Si preguntan qué es Conectando Corazones, su propósito, misión, visión, valores, componentes, la Fundación Proyecto Unión o la alianza con Sincosoft, consulta el documento "fundacion" con "consultar_referencia" y responde con lo que dice. Las cifras de ese documento (niños que atienden los hogares, colaboradores que donan, trabajadores financiados) son datos de la fundación y de la alianza: puedes citarlas como tales, pero nunca como personas atendidas por las jornadas registradas en la app (de eso no tienes cifras de beneficiarios: no las des). Al analizar o resumir actividades de Fundación, puedes relacionarlas con los valores y componentes del programa (p. ej. una visita al hogar es una "Vivencia en el hogar"), sin inventar lo que no dicen los datos. En este módulo todo gasto es de compras asociadas a una actividad. Solo tienes cifras agregadas: no conoces nombres ni datos personales de los participantes, y no debes intentar deducirlos.`);
   }
   const restricciones = [];
   if (!canSeeProveedoresGestion) restricciones.push("gestión de proveedores");
@@ -94,7 +95,10 @@ ${indiceReferencia("procedimiento")}
 
 ÍNDICE DE (C) — ${APP_GUIDE_TITLE} (pide las secciones con "consultar_referencia", documento "guia"):
 ${indiceReferencia("guia")}
-
+${canSeeBienestar ? `
+ÍNDICE DE CONECTANDO CORAZONES (programa de la línea Fundación; pide las secciones con "consultar_referencia", documento "fundacion"):
+${indiceReferencia("fundacion")}
+` : ""}
 Antes de explicar una regla del procedimiento o cómo se usa la app, consulta la sección con "consultar_referencia": no respondas de memoria sobre (B) o (C).`;
 }
 

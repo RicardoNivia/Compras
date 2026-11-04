@@ -3,6 +3,7 @@ import { generateStructuredJson } from "@/lib/aiStructured";
 import { resumenBienestar, LINEAS } from "@/lib/actividadesBienestar";
 import { comentarioUtil } from "@/lib/analisisActividad";
 import { logAnalisisBienestar } from "@/lib/audit";
+import { CONECTANDO_CORAZONES_PROPOSITO } from "@/lib/conectandoCorazones";
 
 // Análisis de Nova del Resumen de Bienestar: uno por línea (Bienestar / Fundación), año y mes (mes 0 = el general del
 // año). Nova solo redacta: las cifras salen de resumenBienestar() (las mismas del tablero) y se le pasan ya
@@ -101,9 +102,11 @@ asociadas") en vez de sacar conclusiones; nada de tecnicismos ni nombres de camp
 
 // Fundación es el acompañamiento de los colaboradores a la Fundación Proyecto Unión: otra lectura, las mismas reglas.
 const ENFOQUE_FUNDACION = `
-Esta línea es el acompañamiento de los colaboradores de Sinco a la Fundación Proyecto Unión, que atiende a niños con
-discapacidad, personas con enfermedades complejas como el cáncer y adultos mayores en condición de calle ("un lugar
-donde la vida recobra la esperanza"). Escribe con ese tono cálido: habla de jornadas, de personas que acompañaron y del
+Esta línea es el programa ${CONECTANDO_CORAZONES_PROPOSITO}
+Sus cuatro componentes son Encuentros (historias inspiradoras), Vivencias en el hogar (visitas a las sedes), Motivadores
+(reconocer a los colaboradores que dedican su tiempo) y Conexiones (campañas para que más colaboradores se unan): cuando
+encaje, relaciona las jornadas con ellos y con sus valores (inclusión, empatía, diversidad, aprendizaje mutuo, servicio
+con sentido, presencia), sin inventar lo que no dicen los datos. Escribe con ese tono cálido: habla de jornadas, de personas que acompañaron y del
 aporte, sin dejar de lado la asistencia y los costos. Las cifras son de los colaboradores y las compras: no tienes datos
 de beneficiarios, así que nunca digas a cuántos niños o abuelitos se atendió.`;
 

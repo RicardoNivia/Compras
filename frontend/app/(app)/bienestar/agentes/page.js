@@ -14,7 +14,7 @@ export default async function AgentesComprasPage({ searchParams }) {
   const puede = (user.permissions?.editBienestar ?? canEditBienestar(user.role)) || user.permissions?.editFundacion;
   if (!puede) redirect("/bienestar");
   return (
-    <AppShell user={user} title="Agentes" subtitle="Nova te ayuda a asociar compras, armar las compras de una actividad y comparar cotizaciones">
+    <AppShell user={user} title="Agentes" subtitle="Nova hace el trabajo pesado, tú decides">
       <AgentesCompras tabInicial={searchParams?.tab} actividadInicial={searchParams?.actividad} />
     </AppShell>
   );
