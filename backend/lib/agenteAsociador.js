@@ -5,12 +5,15 @@ import { asignarActividadACompra } from "@/lib/records";
 import { logPropuestaAsociacion } from "@/lib/audit";
 import { isRoleAllowed } from "@/lib/permissions";
 import { hoyColombia } from "@/lib/hoyColombia";
+import { agenteActivo } from "@/lib/configAgentes";
 
 // Agente asociador de Bienestar: para cada compra del área Bienestar que no tiene actividad, propone a cuál pertenece.
 // El sistema escoge primero las actividades candidatas (fecha cercana, palabras en común, categoría y proveedor que ya
 // usaron sus otras compras) y Nova solo elige entre esas y dice qué tan segura está y por qué. Nada se asocia solo:
 // quien edita Bienestar confirma ("Sí, asociar", que pasa por records.js y queda en la auditoría de la compra) o descarta.
-// Corre una vez al día y a pedido; una compra con propuesta no se vuelve a mirar en 30 días.
+// Corre a pedido ("Buscar ahora", sin avisos: el resultado se ve en pantalla) y, solo si alguien encendió su revisión
+// diaria (lib/configAgentes.js), una vez al día, avisando en la Bandeja. Una compra con propuesta no se vuelve a mirar en
+// 30 días.
 
 const DIAS_ANTES = 75; // la compra suele pedirse antes de la actividad
 const DIAS_DESPUES = 20; // o pocos días después (legalizaciones, reembolsos)
@@ -120,8 +123,9 @@ async function proponerLote(lote) {
   return r?.asignaciones || [];
 }
 
-// Busca propuestas nuevas. Devuelve cuántas compras revisó y cuántas propuestas dejó.
-export async function buscarPropuestas({ actor = null } = {}) {
+// Busca propuestas nuevas. Devuelve cuántas compras revisó y cuántas propuestas dejó. avisar: solo la revisión diaria
+// automática deja aviso en la Bandeja.
+export async function buscarPropuestas({ actor = null, avisar = false } = {}) {
   if (estado.corriendo) return { yaCorriendo: true };
   estado.corriendo = true;
   const inicio = Date.now();
@@ -155,7 +159,7 @@ export async function buscarPropuestas({ actor = null } = {}) {
       });
       await prisma.propuestaAsociacion.createMany({ data: filas });
     }
-    if (propuestas) avisarPropuestas(propuestas).catch(() => {});
+    if (propuestas && avisar) avisarPropuestas(propuestas).catch(() => {});
     estado.ultima = { at: new Date().toISOString(), revisadas: compras.length, propuestas, sinCoincidencia, sinCandidatas, ms: Date.now() - inicio };
     return estado.ultima;
   } finally {
@@ -173,7 +177,7 @@ async function avisarPropuestas(n) {
     fuente: "bienestar",
     titulo: `Nova propone la actividad de ${n} compra(s) de Bienestar`,
     texto: "Revisa cada propuesta y confirma con «Sí, asociar» o descártala. Nada se asocia sin tu confirmación.",
-    notificacionNombre: "Agentes de compras",
+    notificacionNombre: "Agentes",
     tituloItems: "Por revisar",
     items: [{ ref: hoyColombia(), titulo: `${n} propuesta(s) nuevas`, contexto: "Agente asociador", href: "/bienestar/agentes" }],
   });
@@ -255,7 +259,14 @@ export async function resolverVarias(ids, accion, actor, puedeLinea = null) {
 export function startAgenteAsociador() {
   if (process.env.AGENTES_COMPRAS_AUTO === "0" || globalThis.__agenteAsociador) return;
   globalThis.__agenteAsociador = true;
-  const correr = () => buscarPropuestas().catch((e) => console.error("[agente asociador]", e.message));
+  // Se mira cada hora si está encendido y si ya pasó un día desde la última revisión automática.
+  let ultima = 0;
+  const revisar = async () => {
+    if (Date.now() - ultima < CADA_MS || !(await agenteActivo("asociador"))) return;
+    ultima = Date.now();
+    await buscarPropuestas({ avisar: true });
+  };
+  const correr = () => revisar().catch((e) => console.error("[agente asociador]", e.message));
   setTimeout(correr, 5 * 60 * 1000);
-  setInterval(correr, CADA_MS);
+  setInterval(correr, 60 * 60 * 1000);
 }

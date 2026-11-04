@@ -151,6 +151,11 @@ export async function logSalarioMinimo(actor, row, action, antes) {
   await writeLog({ action, entityType: "salarioMinimo", recordId: String(row.anio), recordInfo: `Salario mínimo ${row.anio}`, actor, changes });
 }
 
+// Encender o apagar un agente automático (lib/configAgentes.js).
+export async function logConfigAgente(actor, clave, nombre, activo) {
+  await writeLog({ action: activo ? "activar" : "desactivar", entityType: "configAgente", recordId: clave, recordInfo: nombre, actor, changes: [{ field: "activo", label: "Revisión diaria", before: !activo, after: !!activo }] });
+}
+
 // Agente cotizador: crear o eliminar un cuadro comparativo.
 export async function logCuadroComparativo(actor, cuadro, action, detalle) {
   await writeLog({ action, entityType: "cuadroComparativo", recordId: String(cuadro.id), recordInfo: cuadro.titulo, actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });

@@ -682,6 +682,7 @@ export const eliminarSalarioMinimoApi = (anio) => fetch(`/api/maestros/salario-m
 const postAgente = (url, body, method = "POST") => fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined }).then(handle);
 export const fetchAsociadorApi = () => fetch("/api/actividades/agentes/asociador", { cache: "no-store" }).then(handle);
 export const accionAsociadorApi = (accion, ids) => postAgente("/api/actividades/agentes/asociador", { accion, ids });
+export const revisionDiariaAsociadorApi = (activo) => postAgente("/api/actividades/agentes/asociador", { accion: "revisionDiaria", activo });
 export const sugerirComprasApi = (actividadId) => postAgente(`/api/actividades/${actividadId}/sugerir-compras`, {});
 export const crearComprasSugeridasApi = (actividadId, items) => postAgente(`/api/actividades/${actividadId}/sugerir-compras`, { crear: true, items });
 export const fetchCuadrosApi = () => fetch("/api/actividades/agentes/cotizador", { cache: "no-store" }).then(handle);

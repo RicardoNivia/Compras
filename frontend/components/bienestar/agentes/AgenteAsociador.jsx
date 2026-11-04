@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { fetchAsociadorApi, accionAsociadorApi } from "@/lib/api";
+import { fetchAsociadorApi, accionAsociadorApi, revisionDiariaAsociadorApi } from "@/lib/api";
 import { fmtCOP } from "@/lib/format";
 import { crossfade } from "@/lib/crossfade";
 import PiePagina, { usePagina } from "@/components/bienestar/PiePagina";
@@ -77,6 +77,19 @@ export default function AgenteAsociador() {
     }
   }
 
+  // Encender o apagar la revisión diaria automática (apagada por defecto: solo así avisa en la Bandeja).
+  async function cambiarRevisionDiaria(activo) {
+    setError("");
+    setAviso("");
+    try {
+      const { revisionDiaria } = await revisionDiariaAsociadorApi(activo);
+      setDatos((d) => (d ? { ...d, revisionDiaria } : d));
+      setAviso(activo ? "Revisión diaria encendida: Nova revisará sola una vez al día y avisará en la Bandeja cuando encuentre propuestas." : "Revisión diaria apagada: Nova solo revisa cuando uses «Buscar ahora».");
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   async function resolver(ids, accion, clave) {
     setError("");
     setAviso("");
@@ -111,11 +124,20 @@ export default function AgenteAsociador() {
       <section className="agente-cabeza">
         <div className="agente-cabeza-texto">
           <h2><IconSpark size={18} /> Asociar compras a su actividad</h2>
-          <p>Nova revisa las compras del área Bienestar que no tienen actividad y propone a cuál pertenecen, comparando la descripción, la fecha, el proveedor y la categoría con las actividades cercanas. Tú confirmas o descartas: nada se asocia solo. Revisa sola una vez al día.</p>
+          <p>Nova revisa las compras del área Bienestar que no tienen actividad y propone a cuál pertenecen, comparando la descripción, la fecha, el proveedor y la categoría con las actividades cercanas. Tú confirmas o descartas: nada se asocia solo. Con «Buscar ahora» revisa al momento y ves el resultado aquí; si enciendes la revisión diaria, revisa sola una vez al día y te avisa en la Bandeja.</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={iniciarBusqueda} disabled={!datos || corriendo}>
-          {corriendo ? <><span className="spinner" /> Nova está revisando…</> : <><IconSpark size={14} /> Buscar ahora</>}
-        </button>
+        <div className="agente-cabeza-acciones">
+          <button type="button" className="btn btn-primary" onClick={iniciarBusqueda} disabled={!datos || corriendo}>
+            {corriendo ? <><span className="spinner" /> Nova está revisando…</> : <><IconSpark size={14} /> Buscar ahora</>}
+          </button>
+          <label className="agente-interruptor" title={datos?.revisionDiaria?.actualizadoPorNombre ? `Último cambio: ${datos.revisionDiaria.actualizadoPorNombre}` : undefined}>
+            <span>Revisión diaria automática</span>
+            <span className="toggle-switch">
+              <input type="checkbox" checked={!!datos?.revisionDiaria?.activo} disabled={!datos} onChange={(e) => cambiarRevisionDiaria(e.target.checked)} />
+              <span className="toggle-track"><span className="toggle-thumb" /></span>
+            </span>
+          </label>
+        </div>
       </section>
 
       <section className="agente-cifras" aria-label="Resumen">

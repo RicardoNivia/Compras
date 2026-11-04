@@ -954,3 +954,19 @@ model SalarioMinimo {
 
   @@map("salarios_minimos")
 }
+
+// Encendido de los agentes que corren solos (por ahora el asociador de compras de Bienestar). Apagados por defecto:
+// un agente solo revisa y avisa en la Bandeja cuando alguien lo enciende. Ver lib/configAgentes.js.
+model ConfigAgente {
+  id                   Int      @id @default(autoincrement())
+  clave                String   @unique // "asociador"
+  activo               Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  creadoPorUserId      String?
+  creadoPorNombre      String?
+  actualizadoPorUserId String?
+  actualizadoPorNombre String?
+
+  @@map("config_agentes")
+}

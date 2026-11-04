@@ -48,7 +48,7 @@ const GRUPOS = {
         { key: "bienestar", href: "/bienestar", label: "Resumen", Icon: IconDashboard, feature: "viewDashboardBienestar", show: canViewBienestar },
         { key: "bienestar-actividades", href: "/bienestar/actividades", label: "Actividades", Icon: IconList, feature: "viewBienestar", show: canViewBienestar },
         { key: "bienestar-cronograma", href: "/bienestar/cronograma", label: "Cronograma", Icon: IconCalendar, feature: "viewBienestar", show: canViewBienestar },
-        { key: "bienestar-agentes", href: "/bienestar/agentes", label: "Agentes de compras", Icon: IconSpark, feature: "editBienestar", show: canEditBienestar },
+        { key: "bienestar-agentes", href: "/bienestar/agentes", label: "Agentes", Icon: IconSpark, feature: "editBienestar", show: canEditBienestar },
         { key: "bienestar-maestros", href: "/bienestar/maestros", label: "Maestros", Icon: IconLayers, feature: "viewMaestrosBienestar", show: canViewBienestar },
       ],
     },

@@ -17,7 +17,7 @@ export default function AgentesCompras({ tabInicial, actividadInicial }) {
   const [tab, setTab] = useState(PESTANAS.some(([k]) => k === tabInicial) ? tabInicial : actividadInicial ? "sugeridas" : "asociador");
   return (
     <div className="agentes">
-      <div className="agentes-tabs" role="tablist" aria-label="Agentes de compras">
+      <div className="agentes-tabs" role="tablist" aria-label="Agentes">
         {PESTANAS.map(([k, titulo, nota]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className="agentes-tab" onClick={() => crossfade(() => setTab(k))}>
             <strong>{titulo}</strong>
