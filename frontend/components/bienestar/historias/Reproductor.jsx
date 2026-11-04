@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { urlFoto } from "@/lib/api";
 import { AnimatedNumber } from "@/components/charts/chartKit";
 import { fechaCorta, fechaLarga, Corazon, IconoFoto, LOGO } from "@/components/bienestar/historias/comun";
+import { DIAPOS_PROGRAMA, DiapoPrograma } from "@/components/bienestar/historias/DiaposPrograma";
 
 const ANCHO = 1280;
 const ALTO = 720;
@@ -25,9 +26,10 @@ function diapositivasDe(j, grupo) {
 
 // Reproductor a pantalla completa: pasa solo (cada diapositiva con su tiempo), con flechas, pausa, pantalla completa y
 // una transición de entrada/salida entre diapositivas. El escenario mide 1280×720 y se escala para caber en la ventana.
-export default function Reproductor({ datos, modo, jornadaId, onClose }) {
+export default function Reproductor({ datos, modo, jornadaId, fotosPrograma = [], onClose }) {
   const [actualId, setActualId] = useState(jornadaId);
   const lista = useMemo(() => {
+    if (modo === "programa") return DIAPOS_PROGRAMA.map((d) => ({ ...d, grupo: -2 }));
     if (modo === "anio") return [{ tipo: "anual", grupo: -1, dur: 11000 }, ...datos.jornadas.flatMap((j, i) => diapositivasDe(j, i))];
     const i = datos.jornadas.findIndex((j) => j.id === actualId);
     return diapositivasDe(datos.jornadas[i], i);
@@ -109,6 +111,7 @@ export default function Reproductor({ datos, modo, jornadaId, onClose }) {
   const pintar = (s, clave, clase) => (
     <div key={clave} className={`hist-diapo ${clase}`}>
       {s.tipo === "anual" && <DiapoAnual datos={datos} />}
+      {s.tipo.startsWith("prog-") && <DiapoPrograma tipo={s.tipo} fotos={fotosPrograma} />}
       {s.tipo === "portada" && <DiapoPortada j={s.j} n={s.grupo + 1} total={total} />}
       {s.tipo === "personas" && <DiapoPersonas j={s.j} />}
       {s.tipo === "galeria" && <DiapoGaleria j={s.j} onFoto={(i) => setFoto({ j: s.j, i })} />}
@@ -120,7 +123,7 @@ export default function Reproductor({ datos, modo, jornadaId, onClose }) {
   return createPortal(
     <div ref={raiz} className="hist-reproductor" role="dialog" aria-modal="true" aria-label="Historias de Conectando Corazones">
       <div className="hist-escenario-caja">
-        <div className={`hist-escenario${slide.tipo === "voces" ? " clara" : ""}`} style={{ width: ANCHO, height: ALTO, transform: `scale(${escala})` }} onDoubleClick={latir}>
+        <div className={`hist-escenario${slide.tipo === "voces" || slide.tipo === "prog-valores" ? " clara" : ""}`} style={{ width: ANCHO, height: ALTO, transform: `scale(${escala})` }} onDoubleClick={latir}>
           {saliente != null && lista[saliente] && pintar(lista[saliente], `s${saliente}`, "sale")}
           {pintar(slide, `e${idx}-${actualId}`, "entra")}
 
@@ -133,7 +136,7 @@ export default function Reproductor({ datos, modo, jornadaId, onClose }) {
           </div>
           <div className="hist-rotulo">
             <span><Corazon size={16} className="hist-late" /> Conectando Corazones · Historias</span>
-            <span>{slide.grupo >= 0 ? `Jornada ${slide.grupo + 1} de ${total} · ${datos.anio}` : `${datos.anio} en un minuto`}</span>
+            <span>{slide.grupo >= 0 ? `Jornada ${slide.grupo + 1} de ${total} · ${datos.anio}` : slide.grupo === -2 ? "¿Qué es Conectando Corazones?" : `${datos.anio} en un minuto`}</span>
           </div>
 
           <button type="button" className="hist-zona prev" onClick={() => ir(idx - 1)} aria-label="Diapositiva anterior" />

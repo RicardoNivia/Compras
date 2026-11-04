@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchActividadesApi, sugerirComprasApi, crearComprasSugeridasApi } from "@/lib/api";
 import { fmtCOP } from "@/lib/format";
-import { IconSpark } from "@/components/icons";
+import { IconSpark, IconBag, IconMoney, IconList, IconAlert, IconCheck, IconInfo, IconCalendar, IconSend } from "@/components/icons";
+import { CabezaAgente, CifraAgente, VacioAgente } from "@/components/bienestar/agentes/comun";
 
 const hoy = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
 
@@ -81,54 +82,113 @@ export default function ComprasSugeridas({ actividadInicial }) {
     }
   }
 
+  const actividadSel = (actividades || []).find((a) => String(a.id) === String(actividadId));
+  const pasa = presupuesto > 0 && usado > presupuesto;
+  const pasoActual = aviso ? 3 : resultado ? 2 : actividadId ? 1 : 0;
+
   return (
     <div className="agente-panel">
-      <section className="agente-cabeza">
-        <div className="agente-cabeza-texto">
-          <h2><IconSpark size={18} /> Armar las compras de una actividad</h2>
-          <p>Elige una actividad próxima y Nova propone qué comprar, a quién y con cuánta anticipación, basándose en lo que se compró en actividades parecidas. Los valores son el promedio de esas compras: ajústalos y crea solo las solicitudes que necesites.</p>
+      <CabezaAgente
+        icono={<IconBag size={22} />}
+        color="azul"
+        titulo="Armar las compras de una actividad"
+        descripcion="Nova propone qué comprar, a quién y con cuánta anticipación, con base en lo que se compró en actividades parecidas. Los valores son el promedio de esas compras reales."
+        pasos={["Elige la actividad", "Nova propone la lista", "Ajusta y marca lo que necesitas", "Crea las solicitudes de compra"]}
+        paso={pasoActual}
+      />
+
+      <section className="ag-paso-card">
+        <span className="ag-paso-card-num">1</span>
+        <div className="ag-paso-card-cuerpo">
+          <label htmlFor="ag-actividad"><strong>¿Para qué actividad?</strong> <small>Solo aparecen las actividades próximas que no están cerradas.</small></label>
+          <div className="ag-elegir">
+            <select id="ag-actividad" value={actividadId} onChange={(e) => { setActividadId(e.target.value); setResultado(null); setFilas([]); setAviso(null); }}>
+              <option value="">{actividades ? "Elige la actividad…" : "Cargando actividades…"}</option>
+              {(actividades || []).map((a) => <option key={a.id} value={a.id}>{a.fecha || "Sin fecha"} · {a.nombre} ({a.linea}){a.presupuesto ? ` · ${fmtCOP(a.presupuesto)}` : ""}</option>)}
+            </select>
+            <button type="button" className="btn btn-primary ag-btn-grande" disabled={!actividadId || pensando} onClick={sugerir}>
+              {pensando ? <><span className="spinner" /> Nova está armando la lista…</> : <><IconSpark size={16} /> Sugerir compras</>}
+            </button>
+          </div>
+          {actividadSel && (
+            <div className="ag-chips">
+              <span><IconCalendar size={13} /> {actividadSel.fecha || "Sin fecha"}</span>
+              <span>{actividadSel.linea}</span>
+              <span><IconMoney size={13} /> {actividadSel.presupuesto ? fmtCOP(actividadSel.presupuesto) : "Sin presupuesto"}</span>
+            </div>
+          )}
         </div>
       </section>
 
-      <div className="agente-filtros">
-        <select aria-label="Actividad" value={actividadId} onChange={(e) => { setActividadId(e.target.value); setResultado(null); setFilas([]); }} style={{ minWidth: 340 }}>
-          <option value="">{actividades ? "Elige la actividad…" : "Cargando actividades…"}</option>
-          {(actividades || []).map((a) => <option key={a.id} value={a.id}>{a.fecha || "Sin fecha"} · {a.nombre} ({a.linea}){a.presupuesto ? ` · ${fmtCOP(a.presupuesto)}` : ""}</option>)}
-        </select>
-        <button type="button" className="btn btn-primary" disabled={!actividadId || pensando} onClick={sugerir}>
-          {pensando ? <><span className="spinner" /> Nova está armando la lista…</> : <><IconSpark size={14} /> Sugerir compras</>}
-        </button>
-      </div>
-
-      {aviso && <div className="ficha-aviso" role="status">Se crearon {aviso.n} solicitud(es) de compra. Compras ya las ve en su lista. <Link href={aviso.href}>Ver la actividad</Link></div>}
+      {aviso && <div className="ag-aviso ok" role="status"><IconCheck size={16} /> <span>Se crearon {aviso.n} solicitud(es) de compra. Compras ya las ve en su lista. <Link href={aviso.href}>Ver la actividad</Link></span></div>}
       {error && <div className="modal-error">{error}</div>}
+
+      {pensando && (
+        <div className="ag-trabajando" role="status">
+          <span className="ag-trabajando-orbe" aria-hidden="true"><IconSpark size={18} /></span>
+          <div><strong>Nova está buscando actividades parecidas y sus compras…</strong><small>Tarda unos segundos.</small></div>
+        </div>
+      )}
+
+      {!resultado && !pensando && !aviso && (
+        <VacioAgente icono={<IconBag size={26} />} titulo="Elige una actividad y pide la lista">
+          Nova arma la lista con compras reales de actividades parecidas; tú decides qué pedir.
+        </VacioAgente>
+      )}
 
       {resultado && (
         <>
-          <section className="agente-presupuesto">
-            <div className="agente-presupuesto-cifras">
-              <div><span>Presupuesto de la actividad</span><strong>{presupuesto ? fmtCOP(presupuesto) : "Sin asignar"}</strong></div>
-              <div><span>Ya comprado o pedido</span><strong>{fmtCOP(comprometido)}</strong></div>
-              <div><span>Lo que vas a pedir</span><strong>{fmtCOP(totalElegidas)}</strong></div>
-              <div><span>{presupuesto ? (usado > presupuesto ? "Se pasa por" : "Queda") : "Total"}</span><strong className={presupuesto && usado > presupuesto ? "agente-rojo" : ""}>{fmtCOP(presupuesto ? Math.abs(presupuesto - usado) : usado)}</strong></div>
+          <section className="ag-presupuesto">
+            <div className="ag-presupuesto-cifras">
+              <CifraAgente icono={<IconMoney size={18} />} etiqueta="Presupuesto de la actividad" valor={presupuesto ? fmtCOP(presupuesto) : "Sin asignar"} pequena />
+              <CifraAgente icono={<IconBag size={18} />} etiqueta="Ya comprado o pedido" valor={fmtCOP(comprometido)} pequena />
+              <CifraAgente icono={<IconList size={18} />} etiqueta="Lo que vas a pedir" valor={fmtCOP(totalElegidas)} pequena tono="destaca" />
+              <CifraAgente
+                icono={pasa ? <IconAlert size={18} /> : <IconCheck size={18} />}
+                etiqueta={presupuesto ? (pasa ? "Se pasa por" : "Queda") : "Total"}
+                valor={fmtCOP(presupuesto ? Math.abs(presupuesto - usado) : usado)}
+                pequena
+                tono={presupuesto ? (pasa ? "mal" : "bien") : ""}
+              />
             </div>
-            {presupuesto > 0 && <div className="agente-barra" aria-hidden="true"><i style={{ width: `${pct}%` }} className={usado > presupuesto ? "pasa" : ""} /></div>}
-            {resultado.parecidas.length > 0 && <p className="count-note">Basado en: {resultado.parecidas.map((p) => `${p.nombre} (${p.fecha}, ${p.compras} compra(s))`).join(" · ")}</p>}
+            {presupuesto > 0 && (
+              <div className="ag-medidor">
+                <div className="ag-medidor-barra" aria-hidden="true">
+                  <i className="comprometido" style={{ width: `${Math.min(100, (comprometido / presupuesto) * 100)}%` }} />
+                  <i className={`pedir ${pasa ? "pasa" : ""}`} style={{ width: `${Math.max(0, pct - Math.min(100, (comprometido / presupuesto) * 100))}%` }} />
+                </div>
+                <div className="ag-medidor-leyenda">
+                  <span><i className="comprometido" /> Ya comprado o pedido</span>
+                  <span><i className="pedir" /> Lo que vas a pedir</span>
+                  <b className={pasa ? "agente-rojo" : ""}>{Math.round((usado / presupuesto) * 100)} % del presupuesto</b>
+                </div>
+              </div>
+            )}
+            {resultado.parecidas.length > 0 && (
+              <div className="ag-basado">
+                <span className="ag-etiqueta"><IconSpark size={12} /> Basado en</span>
+                <div className="ag-chips">{resultado.parecidas.map((p) => <span key={`${p.nombre}-${p.fecha}`}>{p.nombre} · {p.fecha} · {p.compras} compra(s)</span>)}</div>
+              </div>
+            )}
           </section>
 
-          {resultado.nota && <div className="ficha-aviso">{resultado.nota}</div>}
+          {resultado.nota && <div className="ag-aviso"><IconInfo size={16} /> <span>{resultado.nota}</span></div>}
 
           {filas.length > 0 && (
-            <div className="table-card">
+            <div className="ag-lista-card">
+              <div className="ag-lista-titulo">
+                <span className="ag-paso-card-num">2</span>
+                <div><strong>Revisa la lista</strong><small>Desmarca lo que no necesites y ajusta el valor y la fecha en que debe llegar.</small></div>
+              </div>
               <div className="table-scroll">
-                <table className="records ficha-tabla agente-tabla">
+                <table className="records ficha-tabla agente-tabla ag-tabla">
                   <thead><tr><th>Pedir</th><th>Qué comprar</th><th>Categoría</th><th>Proveedor sugerido</th><th className="num">Valor estimado</th><th>Debe llegar</th><th>Basado en</th></tr></thead>
                   <tbody>
                     {filas.map((f) => (
                       <tr key={f.clave} className={f.elegida ? "" : "agente-apagada"}>
-                        <td><input type="checkbox" aria-label={`Pedir ${f.descripcion}`} checked={f.elegida} onChange={(e) => cambiar(f.clave, "elegida", e.target.checked)} /></td>
+                        <td><input type="checkbox" className="ag-check" aria-label={`Pedir ${f.descripcion}`} checked={f.elegida} onChange={(e) => cambiar(f.clave, "elegida", e.target.checked)} /></td>
                         <td><input className="agente-input" aria-label="Qué comprar" value={f.descripcion} onChange={(e) => cambiar(f.clave, "descripcion", e.target.value)} /></td>
-                        <td>{f.categoria || <span className="muted">—</span>}</td>
+                        <td>{f.categoria ? <span className="ag-pill">{f.categoria}</span> : <span className="muted">—</span>}</td>
                         <td>{f.proveedorSugerido || <span className="muted">—</span>}</td>
                         <td className="num"><input className="agente-input num" type="number" min="0" step="1000" aria-label="Valor estimado" value={f.valorEstimado ?? ""} onChange={(e) => cambiar(f.clave, "valorEstimado", e.target.value)} /></td>
                         <td><input className="agente-input" type="date" aria-label="Debe llegar" value={f.fechaRequerida || ""} onChange={(e) => cambiar(f.clave, "fechaRequerida", e.target.value)} /></td>
@@ -146,11 +206,13 @@ export default function ComprasSugeridas({ actividadInicial }) {
                   </tbody>
                 </table>
               </div>
-              <div className="table-footer">
-                <span className="count-note">{elegidas.length} de {filas.length} marcada(s) · {fmtCOP(totalElegidas)}</span>
-                <div className="spacer" />
-                <button type="button" className="btn btn-primary" disabled={!elegidas.length || creando || elegidas.some((f) => !f.fechaRequerida)} onClick={crear}>
-                  {creando ? "Creando…" : `Crear ${elegidas.length} solicitud(es) de compra`}
+              <div className="ag-pie-accion">
+                <div>
+                  <strong>{elegidas.length} de {filas.length} marcada(s) · {fmtCOP(totalElegidas)}</strong>
+                  {elegidas.some((f) => !f.fechaRequerida) && <small className="agente-aviso-fila">Falta la fecha en que debe llegar alguna compra marcada.</small>}
+                </div>
+                <button type="button" className="btn btn-primary ag-btn-grande" disabled={!elegidas.length || creando || elegidas.some((f) => !f.fechaRequerida)} onClick={crear}>
+                  {creando ? <><span className="spinner" /> Creando…</> : <><IconSend size={15} /> Crear {elegidas.length} solicitud(es) de compra</>}
                 </button>
               </div>
             </div>

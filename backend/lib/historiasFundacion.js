@@ -4,6 +4,7 @@ import { resumenParticipacion } from "@/lib/participantesBienestar";
 import { hoyColombia } from "@/lib/hoyColombia";
 import { createHash } from "node:crypto";
 import { generateStructuredJson } from "@/lib/aiStructured";
+import { CONECTANDO_CORAZONES_PROPOSITO } from "@/lib/conectandoCorazones";
 
 // Historias de Fundación (Conectando Corazones): cada jornada ya realizada del año contada como presentación, con sus
 // fotos, quiénes acompañaron por área, los comentarios a favor (sin autor) y el análisis de Nova. Solo lectura y solo
@@ -119,7 +120,8 @@ export async function historiasFundacion(anio) {
 // gasto, presupuesto, compras ni inventario (las oraciones del análisis que hablan de eso ni siquiera se le pasan). Solo se pide a la IA cuando la
 // jornada no tiene frase o cambiaron los datos con que se escribió (huella), y todas las que faltan van en UNA llamada.
 // Se guarda con SQL directo para no mover la fecha del análisis (el agente de evaluación la usa para saber qué cambió).
-const PROPOSITO = "Conectando Corazones es el voluntariado corporativo de Sincosoft con la Fundación Proyecto Unión: acerca a los colaboradores a poblaciones vulnerables (niños con discapacidad, adultos mayores en situación de calle) para que vivan la inclusión en persona, crea un vínculo entre los empleados y la causa y busca que más personas se animen a ser agentes de cambio.";
+// Sin la parte de apoyo corporativo ni cifras: Historias nunca habla de dinero.
+const PROPOSITO = CONECTANDO_CORAZONES_PROPOSITO;
 
 const ESQUEMA_FRASES = {
   type: "OBJECT",
@@ -131,7 +133,7 @@ const ESQUEMA_FRASES = {
 const DE_DINERO = /presupuest|gast|cost|compra|inventari|pesos|dinero|sobr[oó]|\$/i;
 const sinDinero = (t) => (String(t || "").match(/[^.!?]+[.!?]?/g) || []).map((o) => o.trim()).filter((o) => o && !DE_DINERO.test(o)).join(" ");
 
-const huella = (j) => createHash("sha1").update(JSON.stringify(["v2", j.nombre, j.nova?.analisis, j.asistentes, j.comentarios.map((c) => c.texto)])).digest("hex");
+const huella = (j) => createHash("sha1").update(JSON.stringify(["v3", j.nombre, j.nova?.analisis, j.asistentes, j.comentarios.map((c) => c.texto)])).digest("hex");
 
 async function asegurarFrases(jornadas) {
   const pendientes = jornadas.filter((j) => j.nova && j.nova.fraseHash !== huella(j));
@@ -149,7 +151,7 @@ async function asegurarFrases(jornadas) {
         systemInstruction: `Eres Nova y escribes la frase con la que cierra la presentación de cada jornada del programa ${PROPOSITO}
 Para cada jornada escribe en español:
 - "titulo": un título corto (máximo 60 caracteres), emotivo, sobre lo que se vivió en la jornada.
-- "frase": UNA frase (entre 90 y 170 caracteres), cálida e inspiradora, que conecte lo que pasó en esa jornada con el propósito del programa (inclusión, vínculo con la causa, ser agentes de cambio).
+- "frase": UNA frase (entre 90 y 170 caracteres), cálida e inspiradora, que conecte lo que pasó en esa jornada con el propósito del programa (inclusión real, empatía, celebrar la diversidad, aprendizaje mutuo, el poder de estar presentes, transformar vidas una sonrisa a la vez).
 Es una presentación sentimental: NUNCA menciones dinero, presupuesto, gasto, costos, compras, inventario ni puntajes. Usa solo lo que dicen los datos: no inventes cifras, nombres, lugares ni actividades y no cuentes beneficiarios. Sin comillas, sin emojis, sin nombres de personas.`,
         prompt: JSON.stringify(datos),
         schema: ESQUEMA_FRASES,
