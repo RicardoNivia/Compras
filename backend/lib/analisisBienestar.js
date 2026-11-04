@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { generateStructuredJson } from "@/lib/aiStructured";
 import { resumenBienestar, LINEAS } from "@/lib/actividadesBienestar";
-import { analizarPendientes, comentarioUtil } from "@/lib/analisisActividad";
+import { comentarioUtil } from "@/lib/analisisActividad";
 import { logAnalisisBienestar } from "@/lib/audit";
 
 // Análisis de Nova del Resumen de Bienestar: uno por línea (Bienestar / Fundación), año y mes (mes 0 = el general del
@@ -171,7 +171,6 @@ export function startAnalisisBienestarScheduler() {
     ocupado = true;
     try {
       await pasada();
-      await analizarPendientes();
     } catch (e) {
       console.warn(`[análisis Bienestar] ${e.message}`);
     } finally {

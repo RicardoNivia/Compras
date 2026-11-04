@@ -62,6 +62,33 @@ async function writeLog({ action, entityType, recordId, recordInfo, actor, chang
       changes: changes && changes.length ? JSON.stringify(changes) : null,
     },
   });
+  cambioQueCalifica({ action, entityType, recordId, changes }).catch(() => {});
+}
+
+// Lo que cuenta para el puntaje de Nova de una actividad (los mismos campos que mira el agente de evaluación): si cambia,
+// se pide recalificar la actividad (analisisActividad.js#reanalizarEnSegundoPlano, con espera de 3 minutos). Cerrar
+// la actividad no cuenta aquí porque el cierre ya la analiza.
+const CAMPOS_ACTIVIDAD_PUNTAJE = new Set(["nombre", "fecha", "fechaFin", "descripcion", "presupuesto", "aplicaParticipantes", "inscritos", "asistentes", "observaciones", "estado"]);
+const CAMPOS_COMPRA_PUNTAJE = new Set(["actividad", "actividadId", "descripcion", "proveedor", "valorConIva", "estadoLegalizacion"]);
+async function cambioQueCalifica({ action, entityType, recordId, changes }) {
+  const campos = Array.isArray(changes) ? changes : [];
+  const destinos = new Set();
+  if (["participante", "inventario", "observacionActividad"].includes(entityType)) destinos.add(Number(recordId));
+  else if (entityType === "actividad") {
+    if (action === "cerrar" || campos.some((c) => c.field === "estado" && String(c.after).toLowerCase() === "cerrada")) return;
+    if (campos.some((c) => CAMPOS_ACTIVIDAD_PUNTAJE.has(c.field))) destinos.add(Number(recordId));
+  } else if (entityType === "record") {
+    if (!campos.some((c) => CAMPOS_COMPRA_PUNTAJE.has(c.field))) return;
+    for (const c of campos) if (c.field === "actividadId") { if (Number(c.before)) destinos.add(Number(c.before)); if (Number(c.after)) destinos.add(Number(c.after)); }
+    if (action !== "eliminar") {
+      const r = await prisma.record.findUnique({ where: { id: String(recordId) }, select: { actividadId: true } }).catch(() => null);
+      if (r?.actividadId) destinos.add(r.actividadId);
+    }
+  }
+  destinos.delete(0);
+  if (!destinos.size) return;
+  const { reanalizarEnSegundoPlano } = await import("@/lib/analisisActividad");
+  for (const id of destinos) if (Number.isInteger(id)) reanalizarEnSegundoPlano(id);
 }
 
 // Para crear/eliminar se guarda el snapshot completo de los campos (no solo un
