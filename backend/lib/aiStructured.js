@@ -12,8 +12,8 @@ import { DEFAULT_ANTHROPIC_MODEL } from "@/lib/anthropicModels";
 const CACHE_MS = 2 * 60 * 60 * 1000;
 const respuestas = globalThis.__aiStructuredCache || (globalThis.__aiStructuredCache = new Map());
 
-export async function generateStructuredJson({ systemInstruction, prompt, schema, image, budgetMs = 100000, cache = true }) {
-  const usarCache = cache && !image;
+export async function generateStructuredJson({ systemInstruction, prompt, schema, image, documento, budgetMs = 100000, cache = true }) {
+  const usarCache = cache && !image && !documento;
   const clave = usarCache ? createHash("sha1").update(JSON.stringify([DEFAULT_ANTHROPIC_MODEL, systemInstruction, prompt, schema])).digest("hex") : null;
   if (clave) {
     const hit = respuestas.get(clave);
@@ -25,6 +25,7 @@ export async function generateStructuredJson({ systemInstruction, prompt, schema
     prompt,
     schema,
     image,
+    documento,
     timeoutMs: budgetMs,
   });
   if (clave) {

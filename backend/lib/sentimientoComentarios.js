@@ -10,8 +10,6 @@ import { logSentimientoComentarios } from "@/lib/audit";
 export const SENTIMIENTOS = ["positivo", "neutro", "negativo", "no_aplica"];
 const LOTE = 60;
 const MAX_POR_PASADA = 1500;
-const PASADA_CADA_MS = 15 * 60 * 1000;
-const ESPERA_INICIAL_MS = 90 * 1000;
 
 const SISTEMA = `Eres Nova y clasificas comentarios que colaboradores y el equipo de Bienestar de Sinco escribieron sobre una
 actividad (encuestas de satisfacción, formularios de inscripción, observaciones y comentarios de cierre). Para cada uno
@@ -118,9 +116,6 @@ export function clasificarEnSegundoPlano(actividadId) {
   }, 0);
 }
 
-export function startClasificacionSentimientos() {
-  if (apagado() || globalThis.__sentimientoTimer) return;
-  const pasada = () => clasificarComentarios().catch((e) => console.error("[sentimiento]", e.message));
-  globalThis.__sentimientoTimer = setInterval(pasada, PASADA_CADA_MS);
-  setTimeout(pasada, ESPERA_INICIAL_MS);
-}
+// Ya no hay revisiones periódicas: la manito se pone solo cuando se guarda o se importa un comentario
+// (clasificarEnSegundoPlano). Se deja la función para no romper el arranque en instrumentation.js.
+export function startClasificacionSentimientos() {}

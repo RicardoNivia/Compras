@@ -140,7 +140,32 @@ export async function generarAnalisisActividad(id, { actor = null, origen = "man
   return toClientAnalisisActividad(row);
 }
 
-// Ya realizadas y sin análisis. Pocas por revisión para no cargar el backend.
+// Recalificación por información nueva: cuando a una actividad realizada (ejecutada o cerrada) le entra información que
+// cuenta para el puntaje (asistencia, participantes, observaciones, inventario, compras, datos propios o el paso a
+// ejecutada), Nova la vuelve a calificar. Espera 3 minutos desde el último cambio, así una importación de muchas filas
+// cuesta una sola llamada. No hay revisiones periódicas: sin información nueva, no se llama a la IA.
+const ESPERA_REANALISIS_MS = 3 * 60 * 1000;
+const programadas = (globalThis.__reanalisisActividad ||= new Map());
+
+export function reanalizarEnSegundoPlano(actividadId) {
+  const id = Number(actividadId);
+  if (!id || process.env.ANALISIS_BIENESTAR_AUTO === "0") return;
+  clearTimeout(programadas.get(id));
+  programadas.set(id, setTimeout(async () => {
+    programadas.delete(id);
+    try {
+      const a = await prisma.actividadBienestar.findUnique({ where: { id }, select: { estado: true, nombre: true } });
+      if (!a || (a.estado !== "ejecutada" && a.estado !== "cerrada")) return;
+      await generarAnalisisActividad(id, { origen: "automatico" });
+      console.log(`[análisis actividad] ${a.nombre}: recalificada por información nueva`);
+    } catch (e) {
+      console.warn(`[análisis actividad] ${id}: ${e.message}`);
+    }
+  }, ESPERA_REANALISIS_MS));
+}
+
+// Ya realizadas y sin análisis. Pocas por revisión para no cargar el backend. Ya no corre sola: queda para el agente
+// al desplegar y para usos puntuales.
 export async function analizarPendientes() {
   const pendientes = await prisma.actividadBienestar.findMany({ where: { estado: { in: ["ejecutada", "cerrada"] }, analisisNova: null }, select: { id: true, nombre: true }, orderBy: { fecha: "desc" }, take: MAX_POR_REVISION });
   for (const a of pendientes) {

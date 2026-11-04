@@ -62,6 +62,33 @@ async function writeLog({ action, entityType, recordId, recordInfo, actor, chang
       changes: changes && changes.length ? JSON.stringify(changes) : null,
     },
   });
+  cambioQueCalifica({ action, entityType, recordId, changes }).catch(() => {});
+}
+
+// Lo que cuenta para el puntaje de Nova de una actividad (los mismos campos que mira el agente de evaluación): si cambia,
+// se pide recalificar la actividad (analisisActividad.js#reanalizarEnSegundoPlano, con espera de 3 minutos). Cerrar
+// la actividad no cuenta aquí porque el cierre ya la analiza.
+const CAMPOS_ACTIVIDAD_PUNTAJE = new Set(["nombre", "fecha", "fechaFin", "descripcion", "presupuesto", "aplicaParticipantes", "inscritos", "asistentes", "observaciones", "estado"]);
+const CAMPOS_COMPRA_PUNTAJE = new Set(["actividad", "actividadId", "descripcion", "proveedor", "valorConIva", "estadoLegalizacion"]);
+async function cambioQueCalifica({ action, entityType, recordId, changes }) {
+  const campos = Array.isArray(changes) ? changes : [];
+  const destinos = new Set();
+  if (["participante", "inventario", "observacionActividad"].includes(entityType)) destinos.add(Number(recordId));
+  else if (entityType === "actividad") {
+    if (action === "cerrar" || campos.some((c) => c.field === "estado" && String(c.after).toLowerCase() === "cerrada")) return;
+    if (campos.some((c) => CAMPOS_ACTIVIDAD_PUNTAJE.has(c.field))) destinos.add(Number(recordId));
+  } else if (entityType === "record") {
+    if (!campos.some((c) => CAMPOS_COMPRA_PUNTAJE.has(c.field))) return;
+    for (const c of campos) if (c.field === "actividadId") { if (Number(c.before)) destinos.add(Number(c.before)); if (Number(c.after)) destinos.add(Number(c.after)); }
+    if (action !== "eliminar") {
+      const r = await prisma.record.findUnique({ where: { id: String(recordId) }, select: { actividadId: true } }).catch(() => null);
+      if (r?.actividadId) destinos.add(r.actividadId);
+    }
+  }
+  destinos.delete(0);
+  if (!destinos.size) return;
+  const { reanalizarEnSegundoPlano } = await import("@/lib/analisisActividad");
+  for (const id of destinos) if (Number.isInteger(id)) reanalizarEnSegundoPlano(id);
 }
 
 // Para crear/eliminar se guarda el snapshot completo de los campos (no solo un
@@ -135,6 +162,30 @@ export async function logInventario(actor, actividad, action, detalle) {
 
 export async function logAgenteImportacion(actor, actividad, action, detalle) {
   await writeLog({ action, entityType: "agenteImportacion", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
+}
+
+// Agente asociador de Bienestar: aceptar o descartar la actividad que Nova propuso para una compra (recordId = la compra).
+export async function logPropuestaAsociacion(actor, propuesta, action, detalle) {
+  await writeLog({ action, entityType: "propuestaAsociacion", recordId: String(propuesta.recordId), recordInfo: `Compra #${propuesta.recordSeq ?? "?"} → ${propuesta.actividad || "sin actividad"}`, actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
+}
+
+// Salario mínimo (SMMLV) de un año en Maestros de Compras. antes: { valor, norma } al editar o eliminar.
+export async function logSalarioMinimo(actor, row, action, antes) {
+  const changes = [
+    { field: "valor", label: "Valor", before: antes?.valor ?? null, after: action === "eliminar" ? null : row.valor },
+    { field: "norma", label: "Norma", before: antes?.norma ?? null, after: action === "eliminar" ? null : row.norma },
+  ].filter((c) => c.before !== c.after);
+  await writeLog({ action, entityType: "salarioMinimo", recordId: String(row.anio), recordInfo: `Salario mínimo ${row.anio}`, actor, changes });
+}
+
+// Encender o apagar un agente automático (lib/configAgentes.js).
+export async function logConfigAgente(actor, clave, nombre, activo) {
+  await writeLog({ action: activo ? "activar" : "desactivar", entityType: "configAgente", recordId: clave, recordInfo: nombre, actor, changes: [{ field: "activo", label: "Revisión diaria", before: !activo, after: !!activo }] });
+}
+
+// Agente cotizador: crear o eliminar un cuadro comparativo.
+export async function logCuadroComparativo(actor, cuadro, action, detalle) {
+  await writeLog({ action, entityType: "cuadroComparativo", recordId: String(cuadro.id), recordInfo: cuadro.titulo, actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
 }
 
 export async function logSentimientoComentarios(actividad, detalle) {
