@@ -7,6 +7,7 @@ import { sendAgentChatApi } from "@/lib/api";
 import AssistantContent, { ThinkingLabel } from "@/components/AgentMessageContent";
 import { IconSend, IconPlus, IconTrash } from "@/components/icons";
 import { useAutoGrow } from "@/lib/useAutoGrow";
+import { PREGUNTAS_BIENESTAR, PREGUNTAS_COMPRAS, preguntasAlAzar } from "@/lib/preguntasGerente";
 
 // Barra de entrada compartida entre el estado "vacío" (centrada, junto al
 // saludo) y el estado "con mensajes" (pegada abajo) — mismo markup en ambos
@@ -32,19 +33,6 @@ function ChatInputBar({ input, setInput, onSend, onKeyDown, sending, placeholder
   );
 }
 
-const SUGGESTIONS = [
-  { prompt: "¿Cuál es el valor total de compras registrado?", title: "Valor total de compras", sub: "Cifra exacta sobre el 100% de los registros", icon: "money" },
-  { prompt: "Muéstrame un gráfico de compras por área", title: "Gráfico por área", sub: "Desglose visual con datos reales", icon: "chart" },
-  { prompt: "¿A partir de qué monto se requiere cuadro comparativo?", title: "Procedimiento de compras", sub: "Umbrales, aprobaciones y plazos", icon: "doc" },
-  { prompt: "¿Qué puedo hacer en esta aplicación según mi rol?", title: "Qué puedo hacer aquí", sub: "Según tu rol en la aplicación", icon: "user" },
-];
-
-const SUGGESTIONS_BIENESTAR = [
-  { prompt: "Dame un resumen de la participación en las actividades de Bienestar este año", title: "Participación del año", sub: "Asistentes, asistencia y actividades", icon: "user" },
-  { prompt: "Muéstrame un gráfico de asistentes por mes en Bienestar", title: "Asistentes por mes", sub: "Desglose visual con datos reales", icon: "chart" },
-  { prompt: "¿Cuánto se ha gastado frente a lo presupuestado en las actividades de Bienestar y Fundación?", title: "Gasto frente a presupuesto", sub: "Compras asociadas a las actividades", icon: "money" },
-  { prompt: "¿Qué actividades vienen próximas y cuáles no tienen presupuesto?", title: "Próximas actividades", sub: "Fechas, estado y presupuesto", icon: "doc" },
-];
 
 const SUGGESTION_ICONS = {
   money: <path d="M8.5 1v15M3 5.5c0-1.4 2.5-2.5 5.5-2.5s5.5 1.1 5.5 2.5-2.5 2.5-5.5 2.5S3 9.4 3 10.8s2.5 2.5 5.5 2.5 5.5-1.1 5.5-2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />,
@@ -94,6 +82,12 @@ export default function AgenteChat({ userName }) {
   const modulo = useModulo();
   const enBienestar = modulo === "bienestar";
   const textoEntrada = enBienestar ? "Pregunta algo sobre las actividades de Bienestar o Fundación…" : "Pregunta algo sobre los datos de compras…";
+  const lista = enBienestar ? PREGUNTAS_BIENESTAR : PREGUNTAS_COMPRAS;
+  // Cuatro preguntas de gerente al azar; arranca con las primeras para que el render del servidor y el del cliente
+  // coincidan, y se barajan al montar o con "Otras preguntas".
+  const [sugerencias, setSugerencias] = useState(() => lista.slice(0, 4));
+  const barajar = () => setSugerencias(preguntasAlAzar(lista, 4));
+  useEffect(() => { setSugerencias(preguntasAlAzar(lista, 4)); }, [lista]);
   const [messages, setMessages] = useState([]); // { role: "user" | "model", text }
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -266,7 +260,7 @@ export default function AgenteChat({ userName }) {
                 placeholder={textoEntrada}
               />
               <div className="agent-suggestions">
-                {(enBienestar ? SUGGESTIONS_BIENESTAR : SUGGESTIONS).map((s, i) => (
+                {sugerencias.map((s, i) => (
                   <button
                     key={s.prompt} type="button" className="agent-suggestion-card"
                     style={{ animationDelay: `${i * 0.05}s` }}
@@ -280,6 +274,7 @@ export default function AgenteChat({ userName }) {
                   </button>
                 ))}
               </div>
+              <button type="button" className="link-btn agent-otras" onClick={barajar}>Otras preguntas</button>
             </div>
           ) : (
             <div className="agent-messages">

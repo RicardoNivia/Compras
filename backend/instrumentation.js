@@ -30,6 +30,10 @@ export async function register() {
     const { startClasificacionSentimientos } = await import("@/lib/sentimientoComentarios");
     startClasificacionSentimientos();
 
+    // Avisos a la Bandeja de las actividades de Bienestar que ya pasaron y siguen programadas (ver lib/avisosBienestar.js).
+    const { startAvisosBienestar } = await import("@/lib/avisosBienestar");
+    startAvisosBienestar();
+
     // Una vez por despliegue: manito de todos los comentarios y recalificación de todas las actividades (ver lib/agenteDespliegue.js).
     const { startAgenteAlDesplegar } = await import("@/lib/agenteDespliegue");
     startAgenteAlDesplegar();

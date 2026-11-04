@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { renderMarkdown, splitChartBlocks } from "@/lib/markdown";
 import ChartFromSpec from "@/components/charts/ChartFromSpec";
+import FotosEnChat from "@/components/FotosEnChat";
 
 // Frases que rotan mientras se espera la respuesta — Nova puede estar
 // ejecutando varias herramientas antes de responder (ver lib/agentTools.js),
@@ -32,7 +33,9 @@ export default function AssistantContent({ text }) {
       {parts.map((part, i) =>
         part.type === "chart"
           ? <ChartFromSpec key={i} spec={part.spec} />
-          : <div key={i} className="chat-markdown">{renderMarkdown(part.text)}</div>
+          : part.type === "fotos"
+            ? <FotosEnChat key={i} spec={part.spec} />
+            : <div key={i} className="chat-markdown">{renderMarkdown(part.text)}</div>
       )}
     </>
   );

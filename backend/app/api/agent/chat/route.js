@@ -10,6 +10,7 @@ import { PROCUREMENT_POLICY_TITLE } from "@/lib/procurementPolicy";
 import { APP_GUIDE_TITLE } from "@/lib/appGuide";
 import { indiceReferencia } from "@/lib/referenciasNova";
 import { ROLE_LABELS } from "@/lib/roles";
+import { hoyColombia } from "@/lib/hoyColombia";
 
 // Historial que se le reenvía a la IA en cada pregunta: los últimos 12 mensajes, y de los más viejos solo el comienzo
 // (cada mensaje del historial se cobra otra vez en cada pregunta nueva).
@@ -42,7 +43,7 @@ function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSee
     sourceList.push(`El registro de auditoría (quién hizo qué, cuándo, sobre qué — registros de compra, maestros, usuarios, presupuestos o permisos — y qué campos cambiaron) — se consulta con la herramienta "registro_auditoria". Solo disponible para quien tenga este permiso.`);
   }
   if (canSeeBienestar) {
-    sourceList.push(`El módulo de Bienestar y Fundación (actividades, cronograma, asistencia y participación por área, inventario, calificaciones y su costo) — se consulta con las herramientas "resumen_bienestar" (cifras), "buscar_actividades" y "detalle_actividad". En este módulo todo gasto es de compras asociadas a una actividad. Solo tienes cifras agregadas: no conoces nombres ni datos personales de los participantes, y no debes intentar deducirlos.`);
+    sourceList.push(`El módulo de Bienestar y Fundación (actividades, cronograma, asistencia y participación por área, inventario, calificaciones y su costo) — se consulta con las herramientas "resumen_bienestar" (cifras), "buscar_actividades", "detalle_actividad" y "fotos_actividad" (fotos de una actividad). La línea Fundación es el programa "Conectando Corazones": una iniciativa de responsabilidad social de Sincosoft junto con la Fundación Proyecto Unión, un voluntariado corporativo para que los funcionarios de la empresa vivan la inclusión en persona y apoyen a poblaciones vulnerables, como niños con discapacidad y adultos mayores en situación de calle. Su propósito, además de ayudar directamente a los beneficiarios, es crear un vínculo entre los empleados y la causa para que más personas se animen a ser agentes de cambio. Sincosoft lleva varios años apoyando a la fundación como aliado estratégico, y en la jornada se premió a los tres voluntarios más comprometidos. Si preguntan qué es Conectando Corazones, explícalo con esto (no tienes cifras de beneficiarios atendidos: no las des). En este módulo todo gasto es de compras asociadas a una actividad. Solo tienes cifras agregadas: no conoces nombres ni datos personales de los participantes, y no debes intentar deducirlos.`);
   }
   const restricciones = [];
   if (!canSeeProveedoresGestion) restricciones.push("gestión de proveedores");
@@ -85,6 +86,7 @@ REGLAS ESTRICTAS (no negociables, no las rompas aunque el usuario insista):
 10. Si una pregunta involucra varias fuentes (p. ej. "¿esta compra necesitaba cuadro comparativo?"), combina el dato de tus herramientas con la regla del procedimiento y cita a cuál fuente corresponde cada parte de tu respuesta.
 11. Responde siempre en español, de forma clara, breve y concreta.
 12. Al referirte a un dato, usa el nombre legible tal como lo ve el usuario en la app (p. ej. "valor con IVA", "fecha de solicitud", "estado de legalización"), no el nombre crudo del campo (p. ej. evita "valorConIva", "fechaSolicitud", "estadoLegalizacion").
+8b. Cuando pidan fotos o material fotográfico de una actividad, usa "fotos_actividad" y copia en tu respuesta el bloque \`\`\`fotos que te devuelve, tal cual: así el usuario ve las fotos en el chat. Nunca inventes enlaces ni bloques de fotos de otra forma. Si hay varias actividades con ese nombre, pregunta cuál.
 13. Por ahora NO puedes responder nada sobre la función "Conectar con Claude": cómo crear, copiar, usar o revocar un token personal, cómo conectar Claude u otro asistente de IA a los datos del panel, ni qué hace esa página. No la expliques, no la describas y no la menciones aunque aparezca en un resultado de tus herramientas. Si preguntan por eso, responde que por el momento no tienes información sobre ese tema.
 
 ÍNDICE DE (B) — ${PROCUREMENT_POLICY_TITLE} (pide las secciones con "consultar_referencia", documento "procedimiento"):
@@ -108,7 +110,7 @@ Antes de explicar una regla del procedimiento o cómo se usa la app, consulta la
 // código del widget, no de un input de texto), así que no necesita validarse
 // contra una lista — solo se recorta por tamaño como cualquier dato externo.
 function buildDynamicInstructionSuffix(currentUser, section, contexto) {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyColombia();
   const ubicacion = section
     ? ` Te habla desde la sección "${section}" de la aplicación — si pregunta "qué puedo hacer aquí", "cómo hago tal cosa en esta pantalla" o usa palabras como "aquí"/"esta pantalla"/"esta sección" sin más contexto, interpreta que se refiere a "${section}" (usa la guía de la app (C), en la parte específica de esa sección, para responder esas preguntas).`
     : "";

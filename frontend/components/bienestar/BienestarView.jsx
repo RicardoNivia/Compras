@@ -123,7 +123,6 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
         </div>
       )}
 
-      {puedeEditar && <ActividadesVencidas actividades={delAnio} fichaDe={fichaDe} />}
 
       {vista === "actividades" && indicadores}
 
@@ -288,24 +287,6 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
         </>
       )}
       {verCalificacion != null && <CalificacionModal actividadId={verCalificacion} puedeEditar={puedeEditar} onClose={() => setVerCalificacion(null)} onCambio={() => router.refresh()} />}
-    </div>
-  );
-}
-
-// Actividades cuya fecha ya pasó y siguen programadas (o creadas): no se sabe si se hicieron. Se avisa para que las
-// marquen como ejecutadas o les cambien la fecha. También salen en Mi día.
-function ActividadesVencidas({ actividades, fichaDe }) {
-  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
-  const vencidas = actividades.filter((a) => (a.estado === "programada" || a.estado === "creada") && a.fecha && (a.fechaFin || a.fecha) < hoy);
-  if (!vencidas.length) return null;
-  return (
-    <div className="aviso-vencidas" role="status">
-      <strong>{vencidas.length} actividad(es) ya pasaron y siguen programadas.</strong>{" "}
-      Márcalas como ejecutadas (y carga la asistencia) o cámbiales la fecha si se movieron:{" "}
-      {vencidas.slice(0, 4).map((a, i) => (
-        <span key={a.id}>{i > 0 && ", "}<Link href={fichaDe(a.id)}>{a.nombre} ({a.fecha})</Link></span>
-      ))}
-      {vencidas.length > 4 && ` y ${vencidas.length - 4} más`}.
     </div>
   );
 }

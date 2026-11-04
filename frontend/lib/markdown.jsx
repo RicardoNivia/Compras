@@ -103,25 +103,25 @@ function parseMarkdownBlocks(text) {
     .map(parseBlock);
 }
 
-// Divide el texto en segmentos: bloques ```chart``` (devueltos aparte para que
-// el llamador los renderice con ChartFromSpec) y el resto como nodos Markdown.
+// Divide el texto en segmentos: bloques ```chart``` y ```fotos``` (devueltos aparte para que
+// el llamador los renderice con ChartFromSpec / FotosEnChat) y el resto como nodos Markdown.
 export function splitChartBlocks(text) {
   const parts = [];
-  const re = /```chart\s*([\s\S]*?)```/g;
+  const re = /```(chart|fotos)\s*([\s\S]*?)```/g;
   let last = 0;
   let m;
   while ((m = re.exec(text))) {
     if (m.index > last) parts.push({ type: "markdown", text: text.slice(last, m.index) });
     let spec = null;
     try {
-      spec = JSON.parse(m[1]);
+      spec = JSON.parse(m[2]);
     } catch {
-      // JSON inválido: se ignora el bloque de gráfico y se muestra como texto plano.
-      parts.push({ type: "markdown", text: "```\n" + m[1].trim() + "\n```" });
+      // JSON inválido: se ignora el bloque y se muestra como texto plano.
+      parts.push({ type: "markdown", text: "```\n" + m[2].trim() + "\n```" });
       last = re.lastIndex;
       continue;
     }
-    parts.push({ type: "chart", spec });
+    parts.push({ type: m[1], spec });
     last = re.lastIndex;
   }
   if (last < text.length) parts.push({ type: "markdown", text: text.slice(last) });

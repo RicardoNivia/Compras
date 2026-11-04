@@ -492,10 +492,16 @@ function TabInventario({ act, puedeEditar, onCambio }) {
           <select aria-label="Unidad" value={nuevo.unidad} onChange={(e) => setNuevo({ ...nuevo, unidad: e.target.value })} style={{ width: 120 }}><option value="">Unidad</option>{unidades.map((u) => <option key={u} value={u}>{u}</option>)}</select>
           <input aria-label="Costo unitario" type="number" min="0" step="any" placeholder="Costo unitario" value={nuevo.costoUnitario} onChange={(e) => setNuevo({ ...nuevo, costoUnitario: e.target.value })} style={{ width: 140 }} />
           <button type="submit" className="btn btn-primary"><IconPlus size={13} /> Agregar</button>
-          <span className="spacer" />
-          <input ref={archivo} type="file" accept=".xlsx,.xls" hidden onChange={importar} />
-          <button type="button" className="btn" onClick={() => archivo.current?.click()} title="Columnas: Ítem, Cantidad, Unidad, Costo unitario, Usado">Subir inventario (Excel)</button>
         </form>
+      )}
+      {puedeEditar && (
+        <div className="importar-tarjetas" aria-label="Importar inventario desde Excel">
+          <label className="importar-tarjeta">
+            <input ref={archivo} type="file" accept=".xlsx,.xls" className="importar-input" onChange={importar} />
+            <IconDownload size={15} style={{ transform: "rotate(180deg)" }} />
+            <span><strong>Importar inventario</strong><span className="count-note">Un Excel con Ítem, Cantidad, Unidad, Costo unitario y Usado. Los ítems que ya existen se actualizan.</span></span>
+          </label>
+        </div>
       )}
       {aviso && <div className="ficha-aviso" role="status">{aviso}</div>}
       {error && <div className="modal-error">{error}</div>}

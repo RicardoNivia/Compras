@@ -57,6 +57,7 @@ const GRUPOS = {
         { key: "fundacion", href: "/bienestar/fundacion", label: "Resumen Fundación", Icon: IconDashboard, feature: "viewDashboardFundacion", show: canViewBienestar },
         { key: "fundacion-actividades", href: "/bienestar/fundacion/actividades", label: "Actividades Fundación", Icon: IconList, feature: "viewFundacion", show: canViewBienestar },
         { key: "fundacion-cronograma", href: "/bienestar/fundacion/cronograma", label: "Cronograma Fundación", Icon: IconCalendar, feature: "viewFundacion", show: canViewBienestar },
+        { key: "fundacion-historias", href: "/bienestar/fundacion/historias", label: "Historias", Icon: IconHeart, feature: "viewFundacion", show: canViewBienestar },
       ],
     },
   ],
