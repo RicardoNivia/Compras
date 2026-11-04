@@ -137,6 +137,25 @@ export async function logAgenteImportacion(actor, actividad, action, detalle) {
   await writeLog({ action, entityType: "agenteImportacion", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
 }
 
+// Agente asociador de Bienestar: aceptar o descartar la actividad que Nova propuso para una compra (recordId = la compra).
+export async function logPropuestaAsociacion(actor, propuesta, action, detalle) {
+  await writeLog({ action, entityType: "propuestaAsociacion", recordId: String(propuesta.recordId), recordInfo: `Compra #${propuesta.recordSeq ?? "?"} → ${propuesta.actividad || "sin actividad"}`, actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
+}
+
+// Salario mínimo (SMMLV) de un año en Maestros de Compras. antes: { valor, norma } al editar o eliminar.
+export async function logSalarioMinimo(actor, row, action, antes) {
+  const changes = [
+    { field: "valor", label: "Valor", before: antes?.valor ?? null, after: action === "eliminar" ? null : row.valor },
+    { field: "norma", label: "Norma", before: antes?.norma ?? null, after: action === "eliminar" ? null : row.norma },
+  ].filter((c) => c.before !== c.after);
+  await writeLog({ action, entityType: "salarioMinimo", recordId: String(row.anio), recordInfo: `Salario mínimo ${row.anio}`, actor, changes });
+}
+
+// Agente cotizador: crear o eliminar un cuadro comparativo.
+export async function logCuadroComparativo(actor, cuadro, action, detalle) {
+  await writeLog({ action, entityType: "cuadroComparativo", recordId: String(cuadro.id), recordInfo: cuadro.titulo, actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
+}
+
 export async function logSentimientoComentarios(actividad, detalle) {
   await writeLog({ action: "clasificar", entityType: "sentimientoComentario", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor: { nombre: "Nova (automático)" }, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
 }

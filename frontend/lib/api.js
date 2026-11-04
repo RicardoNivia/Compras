@@ -673,6 +673,26 @@ export const inscribirPublicoApi = (token, data) => jsonPost(`/api/publico/inscr
 
 // ---------- Bienestar: fotos de las actividades ----------
 
+// Salario mínimo (SMMLV) por año, en Maestros de Compras.
+export const fetchSalariosMinimosApi = () => fetch("/api/maestros/salario-minimo", { cache: "no-store" }).then(handle);
+export const guardarSalarioMinimoApi = (body) => fetch("/api/maestros/salario-minimo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(handle);
+export const eliminarSalarioMinimoApi = (anio) => fetch(`/api/maestros/salario-minimo?anio=${encodeURIComponent(anio)}`, { method: "DELETE" }).then(handle);
+
+// Agentes de compras de Bienestar (asociador, compras sugeridas y cotizador).
+const postAgente = (url, body, method = "POST") => fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined }).then(handle);
+export const fetchAsociadorApi = () => fetch("/api/actividades/agentes/asociador", { cache: "no-store" }).then(handle);
+export const accionAsociadorApi = (accion, ids) => postAgente("/api/actividades/agentes/asociador", { accion, ids });
+export const sugerirComprasApi = (actividadId) => postAgente(`/api/actividades/${actividadId}/sugerir-compras`, {});
+export const crearComprasSugeridasApi = (actividadId, items) => postAgente(`/api/actividades/${actividadId}/sugerir-compras`, { crear: true, items });
+export const fetchCuadrosApi = () => fetch("/api/actividades/agentes/cotizador", { cache: "no-store" }).then(handle);
+export function extraerCotizacionApi(archivo) {
+  const fd = new FormData();
+  fd.append("archivo", archivo, archivo.name);
+  return fetch("/api/actividades/agentes/cotizador/extraer", { method: "POST", body: fd }).then(handle);
+}
+export const crearCuadroApi = (body) => postAgente("/api/actividades/agentes/cotizador", body);
+export const eliminarCuadroApi = (id) => fetch(`/api/actividades/agentes/cotizador/${id}`, { method: "DELETE" }).then(handle);
+
 export const fetchHistoriasApi = (anio) => fetch(`/api/actividades/historias?anio=${encodeURIComponent(anio)}`, { cache: "no-store" }).then(handle);
 export const fetchFotosApi = (actividadId) => fetch(`/api/actividades/${actividadId}/fotos`, { cache: "no-store" }).then(handle);
 export const urlFoto = (actividadId, fotoId, mini = false) => `/api/actividades/${actividadId}/fotos/${fotoId}${mini ? "?t=mini" : ""}`;

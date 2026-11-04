@@ -900,3 +900,57 @@ model SolicitudCompra {
   @@index([actividadId])
   @@map("solicitudes_compra")
 }
+
+// Agente asociador de Bienestar (lib/agenteAsociador.js): para cada compra del área sin actividad, la actividad a la que
+// Nova cree que pertenece, qué tan segura está y por qué. Nada se asocia sin que una persona confirme. estado:
+// pendiente | aceptada | descartada | sin_coincidencia (Nova no vio ninguna) | resuelta (alguien la asoció por otro lado).
+model PropuestaAsociacion {
+  id                Int       @id @default(autoincrement())
+  recordId          String
+  recordSeq         Int?
+  actividadId       Int?
+  confianza         String?   // alta | media | baja
+  razon             String?
+  estado            String    @default("pendiente")
+  resueltaAt        DateTime?
+  resueltaPorUserId String?
+  resueltaPorNombre String?
+  createdAt         DateTime  @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+
+  @@index([estado])
+  @@index([recordId])
+  @@map("propuestas_asociacion")
+}
+
+// Cuadro comparativo armado por el agente cotizador (lib/agenteCotizador.js) con las cotizaciones que sube quien
+// compra: lo extraído de cada una, la comparación calculada por el sistema y la recomendación de Nova.
+model CuadroComparativo {
+  id              Int      @id @default(autoincrement())
+  titulo          String
+  actividadId     Int?
+  datos           Json
+  recomendacion   String?
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@map("cuadros_comparativos")
+}
+
+// Salario mínimo mensual legal vigente (SMMLV) por año, en Maestros de Compras. Lo usa el agente cotizador para el
+// umbral del cuadro comparativo del procedimiento (2 SMMLV administrativas / 4 técnicas). Ver lib/salarioMinimo.js.
+model SalarioMinimo {
+  id                 Int      @id @default(autoincrement())
+  anio               Int      @unique
+  valor              Float
+  norma              String?  // decreto que lo fija, p. ej. "Decreto 1469 de 2025"
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  creadoPorUserId    String?
+  creadoPorNombre    String?
+  actualizadoPorNombre String?
+
+  @@map("salarios_minimos")
+}

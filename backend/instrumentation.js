@@ -34,6 +34,10 @@ export async function register() {
     const { startAvisosBienestar } = await import("@/lib/avisosBienestar");
     startAvisosBienestar();
 
+    // Agente asociador: una vez al día propone la actividad de las compras de Bienestar sin actividad (ver lib/agenteAsociador.js).
+    const { startAgenteAsociador } = await import("@/lib/agenteAsociador");
+    startAgenteAsociador();
+
     // Una vez por despliegue: manito de todos los comentarios y recalificación de todas las actividades (ver lib/agenteDespliegue.js).
     const { startAgenteAlDesplegar } = await import("@/lib/agenteDespliegue");
     startAgenteAlDesplegar();

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import MaestroModal from "@/components/MaestroModal";
 import ConfigCicloProveedores from "@/components/proveedores/ConfigCicloProveedores";
+import ConfigSalarioMinimo from "@/components/ConfigSalarioMinimo";
 import { TIPOS_MAESTRO, TIPO_LABELS, MODULO_POR_TIPO, TIPOS_USUARIO, TIPOS_FIJOS } from "@/lib/maestrosTipos";
 import { updateMaestroApi, deleteMaestroApi } from "@/lib/api";
 import { IconPlus, IconEdit, IconTrash, IconSearch, IconBuilding, IconUsers, IconFlag, IconMoney, IconFile, IconLayers, IconStar, IconClock } from "@/components/icons";
@@ -14,6 +15,7 @@ import { crossfade } from "@/lib/crossfade";
 // eliminar; sí se puede inactivar para que deje de ofrecerse en los formularios.
 
 const CICLO = "cicloProveedores";
+const SALARIO = "salarioMinimo"; // salario mínimo por año, dentro del grupo Compras
 const MODULOS = ["Compras", "Proveedores", "Bienestar"];
 
 const TIPO_ICONS = {
@@ -88,8 +90,9 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
     modulo: mod,
     tipos: TIPOS_MAESTRO.filter((t) => MODULO_POR_TIPO[t] === mod),
     ciclo: mod === "Proveedores" && !!cicloConfig,
+    salario: mod === "Compras",
   })), [modulos, cicloConfig]);
-  const seccionesValidas = grupos.flatMap((g) => [...g.tipos, ...(g.ciclo ? [CICLO] : [])]);
+  const seccionesValidas = grupos.flatMap((g) => [...g.tipos, ...(g.salario ? [SALARIO] : []), ...(g.ciclo ? [CICLO] : [])]);
 
   const [tab, setTab] = useState(() => (initialSeccion && seccionesValidas.includes(initialSeccion) ? initialSeccion : seccionesValidas[0]));
   const [search, setSearch] = useState("");
@@ -196,6 +199,16 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
                   </button>
                 );
               })}
+              {g.salario && (
+                <button
+                  type="button"
+                  className={`maestros-nav-item${tab === SALARIO ? " active" : ""}`}
+                  onClick={() => crossfade(() => setTab(SALARIO))}
+                >
+                  <span className="ic"><IconMoney size={16} /></span>
+                  Salario mínimo
+                </button>
+              )}
               {g.ciclo && (
                 <button
                   type="button"
@@ -219,6 +232,8 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
       <section className="maestros-main">
         {esCiclo ? (
           <ConfigCicloProveedores initial={cicloConfig} />
+        ) : tab === SALARIO ? (
+          <ConfigSalarioMinimo />
         ) : (
           <>
             <div className="maestros-toolbar">

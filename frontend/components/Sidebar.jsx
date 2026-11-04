@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, canViewNotificaciones, canViewBienestar, ROLE_LABELS } from "@/lib/roles";
+import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, canViewNotificaciones, canViewBienestar, canEditBienestar, ROLE_LABELS } from "@/lib/roles";
 import { EVENTO_NO_LEIDAS, EVENTO_SOLICITUDES } from "@/lib/notificacionesApi";
 import { MODULOS } from "@/lib/modulos";
 import { useModulo } from "@/components/ModuloShell";
@@ -48,6 +48,7 @@ const GRUPOS = {
         { key: "bienestar", href: "/bienestar", label: "Resumen", Icon: IconDashboard, feature: "viewDashboardBienestar", show: canViewBienestar },
         { key: "bienestar-actividades", href: "/bienestar/actividades", label: "Actividades", Icon: IconList, feature: "viewBienestar", show: canViewBienestar },
         { key: "bienestar-cronograma", href: "/bienestar/cronograma", label: "Cronograma", Icon: IconCalendar, feature: "viewBienestar", show: canViewBienestar },
+        { key: "bienestar-agentes", href: "/bienestar/agentes", label: "Agentes de compras", Icon: IconSpark, feature: "editBienestar", show: canEditBienestar },
         { key: "bienestar-maestros", href: "/bienestar/maestros", label: "Maestros", Icon: IconLayers, feature: "viewMaestrosBienestar", show: canViewBienestar },
       ],
     },
