@@ -94,14 +94,42 @@ const AGRUPACIONES_PROVEEDOR = {
   mesRegistro: (p) => (p.createdAt ? fechaISO(p.createdAt).slice(0, 7) : "Sin fecha"),
 };
 
+// Los campos de catálogo (área, categoría, estado…) se filtraban por nombre EXACTO: "imprevistos administrativos" no
+// encontraba la categoría "Imprevistos Administrativos (JPA)" y Nova respondía "0 compras". Ahora, si no hay un valor
+// exactamente igual (sin tildes ni mayúsculas), valen los valores que contienen TODAS las palabras pedidas; y si
+// tampoco hay, se devuelven los nombres parecidos para que Nova pregunte o reintente con el correcto.
+const CAMPOS_CATALOGO = { area: "área", categoria: "categoría", estado: "estado", medioPago: "medio de pago", estadoLegalizacion: "estado de legalización" };
+function resolverFiltros(records, f) {
+  const filtros = { ...f, _aceptados: {} };
+  const notas = [];
+  for (const [campo, etiqueta] of Object.entries(CAMPOS_CATALOGO)) {
+    if (!f[campo]) continue;
+    const pedido = normTxt(f[campo]);
+    const valores = new Map();
+    for (const r of records) if (r[campo]) valores.set(normTxt(r[campo]), r[campo]);
+    if (valores.has(pedido)) { filtros._aceptados[campo] = new Set([pedido]); continue; }
+    const palabras = pedido.split(" ").filter((w) => w.length > 2);
+    const parecidos = [...valores.keys()].filter((v) => palabras.length && palabras.every((w) => v.includes(w)));
+    filtros._aceptados[campo] = new Set(parecidos);
+    if (parecidos.length) {
+      notas.push(`La ${etiqueta} «${f[campo]}» no existe con ese nombre exacto; se tomó como: ${parecidos.map((v) => `«${valores.get(v)}»`).join(", ")}.`);
+    } else {
+      const alguna = [...valores.keys()].filter((v) => palabras.some((w) => v.includes(w))).slice(0, 8).map((v) => valores.get(v));
+      notas.push(`No hay ninguna ${etiqueta} llamada «${f[campo]}».${alguna.length ? ` Nombres parecidos que sí existen: ${alguna.map((v) => `«${v}»`).join(", ")}. Reintenta con el que corresponda o pregúntale al usuario cuál quiere.` : ""}`);
+    }
+  }
+  return { filtros, notas };
+}
+
 function matchesFilters(r, f) {
-  if (f.area && norm(r.area) !== norm(f.area)) return false;
-  if (f.estado && norm(r.estado) !== norm(f.estado)) return false;
-  if (f.categoria && norm(r.categoria) !== norm(f.categoria)) return false;
+  const ok = (campo) => (f._aceptados?.[campo] ? f._aceptados[campo].has(normTxt(r[campo])) : norm(r[campo]) === norm(f[campo]));
+  if (f.area && !ok("area")) return false;
+  if (f.estado && !ok("estado")) return false;
+  if (f.categoria && !ok("categoria")) return false;
   if (f.proveedor && !norm(r.proveedor).includes(norm(f.proveedor))) return false;
   if (f.descripcion && !norm(r.descripcion).includes(norm(f.descripcion))) return false;
-  if (f.medioPago && norm(r.medioPago) !== norm(f.medioPago)) return false;
-  if (f.estadoLegalizacion && norm(r.estadoLegalizacion) !== norm(f.estadoLegalizacion)) return false;
+  if (f.medioPago && !ok("medioPago")) return false;
+  if (f.estadoLegalizacion && !ok("estadoLegalizacion")) return false;
   if (f.fechaDesde && (!r.fechaSolicitud || r.fechaSolicitud < f.fechaDesde)) return false;
   if (f.fechaHasta && (!r.fechaSolicitud || r.fechaSolicitud > f.fechaHasta)) return false;
   if (f.valorMin != null && (r.valorConIva || 0) < f.valorMin) return false;
@@ -216,7 +244,7 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
           anio: { type: "integer", description: "Filtra solo por año de la fecha de solicitud (opcional, ej. 2026). Se ignora si se envían fechaDesde/fechaHasta." },
           fechaDesde: { type: "string", description: "Fecha mínima de solicitud, formato YYYY-MM-DD (opcional) — úsala en vez de 'anio' para periodos que no son un año completo (trimestres, meses, rangos arbitrarios)." },
           fechaHasta: { type: "string", description: "Fecha máxima de solicitud, formato YYYY-MM-DD (opcional)." },
-          categoria: { type: "string", description: "Filtra solo por esta categoría (opcional, nombre exacto)." },
+          categoria: { type: "string", description: "Filtra solo por esta categoría (opcional). Si no es el nombre exacto, se toman las categorías que contengan todas sus palabras; la respuesta lo explica en notaFiltros." },
           proveedor: { type: "string", description: "Filtra solo por este proveedor (opcional, coincidencia parcial, sin distinguir mayúsculas/minúsculas)." },
         },
       },
@@ -229,7 +257,7 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
         properties: {
           area: { type: "string", description: "Nombre exacto del área (opcional)." },
           estado: { type: "string", description: "Nombre exacto del estado de la compra (opcional)." },
-          categoria: { type: "string", description: "Nombre exacto de la categoría (opcional)." },
+          categoria: { type: "string", description: "Categoría (opcional; nombre exacto o sus palabras principales, p. ej. 'imprevistos administrativos')." },
           proveedor: { type: "string", description: "Coincidencia parcial del nombre del proveedor (opcional)." },
           descripcion: { type: "string", description: "Coincidencia parcial de la descripción de la compra (opcional, ej. \"empanada\", \"tiquete\")." },
           medioPago: { type: "string", description: "Nombre exacto del medio de pago (opcional)." },
@@ -250,7 +278,7 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
         required: ["descripcion"],
         properties: {
           descripcion: { type: "string", description: "Texto a buscar en la descripción de la compra (coincidencia parcial, ej. \"empanada\")." },
-          categoria: { type: "string", description: "Filtra además por esta categoría exacta (opcional)." },
+          categoria: { type: "string", description: "Filtra además por esta categoría (opcional; nombre exacto o sus palabras principales)." },
           area: { type: "string", description: "Filtra además por esta área exacta (opcional)." },
           limit: { type: "integer", description: "Máximo de proveedores distintos a devolver (opcional, por defecto 8, máximo 20)." },
         },
@@ -446,22 +474,25 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
         // fechaDesde/fechaHasta explícitos tienen prioridad sobre "anio" —
         // permite comparar periodos que no son un año calendario completo
         // (trimestres, meses, rangos arbitrarios), no solo año contra año.
-        const filtered = records.filter((r) => matchesFilters(r, {
+        const { filtros, notas } = resolverFiltros(records, {
           area: args.area, categoria: args.categoria, proveedor: args.proveedor,
           fechaDesde: args.fechaDesde || (args.anio ? `${args.anio}-01-01` : undefined),
           fechaHasta: args.fechaHasta || (args.anio ? `${args.anio}-12-31` : undefined),
-        }));
+        });
+        const filtered = records.filter((r) => matchesFilters(r, filtros));
         const presupuestos = canSeePresupuesto ? await getPresupuestos() : [];
         const aggregates = buildAggregates(filtered, presupuestos);
         if (!canSeePresupuesto) delete aggregates.presupuesto;
-        return aggregates;
+        return notas.length ? { notaFiltros: notas, ...aggregates } : aggregates;
       }
       case "buscar_registros": {
         const records = await getRecords();
         const limit = Math.max(1, Math.min(MAX_BUSCAR_LIMIT, Number(args.limit) || DEFAULT_BUSCAR_LIMIT));
-        const matches = records.filter((r) => matchesFilters(r, args));
+        const { filtros, notas } = resolverFiltros(records, args);
+        const matches = records.filter((r) => matchesFilters(r, filtros));
         const ordenados = [...matches].reverse(); // listRecords ya viene asc por fechaSolicitud
         return {
+          ...(notas.length ? { notaFiltros: notas } : {}),
           totalCoincidencias: matches.length,
           registrosDevueltos: Math.min(limit, ordenados.length),
           registros: ordenados.slice(0, limit).map(compactRecordForChat),
@@ -470,11 +501,10 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
       case "sugerir_proveedores_por_articulo": {
         const records = await getRecords();
         const limit = Math.max(1, Math.min(20, Number(args.limit) || 8));
-        const matches = records.filter((r) => matchesFilters(r, {
-          descripcion: args.descripcion, categoria: args.categoria, area: args.area,
-        }));
+        const { filtros, notas } = resolverFiltros(records, { descripcion: args.descripcion, categoria: args.categoria, area: args.area });
+        const matches = records.filter((r) => matchesFilters(r, filtros));
         if (matches.length === 0) {
-          return { encontrados: 0, proveedores: [], nota: "No hay compras previas que coincidan con esa descripción." };
+          return { encontrados: 0, proveedores: [], nota: ["No hay compras previas que coincidan con esa descripción.", ...notas].join(" ") };
         }
         // Agrupa por proveedorNit cuando existe (referencia real al
         // catálogo); si el registro es viejo y no quedó atado a ninguno,

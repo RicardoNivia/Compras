@@ -10,7 +10,7 @@ import { TimelineButton } from "@/components/RecordTimelineModal";
 import { fmtCOP } from "@/lib/format";
 import { getDiasInfo } from "@/lib/diasInfo";
 import { patchRecordApi, deleteRecordApi, searchFiltersWithAiApi } from "@/lib/api";
-import { canCreateRecord, canEditRecord, canDeleteRecord, canToggleRadicado, getEditableFields } from "@/lib/roles";
+import { canCreateRecord, canEditRecord, canDeleteRecord, canToggleRadicado, getEditableFields, canViewAgentesCompras } from "@/lib/roles";
 import { IconPlus, IconEdit, IconTrash, IconCheck, IconAlert, IconSpark, IconSearch, IconStar } from "@/components/icons";
 
 const PAGE_SIZES = [25, 50, 100, 250];
@@ -728,6 +728,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
 
       {modalRecord !== undefined && (
         <RecordModal
+          puedeRevisar={permissions?.viewAgentesCompras ?? canViewAgentesCompras(role)}
           record={modalRecord}
           records={records}
           onClose={() => { setModalRecord(undefined); setPrefillCompra(null); }}

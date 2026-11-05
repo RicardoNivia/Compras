@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { generateReportContent, resumenCifras, huella } from "@/lib/reportContent";
+import { generateReportContent, resumenCifras, huella, textoAlcance } from "@/lib/reportContent";
 import { generateReportPdfBuffer } from "@/lib/reportPdf";
 import { periodoLabel, MESES } from "@/lib/reportSchedule";
 import { generateStructuredJson } from "@/lib/aiStructured";
@@ -29,15 +29,17 @@ export function opcionesDe(report) {
       nombre: report.nombre,
       periodoGeneral: report.periodoGeneral,
       excluirAnulados: estudio ? contexto.excluirAnulados !== false : false,
+      filtros: estudio ? contexto.filtros || null : null,
     },
     pdf: {
       nombre: report.nombre,
       prioridad: report.prioridad,
       dashboardLayout: report.tipo === "dashboard",
       estudio,
-      subtitulo: estudio ? [periodoLabel(report.periodoGeneral), contexto.audiencia ? `Para ${contexto.audiencia}` : null].filter(Boolean).join(" · ") : undefined,
+      subtitulo: estudio ? [periodoLabel(report.periodoGeneral), textoAlcance(contexto.filtros), contexto.audiencia ? `Para ${contexto.audiencia}` : null].filter(Boolean).join(" · ") : undefined,
     },
     excluirAnulados: estudio ? contexto.excluirAnulados !== false : false,
+    filtros: estudio ? contexto.filtros || null : null,
   };
 }
 
@@ -106,7 +108,7 @@ export const MENSAJE_DEFECTO = "Buen día,\n\nAdjunto el informe {nombre} de {pe
 // sirve para reponer el informe de un período que no se generó (queda con esa fecha en el historial).
 export async function generarEdicion(report, { origen = "programado", actor = null, ahora = null } = {}) {
   const now = ahora || new Date();
-  const { contenido: opts, pdf: pdfOpts, excluirAnulados } = opcionesDe(report);
+  const { contenido: opts, pdf: pdfOpts, excluirAnulados, filtros } = opcionesDe(report);
   const etiqueta = periodoLabel(report.periodoGeneral, now);
   const creador = actor ? { creadoPorUserId: actor.id, creadoPorNombre: actor.nombre } : { creadoPorUserId: null, creadoPorNombre: PROGRAMADOR };
   const base = { reportId: report.id, periodoLabel: etiqueta, origen, ...creador, ...(ahora ? { createdAt: now } : {}) };
@@ -121,7 +123,7 @@ export async function generarEdicion(report, { origen = "programado", actor = nu
       const contentFoto = await generateReportContent({ ...opts, ahora: now, sinIa: true });
       const [pdfFoto, cifrasFoto] = await Promise.all([
         generateReportPdfBuffer(contentFoto, { ...pdfOpts, fecha: now }),
-        resumenCifras(report.periodoGeneral, { excluirAnulados, ahora: now }),
+        resumenCifras(report.periodoGeneral, { excluirAnulados, ahora: now, filtros }),
       ]);
       const foto = await prisma.reportEdicion.create({
         data: { ...base, estado: "guardado", contenido: JSON.stringify(contentFoto), pdf: pdfFoto, resumen: JSON.stringify(cifrasFoto) },
@@ -136,7 +138,7 @@ export async function generarEdicion(report, { origen = "programado", actor = nu
     const content = await generateReportContent({ ...opts, ahora: now, previasIa, conResumen });
     const [pdfBuffer, cifras] = await Promise.all([
       generateReportPdfBuffer(content, { ...pdfOpts, fecha: now, subtitulo: pdfOpts.subtitulo ? pdfOpts.subtitulo.replace(periodoLabel(report.periodoGeneral), etiqueta) : pdfOpts.subtitulo }),
-      resumenCifras(report.periodoGeneral, { excluirAnulados, ahora: now }),
+      resumenCifras(report.periodoGeneral, { excluirAnulados, ahora: now, filtros }),
     ]);
     const res = conResumen ? await resumenNova(content, cifras, previasIa) : null;
     const resumen = res?.texto || "";

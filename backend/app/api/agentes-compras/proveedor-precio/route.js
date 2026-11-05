@@ -12,7 +12,7 @@ import { proveedorYPrecio } from "@/lib/agentesCompras";
  *       200: { description: "{ compras, referencia, proveedores, ejemplos, nova }" }
  */
 export async function POST(request) {
-  const { denied } = await requireAlgunPermiso(["viewAgentesCompras", "createRecord"]);
+  const { denied } = await requireAlgunPermiso(["viewAgentesCompras"]);
   if (denied) return denied;
   try {
     const { texto } = await request.json();

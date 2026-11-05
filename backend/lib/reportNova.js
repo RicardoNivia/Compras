@@ -8,7 +8,7 @@ import { FRECUENCIAS, describirProgramacion, proximasFechas } from "@/lib/report
 // proveedoresValoracion/cicloProveedores se calculan siempre con los datos reales (ver lib/reportContent.js) y los
 // bloques "ia" responden sobre los agregados exactos del período del informe.
 
-const TIPOS = ["texto", "kpi", "grafico", "tabla", "ia", "presupuesto", "pendientes", "fueraPlazo", "proveedoresValoracion", "cicloProveedores", "cumplimientoEntregas", "ahorroArea", "consumoCategoriaArea"];
+const TIPOS = ["texto", "kpi", "grafico", "tabla", "ia", "presupuesto", "pendientes", "fueraPlazo", "proveedoresValoracion", "cicloProveedores", "cumplimientoEntregas", "ahorroArea", "consumoCategoriaArea", "detalleCompras"];
 const PERIODOS = ["historico", "mes_actual", "mes_anterior", "anio_actual", "anio_anterior", "semana_anterior"];
 
 // ---------- Plantillas de un clic ----------
@@ -184,6 +184,7 @@ const CATALOGO_TEXTO = ({ dashboard = true } = {}) => `Tipos de bloque (usa EXAC
 - "cumplimientoEntregas": dona de compras entregadas a tiempo vs. tarde (como "Cumplimiento de entregas" del Dashboard).
 - "ahorroArea": ahorro (cotizado − comprado) por área, con tabla (como "Ahorro por área" del Dashboard).
 - "consumoCategoriaArea": por área, valor del período, acumulado del año, presupuesto, disponible y % consumido (como "Consumo por categoría y área").
+- "detalleCompras": el listado de TODAS las compras del período, una por fila (#, fecha, descripción, proveedor, área, estado y valor con IVA), con el total. Úsalo cuando pidan el detalle, "detallado", "cada compra", "listado", "relación de compras" o "todas las compras"; va al final del informe, después de los totales y gráficas.
 - En "grafico", "limite": N muestra solo los N primeros (ej. top 5 proveedores).
 Períodos válidos para "periodoGeneral": ${PERIODOS.join(", ")} (mes_anterior = el mes calendario anterior a la fecha de cada envío). NO los decides tú: ver PERÍODOS Y FECHAS.
 
@@ -235,9 +236,37 @@ const INFORME_SCHEMA = {
     tono: { type: "STRING", nullable: true },
     entendido: { type: "ARRAY", items: { type: "STRING" } },
     bloques: { type: "ARRAY", items: BLOQUE_SCHEMA },
+    filtroAreas: { type: "ARRAY", items: { type: "STRING" }, nullable: true },
+    filtroCategorias: { type: "ARRAY", items: { type: "STRING" }, nullable: true },
   },
   required: ["nombre", "periodoGeneral", "bloques", "entendido"],
 };
+
+// ALCANCE (filtro por área y categoría): Nova propone nombres; aquí se resuelven contra los nombres reales (sin tildes
+// ni mayúsculas, y si no hay uno igual, el que contenga todas las palabras). Lo que no exista se descarta con aviso.
+const REGLA_ALCANCE = `ALCANCE: si el pedido se limita a una o varias categorías o áreas (p. ej. "lo consumido en imprevistos administrativos", "solo el área de Mercadeo"), pon esos nombres en "filtroCategorias" / "filtroAreas", copiándolos de las listas de categorías y áreas que existen. Todo el informe (cifras, gráficas, tablas y secciones de Nova) se calcula entonces solo con esas compras. Si el pedido no limita, déjalos vacíos. Un desglose ("por categoría", "por área") NO es un filtro: es un bloque con agruparPor.`;
+const nAlc = (v) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+function resolverNombres(pedidos, existentes) {
+  const mapa = new Map((existentes || []).map((v) => [nAlc(v), v]));
+  const ok = [];
+  const faltan = [];
+  for (const p of pedidos || []) {
+    const n = nAlc(p);
+    if (!n) continue;
+    if (mapa.has(n)) { ok.push(mapa.get(n)); continue; }
+    const palabras = n.split(" ").filter((w) => w.length > 2);
+    const hits = [...mapa.keys()].filter((k) => palabras.length && palabras.every((w) => k.includes(w)));
+    if (hits.length) ok.push(...hits.map((k) => mapa.get(k))); else faltan.push(p);
+  }
+  return { ok: [...new Set(ok)], faltan };
+}
+function alcanceDe(res, aggregates) {
+  const a = resolverNombres(res.filtroAreas, Object.keys(aggregates.porArea || {}));
+  const c = resolverNombres(res.filtroCategorias, Object.keys(aggregates.porCategoria || {}));
+  const filtros = a.ok.length || c.ok.length ? { areas: a.ok, categorias: c.ok } : null;
+  const avisos = [...a.faltan.map((x) => `No existe el área «${x}»; no se filtró por ella.`), ...c.faltan.map((x) => `No existe la categoría «${x}»; no se filtró por ella.`)];
+  return { filtros, avisos };
+}
 
 const ESTILOS = ["barras", "columnas", "linea", "dona", "apiladas"];
 const CRONOLOGICOS = ["mes", "dia"];
@@ -312,6 +341,7 @@ export async function armarDesdePedido(pedido) {
   const resumenDatos = {
     totalRegistros: aggregates.totalRegistros,
     areas: Object.keys(aggregates.porArea || {}),
+    categorias: Object.keys(aggregates.porCategoria || {}),
     tieneValoraciones: true,
     tienePresupuesto: Object.keys(aggregates.presupuesto || {}).length > 0,
   };
@@ -328,16 +358,20 @@ Cómo armarlo:
 - "periodoGeneral": SIEMPRE "mes_anterior" (valor inicial); el usuario lo cambia después en Programación. Aunque el pedido mencione un mes, año, trimestre, fechas o "últimos N días", no lo apliques ni lo pongas como chip en "entendido": armas el informe igual (ver PERÍODOS Y FECHAS).
 - "audiencia": para quién es (Gerencia, Comité, Compras, Proveedores…) o null.
 - "tono": "ejecutivo", "detallado" o "formal".
-- "entendido": 3 a 5 frases cortas de lo que entendiste, para mostrárselas al usuario como chips (ej. "Para: Gerencia", "Incluye compras fuera de plazo"; nunca de período).`,
+- "entendido": 3 a 5 frases cortas de lo que entendiste, para mostrárselas al usuario como chips (ej. "Para: Gerencia", "Incluye compras fuera de plazo"; nunca de período).
+
+${REGLA_ALCANCE}`,
     prompt: `Pedido del usuario:\n"""${String(pedido || "").slice(0, 2000)}"""\n\nDatos disponibles (solo para saber qué existe, no para citar):\n${JSON.stringify(resumenDatos)}`,
     schema: INFORME_SCHEMA,
     budgetMs: 45000,
   });
+  const { filtros, avisos: avisosAlcance } = alcanceDe(res, aggregates);
+  const chipAlcance = filtros ? [`Solo: ${[...filtros.categorias, ...filtros.areas].join(", ")}`] : [];
   return {
     nombre: String(res.nombre || "Nuevo informe").slice(0, 120),
     periodoGeneral: "mes_anterior", // el período real se elige en Programación
-    contexto: { audiencia: res.audiencia || null, tono: res.tono || "ejecutivo", excluirAnulados: true },
-    entendido: [...(mencionaPeriodo(pedido) ? [AVISO_PERIODO_CORTO] : []), ...(res.entendido || []).filter((t) => !/per[ií]odo|trimestre|[uú]ltimos|fechas?/i.test(t))].slice(0, 6), // un solo chip de período, el nuestro
+    contexto: { audiencia: res.audiencia || null, tono: res.tono || "ejecutivo", excluirAnulados: true, ...(filtros ? { filtros } : {}) },
+    entendido: [...(mencionaPeriodo(pedido) ? [AVISO_PERIODO_CORTO] : []), ...chipAlcance, ...avisosAlcance, ...(res.entendido || []).filter((t) => !/per[ií]odo|trimestre|[uú]ltimos|fechas?/i.test(t) && !(chipAlcance.length && /filtr|solo |alcance|^categor[ií]as?s*:|^[aá]reas?s*:/i.test(t)))].slice(0, 6), // un solo chip de período, el nuestro
     bloques: limpiarBloques(res.bloques).bloques,
   };
 }
@@ -353,6 +387,9 @@ const EDICION_SCHEMA = {
     respuesta: { type: "STRING" },
     nombre: { type: "STRING", nullable: true },
     periodoGeneral: { type: "STRING", nullable: true },
+    cambiarAlcance: { type: "BOOLEAN", nullable: true },
+    filtroAreas: { type: "ARRAY", items: { type: "STRING" }, nullable: true },
+    filtroCategorias: { type: "ARRAY", items: { type: "STRING" }, nullable: true },
     operaciones: {
       type: "ARRAY",
       items: {
@@ -385,7 +422,7 @@ function aplicarOperaciones(bloques, operaciones) {
   return lista;
 }
 
-const TIPOS_ETIQUETA = { ia: "Análisis de Nova", texto: "Nota", kpi: "Cifra clave", grafico: "Gráfica", tabla: "Tabla", presupuesto: "Presupuesto", pendientes: "Solicitudes sin entregar", fueraPlazo: "Compras fuera de plazo", proveedoresValoracion: "Proveedores a revisar", cicloProveedores: "Ciclo de proveedores" };
+const TIPOS_ETIQUETA = { ia: "Análisis de Nova", texto: "Nota", kpi: "Cifra clave", grafico: "Gráfica", tabla: "Tabla", presupuesto: "Presupuesto", pendientes: "Solicitudes sin entregar", fueraPlazo: "Compras fuera de plazo", proveedoresValoracion: "Proveedores a revisar", cicloProveedores: "Ciclo de proveedores", detalleCompras: "Detalle de compras" };
 
 export async function editarConNova({ nombre, periodoGeneral, contexto, bloques, seleccion, instruccion, historial }) {
   const sel = Number.isInteger(seleccion) && bloques?.[seleccion] ? seleccion : null;
@@ -400,6 +437,7 @@ export async function editarConNova({ nombre, periodoGeneral, contexto, bloques,
     const { textoGuardado, destacadoGuardado, ...resto } = b; // eslint-disable-line no-unused-vars
     return { i, ...resto };
   });
+  const { aggregates: agg } = await loadAggregates();
   const res = await generateStructuredJson({
     systemInstruction: `Eres Nova dentro del editor del Estudio de informes. El usuario te pide cambios sobre un informe y tú devuelves SOLO las operaciones a aplicar (no el informe completo), en orden, y una respuesta corta en español (1-2 frases) contando qué hiciste.
 Operaciones ("op"): "cambiar" (indice + bloque con SOLO los campos que cambian; para quitar un límite de días usa ultimosDias 0), "agregar" (bloque completo con tipo y titulo; posicion opcional, por defecto al final), "quitar" (indice), "mover" (indice + posicion). Los índices se refieren a la lista tal como va quedando después de cada operación. Si no hay nada que cambiar, devuelve operaciones vacías y explícalo.
@@ -413,9 +451,12 @@ Reglas:
 - "Agrega el top 5 de proveedores": un bloque "tabla" o "grafico" con agruparPor "proveedor".
 - Puedes cambiar "nombre" solo si lo piden. "periodoGeneral" devuélvelo SIEMPRE en null: no puedes cambiar períodos ni fechas (ver PERÍODOS Y FECHAS); si lo piden, explícalo en "respuesta".
 - Haz EXACTAMENTE lo que piden: no cambies "agruparPor" a "area" ni a otro valor que no pidieron. Si piden algo que no está en el catálogo (otra agrupación, otra cifra), no lo cambies por algo parecido sin decirlo: explica en "respuesta" qué no se puede y qué propones en su lugar.
-- Nunca inventes cifras ni nombres de proveedores o áreas.`,
+- Nunca inventes cifras ni nombres de proveedores o áreas.
+- ${REGLA_ALCANCE} Solo si el pedido cambia el alcance (limitar, ampliar o quitar el filtro), pon "cambiarAlcance": true con la lista COMPLETA que debe quedar (vacía para quitarlo); si no, "cambiarAlcance": false.`,
     prompt: `Informe actual:
-${JSON.stringify({ nombre, periodoGeneral, audiencia: contexto?.audiencia || null, tono: contexto?.tono || null, bloques: compactos })}
+${JSON.stringify({ nombre, periodoGeneral, audiencia: contexto?.audiencia || null, tono: contexto?.tono || null, alcance: contexto?.filtros || null, bloques: compactos })}
+Áreas que existen: ${JSON.stringify(Object.keys(agg.porArea || {}))}
+Categorías que existen: ${JSON.stringify(Object.keys(agg.porCategoria || {}))}
 (Índices actuales: 0 a ${Math.max(0, (bloques || []).length - 1)}.)
 
 ${sel != null ? `Sección seleccionada: índice ${sel} ("${bloques[sel].titulo}").` : "No hay sección seleccionada."}
@@ -426,7 +467,14 @@ Pedido del usuario: """${String(instruccion || "").slice(0, 1500)}"""`,
   });
   const resultado = aplicarOperaciones(bloques, res.operaciones);
   const { bloques: limpios, avisos } = limpiarBloques(resultado, resultado.map((b, i) => bloques?.[i] || null));
+  let alcance;
+  if (res.cambiarAlcance) {
+    const r = alcanceDe(res, agg);
+    alcance = { filtros: r.filtros };
+    avisos.push(...r.avisos);
+  }
   return {
+    ...(alcance ? { filtros: alcance.filtros } : {}),
     respuesta: [res.respuesta || "Listo.", ...avisos.map((a) => `Ojo: ${a}`), ...(mencionaPeriodo(instruccion) && !/programaci[oó]n/i.test(res.respuesta || "") ? [AVISO_PERIODO] : [])].join("\n"),
     nombre: res.nombre ? String(res.nombre).slice(0, 120) : null,
     periodoGeneral: null, // los períodos se eligen en Programación, no desde el chat

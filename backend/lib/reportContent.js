@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "crypto";
 import { generateStructuredJson } from "@/lib/aiStructured";
 import { listRecords } from "@/lib/records";
@@ -221,6 +222,10 @@ export function buildAggregates(records, presupuestos) {
     totalRegistros: records.length,
     totalValorConIva: records.reduce((s, r) => s + (r.valorConIva || 0), 0),
     totalValorSinIva: records.reduce((s, r) => s + (r.valorSinIva || 0), 0),
+    // Muchas compras no traen el valor sin IVA: la suma de arriba es SOLO de las que lo tienen. Se dice cuántas son
+    // para que Nova (y los informes) no la comparen con el total con IVA como si cubriera lo mismo.
+    comprasConValorSinIva: records.filter((r) => r.valorSinIva != null && r.valorSinIva > 0).length,
+    valorConIvaDeEsasCompras: records.filter((r) => r.valorSinIva != null && r.valorSinIva > 0).reduce((s, r) => s + (r.valorConIva || 0), 0),
     totalSinLegalizar: sinLegalizar.length,
     sinLegalizarMuestra: sinLegalizar.slice(0, MAX_MUESTRA).map((r) => miniRecord(r, { estadoLegalizacion: r.estadoLegalizacion })),
     porArea: countBy(records, "area"),
@@ -239,13 +244,46 @@ export function buildAggregates(records, presupuestos) {
 // loadAggregates (flujo legado/bloque IA, siempre sobre el histórico
 // completo) como renderReportFromBloques (que filtra por bloque según su
 // "periodo" antes de agregar, ver filterRecordsByPeriodo).
+// ---------- Alcance del informe (filtro por área y categoría) ----------
+// Un informe puede limitarse a unas áreas y/o categorías (contexto.filtros = { areas: [], categorias: [] }), p. ej.
+// "consumo en Imprevistos Administrativos". En vez de pasar el filtro por cada función, la generación corre dentro de
+// conAlcance(): todo lo que carga compras para el informe (cifras, gráficas, tablas, secciones de Nova, el "¿de dónde
+// sale?" y el resumen de la edición) pasa por loadRecordsAndPresupuestos y ve solo las compras del alcance.
+const alcanceActual = new AsyncLocalStorage();
+const normAlcance = (v) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+
+export function normalizarAlcance(f) {
+  const lista = (v) => [...new Set((Array.isArray(v) ? v : []).map((x) => String(x || "").trim()).filter(Boolean))].slice(0, 30);
+  const areas = lista(f?.areas);
+  const categorias = lista(f?.categorias);
+  return areas.length || categorias.length ? { areas, categorias } : null;
+}
+export function conAlcance(filtros, fn) {
+  const a = normalizarAlcance(filtros);
+  return a ? alcanceActual.run(a, fn) : fn();
+}
+// "Categoría: Imprevistos Administrativos (JPA) · Áreas: Administrativo" (o null si es todo).
+export function textoAlcance(filtros = alcanceActual.getStore()) {
+  const a = normalizarAlcance(filtros);
+  if (!a) return null;
+  return [a.categorias.length ? `${a.categorias.length > 1 ? "Categorías" : "Categoría"}: ${a.categorias.join(", ")}` : null, a.areas.length ? `${a.areas.length > 1 ? "Áreas" : "Área"}: ${a.areas.join(", ")}` : null].filter(Boolean).join(" · ");
+}
+
 async function loadRecordsAndPresupuestos() {
   const anioActual = new Date().getFullYear();
   const [records, { presupuestos }] = await Promise.all([
     listRecords(),
     listPresupuestos({ anio: anioActual }),
   ]);
-  return { records, presupuestos };
+  const a = alcanceActual.getStore();
+  if (!a) return { records, presupuestos };
+  const areas = new Set(a.areas.map(normAlcance));
+  const cats = new Set(a.categorias.map(normAlcance));
+  return {
+    records: records.filter((r) => (!areas.size || areas.has(normAlcance(r.area))) && (!cats.size || cats.has(normAlcance(r.categoria)))),
+    // El presupuesto es por área: con filtro de área solo esas áreas; con filtro de categoría el gastado ya es solo de esa categoría.
+    presupuestos: areas.size ? presupuestos.filter((p) => areas.has(normAlcance(p.area))) : presupuestos,
+  };
 }
 
 // Trae records+presupuestos y arma agregados/muestra — compartido entre el
@@ -821,7 +859,7 @@ const iaCache = globalThis.__reportIaCache || (globalThis.__reportIaCache = new 
 const IA_CACHE_MS = 10 * 60 * 1000;
 
 async function iaConCache(pregunta, contexto) {
-  const key = JSON.stringify([pregunta, contexto]);
+  const key = JSON.stringify([pregunta, contexto, alcanceActual.getStore() || null]);
   const hit = iaCache.get(key);
   if (hit && Date.now() - hit.at < IA_CACHE_MS) return hit.value;
   const value = await generateBloqueIaContent(pregunta, contexto);
@@ -982,6 +1020,30 @@ function renderBloquePendientes(b, records, sufijo) {
 }
 
 // ---- Bloques del Estudio de informes ----
+
+// Detalle de compras: TODAS las compras del período (y del alcance del informe), una por fila, de la más reciente a la
+// más antigua, con el total al final. En pantalla es una tabla paginada y ordenable; en el PDF continúa en las páginas
+// que haga falta (drawDetalleCompras en reportPdf.js). Tope de filas para que un informe sin filtro no pese demasiado.
+export const MAX_DETALLE_COMPRAS = 1000;
+function renderBloqueDetalleCompras(b, records, sufijo) {
+  const titulo = b.titulo || `Detalle de compras${sufijo}`;
+  if (!records.length) return { titulo, contenido: "No hay compras en este período.", destacado: null, grafico: null, tabla: null, _origen: "detalleCompras" };
+  const ordenadas = [...records].sort((x, y) => String(y.fechaSolicitud || "").localeCompare(String(x.fechaSolicitud || "")) || (y.localSeq || 0) - (x.localSeq || 0));
+  const total = records.reduce((s, r) => s + (r.valorConIva || 0), 0);
+  const visibles = ordenadas.slice(0, MAX_DETALLE_COMPRAS);
+  const columnas = ["#", "Fecha", "Descripción", "Proveedor", "Área", "Estado", "Valor con IVA"];
+  const filas = visibles.map((r) => [r.localSeq != null ? `#${r.localSeq}` : "—", r.fechaSolicitud || "—", r.descripcion || "—", r.proveedor || "—", r.area || "—", r.estado || "—", fmtMoneda(r.valorConIva || 0)]);
+  return {
+    titulo,
+    destacado: `${records.length.toLocaleString("es-CO")} compra(s) · ${fmtMoneda(total)}`,
+    contenido: records.length > visibles.length
+      ? `Se muestran las ${visibles.length.toLocaleString("es-CO")} compras más recientes de ${records.length.toLocaleString("es-CO")}; el total es de todas.`
+      : "Todas las compras del período, de la más reciente a la más antigua.",
+    grafico: null,
+    tabla: { columnas, filas, total: ["Total", "", `${records.length.toLocaleString("es-CO")} compra(s)`, "", "", "", fmtMoneda(total)] },
+    _origen: "detalleCompras",
+  };
+}
 
 function diasDeRegistro(r) {
   if (!r.fechaSolicitud) return null;
@@ -1152,8 +1214,8 @@ function renderBloqueConsumoCategoriaArea(b, records, sufijo, periodo, ctx) {
 }
 
 // Cifras base de una edición, para compararla con otras (ver lib/reportEdiciones.js).
-export async function resumenCifras(periodo, { excluirAnulados = true, ahora = new Date() } = {}) {
-  const { base } = await recordsDelInforme(excluirAnulados);
+export async function resumenCifras(periodo, { excluirAnulados = true, ahora = new Date(), filtros = null } = {}) {
+  const { base } = await conAlcance(filtros, () => recordsDelInforme(excluirAnulados));
   const records = filterRecordsByPeriodo(base, periodo, 0, ahora);
   return {
     valor: records.reduce((s, r) => s + (r.valorConIva || 0), 0),
@@ -1165,9 +1227,9 @@ export async function resumenCifras(periodo, { excluirAnulados = true, ahora = n
 }
 
 // ¿Se cumple la condición de envío del informe? (ver ReportConfig.condicion)
-export async function evaluarCondicion(condicion, periodo, { excluirAnulados = true, ahora = new Date() } = {}) {
+export async function evaluarCondicion(condicion, periodo, { excluirAnulados = true, ahora = new Date(), filtros = null } = {}) {
   if (!condicion || condicion === "siempre") return { cumple: true };
-  const { base, presupuestos } = await recordsDelInforme(excluirAnulados);
+  const { base, presupuestos } = await conAlcance(filtros, () => recordsDelInforme(excluirAnulados));
   if (condicion === "presupuesto80") {
     const p = buildPresupuestoComparativo(base, presupuestos);
     const areas = Object.entries(p).filter(([, v]) => (v.porcentajeGastado || 0) >= 80).map(([a]) => a);
@@ -1195,8 +1257,9 @@ const FORMULAS = {
 // "¿De dónde sale esta cifra?": cómo se calcula, cuántos registros la forman, el detalle por área, los registros
 // principales y el valor del período anterior. Todo determinístico: sirve para verificar cualquier cifra del informe.
 // Con agruparPor + etiqueta explica una barra o porción de una gráfica (solo los registros de ese grupo).
-export async function cifraDetalle({ metrica, periodo, excluirAnulados = true, agruparPor, etiqueta }) {
-  const { base, presupuestos } = await recordsDelInforme(excluirAnulados);
+export async function cifraDetalle({ metrica, periodo, excluirAnulados = true, agruparPor, etiqueta, filtros = null }) {
+  const { base, presupuestos } = await conAlcance(filtros, () => recordsDelInforme(excluirAnulados));
+  const alcance = textoAlcance(filtros);
   const porGrupo = !!agruparPor && etiqueta != null && !AGRUPACIONES_CRONOLOGICAS.includes(agruparPor);
   const enGrupo = (r) => !porGrupo || (r[agruparPor] || "Sin dato") === etiqueta;
   const records = filterRecordsByPeriodo(base, periodo).filter(enGrupo);
@@ -1224,7 +1287,7 @@ export async function cifraDetalle({ metrica, periodo, excluirAnulados = true, a
     valorTexto: fmtKpiValue(valor, def.formato),
     formato: def.formato,
     formula: FORMULAS[key] || def.label,
-    filtro: `${filtroPeriodo}${excluirAnulados ? ", sin las anuladas" : ""}${porGrupo ? ` · ${AGRUPAR_LABELS[agruparPor] || agruparPor}: ${etiqueta}` : ""}`,
+    filtro: `${filtroPeriodo}${excluirAnulados ? ", sin las anuladas" : ""}${alcance ? ` · solo ${alcance}` : ""}${porGrupo ? ` · ${AGRUPAR_LABELS[agruparPor] || agruparPor}: ${etiqueta}` : ""}`,
     registros: records.length,
     porArea,
     muestra,
@@ -1303,6 +1366,7 @@ export async function renderReportFromBloques(bloques, { nombre, periodo, exclui
     if (b.tipo === "tabla") return renderBloqueTabla(b, records, sufijo, periodo, ctx);
     if (b.tipo === "presupuesto") return renderBloquePresupuesto(b, aggregates, sufijo);
     if (b.tipo === "pendientes") return renderBloquePendientes(b, records, sufijo);
+    if (b.tipo === "detalleCompras") return renderBloqueDetalleCompras(b, records, sufijo);
     return renderBloqueTexto(b, aggregates);
   }));
   return {
@@ -1310,6 +1374,7 @@ export async function renderReportFromBloques(bloques, { nombre, periodo, exclui
     saludo: "Buen día,",
     secciones,
     cierre: "Para más detalle, ingresa al Panel de Compras y Bienestar.",
+    ...(textoAlcance() ? { alcance: textoAlcance() } : {}),
     ...(lote ? { _ia: lote.mapa, resumenNova: lote.resumen || null } : {}),
   };
 }
@@ -1388,7 +1453,8 @@ async function datosDelPeriodoTexto({ periodo, excluirAnulados, ahora }, maxMues
   const previo = etiquetaPrev
     ? `\nAgregados exactos del período anterior (${etiquetaPrev}), para comparar:\n${JSON.stringify({ totalRegistros: previos.length, totalValorConIva: previos.reduce((s, r) => s + (r.valorConIva || 0), 0), porArea: countBy(previos, "area"), tiemposEntrega: buildTiemposEntrega(previos) })}\n`
     : "";
-  return `Período del informe: ${PERIODO_LABELS[periodo] || "histórico completo"}${excluirAnulados ? " (sin compras anuladas)" : ""}.
+  const alcance = textoAlcance();
+  return `Período del informe: ${PERIODO_LABELS[periodo] || "histórico completo"}${excluirAnulados ? " (sin compras anuladas)" : ""}.${alcance ? `\nALCANCE DEL INFORME: solo las compras de ${alcance}. Todas las cifras de abajo son solo de ese alcance; dilo así en lo que escribas.` : ""}
 Agregados exactos del período:
 ${JSON.stringify(buildAggregates(records, presupuestos))}
 ${previo}
@@ -1484,10 +1550,10 @@ export async function generateReportContent(reportOrPrompt) {
   if (typeof reportOrPrompt === "string") {
     return generateReportContentFromPrompt(reportOrPrompt);
   }
-  const { prompt, bloques, nombre, periodoGeneral, excluirAnulados, ahora, sinIa, previasIa, conResumen } = reportOrPrompt || {};
+  const { prompt, bloques, nombre, periodoGeneral, excluirAnulados, ahora, sinIa, previasIa, conResumen, filtros } = reportOrPrompt || {};
   const parsedBloques = Array.isArray(bloques) ? bloques : (typeof bloques === "string" ? JSON.parse(bloques || "[]") : []);
   if (parsedBloques.length > 0) {
-    return renderReportFromBloques(parsedBloques, { nombre, periodo: periodoGeneral, excluirAnulados: !!excluirAnulados, ahora: ahora || new Date(), sinIa: !!sinIa, previasIa: previasIa || {}, conResumen: !!conResumen });
+    return conAlcance(filtros, () => renderReportFromBloques(parsedBloques, { nombre, periodo: periodoGeneral, excluirAnulados: !!excluirAnulados, ahora: ahora || new Date(), sinIa: !!sinIa, previasIa: previasIa || {}, conResumen: !!conResumen }));
   }
   return generateReportContentFromPrompt(prompt);
 }

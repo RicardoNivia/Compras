@@ -56,7 +56,7 @@ const emptyForm = {
   actividadId: "",
 };
 
-export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true, editableFields = null, maestros = [], proveedores = [], presupuestos = [], actividades = [], crear = null, actividadFija = null, prefill = null }) {
+export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true, editableFields = null, maestros = [], proveedores = [], presupuestos = [], actividades = [], crear = null, actividadFija = null, prefill = null, puedeRevisar = false }) {
   const isEdit = !!record;
   // editableFields null = todos los campos editables (admin, registro).
   // Con lista (p.ej. legalizar), los demás campos quedan solo-lectura.
@@ -700,9 +700,9 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
               {saving ? "Guardando…" : "Guardar"}
             </button>
             <button type="button" className="btn" onClick={onClose} disabled={saving || deleting}>Cancelar</button>
-            <button type="button" className="btn agente-boton" onClick={revisarConNova} disabled={revisando || saving || !form.descripcion} title="Revisa la compra contra el procedimiento antes de guardar. No cambia nada.">
+            {puedeRevisar && <button type="button" className="btn agente-boton" onClick={revisarConNova} disabled={revisando || saving || !form.descripcion} title="Revisa la compra contra el procedimiento antes de guardar. No cambia nada.">
               {revisando ? <><span className="spinner" /> Revisando…</> : <><IconSpark size={13} /> {revision ? "Revisar la compra de nuevo" : "Revisar la compra"}</>}
-            </button>
+            </button>}
             <div className="spacer" />
             {isEdit && allowDelete && !confirmDelete && (
               <button

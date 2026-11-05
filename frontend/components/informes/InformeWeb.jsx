@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PALETA, periodoCorto } from "@/components/informes/estudioUtils";
+import { textoAlcance } from "@/components/informes/AlcanceInforme";
 
 // Un informe "solo para consultar" visto como una página web interactiva (no como la hoja A4 del PDF): ocupa todo el
 // ancho, las cifras clave van en tarjetas grandes, las gráficas se dibujan al ancho real de su tarjeta con un detalle
@@ -277,6 +278,7 @@ function TablaWeb({ t }) {
               </tr>
             ))}
           </tbody>
+          {t.total && <tfoot><tr className="inf-tabla-total">{t.total.map((v, j) => <td key={j} className={j === t.total.length - 1 ? "mono" : ""}>{v}</td>)}</tr></tfoot>}
         </table>
       </div>
       <div className="table-footer">
@@ -373,6 +375,7 @@ export default function InformeWeb({ informe, content, cargando, generadoAt, acc
   const bloques = informe.bloques || [];
   const secciones = content?.secciones || [];
   const audiencia = informe.contexto?.audiencia;
+  const alcance = textoAlcance(informe.contexto?.filtros);
 
   // Las cifras clave seguidas forman una franja de tarjetas grandes; el resto, tarjetas en una cuadrícula.
   const grupos = [];
@@ -390,7 +393,7 @@ export default function InformeWeb({ informe, content, cargando, generadoAt, acc
           <small>Sinco · Panel de Compras y Bienestar</small>
           <h1>{informe.nombre || "Informe sin título"}</h1>
           <p>
-            {periodoCorto(informe.periodoGeneral)}{audiencia ? ` · Para ${audiencia}` : ""}{subtitulo ? ` · ${subtitulo}` : ""}
+            {periodoCorto(informe.periodoGeneral)}{alcance ? ` · Solo ${alcance}` : ""}{audiencia ? ` · Para ${audiencia}` : ""}{subtitulo ? ` · ${subtitulo}` : ""}
             {generadoAt && !cargando && <> · Datos al {new Date(generadoAt).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</>}
             {cargando && <> · <span className="spinner" style={{ width: 11, height: 11, verticalAlign: -1 }} /> Calculando con los datos de hoy…</>}
           </p>

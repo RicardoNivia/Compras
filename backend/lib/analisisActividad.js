@@ -1,3 +1,4 @@
+import { enSegundoPlano } from "@/lib/anthropicModels";
 import { prisma } from "@/lib/prisma";
 import { generateStructuredJson } from "@/lib/aiStructured";
 import { getActividad, toClientAnalisisActividad } from "@/lib/actividadesBienestar";
@@ -151,7 +152,7 @@ export function reanalizarEnSegundoPlano(actividadId) {
   const id = Number(actividadId);
   if (!id || process.env.ANALISIS_BIENESTAR_AUTO === "0") return;
   clearTimeout(programadas.get(id));
-  programadas.set(id, setTimeout(async () => {
+  programadas.set(id, setTimeout(() => enSegundoPlano(async () => {
     programadas.delete(id);
     try {
       const a = await prisma.actividadBienestar.findUnique({ where: { id }, select: { estado: true, nombre: true } });
@@ -161,7 +162,7 @@ export function reanalizarEnSegundoPlano(actividadId) {
     } catch (e) {
       console.warn(`[análisis actividad] ${id}: ${e.message}`);
     }
-  }, ESPERA_REANALISIS_MS));
+  }), ESPERA_REANALISIS_MS));
 }
 
 // Ya realizadas y sin análisis. Pocas por revisión para no cargar el backend. Ya no corre sola: queda para el agente

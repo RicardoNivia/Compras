@@ -63,7 +63,7 @@ export default function VistaConsulta({ informe, onContenido, onVistaPrevia, onV
       {error && <div className="modal-error"><IconAlert size={13} /> {error}</div>}
       <InformeWeb
         informe={informe} content={content} cargando={cargando} generadoAt={generadoAt}
-        onCifra={(p) => setCifra({ ...p, periodo: informe.periodoGeneral, excluirAnulados: informe.contexto?.excluirAnulados !== false })}
+        onCifra={(p) => setCifra({ ...p, periodo: informe.periodoGeneral, excluirAnulados: informe.contexto?.excluirAnulados !== false, filtros: informe.contexto?.filtros || null })}
         acciones={(
           <>
             <button type="button" className="btn small" onClick={cargar} disabled={cargando}>Actualizar datos</button>

@@ -6,6 +6,7 @@ import { IconSpark, IconArrowRight, IconAlert } from "@/components/icons";
 import DocumentoA4 from "@/components/informes/DocumentoA4";
 import CifraDrawer from "@/components/informes/CifraDrawer";
 import { AGRUPAR, METRICAS, PERIODOS, TIPOS_SECCION, bloqueNuevo, SECCIONES_LISTAS, SECCION_LISTA_POR_CLAVE } from "@/components/informes/estudioUtils";
+import AlcanceInforme from "@/components/informes/AlcanceInforme";
 
 // Editor del Estudio de informes: a la izquierda Nova (cambios en lenguaje natural sobre todo el informe o sobre la
 // sección seleccionada), en el centro el documento tal como saldrá en el PDF y a la derecha la estructura (arrastrar
@@ -203,7 +204,7 @@ export default function EditorDiseno({ informe, onCambio, content, cargando, err
       setBloques(rapido.bs);
       return;
     }
-    const previo = { bloques, nombre: informe.nombre, periodoGeneral: informe.periodoGeneral };
+    const previo = { bloques, nombre: informe.nombre, periodoGeneral: informe.periodoGeneral, contexto: informe.contexto };
     const sel = seleccion;
     setChat((c) => [...c, { rol: "usuario", texto: instruccion, seccion: sel != null ? bloques[sel]?.titulo : null }]);
     setMensaje("");
@@ -216,6 +217,8 @@ export default function EditorDiseno({ informe, onCambio, content, cargando, err
       const extra = {};
       if (res.nombre) extra.nombre = res.nombre;
       if (res.periodoGeneral) extra.periodoGeneral = res.periodoGeneral;
+      // Nova cambió el alcance (filtro por categoría o área) porque el pedido lo pedía.
+      if ("filtros" in res) extra.contexto = { ...informe.contexto, filtros: res.filtros || null };
       const cambio = JSON.stringify(res.bloques) !== JSON.stringify(bloques) || Object.keys(extra).length > 0;
       if (cambio) setBloques(res.bloques, extra);
       setChat((c) => [...c, { rol: "nova", texto: res.respuesta, deshacer: cambio ? previo : null }]);
@@ -229,7 +232,7 @@ export default function EditorDiseno({ informe, onCambio, content, cargando, err
   function deshacer(idx) {
     const m = chat[idx];
     if (!m?.deshacer) return;
-    onCambio({ bloques: m.deshacer.bloques, nombre: m.deshacer.nombre, periodoGeneral: m.deshacer.periodoGeneral });
+    onCambio({ bloques: m.deshacer.bloques, nombre: m.deshacer.nombre, periodoGeneral: m.deshacer.periodoGeneral, ...(m.deshacer.contexto ? { contexto: m.deshacer.contexto } : {}) });
     setChat((c) => c.map((x, i) => (i === idx ? { ...x, deshacer: null, deshecho: true } : x)));
   }
 
@@ -296,7 +299,7 @@ export default function EditorDiseno({ informe, onCambio, content, cargando, err
           <DocumentoA4
             informe={informe} content={content} cargando={cargando}
             seleccion={seleccion} onSeleccion={setSeleccion} onAccion={accion}
-            onCifra={(p) => setCifra({ ...p, periodo: informe.periodoGeneral, excluirAnulados: informe.contexto?.excluirAnulados !== false })}
+            onCifra={(p) => setCifra({ ...p, periodo: informe.periodoGeneral, excluirAnulados: informe.contexto?.excluirAnulados !== false, filtros: informe.contexto?.filtros || null })}
           />
         </div>
       </section>
@@ -363,6 +366,7 @@ export default function EditorDiseno({ informe, onCambio, content, cargando, err
           <div className="field"><label htmlFor="d-aud">Para quién es</label>
             <input id="d-aud" placeholder="Ej. Gerencia" value={informe.contexto?.audiencia || ""} onChange={(e) => onCambio({ contexto: { ...informe.contexto, audiencia: e.target.value || null } })} />
           </div>
+          <AlcanceInforme filtros={informe.contexto?.filtros} onChange={(f) => onCambio({ contexto: { ...informe.contexto, filtros: f } })} />
           <label className="est-switch">
             <input type="checkbox" className="prov-switch" role="switch" checked={informe.contexto?.excluirAnulados !== false} onChange={(e) => onCambio({ contexto: { ...informe.contexto, excluirAnulados: e.target.checked } })} />
             Excluir compras anuladas

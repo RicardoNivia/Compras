@@ -12,7 +12,7 @@ import { listRecords } from "@/lib/records";
  *       200: { description: "{ compras }" }
  */
 export async function GET(request) {
-  const { denied } = await requireAlgunPermiso(["viewAgentesCompras", "editRecord"]);
+  const { denied } = await requireAlgunPermiso(["viewAgentesCompras"]);
   if (denied) return denied;
   try {
     const q = (new URL(request.url).searchParams.get("q") || "").trim().toLowerCase().replace(/^#/, "");

@@ -32,7 +32,7 @@ export async function POST(request) {
   if (denied) return denied;
   try {
     const b = await request.json().catch(() => ({}));
-    return NextResponse.json(await cifraDetalle({ metrica: b.metrica, periodo: b.periodo, excluirAnulados: b.excluirAnulados !== false, agruparPor: b.agruparPor, etiqueta: b.etiqueta }));
+    return NextResponse.json(await cifraDetalle({ metrica: b.metrica, periodo: b.periodo, excluirAnulados: b.excluirAnulados !== false, filtros: b.filtros || null, agruparPor: b.agruparPor, etiqueta: b.etiqueta }));
   } catch (err) {
     return apiError(err);
   }

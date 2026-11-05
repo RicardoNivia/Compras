@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { generateAnthropicJson } from "@/lib/anthropic";
-import { DEFAULT_ANTHROPIC_MODEL } from "@/lib/anthropicModels";
+import { DEFAULT_ANTHROPIC_MODEL, conModelos } from "@/lib/anthropicModels";
 
 // Generación de JSON estructurado (Informes automáticos, moderación del
 // Agente IA, "Explícame este número", etc.) — siempre con Anthropic (Claude),
@@ -19,15 +19,16 @@ export async function generateStructuredJson({ systemInstruction, prompt, schema
     const hit = respuestas.get(clave);
     if (hit && Date.now() - hit.at < CACHE_MS) return structuredClone(hit.value);
   }
-  const value = await generateAnthropicJson({
-    model: DEFAULT_ANTHROPIC_MODEL,
+  // Con respaldo entre modelos (ver lib/anthropicModels.js#conModelos).
+  const { valor: value } = await conModelos((model) => generateAnthropicJson({
+    model,
     systemInstruction,
     prompt,
     schema,
     image,
     documento,
     timeoutMs: budgetMs,
-  });
+  }));
   if (clave) {
     respuestas.set(clave, { at: Date.now(), value: structuredClone(value) });
     if (respuestas.size > 300) respuestas.delete(respuestas.keys().next().value);

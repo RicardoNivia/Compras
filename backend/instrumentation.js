@@ -10,6 +10,10 @@ export async function register() {
     // ese cuelgue silencioso sin afectar nada si el entorno sí tiene IPv6.
     const dns = await import("node:dns");
     dns.setDefaultResultOrder("ipv4first");
+    // Lo que arranca aquí corre solo (sin que una persona lo pida): en producción usa Sonnet 5.5 primero
+    // (ver lib/anthropicModels.js). Los temporizadores creados dentro heredan la marca.
+    const { enSegundoPlano } = await import("@/lib/anthropicModels");
+    await enSegundoPlano(async () => {
 
     const { startReportScheduler } = await import("@/lib/reportScheduler");
     startReportScheduler();
@@ -41,5 +45,6 @@ export async function register() {
     // Una vez por despliegue: manito de todos los comentarios y recalificación de todas las actividades (ver lib/agenteDespliegue.js).
     const { startAgenteAlDesplegar } = await import("@/lib/agenteDespliegue");
     startAgenteAlDesplegar();
+    });
   }
 }

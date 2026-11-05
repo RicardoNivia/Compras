@@ -1,3 +1,4 @@
+import { enSegundoPlano } from "@/lib/anthropicModels";
 import { prisma } from "@/lib/prisma";
 import { generateStructuredJson } from "@/lib/aiStructured";
 import { logSentimientoComentarios } from "@/lib/audit";
@@ -111,9 +112,7 @@ const apagado = () => process.env.SENTIMIENTO_AUTO === "0";
 // Después de guardar comentarios: no espera ni falla la escritura que lo llamó.
 export function clasificarEnSegundoPlano(actividadId) {
   if (apagado()) return;
-  setTimeout(() => {
-    clasificarComentarios({ actividadId }).catch((e) => console.error("[sentimiento]", e.message));
-  }, 0);
+  setTimeout(() => enSegundoPlano(() => clasificarComentarios({ actividadId }).catch((e) => console.error("[sentimiento]", e.message))), 0);
 }
 
 // Ya no hay revisiones periódicas: la manito se pone solo cuando se guarda o se importa un comentario

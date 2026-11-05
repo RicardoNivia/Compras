@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { IconSpark, IconTrash, IconCopy } from "@/components/icons";
 import { PALETA, periodoCorto } from "@/components/informes/estudioUtils";
+import { textoAlcance } from "@/components/informes/AlcanceInforme";
 
 // El informe dibujado como una página A4 (mismo contenido y orden que el PDF, ver backend/lib/reportPdf.js).
 // Cada sección se puede seleccionar para editarla o pedirle cambios a Nova; las cifras clave y las barras/porciones
@@ -147,17 +149,43 @@ function Grafico({ g, onDato }) {
   );
 }
 
+const TAMANOS_TABLA = [10, 25, 50, 100];
 function Tabla({ t }) {
+  const [tam, setTam] = useState(TAMANOS_TABLA[0]);
+  const [pag, setPag] = useState(1);
+  const larga = t.filas.length > 15;
+  const paginas = Math.max(1, Math.ceil(t.filas.length / tam));
+  const actual = Math.min(pag, paginas);
+  useEffect(() => { setPag(1); }, [tam, t.filas.length]);
+  const filas = larga ? t.filas.slice((actual - 1) * tam, actual * tam) : t.filas;
   return (
     <div style={{ overflowX: "auto" }}>
       <table className="est-tbl">
         <thead><tr>{t.columnas.map((c) => <th key={c}>{c}</th>)}</tr></thead>
         <tbody>
-          {t.filas.slice(0, 15).map((f, i) => (
+          {filas.map((f, i) => (
             <tr key={i}>{f.map((v, j) => <td key={j} title={String(v ?? "")}>{v ?? "—"}</td>)}</tr>
           ))}
         </tbody>
+        {t.total && <tfoot><tr className="est-tbl-total">{t.total.map((v, j) => <td key={j}>{v}</td>)}</tr></tfoot>}
       </table>
+      {larga && (
+        <div className="table-footer est-tbl-pie" onClick={(e) => e.stopPropagation()}>
+          <div className="field" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <label style={{ marginBottom: 0 }}>Tamaño</label>
+            <select value={tam} onChange={(e) => setTam(Number(e.target.value))} style={{ width: "auto" }}>
+              {TAMANOS_TABLA.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div className="page-btns">
+            <button type="button" className="btn small" disabled={actual <= 1} onClick={() => setPag(actual - 1)}>Anterior</button>
+            <button type="button" className="btn small" disabled={actual >= paginas} onClick={() => setPag(actual + 1)}>Siguiente</button>
+          </div>
+          <span className="count-note">Página {actual} de {paginas}</span>
+          <div className="spacer" />
+          <span className="count-note">{t.filas.length} fila(s)</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -180,6 +208,7 @@ export default function DocumentoA4({ informe, content, cargando, seleccion, onS
   const bloques = informe.bloques || [];
   const secciones = content?.secciones || [];
   const audiencia = informe.contexto?.audiencia;
+  const alcance = textoAlcance(informe.contexto?.filtros);
   const hoy = new Date().toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
 
   // Las cifras clave seguidas se agrupan en una fila, igual que en el PDF.
@@ -196,6 +225,7 @@ export default function DocumentoA4({ informe, content, cargando, seleccion, onS
         <small>Sinco · Panel de Compras y Bienestar</small>
         <h2>{informe.nombre || "Informe sin título"}</h2>
         <p>{periodoCorto(informe.periodoGeneral)}{audiencia ? ` · Para ${audiencia}` : ""} · {hoy}</p>
+        {alcance && <p className="est-a4-alcance">Solo {alcance}</p>}
       </header>
       <div className="est-a4-body">
         {bloques.length === 0 && <p className="muted" style={{ fontSize: 13 }}>El informe está vacío. Agrega una sección desde la derecha o pídele a Nova que lo arme.</p>}

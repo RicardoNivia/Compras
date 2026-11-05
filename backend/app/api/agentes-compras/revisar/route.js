@@ -12,7 +12,7 @@ import { revisarCompra } from "@/lib/agentesCompras";
  *       200: { description: "{ hallazgos, referencia, nova, smmlv }" }
  */
 export async function POST(request) {
-  const { denied } = await requireAlgunPermiso(["viewAgentesCompras", "createRecord", "editRecord"]);
+  const { denied } = await requireAlgunPermiso(["viewAgentesCompras"]);
   if (denied) return denied;
   try {
     const { borrador, id } = await request.json();
