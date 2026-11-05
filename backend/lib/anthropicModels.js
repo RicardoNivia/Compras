@@ -35,8 +35,11 @@ export const ANTHROPIC_MODELS = [
 //     Sonnet 5.5 y, si falla, Opus 5.5.
 // Nunca Haiku en producción. Fuera de producción (local) se queda Haiku, para que las pruebas no gasten de más.
 // ANTHROPIC_MODELOS y ANTHROPIC_MODELOS_AUTO (ids separados por coma) cambian el orden de cada caso sin tocar el código.
-const ORDEN_PRODUCCION = ["claude-opus-5-5", "claude-sonnet-5-5"];
-const ORDEN_PRODUCCION_AUTO = ["claude-sonnet-5-5", "claude-opus-5-5"];
+// 2026-11-05: en producción Nova respondió "Error al conectar con el servicio de IA (401)" con Opus/Sonnet, así que se
+// volvió a Haiku 4.5 en todos los casos, como estaba antes. Para usar otros modelos sin tocar el código, definir
+// ANTHROPIC_MODELOS / ANTHROPIC_MODELOS_AUTO en el servidor (después de comprobar que la clave de producción los permite).
+const ORDEN_PRODUCCION = ["claude-haiku-4-5-20251001"];
+const ORDEN_PRODUCCION_AUTO = ["claude-haiku-4-5-20251001"];
 const ORDEN_LOCAL = ["claude-haiku-4-5-20251001"];
 
 // ¿La llamada es automática? Lo marca enSegundoPlano(): los temporizadores y promesas que nacen dentro heredan la marca
