@@ -242,6 +242,7 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
         properties: {
           area: { type: "string", description: "Filtra solo por esta área (opcional, nombre exacto tal como aparece en los datos)." },
           anio: { type: "integer", description: "Filtra solo por año de la fecha de solicitud (opcional, ej. 2026). Se ignora si se envían fechaDesde/fechaHasta." },
+          incluirSinIva: { type: "boolean", description: "true SOLO si el usuario pregunta expresamente por el valor sin IVA o antes de IVA. Por defecto se devuelven solo los valores totales (con IVA)." },
           fechaDesde: { type: "string", description: "Fecha mínima de solicitud, formato YYYY-MM-DD (opcional) — úsala en vez de 'anio' para periodos que no son un año completo (trimestres, meses, rangos arbitrarios)." },
           fechaHasta: { type: "string", description: "Fecha máxima de solicitud, formato YYYY-MM-DD (opcional)." },
           categoria: { type: "string", description: "Filtra solo por esta categoría (opcional). Si no es el nombre exacto, se toman las categorías que contengan todas sus palabras; la respuesta lo explica en notaFiltros." },
@@ -483,6 +484,9 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
         const presupuestos = canSeePresupuesto ? await getPresupuestos() : [];
         const aggregates = buildAggregates(filtered, presupuestos);
         if (!canSeePresupuesto) delete aggregates.presupuesto;
+        // Por defecto solo los valores totales (con IVA): el valor sin IVA falta en muchas compras y confundía al
+        // mostrarlo junto al total. Solo se entrega si el usuario lo pide expresamente.
+        if (!args.incluirSinIva) { delete aggregates.totalValorSinIva; delete aggregates.comprasConValorSinIva; delete aggregates.valorConIvaDeEsasCompras; }
         return notas.length ? { notaFiltros: notas, ...aggregates } : aggregates;
       }
       case "buscar_registros": {
