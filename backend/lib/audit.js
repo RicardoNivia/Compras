@@ -184,6 +184,11 @@ export async function logConfigAgente(actor, clave, nombre, activo) {
 }
 
 // Agente cotizador: crear o eliminar un cuadro comparativo.
+// Agente verificador de factura (Compras): queda en la historia de la compra que se verificó.
+export async function logVerificacionFactura(actor, compra, detalle) {
+  await writeLog({ action: "verificar", entityType: "verificacionFactura", recordId: String(compra.id), recordInfo: `Compra #${compra.localSeq ?? "—"}${compra.descripcion ? ` · ${String(compra.descripcion).slice(0, 60)}` : ""}`, actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
+}
+
 export async function logCuadroComparativo(actor, cuadro, action, detalle) {
   await writeLog({ action, entityType: "cuadroComparativo", recordId: String(cuadro.id), recordInfo: cuadro.titulo, actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
 }

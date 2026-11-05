@@ -929,12 +929,16 @@ model PropuestaAsociacion {
 model CuadroComparativo {
   id              Int      @id @default(autoincrement())
   titulo          String
+  modulo          String   @default("bienestar") // "bienestar" | "compras": en qué página de Agentes se lista
   actividadId     Int?
+  recordId        String?  // compra de Compras a la que queda adjunto (sin FK, como el resto de referencias sueltas)
   datos           Json
   recomendacion   String?
   createdAt       DateTime @default(now())
   creadoPorUserId String?
   creadoPorNombre String?
+
+  @@index([recordId])
 
   @@map("cuadros_comparativos")
 }

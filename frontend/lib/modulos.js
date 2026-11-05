@@ -20,6 +20,7 @@ const RUTAS = [
   ["/presupuesto", "compras"],
   ["/informes", "compras"],
   ["/ver-informes", "compras"],
+  ["/agentes", "compras"],
 ];
 
 // El módulo dueño de una ruta, o null si es una ruta general.

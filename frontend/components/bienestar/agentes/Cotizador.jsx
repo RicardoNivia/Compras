@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { fetchCuadrosApi, extraerCotizacionApi, crearCuadroApi, eliminarCuadroApi } from "@/lib/api";
+import { fetchCuadrosApi, extraerCotizacionApi, crearCuadroApi, eliminarCuadroApi, COTIZADOR_BIENESTAR } from "@/lib/api";
+import ElegirCompra from "@/components/compras/agentes/ElegirCompra";
 import { fmtCOP } from "@/lib/format";
 import PiePagina, { usePagina } from "@/components/bienestar/PiePagina";
 import { IconSpark, IconTrash, IconMoney, IconFile, IconCheck, IconAlert, IconDownload, IconStar, IconInfo, IconEye } from "@/components/icons";
@@ -12,7 +13,9 @@ const pctTxt = (p) => (p == null ? "—" : p === 0 ? "La más económica" : `+${
 
 // Agente cotizador: sube las cotizaciones, Nova lee cada una y el sistema arma el cuadro comparativo (totales,
 // diferencias y si el procedimiento exige cuadro), con la recomendación de Nova. Se guarda y se descarga en PDF.
-export default function Cotizador() {
+// base: ruta de la API del módulo (Bienestar o Compras). conCompra: en Compras el cuadro puede quedar adjunto a una compra.
+export default function Cotizador({ base = COTIZADOR_BIENESTAR, conCompra = false, compraInicial = null }) {
+  const [compra, setCompra] = useState(compraInicial);
   const [cuadros, setCuadros] = useState(null);
   const [salario, setSalario] = useState(null);
   const [archivos, setArchivos] = useState([]); // { nombre, estado: leyendo|lista|rechazada, cotizacion?, error? }
@@ -24,7 +27,7 @@ export default function Cotizador() {
   const [arrastrando, setArrastrando] = useState(false);
   const input = useRef(null);
 
-  const cargar = () => fetchCuadrosApi().then((r) => { setCuadros(r.cuadros); setSalario(r.salario); }).catch((e) => setError(e.message));
+  const cargar = () => fetchCuadrosApi(base).then((r) => { setCuadros(r.cuadros); setSalario(r.salario); }).catch((e) => setError(e.message));
   useEffect(() => { cargar(); }, []);
   const pag = usePagina(cuadros || [], "");
 
@@ -35,7 +38,7 @@ export default function Cotizador() {
     setArchivos((a) => [...a, ...nuevos.map((f) => ({ nombre: f.name, estado: "leyendo" }))]);
     for (const f of nuevos) {
       try {
-        const { cotizacion } = await extraerCotizacionApi(f);
+        const { cotizacion } = await extraerCotizacionApi(f, base);
         setArchivos((a) => a.map((x) => (x.nombre === f.name && x.estado === "leyendo" ? { ...x, estado: "lista", cotizacion } : x)));
       } catch (e) {
         setArchivos((a) => a.map((x) => (x.nombre === f.name && x.estado === "leyendo" ? { ...x, estado: "rechazada", error: e.message } : x)));
@@ -51,10 +54,11 @@ export default function Cotizador() {
     setError("");
     setArmando(true);
     try {
-      const { cuadro } = await crearCuadroApi({ titulo, cotizaciones: listas.map((a) => a.cotizacion) });
+      const { cuadro } = await crearCuadroApi({ titulo, recordId: conCompra ? compra?.id || null : undefined, cotizaciones: listas.map((a) => a.cotizacion) }, base);
       setAbierto(cuadro);
       setArchivos([]);
       setTitulo("");
+      setCompra(null);
       cargar();
     } catch (e) {
       setError(e.message);
@@ -65,7 +69,7 @@ export default function Cotizador() {
 
   async function eliminar(c) {
     try {
-      await eliminarCuadroApi(c.id);
+      await eliminarCuadroApi(c.id, base);
       setBorrar(null);
       if (abierto?.id === c.id) setAbierto(null);
       cargar();
@@ -131,6 +135,12 @@ export default function Cotizador() {
               </div>
             ))}
           </div>
+          {conCompra && (
+            <div className="ag-pie-accion ag-pie-compra">
+              <div><strong>¿De qué compra es?</strong><small>Opcional: el cuadro queda adjunto a la compra y el revisor lo tiene en cuenta.</small></div>
+              <ElegirCompra valor={compra} onChange={setCompra} />
+            </div>
+          )}
           <div className="ag-pie-accion">
             <input className="ag-titulo-input" placeholder="¿Qué se está cotizando? (ej. Refrigerios Día del Niño)" value={titulo} onChange={(e) => setTitulo(e.target.value)} aria-label="Nombre del cuadro" />
             <button type="button" className="btn btn-primary ag-btn-grande" disabled={listas.length < 2 || leyendo || armando || !titulo.trim()} onClick={armar}>
@@ -155,15 +165,16 @@ export default function Cotizador() {
         ) : (
           <div className="table-scroll">
             <table className="records ficha-tabla ag-tabla">
-              <thead><tr><th>Cuadro</th><th>Fecha</th><th>Proveedores</th><th>Más económica</th><th>Creado por</th><th className="actions-col">Acciones</th></tr></thead>
+              <thead><tr><th>Cuadro</th>{conCompra && <th>Compra</th>}<th>Fecha</th><th>Proveedores</th><th>Más económica</th><th>Creado por</th><th className="actions-col">Acciones</th></tr></thead>
               <tbody>
-                {!cuadros && <tr><td colSpan={6}><div className="skeleton-bar" style={{ height: 34, borderRadius: 8 }} /></td></tr>}
+                {!cuadros && <tr><td colSpan={conCompra ? 7 : 6}><div className="skeleton-bar" style={{ height: 34, borderRadius: 8 }} /></td></tr>}
                 {pag.pagina.map((c) => {
                   const comp = c.datos.comparacion;
                   const mejor = comp.mejorIndice != null ? comp.filas[comp.mejorIndice] : null;
                   return (
                     <tr key={c.id}>
                       <td><span className="desc-tooltip-wrap" style={{ maxWidth: 280 }}><span className="desc-text"><b>{c.titulo}</b></span><span className="desc-tooltip-bubble">{c.titulo}</span></span></td>
+                      {conCompra && <td className="mono">{c.datos.compra ? `#${c.datos.compra.numero ?? "—"}` : <span className="muted">—</span>}</td>}
                       <td>{new Date(c.createdAt).toLocaleDateString("es-CO")}</td>
                       <td><span className="ag-pill">{comp.filas.length}</span></td>
                       <td>{mejor ? <span className="desc-tooltip-wrap" style={{ maxWidth: 260 }}><span className="desc-text">{mejor.proveedor} · <b>{fmtCOP(mejor.total)}</b></span><span className="desc-tooltip-bubble">{mejor.proveedor} · {fmtCOP(mejor.total)}</span></span> : "—"}</td>
@@ -230,7 +241,7 @@ function CuadroVista({ cuadro, onCerrar }) {
     <section className="agente-cuadro ag-cuadro" aria-label={`Cuadro comparativo ${cuadro.titulo}`}>
       <div className="agente-cuadro-cabeza">
         <div>
-          <span className="ag-etiqueta">Cuadro comparativo</span>
+          <span className="ag-etiqueta">Cuadro comparativo{cuadro.datos.compra ? ` · compra #${cuadro.datos.compra.numero ?? "—"}` : ""}</span>
           <h3>{cuadro.titulo}</h3>
         </div>
         <span className="agente-acciones">

@@ -89,6 +89,16 @@ export function canViewPresupuesto(role) {
   return role === ROLES.ADMIN;
 }
 
+// Agentes de Compras (página /agentes): revisor, proveedor y precio, cotizador y verificar factura. El vigía de
+// presupuesto exige además viewPresupuesto y el detector de anomalías su propia feature.
+export function canViewAgentesCompras(role) {
+  return role === ROLES.ADMIN || role === ROLES.REGISTRO || role === ROLES.LEGALIZAR;
+}
+
+export function canViewAnomaliasCompras(role) {
+  return role === ROLES.ADMIN;
+}
+
 // Módulo de Bienestar: actividades del cronograma, su presupuesto y las compras asociadas.
 export function canViewBienestar(role) {
   return role === ROLES.ADMIN || role === ROLES.REGISTRO;
