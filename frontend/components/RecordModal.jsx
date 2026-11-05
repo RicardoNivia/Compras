@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { getDiasInfo } from "@/lib/diasInfo";
 import { fmtCOP } from "@/lib/format";
-import { createRecordApi, updateRecordApi, deleteRecordApi } from "@/lib/api";
+import { createRecordApi, updateRecordApi, deleteRecordApi, revisarCompraApi } from "@/lib/api";
+import HallazgosRevision from "@/components/compras/agentes/HallazgosRevision";
+import { IconSpark } from "@/components/icons";
 import { IconTrash, IconClock, IconFile, IconLayers, IconMoney, IconEdit } from "@/components/icons";
 import ObservacionesReview from "@/components/ObservacionesReview";
 import MoneyInput from "@/components/MoneyInput";
@@ -118,6 +120,24 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
   const [deleting, setDeleting] = useState(false);
   const [aiReviewLoading, setAiReviewLoading] = useState(false);
   const [pendingInvoiceFields, setPendingInvoiceFields] = useState([]);
+  // Agente revisor: revisa el borrador contra el procedimiento (umbral, compra partida, proveedor, duplicados, precio,
+  // categoría). Solo avisa: nunca bloquea guardar.
+  const [revision, setRevision] = useState(null);
+  const [revisando, setRevisando] = useState(false);
+  const [errorRevision, setErrorRevision] = useState("");
+  async function revisarConNova() {
+    setErrorRevision("");
+    setRevisando(true);
+    try {
+      setRevision(await revisarCompraApi({ ...form, valorConIva: form.valorConIva === "" ? null : Number(form.valorConIva) }, record?.id || null));
+      // El formulario es largo: lleva la vista al resultado para que no pase desapercibido.
+      setTimeout(() => document.querySelector(".ag-revision-form")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 80);
+    } catch (e) {
+      setErrorRevision(e.message);
+    } finally {
+      setRevisando(false);
+    }
+  }
 
   // Al leer una factura: los campos vacíos se llenan directo; si el campo ya
   // tiene un valor distinto al que trae la factura, no se sobrescribe solo —
@@ -664,6 +684,13 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
               )}
             </div>
 
+            {(revision || errorRevision) && (
+              <div className="full ag-revision-form" style={{ gridColumn: "1 / -1" }}>
+                {errorRevision ? <div className="modal-error">{errorRevision}</div> : (
+                  <HallazgosRevision revision={revision} compacto onCategoria={isEditable("categoria") ? (c) => { updateMaestroCampo("categoriaId", "categoria", c.id); setRevision(null); } : undefined} />
+                )}
+              </div>
+            )}
             {error && <div className="modal-error full" style={{ gridColumn: "1 / -1" }}>{error}</div>}
           </div>
 
@@ -673,6 +700,9 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
               {saving ? "Guardando…" : "Guardar"}
             </button>
             <button type="button" className="btn" onClick={onClose} disabled={saving || deleting}>Cancelar</button>
+            <button type="button" className="btn agente-boton" onClick={revisarConNova} disabled={revisando || saving || !form.descripcion} title="Revisa la compra contra el procedimiento antes de guardar. No cambia nada.">
+              {revisando ? <><span className="spinner" /> Revisando…</> : <><IconSpark size={13} /> {revision ? "Revisar la compra de nuevo" : "Revisar la compra"}</>}
+            </button>
             <div className="spacer" />
             {isEdit && allowDelete && !confirmDelete && (
               <button

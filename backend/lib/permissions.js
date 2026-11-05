@@ -28,6 +28,8 @@ export const FEATURES = [
   { key: "editProveedores", label: "Editar proveedores (estados, checklist, excepciones)", modulo: "Compras", section: "Proveedores", defaultRoles: [ROLES.ADMIN, ROLES.PROVEEDORES] },
   { key: "viewPresupuesto", label: "Ver y configurar Presupuesto", modulo: "Compras", section: "Presupuesto", defaultRoles: [ROLES.ADMIN] },
   { key: "viewReportes", label: "Ver y configurar Informes automáticos", modulo: "Compras", section: "Informes", defaultRoles: [ROLES.ADMIN] },
+  { key: "viewAgentesCompras", label: "Agentes de Compras (revisor, proveedor y precio, cotizador y verificar factura)", modulo: "Compras", section: "Agentes", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR] },
+  { key: "viewAnomaliasCompras", label: "Agente detector de anomalías en compras", modulo: "Compras", section: "Agentes", defaultRoles: [ROLES.ADMIN] },
   { key: "viewMaestros", label: "Maestros de Compras y Proveedores (incluye el ciclo de proveedores)", modulo: "Compras", section: "Maestros", defaultRoles: [ROLES.ADMIN, ROLES.PROVEEDORES] },
   { key: "viewDashboardBienestar", label: "Ver Dashboard de Bienestar", modulo: "Bienestar", section: "Bienestar", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
   { key: "viewBienestar", label: "Ver actividades y cronograma de Bienestar", modulo: "Bienestar", section: "Bienestar", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },

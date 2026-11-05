@@ -685,14 +685,31 @@ export const accionAsociadorApi = (accion, ids) => postAgente("/api/actividades/
 export const revisionDiariaAsociadorApi = (activo) => postAgente("/api/actividades/agentes/asociador", { accion: "revisionDiaria", activo });
 export const sugerirComprasApi = (actividadId) => postAgente(`/api/actividades/${actividadId}/sugerir-compras`, {});
 export const crearComprasSugeridasApi = (actividadId, items) => postAgente(`/api/actividades/${actividadId}/sugerir-compras`, { crear: true, items });
-export const fetchCuadrosApi = () => fetch("/api/actividades/agentes/cotizador", { cache: "no-store" }).then(handle);
-export function extraerCotizacionApi(archivo) {
+// El cotizador sirve a Bienestar y a Compras: base = ruta del módulo.
+export const COTIZADOR_BIENESTAR = "/api/actividades/agentes/cotizador";
+export const COTIZADOR_COMPRAS = "/api/agentes-compras/cotizador";
+export const fetchCuadrosApi = (base = COTIZADOR_BIENESTAR) => fetch(base, { cache: "no-store" }).then(handle);
+export function extraerCotizacionApi(archivo, base = COTIZADOR_BIENESTAR) {
   const fd = new FormData();
   fd.append("archivo", archivo, archivo.name);
-  return fetch("/api/actividades/agentes/cotizador/extraer", { method: "POST", body: fd }).then(handle);
+  return fetch(`${base}/extraer`, { method: "POST", body: fd }).then(handle);
 }
-export const crearCuadroApi = (body) => postAgente("/api/actividades/agentes/cotizador", body);
-export const eliminarCuadroApi = (id) => fetch(`/api/actividades/agentes/cotizador/${id}`, { method: "DELETE" }).then(handle);
+export const crearCuadroApi = (body, base = COTIZADOR_BIENESTAR) => postAgente(base, body);
+export const eliminarCuadroApi = (id, base = COTIZADOR_BIENESTAR) => fetch(`${base}/${id}`, { method: "DELETE" }).then(handle);
+
+// Agentes de Compras (página /agentes del módulo Compras).
+export const revisarCompraApi = (borrador, id) => postAgente("/api/agentes-compras/revisar", { borrador, id });
+export const proveedorPrecioApi = (texto) => postAgente("/api/agentes-compras/proveedor-precio", { texto });
+export const buscarComprasAgenteApi = (q) => fetch(`/api/agentes-compras/compras?q=${encodeURIComponent(q || "")}`, { cache: "no-store" }).then(handle);
+export function verificarFacturaApi(recordId, archivo) {
+  const fd = new FormData();
+  fd.append("recordId", recordId);
+  fd.append("archivo", archivo, archivo.name);
+  return fetch("/api/agentes-compras/factura", { method: "POST", body: fd }).then(handle);
+}
+export const vigiaPresupuestoApi = (anio) => fetch(`/api/agentes-compras/presupuesto?anio=${encodeURIComponent(anio)}`, { cache: "no-store" }).then(handle);
+export const anomaliasApi = (desde, hasta) => fetch(`/api/agentes-compras/anomalias?desde=${encodeURIComponent(desde || "")}&hasta=${encodeURIComponent(hasta || "")}`, { cache: "no-store" }).then(handle);
+export const lecturaNovaApi = (body) => postAgente("/api/agentes-compras/lectura", body);
 
 export const fetchHistoriasApi = (anio) => fetch(`/api/actividades/historias?anio=${encodeURIComponent(anio)}`, { cache: "no-store" }).then(handle);
 export const fetchFotosApi = (actividadId) => fetch(`/api/actividades/${actividadId}/fotos`, { cache: "no-store" }).then(handle);

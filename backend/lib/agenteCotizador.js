@@ -139,9 +139,9 @@ function error(msg, status = 400) {
   return Object.assign(new Error(msg), { status });
 }
 
-const aCliente = (c) => ({ id: c.id, titulo: c.titulo, actividadId: c.actividadId, datos: c.datos, recomendacion: c.recomendacion, createdAt: c.createdAt, creadoPorNombre: c.creadoPorNombre });
+const aCliente = (c) => ({ id: c.id, titulo: c.titulo, modulo: c.modulo, actividadId: c.actividadId, recordId: c.recordId, datos: c.datos, recomendacion: c.recomendacion, createdAt: c.createdAt, creadoPorNombre: c.creadoPorNombre });
 
-export async function crearCuadro({ titulo, actividadId, cotizaciones }, actor) {
+export async function crearCuadro({ titulo, actividadId, recordId, cotizaciones }, actor, modulo = "bienestar") {
   if (!Array.isArray(cotizaciones) || cotizaciones.length < 2) throw error("Sube al menos 2 cotizaciones para comparar.");
   if (cotizaciones.length > MAX_ARCHIVOS) throw error(`Máximo ${MAX_ARCHIVOS} cotizaciones por cuadro.`);
   const t = String(titulo || "").trim().slice(0, 200);
@@ -151,12 +151,17 @@ export async function crearCuadro({ titulo, actividadId, cotizaciones }, actor) 
     act = await prisma.actividadBienestar.findUnique({ where: { id: Number(actividadId) }, select: { id: true, nombre: true } });
     if (!act) throw error("La actividad no existe.");
   }
+  let compra = null;
+  if (recordId) {
+    compra = await prisma.record.findUnique({ where: { id: String(recordId) }, select: { id: true, localSeq: true, descripcion: true } });
+    if (!compra) throw error("La compra no existe.");
+  }
   const comp = comparar(cotizaciones, await salarioVigente());
   const rec = await recomendar(cotizaciones, comp).catch(() => ({ recomendado: null, texto: "" }));
   const row = await prisma.cuadroComparativo.create({
     data: {
-      titulo: t, actividadId: act?.id || null,
-      datos: { cotizaciones, comparacion: comp, recomendado: rec.recomendado, actividad: act?.nombre || null },
+      titulo: t, modulo: modulo === "compras" ? "compras" : "bienestar", actividadId: act?.id || null, recordId: compra?.id || null,
+      datos: { cotizaciones, comparacion: comp, recomendado: rec.recomendado, actividad: act?.nombre || null, compra: compra ? { numero: compra.localSeq, descripcion: compra.descripcion } : null },
       recomendacion: rec.texto || null,
       creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null,
     },
@@ -166,14 +171,14 @@ export async function crearCuadro({ titulo, actividadId, cotizaciones }, actor) 
   return aCliente(row);
 }
 
-export async function listCuadros() {
-  const rows = await prisma.cuadroComparativo.findMany({ orderBy: { createdAt: "desc" }, take: 500 });
+export async function listCuadros(modulo = "bienestar") {
+  const rows = await prisma.cuadroComparativo.findMany({ where: { modulo }, orderBy: { createdAt: "desc" }, take: 500 });
   return rows.map(aCliente);
 }
 
-export async function eliminarCuadro(id, actor) {
+export async function eliminarCuadro(id, actor, modulo = "bienestar") {
   const row = await prisma.cuadroComparativo.findUnique({ where: { id: Number(id) } });
-  if (!row) throw error("Cuadro no encontrado.", 404);
+  if (!row || row.modulo !== modulo) throw error("Cuadro no encontrado.", 404);
   await prisma.cuadroComparativo.delete({ where: { id: row.id } });
   logCuadroComparativo(actor, row, "eliminar", `Eliminó el cuadro «${row.titulo}».`).catch(() => {});
 }
