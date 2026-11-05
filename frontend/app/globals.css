@@ -4950,3 +4950,27 @@ button.ficha-cierre:hover, button.ficha-cierre:focus-visible{ border-color: var(
 .ag-cifra-boton.activa > .ag-cifra{ border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
 .ag-paso-card-cuerpo > .ag-compra-buscar, .ag-paso-card-cuerpo > .ag-compra-elegida{ flex:none; }
 @media (min-width: 1100px){ .ag-selector-seis{ grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ===== Estudio de informes: alcance (filtro por categoría y área, components/informes/AlcanceInforme.jsx) ===== */
+.est-alcance{ display:flex; flex-direction:column; gap:8px; padding:12px; border-radius:12px; border:1px dashed var(--border); background: var(--surface-2); }
+.est-alcance.activo{ border-style:solid; border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.est-alcance-cabeza{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.est-alcance > p{ margin:0; font-size:12px; line-height:1.4; }
+.est-alcance-campo{ display:flex; flex-direction:column; gap:6px; }
+.est-alcance-campo > label{ font-size:11.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color: var(--ink-2); }
+.est-alcance-campo select{ min-height:34px; font-size:13px; }
+.est-alcance-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+.est-alcance-todas{ font-size:12.5px; color: var(--muted); font-style:italic; }
+.est-alcance-chip{ display:inline-flex; align-items:center; gap:4px; max-width:100%; padding:3px 4px 3px 10px; border-radius:99px; background: var(--accent); color: var(--accent-ink); font-size:12.5px; font-weight:600; animation: agEntra .25s ease both; }
+.est-alcance-chip > span{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.est-alcance-chip button{ width:20px; height:20px; display:grid; place-items:center; border:0; border-radius:50%; background: rgba(255,255,255,.22); color:inherit; font-size:14px; line-height:1; cursor:pointer; }
+.est-alcance-chip button:hover{ background: rgba(255,255,255,.38); }
+.est-a4-alcance{ display:inline-block; margin-top:6px !important; padding:3px 10px; border-radius:99px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent) !important; font-weight:700; font-size:12px !important; }
+.est-a4-head .est-a4-alcance{ background: rgba(255,255,255,.18); color:#fff !important; }
+.est-alcance-cabeza .link-btn{ font-size:12px; font-weight:700; text-decoration:none; }
+.est-alcance-cabeza .link-btn:hover{ text-decoration:underline; }
+
+/* Estudio de informes: total al pie de las tablas (Detalle de compras) y paginación dentro de la hoja A4 */
+.est-tbl tfoot td, .inf-tabla tfoot td{ font-weight:800; color: var(--ink); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); border-top:2px solid color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.est-tbl-pie{ padding:8px 0 0; border-top:0; font-size:12px; }
+.est-tbl-pie .btn.small{ padding:4px 10px; }

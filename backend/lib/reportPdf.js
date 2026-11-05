@@ -369,6 +369,48 @@ function drawKpiGrid(doc, kpis, width, cols = 2) {
   doc.y = col === 0 ? rowY : rowY + KPI_CARD_H + gap;
 }
 
+// Detalle de compras: tabla larga que continúa en las páginas que haga falta, con el encabezado de columnas repetido en
+// cada página, filas de una línea (el texto largo se corta con "…"), franjas alternas y el total al final.
+const DETALLE_ANCHOS = [0.07, 0.11, 0.31, 0.2, 0.12, 0.08, 0.11];
+const DETALLE_FILA_H = 15;
+function drawDetalleCompras(doc, s, width) {
+  const abajo = () => doc.page.height - doc.page.margins.bottom - 6;
+  const cabecera = 13 + 4 + 22 + 14 + 3 * DETALLE_FILA_H;
+  if (doc.y + cabecera > abajo()) doc.addPage();
+  const x0 = MARGIN;
+  doc.x = x0;
+  doc.fillColor("#132a46").font("Helvetica-Bold").fontSize(13).text(s.titulo || "", { width });
+  if (s.destacado) doc.fillColor(ACCENT_HEX).font("Helvetica-Bold").fontSize(15).text(s.destacado, { width });
+  if (s.contenido) doc.fillColor("#5a6b85").font("Helvetica").fontSize(9).text(contentPlain(s.contenido), { width });
+  doc.moveDown(0.4);
+  const t = s.tabla;
+  if (!t?.filas?.length) { doc.moveDown(1); return; }
+  const anchos = DETALLE_ANCHOS.map((p) => p * width);
+  const xs = anchos.map((_, i) => x0 + anchos.slice(0, i).reduce((a, b) => a + b, 0));
+  const derecha = (i) => i === t.columnas.length - 1;
+  const encabezado = () => {
+    const y = doc.y;
+    doc.rect(x0, y, width, DETALLE_FILA_H + 2).fill("#e4ecf4");
+    doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#33425b");
+    t.columnas.forEach((c, i) => doc.text(String(c).toUpperCase(), xs[i] + 4, y + 5, { width: anchos[i] - 8, align: derecha(i) ? "right" : "left", lineBreak: false, ellipsis: true }));
+    doc.y = y + DETALLE_FILA_H + 2;
+  };
+  const fila = (valores, idx, negrita = false) => {
+    if (doc.y + DETALLE_FILA_H > abajo()) { doc.addPage(); doc.y = doc.page.margins.top; encabezado(); }
+    const y = doc.y;
+    if (negrita) doc.rect(x0, y, width, DETALLE_FILA_H + 2).fill("#dbe6f2");
+    else if (idx % 2) doc.rect(x0, y, width, DETALLE_FILA_H).fill("#f6f9fc");
+    doc.font(negrita ? "Helvetica-Bold" : "Helvetica").fontSize(7.8).fillColor(negrita ? "#132a46" : "#33425b");
+    valores.forEach((v, i) => doc.text(String(v ?? ""), xs[i] + 4, y + 4, { width: anchos[i] - 8, align: derecha(i) ? "right" : "left", lineBreak: false, ellipsis: true, height: DETALLE_FILA_H }));
+    doc.y = y + DETALLE_FILA_H + (negrita ? 2 : 0);
+  };
+  encabezado();
+  t.filas.forEach((f, i) => fila(f, i));
+  if (t.total) fila(t.total, 0, true);
+  doc.x = x0;
+  doc.moveDown(1.1);
+}
+
 // Estudio de informes: las cifras clave seguidas se agrupan en una cuadrícula en el lugar donde están (no se mueven
 // al principio como en el tipo "Dashboard"); el resto de secciones se dibuja igual que siempre.
 function drawSeccionesEstudio(doc, secciones, width) {
@@ -382,6 +424,8 @@ function drawSeccionesEstudio(doc, secciones, width) {
       if (required > doc.page.height - doc.page.margins.bottom - doc.y) doc.addPage();
       drawKpiGrid(doc, run, width, Math.max(1, cols));
       doc.moveDown(1.1);
+    } else if (secciones[i]._origen === "detalleCompras") {
+      drawDetalleCompras(doc, secciones[i++], width);
     } else {
       drawSection(doc, secciones[i++], width);
     }

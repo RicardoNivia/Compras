@@ -14,7 +14,7 @@ import { logVerificacionFactura } from "@/lib/audit";
  *       200: { description: "{ compra, factura, checks, veredicto }" }
  */
 export async function POST(request) {
-  const { user, denied } = await requireAlgunPermiso(["viewAgentesCompras", "editRecord"]);
+  const { user, denied } = await requireAlgunPermiso(["viewAgentesCompras"]);
   if (denied) return denied;
   let nombre = "archivo";
   let recordId = null;

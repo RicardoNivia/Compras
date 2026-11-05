@@ -50,6 +50,7 @@ export const TIPOS_SECCION = {
   cumplimientoEntregas: "Cumplimiento de entregas",
   ahorroArea: "Ahorro por área",
   consumoCategoriaArea: "Consumo por categoría y área",
+  detalleCompras: "Detalle de compras",
 };
 
 // Secciones que el usuario puede agregar a mano desde el editor.
@@ -65,6 +66,7 @@ export function bloqueNuevo(tipo) {
     case "proveedoresValoracion": return { tipo, titulo: "Proveedores a revisar", umbral: 3 };
     case "pendientes": return { tipo, titulo: "Solicitudes sin entregar" };
     case "cicloProveedores": return { tipo, titulo: "Ciclo de proveedores" };
+    case "detalleCompras": return { tipo, titulo: "Detalle de compras" };
     default: return { tipo: "texto", titulo: "Nota", contenido: "" };
   }
 }
@@ -201,6 +203,7 @@ export const SECCIONES_LISTAS = [
       { clave: "consumoCategoriaArea", label: "Consumo por categoría y área (con presupuesto)", bloques: [{ tipo: "consumoCategoriaArea", titulo: "Consumo por categoría y área" }] },
       { clave: "fueraPlazo", label: "Compras fuera de plazo (más de 8 días hábiles)", bloques: [{ tipo: "fueraPlazo", titulo: "Compras fuera de plazo" }] },
       { clave: "pendientes", label: "Solicitudes sin entregar", bloques: [{ tipo: "pendientes", titulo: "Solicitudes sin entregar" }] },
+      { clave: "detalleCompras", label: "Detalle de compras (cada compra del período, con el total)", bloques: [{ tipo: "detalleCompras", titulo: "Detalle de compras" }] },
       { clave: "presupuesto", label: "Presupuesto vs. gastado por área", bloques: [{ tipo: "presupuesto", titulo: "Presupuesto vs. gastado por área" }] },
       { clave: "tablaArea", label: "Tabla resumen por área", bloques: [{ tipo: "tabla", titulo: "Resumen por área", agruparPor: "area" }] },
       { clave: "tablaCategoria", label: "Tabla resumen por categoría", bloques: [{ tipo: "tabla", titulo: "Resumen por categoría", agruparPor: "categoria" }] },
