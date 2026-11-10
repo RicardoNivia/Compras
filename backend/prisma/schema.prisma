@@ -1,0 +1,1244 @@
+// Prisma ORM con migraciones (prisma migrate) sobre PostgreSQL.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Record {
+  id                  String   @id @default(cuid())
+  localSeq            Int?     @unique // número autoincremental visible (# en la tabla), asignado desde Meta.nextLocalSeq
+  informe             String?
+  fechaSolicitud      String?
+  fechaEntrega        String?
+  area                String?  // snapshot — al listar se reemplaza por Maestro.valor ACTUAL si areaId resuelve (ver hydrateConDatosActuales)
+  areaId              String?  // id del Maestro (tipo="area") — referencia real; sin FK, se valida al guardar
+  responsable         String?  // nombre del responsable — snapshot al guardar; al listar se reemplaza por el nombre ACTUAL del usuario si responsableUserId resuelve (ver hydrateConDatosActuales en lib/records.js)
+  responsableUserId   String?  // id del User atado como responsable — referencia real; sin FK (igual que el resto de referencias a User): se valida al guardar, nunca se borra en cascada
+  estado              String?  // snapshot — ver areaId
+  estadoId            String?  // id del Maestro (tipo="estado")
+  categoria           String?  // snapshot — ver areaId
+  categoriaId          String? // id del Maestro (tipo="categoria")
+  descripcion         String?
+  medioPago           String?  // snapshot — ver areaId
+  medioPagoId         String?  // id del Maestro (tipo="medioPago")
+  licitacion          String?
+  estadoLegalizacion  String?  // snapshot — ver areaId
+  estadoLegalizacionId String? // id del Maestro (tipo="estadoLegalizacion")
+  nit                 String?  // NIT del proveedor — snapshot al guardar, para historial/export; se mantiene igual a proveedorNit (ver lib/records.js)
+  proveedor           String?  // nombre del proveedor — mismo criterio: snapshot que se reemplaza por el nombre actual cuando proveedorNit resuelve
+  proveedorNit        String?  // NIT del Proveedor (llave primaria del catálogo) — referencia real con FK: si cambia el NIT se propaga solo (ON UPDATE CASCADE); no se puede borrar un proveedor con registros (RESTRICT)
+  proveedorRef        Proveedor? @relation(fields: [proveedorNit], references: [nit], onUpdate: Cascade, onDelete: Restrict)
+  fe                  String?  // número de factura/referencia — puede repetirse (p.ej. una misma factura cubre varias compras); la duplicidad solo se advierte a nivel de aplicación, no se bloquea en la BD
+  valorConIva         Float?
+  valorSinIva         Float?
+  valorCot            Float?
+  moneda              String   @default("COP") // "COP" | "USD" — en qué moneda se cotizó/compró originalmente; los campos de valor (arriba) SIEMPRE quedan en pesos colombianos, sin importar la moneda original
+  valorUsd            Float?   // monto original en dólares — solo si moneda = "USD", únicamente de referencia/auditoría
+  trm                 Float?   // TRM usada para convertir valorUsd a pesos — solo si moneda = "USD"
+  observaciones       String?
+  radicado            Boolean  @default(false)
+  actividad           String?  // nombre de la actividad de Bienestar — snapshot; al listar se reemplaza por el nombre ACTUAL si actividadId resuelve
+  actividadId         Int?     // actividad de Bienestar a la que se carga esta compra (FK): su gasto cuenta contra el presupuesto de la actividad
+  actividadRef        ActividadBienestar? @relation(fields: [actividadId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  calificacion        CalificacionProveedor?
+  valoracion          ValoracionCompra?
+
+  @@index([proveedorNit])
+  @@index([actividadId])
+  @@map("records")
+}
+
+// Actividad del módulo de Bienestar (cronograma anual): qué se hace, cuándo, con cuánto presupuesto y cuánta gente.
+// Las compras se le asocian desde el formulario de Compras (Record.actividadId); su gasto se suma contra "presupuesto".
+// Una actividad con compras asociadas no se puede eliminar (FK RESTRICT): primero se desasocian.
+model ActividadBienestar {
+  id                Int      @id @default(autoincrement())
+  nombre            String
+  fecha             String?  // YYYY-MM-DD (igual que las fechas de Record); null solo mientras está "creada". Es la fecha de inicio
+  fechaFin          String?  // YYYY-MM-DD, último día si dura varios días (null = un solo día); nunca antes de fecha
+  linea             String   @default("Bienestar") // "Bienestar" | "Fundación"
+  estado            String   @default("creada") // "creada" → "programada" → "ejecutada" → "cerrada" (cerrada: no recibe compras nuevas)
+  descripcion       String?
+  responsableUserId String?  // sin FK, igual que el resto de referencias a User
+  responsableNombre String?  // snapshot
+  presupuesto       Float?   // valor asignado en pesos; null = sin asignar
+  inscritos         Int?
+  asistentes        Int?
+  enCronograma      Boolean  @default(true) // false = actividad extra, realizada fuera del cronograma planeado
+  sentimientoObservaciones String? // de "observaciones", según Nova (ver lib/sentimientoComentarios.js)
+  sentimientoCierre        String? // de "comentarioCierre", según Nova
+  aplicaParticipantes Boolean @default(true) // false = no maneja participantes ni asistencia: no cuentan en cifras ni en la calificación de Nova
+  observaciones     String?
+  createdAt         DateTime @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?  // "Importación Excel" para las que vienen de la base de Bienestar
+  updatedAt         DateTime @updatedAt
+  // Cierre: al pasar a "cerrada" se califica la actividad (1 a 5) y queda quién y cuándo la cerró.
+  calificacion      Int?
+  comentarioCierre  String?
+  cerradaAt         DateTime?
+  cerradaPorUserId  String?
+  cerradaPorNombre  String?
+  // Formulario público de inscripción (enlace sin iniciar sesión, reemplaza Microsoft Forms): /inscripcion/<token>.
+  formularioToken   String?  @unique
+  formularioAbierto Boolean  @default(false)
+  formularioCampos  String?  // JSON: [{ clave, etiqueta, tipo: texto|numero|opcion|si_no|fecha|parrafo, opciones?, obligatorio, sensible }]
+  compras           Record[]
+  participantes     ParticipanteActividad[]
+  inventario        InventarioActividad[]
+  fotos             FotoActividad[]
+  observacionesEquipo ObservacionActividad[]
+  analisisNova      AnalisisActividad?
+  solicitudesCompra SolicitudCompra[]
+
+  @@index([fecha])
+  @@map("actividades_bienestar")
+}
+
+// Una persona inscrita (o registrada) en una actividad de Bienestar: primero se cargan los inscritos (formulario
+// público, Excel de Forms o a mano) y después se marca quién asistió. "datos" guarda los campos propios de la
+// actividad (distancia, talla, equipo, acompañantes, hijos, transporte…, incluidos los sensibles que traigan los
+// formularios); los sensibles solo los ve quien puede editar Bienestar (ver lib/participantesBienestar.js).
+model ParticipanteActividad {
+  id                 Int       @id @default(autoincrement())
+  actividadId        Int
+  actividad          ActividadBienestar @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  nombre             String
+  documento          String?   // sin puntos ni espacios; con él se evita inscribir dos veces a la misma persona
+  area               String?   // snapshot; areaId → Maestro "areaParticipante" (sin FK, igual que Record.areaId)
+  areaId             String?
+  correo             String?
+  inscrito           Boolean   @default(true)
+  asistio            Boolean?  // null = aún no se registra la asistencia
+  motivoInasistencia String?   // "Incapacidad médica" | "Compromisos laborales" | "Motivos personales" | "Calamidad familiar" | "Vacaciones" | "Viaje" | "Sin justificación" | "Otro"
+  motivoInasistenciaId String? // → Maestro "motivoInasistencia"
+  calificacion       Int?      // 1 a 5, la que da la persona a la actividad
+  observacion        String?
+  sentimiento        String?   // "positivo" | "neutro" | "negativo" | "no_aplica" de la observación, según Nova (null = sin clasificar)
+  datos              String?   // JSON con los campos propios de la actividad
+  origen             String    @default("manual") // "formulario" | "importacion" | "manual"
+  autorizaDatos      Boolean   @default(false) // autorización de tratamiento de datos (Ley 1581), obligatoria en el formulario público
+  autorizaDatosAt    DateTime?
+  createdAt          DateTime  @default(now())
+  creadoPorUserId    String?
+  creadoPorNombre    String?   // "Formulario público" / "Importación Excel" cuando no lo creó una persona de la app
+  updatedAt          DateTime  @updatedAt
+
+  @@index([actividadId])
+  @@index([documento])
+  @@map("participantes_actividad")
+}
+
+// Material fotográfico de una actividad. La imagen se guarda ya reducida (máx. 1.600 px, JPEG) más una miniatura
+// (máx. 480 px) para la galería; las que se suben desde la app se reducen en el navegador. origen "informe" = sacada
+// de los informes mensuales en PDF (fuente dice de cuál y qué página). hash evita subir la misma foto dos veces.
+model FotoActividad {
+  id              Int       @id @default(autoincrement())
+  actividadId     Int
+  actividad       ActividadBienestar @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  nombre          String
+  descripcion     String?
+  mime            String    // "image/jpeg" | "image/png" | "image/webp"
+  ancho           Int
+  alto            Int
+  bytes           Int
+  datos           Bytes
+  miniatura       Bytes
+  hash            String    // sha1 de la imagen reducida
+  origen          String    @default("app") // "app" | "informe"
+  fuente          String?   // p. ej. "Informe Bienestar Junio.pdf · página 4"
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([actividadId, hash])
+  @@index([actividadId])
+  @@map("fotos_actividad")
+}
+
+// Observaciones que el equipo anota sobre una actividad (pestaña Encuesta y observaciones). Las de los participantes
+// siguen en ParticipanteActividad.observacion.
+model ObservacionActividad {
+  id              Int       @id @default(autoincrement())
+  actividadId     Int
+  actividad       ActividadBienestar @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  texto           String
+  sentimiento     String?   // "positivo" | "neutro" | "negativo" | "no_aplica", según Nova (null = sin clasificar)
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@index([actividadId])
+  @@map("observaciones_actividad")
+}
+
+// Inventario de una actividad: lo que se compró o se tenía (refrigerios, detalles, materiales…), cuánto se usó y
+// cuánto quedó. El sobrante es lo que permite medir la pérdida por ausentismo.
+model InventarioActividad {
+  id              Int       @id @default(autoincrement())
+  actividadId     Int
+  actividad       ActividadBienestar @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  item            String
+  unidad          String?   // snapshot; unidadId → Maestro "unidadInventario"
+  unidadId        String?
+  cantidad        Float     // lo que había al empezar
+  usado           Float?    // lo que se usó (null = aún no se registra)
+  costoUnitario   Float?
+  recordId        String?   // compra de la que salió (opcional, sin FK: la compra puede borrarse y el inventario queda)
+  observacion     String?
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime  @updatedAt
+
+  @@index([actividadId])
+  @@map("inventario_actividad")
+}
+
+// Calificación del proveedor para una compra puntual (estilo Uber/Rappi: 1 a
+// 5 estrellas). Una sola calificación por registro (se puede editar/volver a
+// calificar, ver lib/calificaciones.js — upsert por recordId). Si estrellas
+// es menor a 5, "causasIds" es obligatorio (al menos una causa del maestro
+// tipo="causaCalificacion" cuyo aplicaEstrellas coincida con las estrellas
+// dadas, ver Maestro.aplicaEstrellas más abajo).
+model CalificacionProveedor {
+  id                   Int       @id @default(autoincrement())
+  recordId             String    @unique
+  record               Record    @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  proveedorNit         String?   // snapshot del NIT del Proveedor calificado — sin FK; se actualiza si el NIT cambia (ver lib/proveedores.js#cambiarNit)
+  proveedor            String?   // snapshot del nombre, igual convención que Record.proveedor
+  estrellas            Int       // 1..5
+  causasIds            String?   // JSON: string[] de ids de Maestro (tipo="causaCalificacion") — null/"[]" si estrellas = 5
+  comentario           String?
+  calificadoPorUserId  String?
+  calificadoPorNombre  String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@map("calificaciones_proveedor")
+}
+
+// Valoración con IA de una compra radicada (una por registro; se puede volver a generar).
+// Evalúa la compra y al proveedor con todos los parámetros del registro y con las compras
+// anteriores a ella con ese mismo proveedor. El proveedor se obtiene por el registro
+// (Record.proveedorNit), así un cambio de NIT no deja la valoración desfasada.
+model ValoracionCompra {
+  id                   Int      @id @default(autoincrement())
+  recordId             String   @unique
+  record               Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  puntajeCompra        Int      // 1 a 5
+  puntajeProveedor     Int?     // 1 a 5 — null si la compra no tiene proveedor
+  resumen              String
+  observacionCompra    String   // por qué la IA calificó así la compra
+  observacionProveedor String?  // por qué calificó así al proveedor
+  factores             String?  // JSON: [{ factor, impacto: "positivo"|"neutro"|"negativo", detalle }]
+  comprasPrevias       Int      @default(0) // cuántas compras anteriores con el mismo proveedor se analizaron
+  modelo               String?
+  origen               String   @default("radicacion") // "radicacion" | "carga masiva"
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  creadoPorUserId      String?
+  creadoPorNombre      String?  // "Valoración masiva" cuando no la generó una persona
+
+  @@map("valoraciones_compra")
+}
+
+// Auditoría de acciones sobre registros (crear / editar / eliminar / radicar).
+// userId no tiene relación FK a propósito: si el usuario se elimina, el log
+// debe seguir existiendo con el nombre/correo capturados en el momento.
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String   // "crear" | "editar" | "eliminar" | "radicar"
+  entityType String   @default("record") // "record" | "maestro" | "proveedor" | "user" | "presupuesto" | "permiso" | "informe"
+  recordId   String   // id de la entidad afectada (registro, maestro o usuario)
+  recordInfo String?
+  userId     String?
+  userNombre String?
+  userEmail  String?
+  changes    String?  // JSON: [{ field, label, before, after }]
+  createdAt  DateTime @default(now())
+
+  @@index([recordId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([entityType])
+  @@map("audit_logs")
+}
+
+model Meta {
+  id            Int      @id @default(1)
+  sourceFile    String?
+  sourceSheet   String?
+  nextLocalSeq  Int      @default(1)
+  updatedAt     DateTime @updatedAt
+
+  @@map("meta")
+}
+
+// role: "admin" | "registro" | "legalizar" | "radicar" (ver lib/roles.js)
+model User {
+  id            String         @id @default(cuid())
+  nombre        String
+  email         String         @unique
+  password      String
+  role          String
+  activo        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[]
+
+  @@map("users")
+}
+
+// Historial de conversaciones del Agente IA (una por hilo de chat).
+model Conversation {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String?
+  model     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@map("agent_conversations")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  role           String       // "user" | "model"
+  text           String
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("agent_messages")
+}
+
+// Opciones administrables para los desplegables del formulario de registros.
+// tipo: "area" | "responsable" | "estado" | "categoria" | "medioPago" | "estadoLegalizacion" | "causaCalificacion"
+//       | "motivoExcepcion" | "tipoProveedor" | "clasificacionMonto" | "tipoServicio" (estos 4 los usa Proveedor;
+//       | "areaProveedor" (área de Proveedores, distinta de "area" de Compras — ver lib/maestros.js#MODULO_POR_TIPO)
+// (los primeros 6 coinciden 1:1 con el nombre del campo correspondiente en Record;
+// "causaCalificacion" es independiente, ver CalificacionProveedor).
+model Maestro {
+  id              String   @id @default(cuid())
+  tipo            String
+  valor           String
+  userId          String?  // solo para tipo="responsable": id del User al que está atado este valor (sin FK, igual que el resto de este modelo — ver lib/maestros.js). null para los demás tipos.
+  aplicaEstrellas Int?     // solo para tipo="causaCalificacion": a qué cantidad de estrellas (1..4) aplica esta causa — null para los demás tipos.
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@unique([tipo, valor])
+  @@map("maestros")
+}
+
+// Catálogo de proveedores. La llave primaria es el NIT (sin dígito de
+// verificación, solo dígitos; "PENDIENTE-…" para los que aún no tienen NIT
+// formal). Todas las relaciones (registros, ciclos, procesos, checklist)
+// apuntan al NIT con FK ON UPDATE CASCADE, así corregir un NIT se propaga
+// solo. Tipo, clasificación por monto, tipo de servicio, área y motivo de
+// excepción son maestros referenciados por id (el texto es solo snapshot).
+model Proveedor {
+  nit                String   @id // llave primaria — sin dígito de verificación
+  nombre             String
+  descripcion        String   // obligatoria — qué vende/para qué sirve este proveedor (Nova la usa para sugerirlo)
+  telefono           String?  // opcional — solo para que Nova (Agente IA) pueda citarlo, no se usa en validaciones
+  correo             String?  // opcional — ídem
+  internacional      Boolean  @default(false) // proveedor internacional (ADM-P-01) — legaliza por invoice, no aplica RUT/declaración de renta. Solo informativo.
+  ultimaEvaluacionCriticoFecha     DateTime? // evaluación anual de proveedores críticos (ADM-P-01) — la ejecutan compras+líderes de área fuera de esta app; aquí solo se refleja el resultado
+  ultimaEvaluacionCriticoResultado String?
+  activo             Boolean  @default(true)
+  inactivoMotivo     String?  // texto libre — solo si activo=false (desvinculado, no apto, anulado…)
+  // Clasificación del maestro (no cambia por año). El estado de cada ciclo vive en ProveedorCiclo.
+  tipoProveedorId    String?  // id del Maestro (tipo="tipoProveedor"): Crítico / No crítico — columna "Tipo" del Excel
+  criticidad         String?  // snapshot del valor del maestro tipoProveedor | null = sin definir
+  areaId             String?  // id del Maestro (tipo="areaProveedor") — maestro propio de Proveedores, distinto del área de Compras
+  area               String?  // snapshot del nombre del área de proveedor
+  tipoServicioId     String?  // id del Maestro (tipo="tipoServicio")
+  servicio           String?  // snapshot del nombre del tipo de servicio
+  esExcepcion        Boolean  @default(false) // no entra al ciclo de actualización ni al checklist, sin importar fechas
+  motivoExcepcionId  String?  // id del Maestro (tipo="motivoExcepcion")
+  motivoExcepcion    String?  // snapshot del nombre del motivo
+  justificacionExcepcion String?
+  fechaExcepcion     DateTime? // cuándo se marcó (o figura en el Excel) como excepción — para el informe mensual
+  radicaFacturas     Boolean  @default(false) // solo excepciones: ya está radicando facturas
+  radicaFacturasAt   DateTime?
+  fechaActualizacion DateTime? // fecha de la ÚLTIMA actualización — base del cálculo del ciclo (no la fecha de registro)
+  clasificacionMontoId String? // id del Maestro (tipo="clasificacionMonto")
+  clasificacionMonto String?  // snapshot del nombre de la clasificación por monto
+  revision           String?  // quién revisa: SRM, Financiero…
+  observacion        String?
+  fechaInvitacion    DateTime? // cuándo se invitó a actualizarse (Excel)
+  createdAt          DateTime @default(now()) // fecha de registro
+  creadoPorUserId    String?  // quién lo registró (sin FK, como el resto de referencias a User)
+  creadoPorNombre    String?  // snapshot del nombre; "Importación Excel" / "Migración histórica" si no lo creó una persona
+  updatedAt          DateTime @updatedAt
+  ciclos             ProveedorCiclo[]
+  procesos           ProveedorProceso[] // LEGADO: historial importado del Excel anterior, ya no lo usa la UI
+  checklist          ProveedorChecklist? // LEGADO: reemplazado por ProveedorCicloDocumento
+  records            Record[]
+
+  @@index([tipoProveedorId])
+  @@index([clasificacionMontoId])
+  @@index([tipoServicioId])
+  @@index([areaId])
+  @@map("proveedores")
+}
+
+// Estado de un proveedor dentro de un ciclo de actualización. El ciclo N va
+// del 1 abr N al 31 mar N+1 (corte configurable en ConfigProveedores). Se
+// crea una fila por proveedor y ciclo: es el histórico anual.
+model ProveedorCiclo {
+  id                  Int       @id @default(autoincrement())
+  proveedorNit        String
+  proveedor           Proveedor @relation(fields: [proveedorNit], references: [nit], onUpdate: Cascade, onDelete: Cascade)
+  anio                Int       // año en que inicia el ciclo (2026 = 1 abr 2026 → 31 mar 2027)
+  clasificacion       String    // "actualizacion" | "nuevo" (nuevo = creado en ese año, entra actualizado)
+  estado              String    // "desactualizado" | "en_proceso" | "en_aprobacion" | "actualizado"
+  aprobadoPorUserId   String?
+  aprobadoPorNombre   String?   // snapshot
+  aprobadoAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  documentos          ProveedorCicloDocumento[]
+
+  @@unique([proveedorNit, anio])
+  @@map("proveedor_ciclos")
+}
+
+// Documentos manuales del checklist por ciclo. Los 3 automáticos (criticidad,
+// área y servicio, teléfono de contacto) se derivan del propio proveedor y no se guardan.
+model ProveedorCicloDocumento {
+  id                  Int            @id @default(autoincrement())
+  cicloId             Int
+  ciclo               ProveedorCiclo @relation(fields: [cicloId], references: [id], onDelete: Cascade)
+  clave               String         // "rutVigente" | "certBancaria" | "listasRestr"
+  cumple              Boolean        @default(false)
+  verificadoPorUserId String?
+  verificadoPorNombre String?
+  verificadoAt        DateTime?
+  updatedAt           DateTime       @updatedAt
+
+  @@unique([cicloId, clave])
+  @@map("proveedor_ciclo_documentos")
+}
+
+// Configuración del ciclo de actualización (fila única, editable desde Maestros).
+model ConfigProveedores {
+  id        Int      @id @default(autoincrement())
+  diaCorte  Int      @default(31)
+  mesCorte  Int      @default(3)
+  diasAviso Int      @default(30)
+  updatedAt DateTime @updatedAt
+
+  @@map("config_proveedores")
+}
+
+// Marca de inicio de cada ciclo: garantiza que el 1 de abril se ejecute una sola vez.
+model CicloProveedorIniciado {
+  id          Int      @id @default(autoincrement())
+  anio        Int      @unique
+  iniciadoAt  DateTime @default(now())
+  cantidad    Int      @default(0)
+
+  @@map("ciclos_proveedor_iniciados")
+}
+
+// Historial de procesos de gestión del proveedor (migrado desde el Excel de
+// "Gestión de Proveedores" de Sincosoft — ver plan de integración). Un mismo
+// proveedor puede tener varias filas por proceso a lo largo del tiempo; la
+// más reciente por "proceso" es la que se usa para calcular infoActualizada
+// (ver lib/proveedoresProcesos.js).
+model ProveedorProceso {
+  id            String    @id @default(cuid())
+  proveedorNit  String
+  proveedor     Proveedor @relation(fields: [proveedorNit], references: [nit], onUpdate: Cascade, onDelete: Cascade)
+  proceso       String    // "actualizacion" | "nuevo" | "excepcion"
+  estado        String?   // snapshot — "Aprobado" | "Pendiente" | "En revisión" | etc (texto tal cual del origen)
+  estadoId      String?   // id del Maestro (tipo="estadoProveedor") — referencia real, igual convención que Record
+  fecha         DateTime?
+  revision      String?   // ej. "SRM", "Financiero" — quién/qué revisó
+  contacto      String?
+  observacion   String?
+  criticidad    String?   // "Critico" | "No crítico"
+  clasificacion String?   // clasificación por monto
+  area          String?   // snapshot
+  areaId        String?   // id del Maestro (tipo="areaProveedor")
+  servicio      String?   // snapshot
+  servicioId    String?   // id del Maestro (tipo="tipoServicio")
+  viaExcepcionCorreo Boolean @default(false) // vinculación liviana por correo (ADM-P-01: proveedores del CEO, almacenes de cadena, tiquetes, universidades, ferias, licencias/suscripciones extranjeras, entidades certificadoras) — exime de checklist completo, no se marca como "desactualizado" por eso
+  radicado      Boolean   @default(false) // solo aplica a proceso="excepcion"
+  radicadoAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([proveedorNit])
+  @@index([proceso])
+  @@map("proveedor_procesos")
+}
+
+// Checklist de compras — 3 de los 6 requisitos son manuales (los otros 3:
+// criticidad/área/contacto se derivan en vivo del ProveedorProceso más
+// reciente, ver lib/proveedoresProcesos.js#checklistDe).
+model ProveedorChecklist {
+  proveedorNit String    @id
+  proveedor    Proveedor @relation(fields: [proveedorNit], references: [nit], onUpdate: Cascade, onDelete: Cascade)
+  // Los 3 de abajo son 100% manuales. criticidad/área/contacto se derivan
+  // automáticamente del proceso más reciente (ver checklistDerivadosDe en
+  // lib/proveedoresProcesos.js) — los *Override de abajo permiten forzarlos a
+  // mano cuando el dato automático todavía no aplica (igual que en la página
+  // original de Gestión de Proveedores, donde los 6 ítems son clicables).
+  rutVigente         Boolean  @default(false)
+  certBancaria       Boolean  @default(false)
+  listasRestr        Boolean  @default(false)
+  criticidadOverride Boolean  @default(false)
+  areaOverride       Boolean  @default(false)
+  contactoOverride   Boolean  @default(false)
+  updatedAt          DateTime @updatedAt
+
+  @@map("proveedor_checklists")
+}
+
+// El modo (por área o por categoría) es una configuración GENERAL por año,
+// no por área individual: aplica a todas las áreas de ese año por igual.
+// Cambiarlo cuando ya hay presupuestos configurados en el modo anterior borra
+// esos datos (ver lib/presupuestos.js#setModoAnio).
+model PresupuestoAnio {
+  anio      Int      @id
+  modo      String   // "area" | "categoria"
+  updatedAt DateTime @updatedAt
+
+  @@map("presupuesto_anios")
+}
+
+// Presupuesto configurado por área y año, en el modo vigente de ese año
+// (PresupuestoAnio): si es "area", un solo valor total (valorArea); si es
+// "categoria", se reparte por categoría (ver PresupuestoCategoria) y el
+// total del área es la suma de esas categorías.
+model Presupuesto {
+  id         String                 @id @default(cuid())
+  area       String
+  anio       Int
+  valorArea  Float?                 // usado solo si el modo del año es "area"
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  categorias PresupuestoCategoria[]
+
+  @@unique([area, anio])
+  @@map("presupuestos")
+}
+
+model PresupuestoCategoria {
+  id            String      @id @default(cuid())
+  presupuestoId String
+  categoria     String
+  valor         Float
+  presupuesto   Presupuesto @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
+
+  @@unique([presupuestoId, categoria])
+  @@map("presupuesto_categorias")
+}
+
+// Excepciones configurables por el admin a los permisos por defecto de
+// lib/roles.js (ver lib/permissions.js#FEATURES para el catálogo de
+// funcionalidades y sus roles por defecto). La AUSENCIA de una fila para
+// (role, feature) significa "usar el valor por defecto de esa funcionalidad"
+// — así un error de datos o una fila faltante nunca deja a un rol sin acceso
+// de forma inesperada, solo hace que se use el comportamiento original.
+model RolePermission {
+  id        String   @id @default(cuid())
+  role      String
+  feature   String
+  allowed   Boolean
+  updatedAt DateTime @updatedAt
+
+  @@unique([role, feature])
+  @@map("role_permissions")
+}
+
+// Roles creados desde la interfaz (Usuarios › Roles), además de los 5 del sistema que viven en lib/roles.js (esos
+// tienen reglas propias en el código: campos de Legalizar, radicado, etc.). Un rol personalizado no tiene ningún
+// permiso por defecto: sus funcionalidades son filas de RolePermission (la misma Matriz de permisos). User.role
+// guarda la clave. Solo se puede eliminar si ningún usuario lo tiene.
+model RolPersonalizado {
+  id              Int      @id @default(autoincrement())
+  clave           String   @unique // lo que se guarda en User.role y RolePermission.role (minúsculas, sin espacios)
+  nombre          String
+  descripcion     String?
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("roles")
+}
+
+// Informe ejecutivo configurable por prompt (ver lib/reportContent.js): el
+// admin describe en lenguaje natural qué debe contener, el sistema genera una
+// vista previa con IA antes de guardar, y una vez guardado se envía por
+// correo a "destinatarios" según "frecuencia"/"diaSemana"/"diaMes"/"hora"
+// (ver lib/reportScheduler.js — revisa cada minuto qué informes están
+// vencidos, sin depender de un cron externo al proceso de Next.js).
+// prioridad es solo informativa (se muestra en la UI y en el asunto del
+// correo); no afecta el orden ni la frecuencia de envío.
+// El informe (secciones + gráficas) se envía como PDF adjunto (ver
+// lib/reportPdf.js); "cuerpoModo"/"cuerpoPrompt" controlan el TEXTO PLANO del
+// cuerpo del correo (ver lib/reportEmailBody.js), independiente del contenido
+// del PDF.
+model ReportConfig {
+  id              String    @id @default(cuid())
+  nombre          String
+  tipo            String    @default("bloques") // "bloques" (constructor manual) | "dashboard" (secciones preestablecidas tipo Dashboard, ver ReportEditor.jsx) — ambos usan exactamente el mismo motor de bloques, solo cambia cómo se arman en la UI
+  prompt          String?   // opcional: solo se usa para "generar un borrador con IA" (ver ReportBloqueBuilder.jsx) — el contenido real del informe vive en "bloques"
+  bloques         String    @default("[]") // JSON: bloque[] del constructor manual (texto/kpi/grafico/tabla/ia) — ver lib/reportContent.js#renderReportFromBloques. Si viene vacío, se usa el flujo legado de un solo "prompt" para todo el informe.
+  periodoGeneral  String    @default("historico") // "historico" | "mes_actual" | "mes_anterior" | "anio_actual" | "anio_anterior" — un solo periodo para TODO el informe (se eligió esto en vez de uno por bloque, ver ReportEditor.jsx), aplicado a los bloques kpi/grafico/tabla, recalculado relativo a "ahora" en cada generación (ver filterRecordsByPeriodo)
+  destinatarios   String    // JSON: string[] de correos (Para / To)
+  cc              String?   // JSON: string[] de correos en copia (CC), opcional
+  frecuencia      String    // "diaria" | "semanal" | "mensual"
+  diaSemana       Int?      // 0 (domingo) .. 6 (sábado) — solo si frecuencia = "semanal"
+  diaMes          Int?      // 1..31 — solo si frecuencia = "mensual" (31 = fin de mes, ver reportScheduler.js)
+  hora            String    // "HH:mm" (24h, hora local del servidor)
+  sabadoHabil     Boolean   @default(false) // si es false, un envío programado en sábado se corre al siguiente día hábil (ver lib/reportScheduler.js)
+  domingoHabil    Boolean   @default(false) // ídem para domingo — sábado y domingo se controlan por separado (uno puede ser hábil y el otro no)
+  prioridad       String    @default("media") // "alta" | "media" | "baja"
+  cuerpoModo      String    @default("resumen") // "plano" | "resumen" — legado, solo usado cuando "cuerpoHtml" viene vacío (ver lib/reportEmailBody.js)
+  cuerpoPrompt    String?   // legado: instrucción de estilo/tono para generar el cuerpo con IA — reemplazado por edición directa en "cuerpoHtml"; se conserva para informes guardados antes de ese cambio
+  cuerpoHtml      String?   // HTML del cuerpo del correo, editado directamente por el usuario (editor de texto enriquecido, ver ReportBodyEditor.jsx) — si está vacío, se usa el flujo legado (cuerpoModo/cuerpoPrompt, con IA)
+  activo          Boolean   @default(true)
+  esBorrador      Boolean   @default(false) // true = guardado como borrador (ver botón "Guardar como borrador" en ReportEditor.jsx): se salta los requisitos de destinatarios/bloques al guardar, y el scheduler lo ignora por completo (nunca se envía) hasta que se complete y se guarde como informe normal
+  ultimoContenido String?   // JSON: snapshot de la última vista previa/envío generado (ver REPORT_SCHEMA)
+  ultimoCuerpoCorreo String? // texto plano del cuerpo de correo de esa misma vista previa/envío — sin esto, al editar un informe ya guardado no había forma de volver a mostrar el cuerpo exacto que se generó (solo el contenido del PDF)
+  ultimoEnvio     DateTime?
+  // ---- Estudio de informes (ver lib/reportSchedule.js, lib/reportEdiciones.js, lib/reportNova.js) ----
+  pedido          String?   // lo que el usuario le pidió a Nova al crear el informe ("Quiero un informe mensual para gerencia...")
+  contexto        String?   // JSON { audiencia, tono } que Nova entendió del pedido
+  reglaTexto      String?   // la programación tal como la escribió el usuario ("el primer lunes hábil de cada mes a las 8")
+  ordinal         Int?      // frecuencia "mensual_semana": 1..4 = primero..cuarto, -1 = último (con diaSemana)
+  fechaUnica      String?   // frecuencia "unica": YYYY-MM-DD
+  saltarFestivos  Boolean   @default(true) // si la fecha cae en festivo colombiano (o fin de semana no hábil) se corre al siguiente hábil
+  condicion       String    @default("siempre") // "siempre" | "presupuesto80" | "fueraPlazo": si no se cumple, ese período no se genera
+  entrega         String    @default("yo") // "yo" (Lo envío yo) | "correo" (automático, cuando haya SMTP) | "teams" (próximamente)
+  responsables    String?   // JSON [{ id, nombre }]: a quién se le avisa en Mi día para que lo envíe (por defecto, quien lo creó)
+  asunto          String?   // asunto del correo con variables {mes} {año} {valor_total} {fecha_envio}
+  mensaje         String?   // cuerpo del correo con las mismas variables + {resumen_nova}
+  createdBy       String?
+  createdByNombre String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  ediciones       ReportEdicion[]
+
+  @@map("report_configs")
+}
+
+// Cada generación de un informe (programada, manual o de prueba) queda archivada con su PDF tal como salió ese día:
+// es lo que el responsable descarga y envía ("Lo envío yo"), lo que se compara entre meses y el historial del informe.
+model ReportEdicion {
+  id               Int          @id @default(autoincrement())
+  reportId         String
+  report           ReportConfig @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  periodoLabel     String       // "Octubre 2026", "2026", "Histórico"
+  origen           String       @default("programado") // "programado" | "manual" | "prueba"
+  estado           String       // "por_enviar" | "enviado" | "omitido" | "error"
+  motivo           String?      // por qué se omitió o falló
+  contenido        String?      // JSON: el contenido generado (secciones) — ver lib/reportContent.js
+  pdf              Bytes?
+  asunto           String?      // ya con las variables reemplazadas
+  mensaje          String?
+  destinatarios    String?      // JSON string[] (snapshot al generar)
+  cc               String?      // JSON string[]
+  resumen          String?      // JSON { valor, compras, cumplimientoPct, enProceso, fueraPlazo } para comparar ediciones
+  descargadoAt     DateTime?
+  enviadoAt        DateTime?
+  enviadoPorUserId String?
+  enviadoPorNombre String?
+  createdAt        DateTime     @default(now())
+  creadoPorUserId  String?
+  creadoPorNombre  String?      // "Programación automática" cuando la generó el programador
+
+  @@index([reportId, createdAt])
+  @@index([estado])
+  @@map("report_ediciones")
+}
+
+// Tokens personales para conectar un cliente MCP (Claude Desktop / Claude Code / claude.ai) a /api/mcp.
+// Solo se guarda el hash SHA-256: el token en claro se muestra una única vez al crearlo.
+model TokenAcceso {
+  id                Int       @id @default(autoincrement())
+  userId            String    // dueño del token — sin FK (igual que el resto de referencias a User)
+  nombre            String    // etiqueta que le pone la persona ("Mi Claude Desktop")
+  prefijo           String    // primeros caracteres, solo para reconocerlo en la lista
+  tokenHash         String    @unique
+  expiraAt          DateTime?
+  ultimoUsoAt       DateTime?
+  usos              Int       @default(0)
+  revocadoAt        DateTime?
+  revocadoPorNombre String?
+  createdAt         DateTime  @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+
+  @@index([userId])
+  @@map("tokens_acceso")
+}
+
+// Notificaciones configurables por prompt (ver docs/notificaciones-diseno.md y lib/notificaciones*.js).
+// Nova convierte el pedido en esta regla; después se ejecuta sola, sin IA, con consultas deterministas.
+// La programación usa los mismos campos que ReportConfig para reutilizar lib/reportSchedule.js.
+model Notificacion {
+  id                Int       @id @default(autoincrement())
+  nombre            String
+  pedido            String    // lo que escribió la persona
+  aclaraciones      String?   // JSON: [{ pregunta, respuesta }] del diálogo con Nova
+  disparador        String    @default("programado") // "programado" | "evento"
+  evento            String?   // disparador "evento": "compra.radicada", "compra.valorada"… (catálogo EVENTOS)
+  agrupacion        String?   // disparador "evento": "inmediato" | "cada_15_min" | "resumen_diario"
+  fuente            String    // "compras" | "mi_dia" | "proveedores" | "presupuesto"
+  consulta          String    // clave del catálogo (lib/notificacionesCatalogo.js)
+  parametros        String    @default("{}") // JSON validado contra el catálogo
+  alcance           String    @default("general") // "general" | "personal"
+  condicion         String    @default("si_hay_resultados") // "siempre" | "si_hay_resultados" | "umbral"
+  umbral            Int?
+  frecuencia        String?   // mismas de lib/reportSchedule.js
+  diaSemana         Int?
+  diaMes            Int?
+  ordinal           Int?
+  fechaUnica        String?
+  hora              String?   // "HH:mm", hora de Colombia
+  siFestivo         String    @default("correr") // "correr" | "enviar" | "omitir"
+  sabadoHabil       Boolean   @default(false)
+  domingoHabil      Boolean   @default(false)
+  titulo            String
+  plantilla         String
+  canales           String    @default("[\"app\"]") // JSON: ["app","teams"]
+  estado            String    @default("activa") // "borrador" | "activa" | "pausada" | "pausada_por_permisos"
+  motivoPausa       String?
+  pausadaPorUserId  String?
+  pausadaPorNombre  String?
+  pausadaAt         DateTime?
+  propietarioUserId String    // dueño: los permisos de datos se evalúan con su rol
+  propietarioNombre String
+  ultimaEjecucionAt DateTime?
+  ultimoResultado   String?   // "enviada" | "omitida_sin_resultados" | "parcial" | "error"
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+  destinatarios     NotificacionDestinatario[]
+  ejecuciones       NotificacionEjecucion[]
+
+  @@index([estado, disparador])
+  @@index([propietarioUserId])
+  @@map("notificaciones")
+}
+
+model NotificacionDestinatario {
+  id              Int          @id @default(autoincrement())
+  notificacionId  Int
+  notificacion    Notificacion @relation(fields: [notificacionId], references: [id], onDelete: Cascade)
+  userId          String       // sin FK, igual que el resto de referencias a User
+  userNombre      String
+  deBaja          Boolean      @default(false) // "Dejar de recibir"
+  deBajaAt        DateTime?
+  createdAt       DateTime     @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@unique([notificacionId, userId])
+  @@index([userId])
+  @@map("notificacion_destinatarios")
+}
+
+// Cada vez que una notificación se evalúa (programada, recuperada o prueba). `clave` es única: evita envíos duplicados.
+model NotificacionEjecucion {
+  id              Int          @id @default(autoincrement())
+  notificacionId  Int
+  notificacion    Notificacion @relation(fields: [notificacionId], references: [id], onDelete: Cascade)
+  clave           String       @unique // "n12|2026-10-20" | "n12|prueba|<ts>"
+  origen          String       // "programado" | "recuperado" | "prueba"
+  estado          String       // "procesando" | "enviada" | "omitida_sin_resultados" | "parcial" | "error"
+  resultados      Int          @default(0)
+  contenido       String?      // JSON: { titulo, texto, items, total, enlace } tal como salió
+  error           String?
+  retrasoMin      Int?
+  createdAt       DateTime     @default(now())
+  creadoPorUserId String?      // null = programador
+  creadoPorNombre String?      // "Programador de notificaciones" o quien probó
+  entregas        NotificacionEntrega[]
+
+  @@index([notificacionId, createdAt])
+  @@map("notificacion_ejecuciones")
+}
+
+// Bandeja de salida de eventos (fase 2 de notificaciones, ver lib/notificacionesEventos.js): cada cambio relevante
+// (compra radicada, valorada, calificada, proveedor creado…) se anota aquí sin bloquear la escritura que lo originó, y
+// el procesador lo cruza con las notificaciones por evento. `clave` evita anotar dos veces el mismo hecho.
+model EventoNotificacion {
+  id              Int       @id @default(autoincrement())
+  tipo            String    // "compra.radicada", "proveedor.creado"…
+  clave           String    @unique
+  entidadId       String    // id del registro, NIT del proveedor o área
+  datos           String    // JSON con lo necesario para el mensaje y los filtros
+  procesadoAt     DateTime?
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?   // quien hizo el cambio (null = proceso automático)
+  creadoPorNombre String?
+
+  @@index([procesadoAt])
+  @@index([tipo, createdAt])
+  @@map("eventos_notificacion")
+}
+
+// Una entrega por destinatario y canal. Las de canal "app" son la bandeja de cada persona.
+model NotificacionEntrega {
+  id              Int                   @id @default(autoincrement())
+  ejecucionId     Int?                  // null = aviso directo del sistema, sin regla configurada (p. ej. solicitudes de compra)
+  ejecucion       NotificacionEjecucion? @relation(fields: [ejecucionId], references: [id], onDelete: Cascade)
+  userId          String
+  userNombre      String
+  canal           String                // "app" | "teams"
+  estado          String                // "pendiente" | "enviada" | "error" | "omitida"
+  motivo          String?
+  contenido       String?               // JSON: lo que recibió esta persona (con alcance "personal" difiere por destinatario)
+  intentos        Int                   @default(0)
+  proximoIntento  DateTime?
+  enviadaAt       DateTime?
+  leidaAt         DateTime?             // solo canal "app"
+  createdAt       DateTime              @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@index([userId, canal, leidaAt])
+  @@index([estado, proximoIntento])
+  @@map("notificacion_entregas")
+}
+
+// Análisis de Nova del Resumen de Bienestar (uno por línea, año y mes; mes 0 = el general del año). Se genera solo el
+// día 1 de cada mes (el del mes que terminó y el general hasta ese corte, ver lib/analisisBienestar.js) y a pedido
+// con "Resumir de nuevo", que lo reemplaza. puntos: [{ tipo: "logro"|"alerta"|"idea", texto }].
+model AnalisisBienestar {
+  id              Int      @id @default(autoincrement())
+  linea           String   // "Bienestar" | "Fundación"
+  anio            Int
+  mes             Int      @default(0) // 1-12; 0 = general del año
+  titulo          String
+  resumen         String
+  puntos          Json
+  corte           String   // YYYY-MM-DD: datos hasta ese día
+  origen          String   @default("automatico") // "automatico" | "manual"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@unique([linea, anio, mes])
+  @@map("analisis_bienestar")
+}
+
+// Análisis de Nova de una actividad, con su propio puntaje de 1 a 5 (ver lib/analisisActividad.js): se genera al cerrarla,
+// junto a la calificación de la persona (ActividadBienestar.calificacion), o a pedido; regenerarlo lo reemplaza.
+// puntos: [{ tipo: "logro"|"alerta"|"idea", texto }].
+model AnalisisActividad {
+  id              Int      @id @default(autoincrement())
+  actividadId     Int      @unique
+  actividad       ActividadBienestar @relation(fields: [actividadId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  puntaje         Int?     // null = sin datos para calificar (no se inventa un puntaje)
+  titulo          String
+  resumen         String
+  puntos          Json
+  origen          String   @default("cierre") // "cierre" | "manual" | "automatico" | "agente"
+  // Título y frase de cierre que Nova escribe para Historias de Fundación (ver lib/historiasFundacion.js): emocionales,
+  // sin gasto ni presupuesto. La huella guarda los datos con que se escribieron: si cambian, se vuelven a escribir.
+  tituloHistoria    String?
+  fraseHistoria     String?
+  fraseHistoriaHash String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@map("analisis_actividad")
+}
+
+// Bienestar le pide una compra a Compras desde una actividad ya registrada (ver lib/solicitudesCompra.js). Sale de la
+// lista cuando se genera la compra (recordId) o se rechaza (motivoRechazo).
+model SolicitudCompra {
+  id                Int      @id @default(autoincrement())
+  actividadId       Int
+  actividad         ActividadBienestar @relation(fields: [actividadId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  descripcion       String
+  valorEstimado     Float?
+  categoria         String?  // snapshot; categoriaId → Maestro "categoria"
+  categoriaId       String?
+  proveedorSugerido String?
+  fechaRequerida    String?  // YYYY-MM-DD
+  observaciones     String?
+  estado            String   @default("pendiente") // pendiente → generando → creada | rechazada | cancelada
+  motivoRechazo     String?
+  recordId          String?  // la compra generada (sin FK: la compra puede borrarse después)
+  recordSeq         Int?
+  atendidaAt        DateTime?
+  atendidaPorUserId String?
+  atendidaPorNombre String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+
+  @@index([estado])
+  @@index([actividadId])
+  @@map("solicitudes_compra")
+}
+
+// Agente asociador de Bienestar (lib/agenteAsociador.js): para cada compra del área sin actividad, la actividad a la que
+// Nova cree que pertenece, qué tan segura está y por qué. Nada se asocia sin que una persona confirme. estado:
+// pendiente | aceptada | descartada | sin_coincidencia (Nova no vio ninguna) | resuelta (alguien la asoció por otro lado).
+model PropuestaAsociacion {
+  id                Int       @id @default(autoincrement())
+  recordId          String
+  recordSeq         Int?
+  actividadId       Int?
+  confianza         String?   // alta | media | baja
+  razon             String?
+  estado            String    @default("pendiente")
+  resueltaAt        DateTime?
+  resueltaPorUserId String?
+  resueltaPorNombre String?
+  createdAt         DateTime  @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+
+  @@index([estado])
+  @@index([recordId])
+  @@map("propuestas_asociacion")
+}
+
+// Cuadro comparativo armado por el agente cotizador (lib/agenteCotizador.js) con las cotizaciones que sube quien
+// compra: lo extraído de cada una, la comparación calculada por el sistema y la recomendación de Nova.
+model CuadroComparativo {
+  id              Int      @id @default(autoincrement())
+  titulo          String
+  modulo          String   @default("bienestar") // "bienestar" | "compras": en qué página de Agentes se lista
+  actividadId     Int?
+  recordId        String?  // compra de Compras a la que queda adjunto (sin FK, como el resto de referencias sueltas)
+  datos           Json
+  recomendacion   String?
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@index([recordId])
+
+  @@map("cuadros_comparativos")
+}
+
+// Salario mínimo mensual legal vigente (SMMLV) por año, en Maestros de Compras. Lo usa el agente cotizador para el
+// umbral del cuadro comparativo del procedimiento (2 SMMLV administrativas / 4 técnicas). Ver lib/salarioMinimo.js.
+model SalarioMinimo {
+  id                 Int      @id @default(autoincrement())
+  anio               Int      @unique
+  valor              Float
+  norma              String?  // decreto que lo fija, p. ej. "Decreto 1469 de 2025"
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  creadoPorUserId    String?
+  creadoPorNombre    String?
+  actualizadoPorNombre String?
+
+  @@map("salarios_minimos")
+}
+
+// Encendido de los agentes que corren solos (por ahora el asociador de compras de Bienestar). Apagados por defecto:
+// un agente solo revisa y avisa en la Bandeja cuando alguien lo enciende. Ver lib/configAgentes.js.
+model ConfigAgente {
+  id                   Int      @id @default(autoincrement())
+  clave                String   @unique // "asociador"
+  activo               Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  creadoPorUserId      String?
+  creadoPorNombre      String?
+  actualizadoPorUserId String?
+  actualizadoPorNombre String?
+
+  @@map("config_agentes")
+}
+
+// Correo de Microsoft 365 vinculado por cada persona (Microsoft Graph, permiso de solo lectura Mail.Read), para que el
+// agente de correo lea las solicitudes de creación de proveedor (ver lib/correoCuentas.js y lib/agenteCorreoProveedores.js).
+// Los tokens se guardan cifrados (AES-256-GCM, lib/cifradoTokens.js) y nunca salen al cliente ni a la auditoría.
+model CuentaCorreo {
+  id              Int       @id @default(autoincrement())
+  userId          String    @unique // una cuenta por persona (sin FK, como el resto de referencias a User)
+  userNombre      String
+  email           String    // buzón vinculado (debe ser el mismo correo del usuario del panel)
+  proveedor       String    @default("microsoft") // "microsoft" | "simulado"
+  accessToken     String?   // cifrado
+  refreshToken    String?   // cifrado
+  expiraAt        DateTime?
+  agenteActivo    Boolean   @default(true) // el agente lee el correo solo con esto encendido
+  estado          String    @default("activa") // "activa" | "error" (hay que volver a vincular)
+  ultimoError     String?
+  revisadoHasta   DateTime? // fecha de recepción del último correo leído
+  ultimaRevision  DateTime?
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime  @updatedAt
+
+  @@map("cuentas_correo")
+}
+
+// Correos que el agente ya mandó a Nova (para no pagar dos veces el mismo). Solo el id del mensaje y el resultado.
+model CorreoRevisado {
+  id              Int      @id @default(autoincrement())
+  cuentaId        Int
+  mensajeId       String
+  resultado       String   // "solicitud" | "no_es" | "error"
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@unique([cuentaId, mensajeId])
+  @@map("correos_revisados")
+}
+
+// Solicitud de creación de proveedor que el agente encontró en el correo de una persona. Queda pendiente en su Bandeja
+// hasta que la apruebe (se crea el proveedor) o la descarte. Nunca se crea un proveedor sin que una persona lo confirme.
+model SolicitudProveedorCorreo {
+  id               Int       @id @default(autoincrement())
+  userId           String    // dueña del buzón: solo a ella le llega
+  userNombre       String
+  cuentaId         Int
+  mensajeId        String
+  webLink          String?   // abrir el correo en Outlook
+  remitente        String?
+  asunto           String?
+  recibidoAt       DateTime?
+  resumen          String?   // lo que Nova entendió, en una frase
+  datos            String    // JSON: campos del formulario de proveedor (con los ids de maestros ya resueltos)
+  faltantes        String    // JSON: obligatorios que faltan o no son válidos [{ campo, motivo }]
+  notas            String?   // JSON: avisos (adjunto no leído, valor de maestro que no existe…)
+  adjuntos         String?   // JSON: nombres de los adjuntos del correo
+  nit              String?   // NIT normalizado (si se encontró)
+  estado           String    @default("pendiente") // "pendiente" | "aprobada" | "descartada"
+  proveedorNit     String?   // el proveedor creado al aprobar
+  motivoDescarte   String?
+  resueltoAt       DateTime?
+  resueltoPorUserId String?
+  resueltoPorNombre String?
+  createdAt        DateTime  @default(now())
+  creadoPorUserId  String?
+  creadoPorNombre  String?   // "Agente de correo"
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId, mensajeId])
+  @@index([userId, estado])
+  @@map("solicitudes_proveedor_correo")
+}
+
+// ===================== Tesorería (flujo de caja, soportes, conciliación y cierre) =====================
+// Módulo aparte de Compras y Bienestar (ver lib/tesoreria/*). Tiene finanzas personales y patrimoniales, así que el
+// acceso es NOMINAL (AccesoTesoreria), no por rol: ser admin del panel no da acceso. Valores siempre positivos: el tipo
+// da el signo (ingreso suma, egreso resta, traslado mueve entre cuentas propias sin afectar el flujo).
+
+model AccesoTesoreria {
+  id              Int      @id @default(autoincrement())
+  userId          String   @unique
+  userNombre      String
+  nivel           String   // "consulta" | "registro" | "firma" (firma = además concilia, firma el cierre y administra accesos y maestros)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("tesoreria_accesos")
+}
+
+// Catálogos del módulo: cuenta (medio de pago), ítem (inmueble, oficinas, impuestos…), concepto y pagador.
+model CuentaTesoreria {
+  id                Int      @id @default(autoincrement())
+  nombre            String   @unique
+  tipo              String   @default("ahorros") // ahorros | inversion | tarjeta | efectivo | otro
+  moneda            String   @default("COP") // código ISO 4217 (COP, USD, EUR…)
+  formatoExtracto   String?  // "avvillas" | "credicorp" | null (sin importador)
+  saldoInicial      Decimal  @default(0) @db.Decimal(18, 2)
+  saldoInicialFecha String?  // AAAA-MM-DD desde el que cuenta el saldo inicial
+  activo            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+  updatedAt         DateTime @updatedAt
+
+  @@map("tesoreria_cuentas")
+}
+
+model ItemTesoreria {
+  id              Int      @id @default(autoincrement())
+  nombre          String   @unique
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("tesoreria_items")
+}
+
+model ConceptoTesoreria {
+  id              Int      @id @default(autoincrement())
+  nombre          String   @unique
+  itemId          Int?     // ítem por defecto al elegir el concepto
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("tesoreria_conceptos")
+}
+
+model PagadorTesoreria {
+  id              Int      @id @default(autoincrement())
+  nombre          String   @unique // TIT, SNC, Inversora, POINT, CRM, BNM
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("tesoreria_pagadores")
+}
+
+model MovimientoTesoreria {
+  id              Int       @id @default(autoincrement())
+  fecha           String    // AAAA-MM-DD
+  fechaAproximada Boolean   @default(false) // migrado del Excel solo con el mes (día 1)
+  tipo            String    // "ingreso" | "egreso" | "traslado"
+  estado          String    // "proyectado" | "ejecutado" (conciliado = tiene líneas del extracto enlazadas)
+  valor           Decimal   @db.Decimal(18, 2) // siempre positivo
+  moneda          String    @default("COP") // código ISO 4217: el de la cuenta
+  cuentaId        Int       // cuenta (origen si es traslado)
+  cuentaDestinoId Int?      // solo traslados
+  itemId          Int?
+  conceptoId      Int?
+  concepto        String    // snapshot del nombre del concepto
+  pagadorId       Int?
+  tercero         String?
+  referencia      String?   // CUS, número de aprobación, factura…
+  observacion     String?
+  origen          String    @default("manual") // manual | soporte | extracto | importacion
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime  @updatedAt
+  soportes        SoporteMovimiento[]
+  lineas          LineaExtracto[]
+
+  @@index([fecha])
+  @@index([cuentaId, fecha])
+  @@index([estado])
+  @@map("tesoreria_movimientos")
+}
+
+model SoporteMovimiento {
+  id              Int                 @id @default(autoincrement())
+  movimientoId    Int
+  movimiento      MovimientoTesoreria @relation(fields: [movimientoId], references: [id], onDelete: Cascade)
+  nombre          String
+  tipoMime        String
+  tamano          Int
+  sha1            String
+  contenido       Bytes
+  datosLeidos     String?             // JSON: lo que leyó Nova
+  createdAt       DateTime            @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@index([sha1])
+  @@map("tesoreria_soportes")
+}
+
+// Una importación del extracto de una cuenta y sus líneas.
+model ExtractoBancario {
+  id              Int      @id @default(autoincrement())
+  cuentaId        Int
+  archivo         String
+  desde           String?
+  hasta           String?
+  lineasNuevas    Int      @default(0)
+  lineasRepetidas Int      @default(0)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@map("tesoreria_extractos")
+}
+
+model LineaExtracto {
+  id                Int                  @id @default(autoincrement())
+  cuentaId          Int
+  extractoId        Int?
+  fecha             String               // AAAA-MM-DD
+  descripcion       String
+  tercero           String?
+  valor             Decimal              @db.Decimal(18, 2) // con signo: + entra, − sale
+  clave             String               // huella para no importar dos veces la misma línea
+  etiqueta          String?              // concepto que alguien le puso a mano en el Excel
+  movimientoId      Int?
+  movimiento        MovimientoTesoreria? @relation(fields: [movimientoId], references: [id], onDelete: SetNull)
+  comoSeEnlazo      String?              // "exacto" | "manual" | "creado"
+  enlazadoAt        DateTime?
+  enlazadoPorNombre String?
+  ignorada          Boolean              @default(false) // saldos u otras filas que no son movimientos
+  createdAt         DateTime             @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+
+  @@unique([cuentaId, clave])
+  @@index([cuentaId, fecha])
+  @@index([movimientoId])
+  @@map("tesoreria_lineas_extracto")
+}
+
+// "La descripción del banco contiene X → concepto Y": aprendida del Excel y de cada movimiento creado desde el extracto.
+model ReglaClasificacion {
+  id              Int      @id @default(autoincrement())
+  patron          String   @unique // texto normalizado que debe contener la descripción
+  conceptoId      Int
+  itemId          Int?
+  pagadorId       Int?
+  usos            Int      @default(0)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("tesoreria_reglas")
+}
+
+model CierreMes {
+  id               Int      @id @default(autoincrement())
+  anio             Int
+  mes              Int
+  saldos           String   // JSON por cuenta: { cuenta, libro, extracto, diferencia }
+  firmadoPorUserId String?
+  firmadoPorNombre String?
+  createdAt        DateTime @default(now()) // = fecha de la firma
+  creadoPorUserId  String?
+  creadoPorNombre  String?
+
+  @@unique([anio, mes])
+  @@map("tesoreria_cierres")
+}

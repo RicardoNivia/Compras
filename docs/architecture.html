@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Compras y Bienestar — Architecture</title>
+    <style>
+        :root {
+            --fg: #1f2937;
+            --bg: #f9fafb;
+            --border: #e5e7eb;
+            --accent: #2063a0;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --fg: #f3f4f6;
+                --bg: #111827;
+                --border: #374151;
+            }
+        }
+        body {
+            margin: 0;
+            padding: 20px;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.6;
+        }
+        h1, h2 { margin: 1em 0 0.5em 0; }
+        h1 { font-size: 1.8em; }
+        h2 { font-size: 1.3em; margin-top: 1.5em; }
+        figure {
+            margin: 2em 0;
+            padding: 1em;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        figcaption {
+            margin-top: 0.75em;
+            font-size: 0.95em;
+            color: var(--fg);
+        }
+        svg {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+        .section {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        ul { margin: 0.5em 0 1em 1.5em; }
+        li { margin: 0.3em 0; }
+        code {
+            background: var(--border);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+            font-family: "Monaco", "Courier New", monospace;
+        }
+        .flow-desc {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2em;
+            margin: 1.5em 0;
+        }
+        .flow-item h3 {
+            margin-top: 0;
+            font-size: 1em;
+            color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+<div class="section">
+    <h1>Panel de Compras y Bienestar — Full Architecture</h1>
+
+    <figure>
+        <svg viewBox="0 0 1000 700" role="img" aria-label="Three-tier architecture with frontend, backend, database, and AI services">
+            <defs>
+                <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,6 L9,3 z" fill="currentColor"/>
+                </marker>
+                <marker id="arrow-accent" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,6 L9,3 z" fill="#2063a0"/>
+                </marker>
+            </defs>
+
+            <!-- Browser/Client -->
+            <rect x="50" y="20" width="120" height="60" fill="none" stroke="currentColor" stroke-width="2" rx="4"/>
+            <text x="110" y="55" text-anchor="middle" font-size="14" font-weight="bold">Browser</text>
+
+            <!-- Frontend (port 3000) -->
+            <rect x="250" y="20" width="160" height="60" fill="none" stroke="currentColor" stroke-width="2" rx="4"/>
+            <text x="330" y="45" text-anchor="middle" font-size="13" font-weight="bold">Frontend</text>
+            <text x="330" y="63" text-anchor="middle" font-size="11">Next.js (port 3000)</text>
+
+            <!-- Backend (port 3001) -->
+            <rect x="550" y="20" width="160" height="60" fill="none" stroke="currentColor" stroke-width="2" rx="4"/>
+            <text x="630" y="45" text-anchor="middle" font-size="13" font-weight="bold">Backend API</text>
+            <text x="630" y="63" text-anchor="middle" font-size="11">Next.js (port 3001)</text>
+
+            <!-- Anthropic AI -->
+            <rect x="800" y="20" width="150" height="60" fill="none" stroke="#2063a0" stroke-width="2" rx="4"/>
+            <text x="875" y="45" text-anchor="middle" font-size="13" font-weight="bold" fill="#2063a0">Anthropic API</text>
+            <text x="875" y="63" text-anchor="middle" font-size="11" fill="#2063a0">Claude Models</text>
+
+            <!-- PostgreSQL -->
+            <rect x="550" y="180" width="160" height="60" fill="none" stroke="currentColor" stroke-width="2" rx="4"/>
+            <text x="630" y="205" text-anchor="middle" font-size="13" font-weight="bold">PostgreSQL</text>
+            <text x="630" y="223" text-anchor="middle" font-size="11">Prisma ORM</text>
+
+            <!-- Frontend Internal Components -->
+            <g>
+                <text x="330" y="120" text-anchor="middle" font-size="12" font-weight="bold">Components:</text>
+                <text x="330" y="140" text-anchor="middle" font-size="11">• Registros (Table CRUD)</text>
+                <text x="330" y="158" text-anchor="middle" font-size="11">• Dashboard (Analytics)</text>
+                <text x="330" y="176" text-anchor="middle" font-size="11">• Usuarios, Maestros, etc.</text>
+            </g>
+
+            <!-- Backend Internal Services -->
+            <g>
+                <text x="630" y="120" text-anchor="middle" font-size="12" font-weight="bold">Services:</text>
+                <text x="630" y="140" text-anchor="middle" font-size="11">• lib/records.js (CRUD)</text>
+                <text x="630" y="158" text-anchor="middle" font-size="11">• lib/auth.js (Session)</text>
+                <text x="630" y="176" text-anchor="middle" font-size="11">• lib/permissions.js (Auth)</text>
+            </g>
+
+            <!-- AI Services in Backend -->
+            <g>
+                <text x="630" y="320" text-anchor="middle" font-size="12" font-weight="bold">AI Services:</text>
+                <text x="630" y="340" text-anchor="middle" font-size="11">• Chat (Agente IA)</text>
+                <text x="630" y="358" text-anchor="middle" font-size="11">• Reports (Informes)</text>
+                <text x="630" y="376" text-anchor="middle" font-size="11">• Review (Alertas)</text>
+            </g>
+
+            <!-- Arrows: Browser → Frontend -->
+            <line x1="170" y1="50" x2="250" y2="50" stroke="currentColor" stroke-width="2" marker-end="url(#arrow)"/>
+            <text x="210" y="40" text-anchor="middle" font-size="10">HTTP/WS</text>
+            <text x="210" y="65" text-anchor="middle" font-size="10" fill="#2063a0">(session cookie)</text>
+
+            <!-- Arrows: Frontend → Backend -->
+            <line x1="410" y1="50" x2="550" y2="50" stroke="currentColor" stroke-width="2" marker-end="url(#arrow)"/>
+            <text x="480" y="40" text-anchor="middle" font-size="10">/api/... proxied</text>
+            <text x="480" y="65" text-anchor="middle" font-size="10">(session forwarded)</text>
+
+            <!-- Arrows: Backend → PostgreSQL -->
+            <line x1="630" y1="80" x2="630" y2="180" stroke="currentColor" stroke-width="2" marker-end="url(#arrow)"/>
+            <text x="655" y="135" text-anchor="start" font-size="10">Prisma queries</text>
+
+            <!-- Arrows: Backend ← PostgreSQL -->
+            <line x1="605" y1="180" x2="605" y2="80" stroke="currentColor" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrow)"/>
+            <text x="565" y="135" text-anchor="end" font-size="10">rows</text>
+
+            <!-- Arrows: Backend → Anthropic -->
+            <line x1="710" y1="50" x2="800" y2="50" stroke="#2063a0" stroke-width="2" marker-end="url(#arrow-accent)"/>
+            <text x="755" y="40" text-anchor="middle" font-size="10" fill="#2063a0">streaming</text>
+            <text x="755" y="63" text-anchor="middle" font-size="10" fill="#2063a0">prompts</text>
+
+            <!-- Arrows: Backend ← Anthropic -->
+            <line x1="790" y1="70" x2="720" y2="70" stroke="#2063a0" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrow-accent)"/>
+            <text x="755" y="87" text-anchor="middle" font-size="10" fill="#2063a0">responses</text>
+
+            <!-- Key Flows Section -->
+            <text x="50" y="420" font-size="14" font-weight="bold">Authentication Flow:</text>
+            <text x="50" y="445" font-size="11">1. Login → Backend verifies credentials (bcrypt), signs session cookie (HMAC)</text>
+            <text x="50" y="465" font-size="11">2. Cookie stored httpOnly, sent with every request (Frontend proxies to Backend)</text>
+            <text x="50" y="485" font-size="11">3. Backend middleware checks cookie on every /api/* route (except /api/auth/login)</text>
+
+            <text x="50" y="520" font-size="14" font-weight="bold">Data Read Flow (e.g., Registros table):</text>
+            <text x="50" y="545" font-size="11">1. User clicks Registros → Frontend Server Component calls lib/backendFetch()</text>
+            <text x="50" y="565" font-size="11">2. lib/backendFetch forwards session cookie → Backend GET /api/records</text>
+            <text x="50" y="585" font-size="11">3. Backend reads session, checks permissions, queries Prisma → PostgreSQL</text>
+            <text x="50" y="605" font-size="11">4. Backend returns JSON → Frontend renders table, sends to browser</text>
+
+            <text x="50" y="640" font-size="14" font-weight="bold">AI Flow (e.g., Agente IA chat):</text>
+            <text x="50" y="665" font-size="11">1. User sends message in browser → Frontend POST /api/agent/chat</text>
+            <text x="50" y="685" font-size="11">2. Backend assembles context (user data, recent records from DB), streams to Anthropic</text>
+        </svg>
+        <figcaption>
+            Three-tier architecture: Browser → Frontend (Next.js, port 3000) → Backend (Next.js API, port 3001) → PostgreSQL.
+            Frontend proxies /api/* calls to Backend (session cookie forwarded server-to-server). Backend integrates Anthropic API for chat,
+            structured AI, and report generation. Authentication via HMAC-signed session cookie, checked on every Backend route.
+        </figcaption>
+    </figure>
+
+    <h2>Data Models (Prisma Schema)</h2>
+    <p>Core entities in PostgreSQL, accessed via Prisma ORM:</p>
+    <ul>
+        <li><code>Record</code> — purchase order (fecha, proveedor, área, estado, valores, radicado, etc.)</li>
+        <li><code>User</code> — dashboard user (email, role, bcrypt password, active flag)</li>
+        <li><code>Maestro</code> — catalog item (area, responsable, estado, categoría, medioPago, etc. — dropdown options)</li>
+        <li><code>Presupuesto*</code> — budget (per-year, per-area, per-category if applicable)</li>
+        <li><code>AuditLog</code> — every change (user, entity, action, timestamp, before/after JSON)</li>
+        <li><code>Conversation</code> / <code>Message</code> — AI chat history</li>
+        <li><code>ReportConfig</code> — automated report schedules & templates</li>
+    </ul>
+
+    <h2>Backend Route Structure (/api)</h2>
+    <div class="flow-desc">
+        <div class="flow-item">
+            <h3>Records & Core</h3>
+            <ul>
+                <li><code>GET /api/records</code> — list (filters, pagination)</li>
+                <li><code>POST /api/records</code> — create</li>
+                <li><code>PATCH /api/records/[id]</code> — edit</li>
+                <li><code>DELETE /api/records/[id]</code> — soft/hard delete</li>
+                <li><code>GET /api/maestros</code> — dropdown options</li>
+            </ul>
+        </div>
+        <div class="flow-item">
+            <h3>Auth & Admin</h3>
+            <ul>
+                <li><code>POST /api/auth/login</code> — issue session cookie</li>
+                <li><code>GET /api/auth/me</code> — session user + permissions</li>
+                <li><code>POST /api/auth/logout</code> — clear cookie</li>
+                <li><code>GET/POST /api/users</code> — user CRUD (admin only)</li>
+            </ul>
+        </div>
+        <div class="flow-item">
+            <h3>Analytics & AI</h3>
+            <ul>
+                <li><code>GET /api/alerts</code> — pending, overdue, budget risk</li>
+                <li><code>POST /api/agent/chat</code> — stream AI responses</li>
+                <li><code>GET/POST /api/reports</code> — report builder/scheduler</li>
+            </ul>
+        </div>
+        <div class="flow-item">
+            <h3>Permissions & Audit</h3>
+            <ul>
+                <li><code>GET /api/permissions</code> — effective perms for user</li>
+                <li><code>POST /api/permissions</code> — admin override (audited)</li>
+                <li><code>GET /api/audit</code> — change log</li>
+            </ul>
+        </div>
+    </div>
+
+    <h2>Frontend Page Routes</h2>
+    <ul>
+        <li><code>/dashboard</code> — KPI cards, charts (BarChart, StackedBar SVG components)</li>
+        <li><code>/registros</code> — table, filters, CRUD modals, export (CSV/PDF/Word)</li>
+        <li><code>/usuarios</code> — user management + Permissions Matrix editor</li>
+        <li><code>/maestros</code> — catalog admin (dropdown options)</li>
+        <li><code>/presupuesto</code> — budget per-year/per-area configuration</li>
+        <li><code>/alertas</code> — pending, overdue, budget-risk alerts</li>
+        <li><code>/auditoria</code> — change log viewer</li>
+        <li><code>/informes</code> — report builder/scheduler/executor</li>
+        <li><code>/agente-ia</code> — chat interface</li>
+        <li><code>/login</code> — session start</li>
+    </ul>
+
+    <h2>AI Integration (Anthropic)</h2>
+    <p><strong>Backend only</strong> — Frontend never calls Anthropic directly. Three use cases:</p>
+    <div class="flow-desc">
+        <div class="flow-item">
+            <h3>1. Chat (Agente IA)</h3>
+            <p>
+                User sends message → <code>lib/aiChatCascade.js</code> streams to Claude (streaming endpoint).
+                Context includes recent records, user role, alerts. Responses appear in browser in real-time.
+            </p>
+        </div>
+        <div class="flow-item">
+            <h3>2. Structured AI</h3>
+            <p>
+                <code>lib/aiStructured.js</code> uses non-streaming JSON mode for extraction/classification.
+                Used by: report content generation, "explain this number", moderation checks.
+            </p>
+        </div>
+        <div class="flow-item">
+            <h3>3. Reports (Informes Automáticos)</h3>
+            <p>
+                <code>lib/reportScheduler.js</code> checks daily. Calls AI to generate report blocks (KPIs, summaries, insights).
+                Runs in-process; built PDF + HTML email body; saved to disk.
+            </p>
+        </div>
+        <div class="flow-item">
+            <h3>Alerts Review</h3>
+            <p>
+                <code>app/api/agent/review-alertas</code> — AI analyzes current alerts (pending, overdue, budget).
+                Reuses exact same alert data as the frontend sees (intentional — consistency).
+            </p>
+        </div>
+    </div>
+
+    <h2>Session & Auth Model</h2>
+    <ul>
+        <li><strong>Session token</strong> — HMAC-signed (Web Crypto, works in Node + Edge middleware), httpOnly cookie</li>
+        <li><strong>Same secret in both apps</strong> — <code>SESSION_SECRET</code> env var, so Frontend & Backend can independently verify cookies</li>
+        <li><strong>Middleware</strong> — Backend <code>middleware.js</code> checks every /api/* route (except login), returns 401 if invalid or expired</li>
+        <li><strong>Permissions</strong> — stored in <code>RolePermission</code> table (admin overrides), returned by <code>GET /api/auth/me</code> alongside user data</li>
+        <li><strong>Fallback</strong> — if permissions lookup fails, uses static <code>lib/roles.js</code> defaults (safety first)</li>
+    </ul>
+
+    <h2>Database Deployment</h2>
+    <ul>
+        <li><strong>Migrations</strong> — managed via Prisma: <code>npx prisma migrate dev --name &lt;name&gt;</code> (dev), <code>npm run prisma:deploy</code> (prod)</li>
+        <li><strong>Seed</strong> — <code>npm run db:seed</code> runs <code>prisma/seed.mjs</code>, which loads <code>seed-data.json</code> (sample data only)</li>
+        <li><strong>Real data</strong> — replace seed-data.json with actual export, re-run seed</li>
+    </ul>
+
+    <h2>Scaling Considerations</h2>
+    <ul>
+        <li><strong>Current state</strong> — everything in one Backend instance (routes, AI, scheduler, report jobs)</li>
+        <li><strong>If reports/AI slow down UI</strong> — move job queue (Bull, RabbitMQ) + separate worker service</li>
+        <li><strong>If routes grow (50+)</strong> — consider NestJS (better structure, DI, validation)</li>
+        <li><strong>If multi-region</strong> — cache session secret, use read replicas for queries</li>
+        <li><strong>Current guardrail</strong> — <code>lib/permissions.js</code> and <code>lib/records.js</code> are DB-agnostic, so switching ORMs is low-friction</li>
+    </ul>
+</div>
+</body>
+</html>

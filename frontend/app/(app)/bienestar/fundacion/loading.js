@@ -1,0 +1,5 @@
+import { PaginaCargando, EsqueletoResumen } from "@/components/bienestar/Esqueletos";
+
+export default function Loading() {
+  return <PaginaCargando><EsqueletoResumen /></PaginaCargando>;
+}
