@@ -353,3 +353,18 @@ export const SOPORTE_TESORERIA_FIELD_LABELS = {
   archivo: "Archivo",
   movimiento: "Movimiento",
 };
+
+// Pagos recurrentes de Tesorería.
+Object.assign(ACTION_LABELS, { generar: "Generó" });
+Object.assign(ENTITY_LABELS, { recurrenciaTesoreria: "Pago recurrente de tesorería" });
+export const RECURRENCIA_TESORERIA_FIELD_LABELS = {
+  nombre: "Nombre",
+  tipo: "Tipo",
+  valor: "Valor",
+  cuenta: "Cuenta",
+  concepto: "Concepto",
+  item: "Ítem",
+  frecuencia: "Frecuencia",
+  vigencia: "Vigencia",
+  activo: "Activo",
+};

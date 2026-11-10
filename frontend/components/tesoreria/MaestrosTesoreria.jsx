@@ -20,7 +20,7 @@ const TIPOS = [
 ];
 const TIPO_CUENTA = { ahorros: "Ahorros", inversion: "Inversión", tarjeta: "Tarjeta de crédito", efectivo: "Efectivo", otro: "Otro" };
 const FORMATO = { avvillas: "Tipo AV Villas", credicorp: "Tipo Credicorp", generico: "Genérico (fecha, descripción, valor)" };
-const sin = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const sin = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 function ToggleSwitch({ checked, onChange, disabled, title }) {
   return (

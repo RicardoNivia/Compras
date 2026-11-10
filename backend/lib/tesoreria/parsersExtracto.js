@@ -9,8 +9,8 @@ import * as XLSX from "xlsx";
 //               FORMATO y las filas SALDO INICIAL/FINAL no son movimientos.
 //   generico  — cualquier Excel/CSV con columnas de fecha, descripción y valor (o débito y crédito).
 
-const norm = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
-const texto = (s) => (s == null ? "" : String(s).replace(/�/g, "").replace(/\s+/g, " ").trim());
+const norm = (s) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const texto = (s) => (s == null ? "" : String(s).replace(/\uFFFD/g, "").replace(/\s+/g, " ").trim());
 
 export function fechaDeCelda(v) {
   if (v == null || v === "") return null;

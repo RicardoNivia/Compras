@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { logObservacionActividad } from "@/lib/audit";
-import { clasificarEnSegundoPlano } from "@/lib/sentimientoComentarios";
+import { clasificarAhora } from "@/lib/sentimientoComentarios";
 
 // Encuesta y observaciones de una actividad: reúne en una sola lista lo que el equipo anota (ObservacionActividad) con
 // lo que ya estaba en otras partes: la calificación y el comentario de cada participante, las observaciones del
@@ -76,8 +76,10 @@ export async function crearObservacion(actividadId, body, actor) {
     data: { actividadId: a.id, texto, creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null },
   });
   logObservacionActividad(actor, a, "crear", `Agregó: ${texto.slice(0, 200)}`).catch(() => {});
-  clasificarEnSegundoPlano(a.id);
-  return toClientNota(row);
+  // La manito se pone de una vez: Nova clasifica la observación antes de responder (con un tope de espera).
+  await clasificarAhora(a.id);
+  const conTono = await prisma.observacionActividad.findUnique({ where: { id: row.id } });
+  return toClientNota(conTono || row);
 }
 
 export async function eliminarObservacion(actividadId, id, actor) {

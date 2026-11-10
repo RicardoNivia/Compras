@@ -14,7 +14,7 @@ export const POST = conTesoreria("registro", async ({ request, user }) => {
   const archivo = await archivoDe(form);
   let datos = {};
   try { datos = JSON.parse(String(form.get("datos") || "{}")); } catch { throw Object.assign(new Error("Datos inválidos."), { status: 400 }); }
-  if (JSON.stringify(datos).includes("�")) throw Object.assign(new Error("El texto contiene caracteres dañados: vuelve a escribir los acentos."), { status: 400 });
+  if (JSON.stringify(datos).includes("\uFFFD")) throw Object.assign(new Error("El texto contiene caracteres dañados: vuelve a escribir los acentos."), { status: 400 });
   const mv = await guardarConSoporte(user, { datos, proyectadoId: form.get("proyectadoId") || null, lineaId: form.get("lineaId") || null, archivo });
   return getMovimiento(mv.id);
 });

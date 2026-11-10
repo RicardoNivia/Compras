@@ -84,7 +84,7 @@ export async function aprobarSolicitud(user, id, body = {}) {
 export async function descartarSolicitud(user, id, motivo) {
   const s = await cargar(user, id);
   if (s.estado !== "pendiente") throw err("Esta solicitud ya no está pendiente.");
-  const m = String(motivo || "").replace(/�/g, "").trim().slice(0, 300) || null;
+  const m = String(motivo || "").replace(/\uFFFD/g, "").trim().slice(0, 300) || null;
   await prisma.solicitudProveedorCorreo.update({
     where: { id: s.id },
     data: { estado: "descartada", motivoDescarte: m, resueltoAt: new Date(), resueltoPorUserId: user.id, resueltoPorNombre: user.nombre || null },

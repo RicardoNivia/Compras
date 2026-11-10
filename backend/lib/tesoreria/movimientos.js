@@ -45,6 +45,7 @@ export function toClientMovimiento(mv, mapas) {
     referencia: mv.referencia,
     observacion: mv.observacion,
     origen: mv.origen,
+    recurrenciaId: mv.recurrenciaId ?? null,
     soportes: mv._count?.soportes ?? mv.soportes?.length ?? 0,
     createdAt: mv.createdAt,
     creadoPorNombre: mv.creadoPorNombre,
