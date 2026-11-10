@@ -35,9 +35,9 @@ export async function requireTesoreria(nivelMinimo = "consulta") {
 
 // ---------- Texto, números, fechas y moneda (ISO 4217) ----------
 
-export const sinTildes = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+export const sinTildes = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 // La BD rechaza U+FFFD: se quita aquí (texto que viene de bancos o archivos con codificación dañada).
-export const limpiar = (s, max = 500) => (s == null ? null : String(s).replace(/�/g, "").replace(/\s+/g, " ").trim().slice(0, max) || null);
+export const limpiar = (s, max = 500) => (s == null ? null : String(s).replace(/\uFFFD/g, "").replace(/\s+/g, " ").trim().slice(0, max) || null);
 
 export function numero(v, campo = "El valor") {
   const n = typeof v === "number" ? v : Number(String(v ?? "").replace(/[^\d.,-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."));

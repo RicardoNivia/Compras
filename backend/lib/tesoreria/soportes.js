@@ -94,7 +94,13 @@ export async function proponerDesdeSoporte(buffer, nombre) {
     const desde = new Date(Date.parse(`${propuesta.fecha}T00:00:00Z`) - 25 * 86400000).toISOString().slice(0, 10);
     const hasta = new Date(Date.parse(`${propuesta.fecha}T00:00:00Z`) + 25 * 86400000).toISOString().slice(0, 10);
     const proys = await prisma.movimientoTesoreria.findMany({ where: { estado: "proyectado", tipo, fecha: { gte: desde, lte: hasta }, ...(cuenta ? { cuentaId: cuenta.id } : {}) } });
-    const p = proys.filter((m) => Math.abs(Number(m.valor) - valor) < 0.5).sort((a, b) => Math.abs(Date.parse(a.fecha) - Date.parse(propuesta.fecha)) - Math.abs(Date.parse(b.fecha) - Date.parse(propuesta.fecha)))[0];
+    const cercania = (a, b) => Math.abs(Date.parse(a.fecha) - Date.parse(propuesta.fecha)) - Math.abs(Date.parse(b.fecha) - Date.parse(propuesta.fecha));
+    let p = proys.filter((m) => Math.abs(Number(m.valor) - valor) < 0.5).sort(cercania)[0];
+    // Pago recurrente de valor variable: mismo concepto aunque el valor cambie (el proyectado traía un estimado).
+    if (!p && propuesta.conceptoId) {
+      p = proys.filter((m) => m.recurrenciaId && m.conceptoId === propuesta.conceptoId).sort(cercania)[0];
+      if (p) avisos.push(`Cumple el pago recurrente «${p.concepto}», que tenía un valor estimado de ${fmtMoneda(p.valor, p.moneda)}: se guarda con el valor real.`);
+    }
     if (p) {
       proyectado = { id: p.id, fecha: p.fecha, concepto: p.concepto, valorTexto: fmtMoneda(p.valor, p.moneda) };
       Object.assign(propuesta, { conceptoId: propuesta.conceptoId || p.conceptoId, itemId: propuesta.itemId || p.itemId, pagadorId: propuesta.pagadorId || p.pagadorId, cuentaId: propuesta.cuentaId || p.cuentaId });

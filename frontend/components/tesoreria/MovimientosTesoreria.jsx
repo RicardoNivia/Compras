@@ -8,6 +8,7 @@ import { crossfade } from "@/lib/crossfade";
 import { Paginacion } from "@/components/notificaciones/ui";
 import { Celda, EstadoPill, tipoTexto, fechaCorta, useCatalogos, Aviso, MESES, anios, anioActual } from "@/components/tesoreria/comun";
 import { FormMovimientoModal, SoporteModal, DetalleMovimientoModal } from "@/components/tesoreria/MovimientoModales";
+import ImportarExcelModal from "@/components/tesoreria/ImportarExcelModal";
 
 const PAGE_SIZES = [25, 50, 100];
 const ESTADOS = [["", "Todos"], ["proyectado", "Proyectados"], ["ejecutado", "Ejecutados"], ["conciliado", "Conciliados"], ["porConciliar", "Por conciliar"], ["sinSoporte", "Sin soporte"]];
@@ -74,6 +75,7 @@ export default function MovimientosTesoreria({ acceso }) {
         </div>
         {puedeRegistrar && (
           <div className="tes-filtros-acciones">
+            <button type="button" className="btn" onClick={() => setModal({ tipo: "importar" })}>Importar plantilla Excel</button>
             <button type="button" className="btn" onClick={() => setModal({ tipo: "form" })} disabled={!cat}>Registrar a mano</button>
             <button type="button" className="btn btn-primary" onClick={() => setModal({ tipo: "soporte" })} disabled={!cat}>Registrar con soporte</button>
           </div>
@@ -115,7 +117,7 @@ export default function MovimientosTesoreria({ acceso }) {
                   <td>{m.pagador || <span className="muted">—</span>}</td>
                   <td><Celda v={m.tercero} /></td>
                   <td style={{ textAlign: "right" }} className={m.tipo === "egreso" ? "tes-neg" : m.tipo === "ingreso" ? "tes-pos" : ""}><strong>{m.tipo === "egreso" ? "−" : m.tipo === "ingreso" ? "+" : "⇄ "}{m.valorTexto}</strong></td>
-                  <td><EstadoPill mov={m} /></td>
+                  <td><EstadoPill mov={m} />{m.recurrenciaId ? <span className="pill muted tes-rec-var" title="Generado por un pago recurrente">recurrente</span> : null}</td>
                   <td>{m.soportes ? `${m.soportes} archivo(s)` : <span className="muted">—</span>}</td>
                 </tr>
               ))}
@@ -129,6 +131,7 @@ export default function MovimientosTesoreria({ acceso }) {
       {modal?.tipo === "form" && cat && <FormMovimientoModal cat={cat} movimiento={modal.mov} onClose={() => setModal(null)} onSaved={guardado} />}
       {modal?.tipo === "soporte" && cat && <SoporteModal cat={cat} onClose={() => setModal(null)} onSaved={guardado} />}
       {modal?.tipo === "detalle" && cat && <DetalleMovimientoModal id={modal.id} cat={cat} puedeRegistrar={puedeRegistrar} onClose={() => setModal(null)} onCambio={cambio} onEditar={(mov) => setModal({ tipo: "form", mov })} />}
+      {modal?.tipo === "importar" && <ImportarExcelModal acceso={acceso} onClose={() => setModal(null)} onListo={() => { setModal(null); cambio("Plantilla cargada."); }} />}
       <Aviso texto={aviso} onCerrar={() => setAviso("")} />
     </div>
   );

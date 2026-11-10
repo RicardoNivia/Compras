@@ -22,9 +22,9 @@ const MAX_NOVA_POR_REVISION = 20;
 const MAX_CUERPO = 8000;
 const ACTOR_AGENTE = { id: null, nombre: "Agente de correo", email: null };
 
-const sinTildes = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const sinTildes = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 // Quita el carácter de reemplazo (texto con codificación dañada) y los de control: la BD rechaza U+FFFD.
-const limpiar = (s, max = 2000) => (s == null ? null : String(s).replace(/�/g, "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").trim().slice(0, max) || null);
+const limpiar = (s, max = 2000) => (s == null ? null : String(s).replace(/\uFFFD/g, "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").trim().slice(0, max) || null);
 
 // ¿Vale la pena que Nova lo lea? Habla de un proveedor y de registrarlo/crearlo, o menciona SRM, o trae un RUT.
 export function pareceSolicitud(asunto, cuerpo, nombresAdjuntos = []) {

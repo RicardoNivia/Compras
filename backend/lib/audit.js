@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { FIELD_LABELS, TOKEN_FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS, NOTIFICACION_FIELD_LABELS, ACTIVIDAD_FIELD_LABELS, SOLICITUD_COMPRA_FIELD_LABELS, ROL_FIELD_LABELS, DETALLE_FIELD_LABELS, CUENTA_CORREO_FIELD_LABELS, SOLICITUD_PROVEEDOR_CORREO_FIELD_LABELS, MOVIMIENTO_TESORERIA_FIELD_LABELS, MAESTRO_TESORERIA_FIELD_LABELS, ACCESO_TESORERIA_FIELD_LABELS, CONCILIACION_TESORERIA_FIELD_LABELS, CIERRE_TESORERIA_FIELD_LABELS, EXTRACTO_TESORERIA_FIELD_LABELS, SOPORTE_TESORERIA_FIELD_LABELS } from "@/lib/auditLabels";
+import { FIELD_LABELS, TOKEN_FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS, NOTIFICACION_FIELD_LABELS, ACTIVIDAD_FIELD_LABELS, SOLICITUD_COMPRA_FIELD_LABELS, ROL_FIELD_LABELS, DETALLE_FIELD_LABELS, CUENTA_CORREO_FIELD_LABELS, SOLICITUD_PROVEEDOR_CORREO_FIELD_LABELS, MOVIMIENTO_TESORERIA_FIELD_LABELS, MAESTRO_TESORERIA_FIELD_LABELS, ACCESO_TESORERIA_FIELD_LABELS, CONCILIACION_TESORERIA_FIELD_LABELS, CIERRE_TESORERIA_FIELD_LABELS, EXTRACTO_TESORERIA_FIELD_LABELS, SOPORTE_TESORERIA_FIELD_LABELS, RECURRENCIA_TESORERIA_FIELD_LABELS } from "@/lib/auditLabels";
 
 export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, TOKEN_FIELD_LABELS, ACTION_LABELS, ENTITY_LABELS } from "@/lib/auditLabels";
 
@@ -184,11 +184,6 @@ export async function logConfigAgente(actor, clave, nombre, activo) {
 }
 
 // Agente cotizador: crear o eliminar un cuadro comparativo.
-// Agente verificador de factura (Compras): queda en la historia de la compra que se verificó.
-export async function logVerificacionFactura(actor, compra, detalle) {
-  await writeLog({ action: "verificar", entityType: "verificacionFactura", recordId: String(compra.id), recordInfo: `Compra #${compra.localSeq ?? "—"}${compra.descripcion ? ` · ${String(compra.descripcion).slice(0, 60)}` : ""}`, actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
-}
-
 export async function logCuadroComparativo(actor, cuadro, action, detalle) {
   await writeLog({ action, entityType: "cuadroComparativo", recordId: String(cuadro.id), recordInfo: cuadro.titulo, actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
 }
@@ -710,6 +705,7 @@ const TESORERIA_LABELS = {
   cierreTesoreria: CIERRE_TESORERIA_FIELD_LABELS,
   extractoTesoreria: EXTRACTO_TESORERIA_FIELD_LABELS,
   soporteTesoreria: SOPORTE_TESORERIA_FIELD_LABELS,
+  recurrenciaTesoreria: RECURRENCIA_TESORERIA_FIELD_LABELS,
 };
 
 export async function logTesoreria(actor, { action, entityType, recordId, recordInfo, before = null, after = null }) {

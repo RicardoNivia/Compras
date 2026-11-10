@@ -122,10 +122,17 @@ export async function estadoConciliacion(cuentaId, anio, mes) {
       .sort((a, b) => a.d - b.d)
       .slice(0, 3);
     const linea = { id: l.id, fecha: l.fecha, descripcion: l.descripcion, tercero: l.tercero, valor: num(l.valor), valorTexto: fm(l.valor), etiqueta: l.etiqueta };
+    // Pago recurrente de valor variable (servicios): su proyectado lleva un estimado, así que se busca por la regla
+    // (mismo concepto), el mismo sentido y el mismo mes aunque el valor no sea idéntico; al confirmarlo toma el real.
+    const r = reglaPara(rs, l.descripcion);
+    const recurrentes = cands.length || !r ? [] : sinLinea
+      .filter((m) => m.recurrenciaId && m.estado === "proyectado" && m.conceptoId === r.conceptoId && m.fecha.slice(0, 7) === l.fecha.slice(0, 7) && Math.sign(signoEnCuenta(m, cuenta.id)) === Math.sign(v))
+      .slice(0, 2);
     if (cands.length) {
       sugerencias.push({ linea, candidatos: cands.map(({ m, d }) => ({ ...cli(m), razon: m.estado === "proyectado" ? `Proyectado por el mismo valor${m.fechaAproximada ? " en el mes" : `, ${Math.round(d)} día(s) de diferencia`}: al confirmarlo pasa a ejecutado` : m.fechaAproximada ? "Mismo valor; el movimiento vino del Excel solo con el mes" : `Mismo valor, ${Math.round(d)} día(s) de diferencia` })) });
+    } else if (recurrentes.length) {
+      sugerencias.push({ linea, candidatos: recurrentes.map((m) => ({ ...cli(m), razon: `Pago recurrente del mes con valor estimado ${fmtMoneda(m.valor, m.moneda)}: al confirmarlo pasa a ejecutado con el valor real del banco` })) });
     } else {
-      const r = reglaPara(rs, l.descripcion);
       soloBanco.push({ ...linea, propuesta: r ? { conceptoId: r.conceptoId, concepto: mapas.conceptos.get(r.conceptoId)?.nombre, itemId: r.itemId, item: r.itemId ? mapas.items.get(r.itemId)?.nombre : null, pagadorId: r.pagadorId, usos: r.usos } : null });
     }
   }
@@ -167,7 +174,8 @@ export async function enlazar(actor, { lineaId, movimientoId }) {
   await exigirMesAbierto(mv.fecha);
   // Un proyectado que aparece en el banco ya se ejecutó: toma la fecha real de la línea.
   const datosMov = {};
-  if (mv.estado === "proyectado") Object.assign(datosMov, { estado: "ejecutado" });
+  // Y el valor real del banco (un recurrente de valor variable traía un estimado).
+  if (mv.estado === "proyectado") Object.assign(datosMov, { estado: "ejecutado", ...(Math.abs(Math.abs(num(l.valor)) - num(mv.valor)) >= CENTAVO ? { valor: Math.abs(num(l.valor)) } : {}) });
   if (mv.estado === "proyectado" || mv.fechaAproximada) Object.assign(datosMov, { fecha: l.fecha, fechaAproximada: false });
   await prisma.$transaction([
     prisma.lineaExtracto.update({ where: { id: l.id }, data: { movimientoId: mv.id, comoSeEnlazo: "manual", enlazadoAt: new Date(), enlazadoPorNombre: actor.nombre || null } }),

@@ -1138,7 +1138,11 @@ model MovimientoTesoreria {
   tercero         String?
   referencia      String?   // CUS, número de aprobación, factura…
   observacion     String?
-  origen          String    @default("manual") // manual | soporte | extracto | importacion
+  origen          String    @default("manual") // manual | soporte | extracto | importacion | recurrente
+  recurrenciaId   Int?      // el pago recurrente que generó este proyectado
+  recurrencia     RecurrenciaTesoreria? @relation(fields: [recurrenciaId], references: [id], onDelete: SetNull)
+  periodoRecurrencia String? // AAAA-MM del periodo que cubre (uno por recurrente y periodo)
+  claveImportacion String?  @unique // huella de la fila del Excel importado: volver a importar no duplica (lib/tesoreria/importadorExcel.js)
   createdAt       DateTime  @default(now())
   creadoPorUserId String?
   creadoPorNombre String?
@@ -1146,6 +1150,7 @@ model MovimientoTesoreria {
   soportes        SoporteMovimiento[]
   lineas          LineaExtracto[]
 
+  @@unique([recurrenciaId, periodoRecurrencia])
   @@index([fecha])
   @@index([cuentaId, fecha])
   @@index([estado])
@@ -1241,4 +1246,34 @@ model CierreMes {
 
   @@unique([anio, mes])
   @@map("tesoreria_cierres")
+}
+
+// Pago recurrente de Tesorería (arriendo, administración, servicios, nómina, tarjeta…): genera solo el proyectado de cada
+// periodo (lib/tesoreria/recurrentes.js). Cuando llega el soporte o la línea del extracto, ese proyectado pasa a
+// ejecutado. Si el valor es variable (servicios), el proyectado lleva el estimado y se corrige con el valor real.
+model RecurrenciaTesoreria {
+  id              Int       @id @default(autoincrement())
+  nombre          String
+  tipo            String    // "ingreso" | "egreso" | "traslado"
+  valor           Decimal   @db.Decimal(18, 2) // positivo; estimado si valorVariable
+  valorVariable   Boolean   @default(false)
+  moneda          String    @default("COP") // ISO 4217: la de la cuenta
+  cuentaId        Int
+  cuentaDestinoId Int?
+  itemId          Int?
+  conceptoId      Int
+  pagadorId       Int?
+  tercero         String?
+  frecuencia      String    @default("mensual") // mensual | bimestral | trimestral | semestral | anual
+  diaDelMes       Int       // 1-31 (en meses más cortos, el último día)
+  desde           String    // AAAA-MM-DD: primer periodo
+  hasta           String?   // AAAA-MM-DD: último periodo (null = sin fin)
+  activo          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime  @updatedAt
+  movimientos     MovimientoTesoreria[]
+
+  @@map("tesoreria_recurrencias")
 }

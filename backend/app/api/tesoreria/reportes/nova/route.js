@@ -46,7 +46,7 @@ function buscar(lista, nombre) {
  *     summary: "Traduce un pedido en lenguaje natural a los filtros de Reportes ({ texto, anioActual }). Responde { aplicable, filtros, resumen } o { aplicable: false, motivo } si el pedido no se puede expresar con los filtros."
  */
 export const POST = conTesoreria("consulta", async ({ body = {} }) => {
-  const texto = String(body.texto || "").replace(/�/g, "").trim().slice(0, 400);
+  const texto = String(body.texto || "").replace(/\uFFFD/g, "").trim().slice(0, 400);
   if (!texto) throw Object.assign(new Error("Escribe qué quieres ver."), { status: 400 });
   const [cuentas, pagadores, items, anios] = await Promise.all([
     prisma.cuentaTesoreria.findMany({ select: { id: true, nombre: true } }),
