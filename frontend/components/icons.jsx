@@ -93,6 +93,18 @@ export function IconPlus(props) {
   );
 }
 
+// Manito: arriba (positivo), al medio (neutro, de lado) o abajo (negativo).
+export function IconMano({ sentido = "arriba", ...props }) {
+  const giro = { arriba: 0, medio: 90, abajo: 180 }[sentido] ?? 0;
+  return (
+    <Svg {...props}>
+      <g transform={`rotate(${giro} 8.5 8.5)`}>
+        <path d="M5.2 7.6v7H3a.9.9 0 0 1-.9-.9V8.5a.9.9 0 0 1 .9-.9h2.2Zm0 0 2.7-5.2a1.5 1.5 0 0 1 2.8.9l-.6 3.1h3.6a1.4 1.4 0 0 1 1.4 1.7l-1.1 5.3a1.4 1.4 0 0 1-1.4 1.2H5.2" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="currentColor" fillOpacity=".14" />
+      </g>
+    </Svg>
+  );
+}
+
 export function IconDownload(props) {
   return (
     <Svg {...props} viewBox="0 0 13 13">
@@ -202,6 +214,24 @@ export function IconAlert(props) {
   );
 }
 
+export function IconCopy(props) {
+  return (
+    <Svg {...props} viewBox="0 0 14 14">
+      <rect x="5" y="5" width="7.5" height="7.5" rx="1.3" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M3.5 9.5h-1A1 1 0 0 1 1.5 8.5v-6A1 1 0 0 1 2.5 1.5h6a1 1 0 0 1 1 1v1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconInfo(props) {
+  return (
+    <Svg {...props} viewBox="0 0 14 14">
+      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M7 6.3v3.4M7 4.3h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function IconLayers(props) {
   return (
     <Svg {...props}>
@@ -223,11 +253,97 @@ export function IconBuilding(props) {
   );
 }
 
+export function IconMail(props) {
+  return (
+    <Svg {...props} viewBox="0 0 16 16">
+      <rect x="1.5" y="3" width="13" height="10" rx="1.6" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M2 4l6 5 6-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconStar({ filled, ...props }) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M8.5 1.8l2 4.1 4.5.6-3.3 3.2.8 4.5-4-2.1-4 2.1.8-4.5-3.3-3.2 4.5-.6z"
+        stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"
+        fill={filled ? "currentColor" : "none"}
+      />
+    </Svg>
+  );
+}
+
 export function IconFlag(props) {
   return (
     <Svg {...props}>
       <path d="M3 1.5v13.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
       <path d="M3 2.2c2-1 4 1 6 0s4-1 4 0v6c-2-1-4 1-6 0s-4-1-4 0Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconEye(props) {
+  return (
+    <Svg {...props} viewBox="0 0 16 16">
+      <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
+    </Svg>
+  );
+}
+
+export function IconCalendar(props) {
+  return (
+    <Svg {...props}>
+      <rect x="1.8" y="3" width="13.4" height="12.2" rx="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M1.8 7h13.4M5.3 1.5v3M11.7 1.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function IconBag(props) {
+  return (
+    <Svg {...props}>
+      <path d="M3.2 5.5h10.6l-.8 9.2a1 1 0 0 1-1 .9H5a1 1 0 0 1-1-.9z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M6 7.5V4.6a2.5 2.5 0 0 1 5 0v2.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function IconHeart(props) {
+  return (
+    <Svg {...props}>
+      <path d="M8.5 14.6S2 10.8 2 6.4A3.4 3.4 0 0 1 8.5 4.9a3.4 3.4 0 0 1 6.5 1.5c0 4.4-6.5 8.2-6.5 8.2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconPanel(props) {
+  return (
+    <Svg {...props}>
+      <rect x="1.8" y="2.5" width="13.4" height="12" rx="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M6.3 2.5v12" stroke="currentColor" strokeWidth="1.3" />
+    </Svg>
+  );
+}
+
+export function IconList(props) {
+  return (
+    <Svg {...props}>
+      <path d="M6 4.5h8.5M6 8.5h8.5M6 12.5h8.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <circle cx="3" cy="4.5" r="0.9" fill="currentColor" />
+      <circle cx="3" cy="8.5" r="0.9" fill="currentColor" />
+      <circle cx="3" cy="12.5" r="0.9" fill="currentColor" />
+    </Svg>
+  );
+}
+
+// Bandeja de entrada (Mi correo / agente de correo).
+export function IconInbox(props) {
+  return (
+    <Svg {...props} viewBox="0 0 16 16">
+      <path d="M2 9.5l1.6-5.2A1.4 1.4 0 0 1 4.9 3.3h6.2a1.4 1.4 0 0 1 1.3 1L14 9.5V12a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12V9.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M2 9.5h3.2l.9 1.6h3.8l.9-1.6H14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }

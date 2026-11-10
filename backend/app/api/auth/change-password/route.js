@@ -4,6 +4,39 @@ import { getSessionUser } from "@/lib/auth-server";
 
 // Protegido por middleware.js (requiere sesión válida; cualquier rol puede cambiar su propia contraseña).
 
+/**
+ * @openapi
+ * /api/auth/change-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Cambia la contraseña del usuario autenticado (requiere la contraseña actual).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [currentPassword, newPassword]
+ *             properties:
+ *               currentPassword: { type: string, format: password }
+ *               newPassword: { type: string, format: password }
+ *     responses:
+ *       200:
+ *         description: Contraseña actualizada.
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { ok: { type: boolean } } }
+ *       400:
+ *         description: Datos inválidos (p. ej. contraseña actual incorrecta).
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *       401:
+ *         description: No autenticado.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ */
 export async function POST(request) {
   try {
     const user = await getSessionUser();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { fmtDateDisplay, fmtPesos } from "@/lib/format";
+import { fmtDateDisplay, fmtDateTime, fmtPesos } from "@/lib/format";
 import { getDiasInfo } from "@/lib/diasInfo";
 
 function estadoPillClass(estado) {
@@ -72,7 +72,9 @@ export default function DetailModal({ record, onClose }) {
 
           <Item label="Descripción" full><EmptyOr value={record.descripcion} /></Item>
 
+          <Item label="Nit"><EmptyOr value={record.nit} /></Item>
           <Item label="Proveedor"><EmptyOr value={record.proveedor} /></Item>
+          <Item label="Actividad de Bienestar"><EmptyOr value={record.actividad} /></Item>
           <Item label="Licitación"><EmptyOr value={record.licitacion} /></Item>
 
           <Item label="Estado legalización">
@@ -87,8 +89,23 @@ export default function DetailModal({ record, onClose }) {
 
           <Item label="Valor cotizado">{fmtPesos(record.valorCot)}</Item>
           <Item label="Radicado">{record.radicado ? "Sí" : "No"}</Item>
+          <Item label="Calificación">
+            {record.calificacion ? "★".repeat(record.calificacion.estrellas) + "☆".repeat(5 - record.calificacion.estrellas) : "Sin calificar"}
+          </Item>
+
+          {record.moneda === "USD" && (
+            <>
+              <Item label="Moneda original">Dólares (USD)</Item>
+              <Item label="Valor en USD / TRM">
+                {record.valorUsd != null ? `US$${record.valorUsd.toLocaleString("es-CO")}` : "—"}
+                {record.trm != null ? ` · TRM ${record.trm.toLocaleString("es-CO")}` : ""}
+              </Item>
+            </>
+          )}
 
           <Item label="Observaciones" full><EmptyOr value={record.observaciones} /></Item>
+
+          <Item label="Fecha de registro en el sistema">{fmtDateTime(record.fechaRegistro)}</Item>
         </div>
       </div>
     </div>

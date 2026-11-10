@@ -5,7 +5,7 @@ import AppShell from "@/components/AppShell";
 import RegistrosView from "@/components/RegistrosView";
 import ExportMenu from "@/components/ExportMenu";
 
-export default function RegistrosPageClient({ user, initialRecords, currentUser, maestros, presupuestos = [] }) {
+export default function RegistrosPageClient({ user, initialRecords, currentUser, maestros, proveedores = [], alertasProveedores = {}, presupuestos = [], actividades = [], nuevaCompraActividad = null }) {
   const [records, setRecords] = useState(initialRecords || []);
   const [filtered, setFiltered] = useState(initialRecords || []);
 
@@ -22,7 +22,11 @@ export default function RegistrosPageClient({ user, initialRecords, currentUser,
         onFilteredChange={setFiltered}
         currentUser={currentUser}
         maestros={maestros}
+        proveedores={proveedores}
+        alertasProveedores={alertasProveedores}
         presupuestos={presupuestos}
+        actividades={actividades}
+        nuevaCompraActividad={nuevaCompraActividad}
       />
     </AppShell>
   );

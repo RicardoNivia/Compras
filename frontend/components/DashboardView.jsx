@@ -1,17 +1,18 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DetailModal from "@/components/DetailModal";
 import BarChartSvg from "@/components/charts/BarChartSvg";
 import StackedBarChartSvg from "@/components/charts/StackedBarChartSvg";
 import CompliancePercentChartSvg from "@/components/charts/CompliancePercentChartSvg";
 import PieChartSvg from "@/components/charts/PieChartSvg";
 import GaugeSvg from "@/components/charts/GaugeSvg";
+import Sparkline from "@/components/charts/Sparkline";
+import { AnimatedNumber } from "@/components/charts/chartKit";
 import { fmtCOP, fmtCompact, fmtNum, fmtPesos, fmtDateDisplay, monthKey, monthLabel } from "@/lib/format";
 import { businessDaysBetween, businessDaysElapsedToToday } from "@/lib/businessDays";
 import { getDiasInfo } from "@/lib/diasInfo";
-import { explainKpiApi } from "@/lib/api";
-import { renderMarkdown } from "@/lib/markdown";
+import KpiExplain from "@/components/KpiExplain";
 import { IconFile, IconMoney, IconClock, IconAlert, IconTrendUp, IconSpark } from "@/components/icons";
 
 const ESTADO_ORDER = ["Ejecutado", "Proceso", "Pendiente", "Anulado", "Sin estado"];
@@ -30,7 +31,7 @@ function sum(arr, fn) {
 }
 
 // Versión compacta de un registro, para mandarle solo lo necesario al backend
-// cuando se pide "Explícame este número" (ver KpiExplain más abajo).
+// cuando se pide "Explícame este número" (ver components/KpiExplain.jsx).
 function compactRecord(r, extra) {
   return {
     fecha: r.fechaSolicitud, entrega: r.fechaEntrega || null, area: r.area || "Sin área",
@@ -41,70 +42,6 @@ function compactRecord(r, extra) {
 
 function isAnulado(r) {
   return r.estado === "Anulado";
-}
-
-// Botón "Explícame este número": pide al Agente IA (modelo gratis de Gemini,
-// sin streaming) una explicación puntual del KPI a partir de los registros
-// que lo componen, y la muestra en un modal con el mismo renderizado
-// Markdown del chat — se calcula una sola vez y se cachea mientras el
-// componente esté montado con las mismas props.
-function KpiExplain({ label, value, comparisonLabel, comparisonValue, records }) {
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [text, setText] = useState("");
-  const [error, setError] = useState("");
-
-  async function handleClick() {
-    setOpen(true);
-    if (text || loading) return;
-    setLoading(true);
-    setError("");
-    try {
-      const { explanation } = await explainKpiApi({ label, value, comparisonLabel, comparisonValue, records });
-      setText(explanation);
-    } catch (err) {
-      setError(err.message || "No se pudo generar la explicación.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="kpi-explain">
-      <button type="button" className="kpi-explain-btn" onClick={handleClick}>
-        <IconSpark size={11} /> Explicar
-      </button>
-      {open && (
-        <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
-          <div className="modal kpi-explain-modal">
-            <div className="modal-head">
-              <div className="kpi-explain-modal-title">
-                <span className="kpi-explain-modal-ic"><IconSpark size={16} /></span>
-                <div>
-                  <h3>{label}</h3>
-                  <p className="card-sub" style={{ margin: 0 }}>
-                    {value}
-                    {comparisonLabel && comparisonValue != null ? ` · ${comparisonLabel}: ${comparisonValue}` : ""}
-                  </p>
-                </div>
-              </div>
-              <button type="button" className="btn-ghost icon-btn" onClick={() => setOpen(false)} aria-label="Cerrar">✕</button>
-            </div>
-            <div className="modal-body">
-              {loading && (
-                <div className="kpi-explain-loading"><span className="spinner" /> Analizando los registros…</div>
-              )}
-              {!loading && error && <div className="modal-error"><IconAlert size={13} /> {error}</div>}
-              {!loading && !error && <div className="chat-markdown">{renderMarkdown(text)}</div>}
-            </div>
-            <div className="modal-foot">
-              <button type="button" className="btn" onClick={() => setOpen(false)}>Cerrar</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 }
 
 function estadoLabel(estado) {
@@ -140,12 +77,12 @@ export default function DashboardView({ records, presupuestos = [] }) {
 
   function switchToMensual() {
     setViewMode("mensual");
-    setSelectedYear("");
+    setSelectedYear((y) => y || currentYear);
     setSelectedMonth((m) => m || currentMonthKey);
   }
 
   // Años disponibles a partir de todos los registros (más el año actual, para que
-  // la pestaña Anual siempre tenga un año válido seleccionado por defecto).
+  // ambas pestañas siempre tengan un año válido seleccionado por defecto).
   const yearOptions = useMemo(() => {
     const set = new Set([currentYear]);
     for (const r of records) {
@@ -155,25 +92,33 @@ export default function DashboardView({ records, presupuestos = [] }) {
     return Array.from(set).sort().reverse();
   }, [records, currentYear]);
 
+  // El año se comparte entre las dos pestañas: eligiendo el mismo año en Mensual
+  // y en Anual, ambas deben quedar restringidas exactamente al mismo conjunto de
+  // registros (ver yearFilteredRecords/yearRecordsForCategoriaArea más abajo).
   function handleYearChange(year) {
     setSelectedYear(year);
   }
 
-  // Pestaña Anual: se restringe al año elegido. Pestaña Mensual: sin restricción de
-  // año (el mes YYYY-MM ya es específico), así el selector de mes lista todos los meses.
   const yearFilteredRecords = useMemo(() => {
     if (!selectedYear) return records;
     return records.filter((r) => (monthKey(r.fechaSolicitud) || "").startsWith(selectedYear));
   }, [records, selectedYear]);
 
   const monthOptions = useMemo(() => {
-    const set = new Set(viewMode === "mensual" ? [currentMonthKey] : []);
+    const set = new Set(viewMode === "mensual" && selectedYear === currentYear ? [currentMonthKey] : []);
     for (const r of yearFilteredRecords) {
       const k = monthKey(r.fechaSolicitud);
       if (k) set.add(k);
     }
     return Array.from(set).sort().reverse();
-  }, [yearFilteredRecords, viewMode, currentMonthKey]);
+  }, [yearFilteredRecords, viewMode, currentMonthKey, selectedYear, currentYear]);
+
+  // Si al cambiar de año en Mensual el mes elegido no existe en el nuevo año
+  // (sin registros ese mes), se ajusta al mes disponible más reciente de ese año.
+  useEffect(() => {
+    if (viewMode !== "mensual" || monthOptions.length === 0) return;
+    if (!monthOptions.includes(selectedMonth)) setSelectedMonth(monthOptions[0]);
+  }, [viewMode, monthOptions, selectedMonth]);
 
   const multiYear = useMemo(() => {
     const years = new Set(monthOptions.map((k) => k.slice(0, 4)));
@@ -191,6 +136,36 @@ export default function DashboardView({ records, presupuestos = [] }) {
 
   // ---------- KPI 1: valor del mes ----------
   const kpi1 = useMemo(() => {
+    // Vista Anual: el KPI es el total del año y se compara contra el año anterior (no contra el mes anterior).
+    // En el año en curso se compara el mismo período (enero hasta el mes actual) para no cotejar un año parcial con uno completo.
+    if (viewMode === "anual" && selectedYear) {
+      const prevYear = String(Number(selectedYear) - 1);
+      const esActual = selectedYear === currentYear;
+      const mesTope = esActual ? currentMonthKey.slice(5) : "12";
+      const delAnio = (anio, hastaMes) => records.filter((r) => {
+        const mk = monthKey(r.fechaSolicitud) || "";
+        return !isAnulado(r) && mk.startsWith(anio) && mk.slice(5) <= hastaMes;
+      });
+      const actuales = delAnio(selectedYear, mesTope);
+      const previos = delAnio(prevYear, mesTope);
+      const value = sum(actuales, (r) => r.valorConIva);
+      const prevValue = previos.length ? sum(previos, (r) => r.valorConIva) : null;
+      const delta = prevValue ? ((value - prevValue) / prevValue) * 100 : null;
+      const meses = Array.from({ length: Number(mesTope) }, (_, i) => `${selectedYear}-${String(i + 1).padStart(2, "0")}`);
+      const serie = meses.map((mk) => sum(actuales.filter((r) => monthKey(r.fechaSolicitud) === mk), (r) => r.valorConIva));
+      const periodoPrev = esActual ? `mismo período de ${prevYear}` : prevYear;
+      return {
+        label: `${selectedYear} · total del año${esActual ? " a la fecha" : ""}`,
+        value, delta, foot: "", prevValue, serie,
+        deltaLabel: `vs ${periodoPrev}`,
+        prevLabel: prevValue != null ? periodoPrev : null,
+        explainRecords: [
+          ...actuales.map((r) => compactRecord(r, { periodo: "actual" })),
+          ...previos.map((r) => compactRecord(r, { periodo: "anterior" })),
+        ],
+      };
+    }
+
     const currentMonth = allMonthsAsc[allMonthsAsc.length - 1] || null;
     const lastClosedMonth = allMonthsAsc.length > 1 ? allMonthsAsc[allMonthsAsc.length - 2] : currentMonth;
     const baseMonth = selectedMonth || lastClosedMonth;
@@ -222,8 +197,11 @@ export default function DashboardView({ records, presupuestos = [] }) {
       ...(prevMonth ? recordsFor(prevMonth, "anterior") : []),
     ];
 
-    return { label, value, delta, foot, prevValue, prevLabel: prevMonth ? monthLabel(prevMonth, multiYear) : null, explainRecords };
-  }, [yearFilteredRecords, allMonthsAsc, selectedMonth, multiYear]);
+    // Tendencia de los 6 meses hasta el mes base (para el sparkline del KPI).
+    const serie = idx >= 0 ? allMonthsAsc.slice(Math.max(0, idx - 5), idx + 1).map(valueFor) : [];
+
+    return { label, value, delta, foot, prevValue, serie, deltaLabel: "vs mes anterior", prevLabel: prevMonth ? monthLabel(prevMonth, multiYear) : null, explainRecords };
+  }, [yearFilteredRecords, allMonthsAsc, selectedMonth, multiYear, viewMode, selectedYear, records, currentYear, currentMonthKey]);
 
   // ---------- KPI 2: cumplimiento de tiempos ----------
   // Cuenta como "resuelta" toda solicitud ya entregada, y también las que
@@ -591,7 +569,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
 
   // ---------- Presupuesto por área (configurado en la sección "Presupuesto",
   // por año — en modo "categoría" el total del área es la suma de categorías) ----------
-  const refYear = Number(viewMode === "anual" ? selectedYear : (selectedMonth || currentMonthKey).slice(0, 4));
+  const refYear = Number(selectedYear || currentYear);
   const presupuestoPorArea = useMemo(() => {
     const map = new Map();
     for (const p of presupuestos) {
@@ -614,16 +592,29 @@ export default function DashboardView({ records, presupuestos = [] }) {
   }, [presupuestos, refYear]);
 
   // ---------- Consumo por categoría y área ----------
-  // Presupuesto de referencia: en la vista Mensual se compara contra el presupuesto
-  // anual dividido en 12 (presupuesto del mes); en la vista Anual, contra el anual completo.
+  // El consumo mostrado aquí es siempre el acumulado de todo el año de
+  // referencia (refYear) — igual en la vista Mensual que en la Anual, sin
+  // importar qué mes esté seleccionado. Solo el presupuesto de comparación
+  // cambia: en Mensual se compara contra el presupuesto anual dividido en 12
+  // (presupuesto del mes); en Anual, contra el anual completo.
+  const yearRecordsForCategoriaArea = useMemo(() => {
+    return records.filter((r) => !isAnulado(r) && (monthKey(r.fechaSolicitud) || "").startsWith(String(refYear)));
+  }, [records, refYear]);
+
   const porCategoriaArea = useMemo(() => {
     const areaMap = new Map();
-    for (const r of activeRecords) {
+    for (const r of yearRecordsForCategoriaArea) {
       const a = r.area || "Sin área";
-      if (!areaMap.has(a)) areaMap.set(a, { count: 0, value: 0, cats: new Map() });
+      if (!areaMap.has(a)) areaMap.set(a, { count: 0, value: 0, valueMes: 0, cats: new Map() });
       const e = areaMap.get(a);
       e.count += 1;
       e.value += r.valorConIva || 0;
+      // Además del acumulado del año (value), en la vista Mensual se guarda
+      // aparte lo que corresponde SOLO al mes seleccionado — para mostrar
+      // ambos números en la tabla (valor del mes vs. acumulado del año).
+      if (viewMode === "mensual" && monthKey(r.fechaSolicitud) === selectedMonth) {
+        e.valueMes += r.valorConIva || 0;
+      }
       const cat = r.categoria || "Sin categoría";
       e.cats.set(cat, (e.cats.get(cat) || 0) + (r.valorConIva || 0));
     }
@@ -636,21 +627,16 @@ export default function DashboardView({ records, presupuestos = [] }) {
         .map((cname) => {
           const cvalue = v.cats.get(cname) || 0;
           const catPresupuestoAnual = catPresupuestos.get(cname) ?? null;
-          const catPresupuesto = catPresupuestoAnual != null
-            ? (viewMode === "mensual" ? catPresupuestoAnual / 12 : catPresupuestoAnual)
-            : null;
-          const catPctPresupuesto = catPresupuesto ? (cvalue / catPresupuesto) * 100 : null;
+          const catPctPresupuesto = catPresupuestoAnual ? (cvalue / catPresupuestoAnual) * 100 : null;
           return {
             name: cname, value: cvalue, pct: v.value ? (cvalue / v.value) * 100 : 0,
-            presupuesto: catPresupuesto, pctPresupuesto: catPctPresupuesto,
+            presupuesto: catPresupuestoAnual, pctPresupuesto: catPctPresupuesto,
           };
         })
         .sort((a, b) => b.value - a.value);
 
       const presupuestoAnual = presupuestoPorArea.get(name) ?? null;
-      const presupuesto = presupuestoAnual != null
-        ? (viewMode === "mensual" ? presupuestoAnual / 12 : presupuestoAnual)
-        : null;
+      const presupuesto = presupuestoAnual;
       const pctPresupuesto = presupuesto ? (v.value / presupuesto) * 100 : null;
       const presupuestoEstado = pctPresupuesto === null
         ? "sin-datos"
@@ -670,20 +656,21 @@ export default function DashboardView({ records, presupuestos = [] }) {
         .sort((a, b) => b.value - a.value);
 
       return {
-        name, count: v.count, value: v.value, top, moreCount: Math.max(0, catList.length - top.length),
+        name, count: v.count, value: v.value, valueMes: v.valueMes, top, moreCount: Math.max(0, catList.length - top.length),
         presupuestoAnual, presupuesto, pctPresupuesto, presupuestoEstado, disponible,
       };
     }).sort((a, b) => b.value - a.value);
     const totals = rows.reduce((acc, r) => ({
       count: acc.count + r.count,
       value: acc.value + r.value,
+      valueMes: acc.valueMes + r.valueMes,
       presupuesto: acc.presupuesto + (r.presupuesto || 0),
       disponible: acc.disponible + (r.disponible || 0),
       gastadoConPresupuesto: acc.gastadoConPresupuesto + (r.presupuesto != null ? r.value : 0),
       conPresupuesto: acc.conPresupuesto || r.presupuesto != null,
-    }), { count: 0, value: 0, presupuesto: 0, disponible: 0, gastadoConPresupuesto: 0, conPresupuesto: false });
+    }), { count: 0, value: 0, valueMes: 0, presupuesto: 0, disponible: 0, gastadoConPresupuesto: 0, conPresupuesto: false });
     return { rows, totals };
-  }, [activeRecords, presupuestoPorArea, presupuestoCategoriasPorArea, viewMode]);
+  }, [yearRecordsForCategoriaArea, presupuestoPorArea, presupuestoCategoriasPorArea, viewMode, selectedMonth]);
 
   async function handleExportPDF() {
     if (!containerRef.current) return;
@@ -809,12 +796,20 @@ export default function DashboardView({ records, presupuestos = [] }) {
               </select>
             </div>
           ) : (
-            <div className="field" style={{ width: 200 }}>
-              <label htmlFor="dash-month">Mes</label>
-              <select id="dash-month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
-                {monthOptions.map((k) => <option key={k} value={k}>{monthLabel(k, true)}</option>)}
-              </select>
-            </div>
+            <>
+              <div className="field" style={{ width: 110 }}>
+                <label htmlFor="dash-year-mensual">Año</label>
+                <select id="dash-year-mensual" value={selectedYear} onChange={(e) => handleYearChange(e.target.value)}>
+                  {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ width: 170 }}>
+                <label htmlFor="dash-month">Mes</label>
+                <select id="dash-month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+                  {monthOptions.map((k) => <option key={k} value={k}>{monthLabel(k, multiYear)}</option>)}
+                </select>
+              </div>
+            </>
           )}
         </div>
         <div className="spacer" />
@@ -834,12 +829,13 @@ export default function DashboardView({ records, presupuestos = [] }) {
             <div className="label">{kpi1.label}</div>
             <div className="kpi-ic"><IconMoney size={14} /></div>
           </div>
-          <div className="value">{fmtPesos(kpi1.value)}</div>
+          <div className="value"><AnimatedNumber value={kpi1.value} format={fmtPesos} /></div>
           {kpi1.delta !== null && (
-            <div className="delta">
-              {kpi1.delta > 0 ? "▲" : kpi1.delta < 0 ? "▼" : "＝"} {Math.abs(kpi1.delta).toFixed(1)}%
+            <div className={`delta delta-chip ${kpi1.delta > 0 ? "up" : kpi1.delta < 0 ? "down" : ""}`} title={`Frente a: ${kpi1.deltaLabel.replace("vs ", "")}`}>
+              {kpi1.delta > 0 ? "▲" : kpi1.delta < 0 ? "▼" : "＝"} {Math.abs(kpi1.delta).toFixed(1)}% <span className="delta-vs">{kpi1.deltaLabel}</span>
             </div>
           )}
+          <Sparkline data={kpi1.serie} color="var(--accent)" />
           {kpi1.foot && <div className="foot">{kpi1.foot}</div>}
           <KpiExplain
             label={kpi1.label} value={fmtPesos(kpi1.value)}
@@ -852,7 +848,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
             <div className="label">Cumplimiento de tiempos</div>
             <div className="kpi-ic"><IconClock size={14} /></div>
           </div>
-          <div className="value">{cumplimiento.total ? `${cumplimiento.pct.toFixed(0)}%` : "—"}</div>
+          <div className="value">{cumplimiento.total ? <AnimatedNumber value={Math.round(cumplimiento.pct)} format={(v) => `${v}%`} /> : "—"}</div>
           <div className="meter-track">
             <div className="meter-fill" style={{ width: `${cumplimiento.pct}%` }} />
           </div>
@@ -867,7 +863,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
             <div className="label">En proceso</div>
             <div className="kpi-ic"><IconAlert size={14} /></div>
           </div>
-          <div className="value">{fmtNum(kpi3.count)}</div>
+          <div className="value"><AnimatedNumber value={kpi3.count} format={fmtNum} /></div>
           <div className="foot">{fmtPesos(kpi3.value)}</div>
           <KpiExplain label="En proceso" value={`${fmtNum(kpi3.count)} (${fmtPesos(kpi3.value)})`} records={kpi3.explainRecords} />
         </div>
@@ -876,7 +872,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
             <div className="label">Ticket promedio</div>
             <div className="kpi-ic"><IconTrendUp size={14} /></div>
           </div>
-          <div className="value">{fmtPesos(kpi4.avg)}</div>
+          <div className="value"><AnimatedNumber value={kpi4.avg} format={fmtPesos} /></div>
           <KpiExplain label="Ticket promedio" value={fmtPesos(kpi4.avg)} records={kpi4.explainRecords} />
         </div>
       </div>
@@ -916,7 +912,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
         <div className="card" style={{ marginBottom: 14 }}>
           <h3>Presupuesto vs. gastado — nivel general</h3>
           <p className="card-sub">
-            Suma de las áreas con presupuesto configurado para {viewMode === "mensual" ? `${refYear} (prorrateado por mes)` : refYear}.
+            Suma de las áreas con presupuesto configurado para {refYear}.
           </p>
           <div className="kpi-row" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
             <div className="kpi" style={{ "--kpi-c": "var(--accent)" }}>
@@ -1050,9 +1046,30 @@ export default function DashboardView({ records, presupuestos = [] }) {
                   return (
                     <tr key={p.record.id} className="clickable" onClick={() => setDetailRecord(p.record)}>
                       <td className="rank">{i + 1}</td>
-                      <td>{p.record.descripcion || "—"}</td>
-                      <td>{p.record.area || "—"}</td>
-                      <td>{p.record.responsable || "—"}</td>
+                      <td className="truncate">
+                        {p.record.descripcion ? (
+                          <span className="desc-tooltip-wrap">
+                            <span className="desc-text desc-text-ancha">{p.record.descripcion}</span>
+                            <span className="desc-tooltip-bubble">{p.record.descripcion}</span>
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="truncate">
+                        {p.record.area ? (
+                          <span className="desc-tooltip-wrap">
+                            <span className="desc-text">{p.record.area}</span>
+                            <span className="desc-tooltip-bubble">{p.record.area}</span>
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="truncate">
+                        {p.record.responsable ? (
+                          <span className="desc-tooltip-wrap">
+                            <span className="desc-text">{p.record.responsable}</span>
+                            <span className="desc-tooltip-bubble">{p.record.responsable}</span>
+                          </span>
+                        ) : "—"}
+                      </td>
                       <td>{fmtDateDisplay(p.record.fechaSolicitud)}</td>
                       <td><span className={`pill ${severity}`}>{p.dias} d.</span></td>
                       <td>{p.record.estado || "—"}</td>
@@ -1071,7 +1088,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
           <div className="card">
             <h3>Valor de compras por mes</h3>
             <p className="card-sub">Total con IVA por mes de solicitud (excluye anulados).</p>
-            <BarChartSvg data={valorPorMes} />
+            <BarChartSvg data={valorPorMes} onSelect={(d) => { setViewMode("mensual"); setSelectedMonth(d.key); }} />
           </div>
         ) : (
           <div className="card">
@@ -1330,15 +1347,17 @@ export default function DashboardView({ records, presupuestos = [] }) {
       <div className="card" style={{ marginBottom: 14 }}>
         <h3>Consumo por categoría y área</h3>
         <p className="card-sub">
-          Presupuesto {refYear}: {viewMode === "mensual" ? "presupuesto del año dividido en 12 (mes)" : "presupuesto configurado para el año"} (configúralo en la sección "Presupuesto").
+          Presupuesto {refYear}: presupuesto configurado para el año (configúralo en la sección "Presupuesto").
           Se resalta en amarillo desde el {PRESUPUESTO_ALERTA_PCT}% de consumo, y en rojo desde el {PRESUPUESTO_CRITICO_PCT}% (cerca del límite o ya excedido).
         </p>
         <div className="table-wrap-plain">
           <table className="plain-table">
             <thead>
               <tr>
-                <th>Área</th><th className="num">Cant.</th><th className="num">Valor total</th>
-                <th className="num">Presupuesto {viewMode === "mensual" ? "(mes)" : `(${refYear})`}</th>
+                <th>Área</th><th className="num">Cant.</th>
+                {viewMode === "mensual" && <th className="num">Valor del mes</th>}
+                <th className="num">Valor acumulado ({refYear})</th>
+                <th className="num">Presupuesto ({refYear})</th>
                 <th className="num">Disponible</th>
                 <th className="num">% consumido</th>
                 <th>Categorías</th>
@@ -1349,6 +1368,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
                 <tr key={r.name} className={r.presupuestoEstado === "excedido" ? "row-critical" : r.presupuestoEstado === "alerta" ? "row-warning" : ""}>
                   <td>{r.name}</td>
                   <td className="num">{fmtNum(r.count)}</td>
+                  {viewMode === "mensual" && <td className="num">{fmtCOP(r.valueMes)}</td>}
                   <td className="num">{fmtCOP(r.value)}</td>
                   <td className="num">{r.presupuesto != null ? fmtCOP(r.presupuesto) : "—"}</td>
                   <td className={`num${r.disponible !== null && r.disponible < 0 ? " text-critical" : ""}`}>
@@ -1380,6 +1400,7 @@ export default function DashboardView({ records, presupuestos = [] }) {
               <tr className="total-row">
                 <td>Total</td>
                 <td className="num">{fmtNum(porCategoriaArea.totals.count)}</td>
+                {viewMode === "mensual" && <td className="num">{fmtCOP(porCategoriaArea.totals.valueMes)}</td>}
                 <td className="num">{fmtCOP(porCategoriaArea.totals.value)}</td>
                 <td className="num">{porCategoriaArea.totals.conPresupuesto ? fmtCOP(porCategoriaArea.totals.presupuesto) : "—"}</td>
                 <td className={`num${porCategoriaArea.totals.conPresupuesto && porCategoriaArea.totals.disponible < 0 ? " text-critical" : ""}`}>

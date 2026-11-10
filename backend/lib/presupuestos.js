@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { logPresupuestoUpsert, logPresupuestoDelete, logPresupuestoModoChange } from "@/lib/audit";
+import { revisarUmbralPresupuesto, publicarCambioPresupuesto } from "@/lib/notificacionesEventos";
 
 function badRequest(message) {
   const err = new Error(message);
@@ -88,6 +89,7 @@ export async function setModoAnio(body, actor) {
   });
 
   await logPresupuestoModoChange(actor, anio, actual, modo, afectados).catch(() => {});
+  if (actual !== modo) publicarCambioPresupuesto("modo", null, null, actor, { anio, modoAnterior: actual, modoNuevo: modo, borrados: afectados });
   return { anio, modo, cambiado: true, presupuestosBorrados: afectados };
 }
 
@@ -154,6 +156,9 @@ export async function upsertPresupuesto(body, actor) {
 
   const after = toClientPresupuesto(row, modo);
   await logPresupuestoUpsert(actor, before, after).catch(() => {});
+  publicarCambioPresupuesto(before ? "modificado" : "creado", before, after, actor);
+  // Bajar un tope también puede dejarlo superado: se revisan el área (y cada categoría) y el general.
+  for (const c of after.categorias?.length ? after.categorias : [{ categoria: null }]) revisarUmbralPresupuesto(after.area, c.categoria);
   return after;
 }
 
@@ -167,4 +172,5 @@ export async function deletePresupuesto(id, actor) {
   const modo = await getModoAnio(current.anio);
   await prisma.presupuesto.delete({ where: { id } });
   await logPresupuestoDelete(actor, toClientPresupuesto(current, modo || "area")).catch(() => {});
+  publicarCambioPresupuesto("eliminado", toClientPresupuesto(current, modo || "area"), null, actor);
 }

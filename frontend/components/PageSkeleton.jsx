@@ -6,25 +6,6 @@ function Bar({ w, h = 12, r = 6, style }) {
   return <div className="skeleton-bar" style={{ width: w, height: h, borderRadius: r, ...style }} />;
 }
 
-function ShellSidebar() {
-  return (
-    <aside className="sidebar" aria-hidden="true">
-      <div className="sidebar-head">
-        <span className="sidebar-brand-mark skeleton-pulse" style={{ background: "rgba(255,255,255,0.14)", color: "transparent" }}>S</span>
-        <span className="skeleton-bar dark" style={{ width: 110, height: 12 }} />
-      </div>
-      <div className="sidebar-nav">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="sidebar-link" style={{ pointerEvents: "none" }}>
-            <span className="sidebar-link-ic skeleton-pulse" />
-            <span className="skeleton-bar dark" style={{ width: 90, height: 11 }} />
-          </div>
-        ))}
-      </div>
-    </aside>
-  );
-}
-
 function ShellTopbar({ title }) {
   return (
     <header className="topbar">
@@ -123,14 +104,15 @@ export function ChatSkeleton() {
   );
 }
 
+// El menú lateral ya no se "skeletoniza" acá — lo monta app/(app)/layout.js
+// una sola vez y persiste entre navegaciones (no depende de ningún fetch),
+// así que este fallback de Suspense/loading.js solo cubre el encabezado y el
+// contenido de la página específica, nunca el menú.
 export default function PageSkeleton({ title, children }) {
   return (
-    <div className="app-shell">
-      <ShellSidebar />
-      <div className="app-main">
-        <ShellTopbar title={title} />
-        <main>{children}</main>
-      </div>
-    </div>
+    <>
+      <ShellTopbar title={title} />
+      <main>{children}</main>
+    </>
   );
 }

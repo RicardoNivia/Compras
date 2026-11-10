@@ -6,7 +6,8 @@ const PUBLIC_PATHS = new Set(["/login"]);
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  if (PUBLIC_PATHS.has(pathname)) {
+  // El formulario público de inscripción a actividades de Bienestar no pide sesión (enlace con token).
+  if (PUBLIC_PATHS.has(pathname) || pathname.startsWith("/inscripcion/")) {
     return NextResponse.next();
   }
 
@@ -17,6 +18,14 @@ export async function middleware(request) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
+  }
+
+  // "Conectar con Claude" es solo para administradores: cualquier otro rol vuelve a Registros (redirect real, no solo en la página).
+  if ((pathname === "/conectar-claude" || pathname.startsWith("/conectar-claude/")) && payload.role !== "admin") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/registros";
+    url.search = "";
     return NextResponse.redirect(url);
   }
 

@@ -3,7 +3,10 @@
 import { useMemo, useState } from "react";
 import UserModal from "@/components/UserModal";
 import PermissionsMatrix from "@/components/PermissionsMatrix";
+import RolesView from "@/components/RolesView";
+import { fetchRolesApi, fetchPermissionsMatrix } from "@/lib/api";
 import { ROLE_LABELS, ROLE_LIST, ROLE_COLOR_VARS, ROLE_ICONS } from "@/lib/roles";
+import { crossfade } from "@/lib/crossfade";
 
 function initials(name) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -27,20 +30,35 @@ function TrashIcon() {
   );
 }
 
-export default function UsuariosView({ initialUsers, initialPermissionsMatrix }) {
-  const [tab, setTab] = useState("usuarios"); // "usuarios" | "permisos"
+export default function UsuariosView({ initialUsers, initialPermissionsMatrix, initialRoles }) {
+  const [tab, setTab] = useState("usuarios"); // "usuarios" | "roles" | "permisos"
+  // Roles del sistema y personalizados (Usuarios › Roles); sin la lista del servidor, solo los del sistema.
+  const [roles, setRoles] = useState(initialRoles?.length ? initialRoles : ROLE_LIST.map((clave) => ({ clave, nombre: ROLE_LABELS[clave], sistema: true, funcionalidades: [], usuarios: 0 })));
+  const [matrix, setMatrix] = useState(initialPermissionsMatrix || []);
+  const nombreRol = (clave) => roles.find((r) => r.clave === clave)?.nombre || ROLE_LABELS[clave] || clave;
+
+  // Tras crear, editar o eliminar un rol (o cambiar la Matriz) se vuelven a pedir ambos: comparten los mismos datos.
+  async function refrescarRoles() {
+    const [r, m] = await Promise.all([fetchRolesApi(), fetchPermissionsMatrix()]);
+    setRoles(r.roles);
+    setMatrix(m.matrix);
+  }
   const [users, setUsers] = useState(initialUsers || []);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [moduloFilter, setModuloFilter] = useState("");
+  // Módulos de un rol según la Matriz: los que tienen al menos una funcionalidad permitida.
+  const modulosDeRol = (rol) => ["Compras", "Bienestar"].filter((mod) => matrix.some((r) => r.modulo === mod && r.roles?.[rol]));
+  const cumpleModulo = (u) => !moduloFilter || modulosDeRol(u.role).includes(moduloFilter);
   const [modalUser, setModalUser] = useState(undefined); // undefined = closed, null = new
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
   const roleCounts = useMemo(() => {
-    const counts = Object.fromEntries(ROLE_LIST.map((r) => [r, 0]));
+    const counts = Object.fromEntries(roles.map((r) => [r.clave, 0]));
     for (const u of users) counts[u.role] = (counts[u.role] || 0) + 1;
     return counts;
-  }, [users]);
+  }, [users, roles]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -70,33 +88,38 @@ export default function UsuariosView({ initialUsers, initialPermissionsMatrix })
   return (
     <div>
       <div className="dash-tabs" role="tablist" aria-label="Vista de usuarios" style={{ marginBottom: 16 }}>
-        <button type="button" role="tab" aria-selected={tab === "usuarios"} className="dash-tab" onClick={() => setTab("usuarios")}>
+        <button type="button" role="tab" aria-selected={tab === "usuarios"} className="dash-tab" onClick={() => crossfade(() => setTab("usuarios"))}>
           Usuarios
         </button>
-        <button type="button" role="tab" aria-selected={tab === "permisos"} className="dash-tab" onClick={() => setTab("permisos")}>
+        <button type="button" role="tab" aria-selected={tab === "roles"} className="dash-tab" onClick={() => crossfade(() => setTab("roles"))}>
+          Roles
+        </button>
+        <button type="button" role="tab" aria-selected={tab === "permisos"} className="dash-tab" onClick={() => crossfade(() => setTab("permisos"))}>
           Matriz de permisos
         </button>
       </div>
 
-      {tab === "permisos" ? (
-        <PermissionsMatrix initialMatrix={initialPermissionsMatrix} />
+      {tab === "roles" ? (
+        <RolesView roles={roles} features={matrix.map(({ key, label, section, modulo }) => ({ key, label, section: `${modulo} · ${section}` }))} onCambio={refrescarRoles} />
+      ) : tab === "permisos" ? (
+        <PermissionsMatrix initialMatrix={matrix} roles={roles} onChanged={() => refrescarRoles().catch(() => {})} />
       ) : (
         <>
       <div className="role-summary-row">
-        {ROLE_LIST.map((r) => {
+        {roles.map(({ clave: r, nombre }) => {
           const active = roleFilter === r;
           return (
             <button
               key={r}
               type="button"
               className={`role-summary-chip${active ? " active" : ""}`}
-              style={{ "--rc": `var(${ROLE_COLOR_VARS[r]})` }}
+              style={{ "--rc": `var(${ROLE_COLOR_VARS[r] || "--sOther"})` }}
               onClick={() => setRoleFilter(active ? "" : r)}
-              title={`Filtrar por ${ROLE_LABELS[r]}`}
+              title={`Filtrar por ${nombre}`}
             >
-              <span className="role-summary-ic">{ROLE_ICONS[r]}</span>
+              <span className="role-summary-ic">{ROLE_ICONS[r] || nombre[0]}</span>
               <span className="role-summary-count">{roleCounts[r] || 0}</span>
-              <span className="role-summary-label">{ROLE_LABELS[r]}</span>
+              <span className="role-summary-label">{nombre}</span>
             </button>
           );
         })}
@@ -110,17 +133,25 @@ export default function UsuariosView({ initialUsers, initialPermissionsMatrix })
             value={search} onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <div className="field" style={{ maxWidth: 190 }}>
+          <label htmlFor="u-modulo">Módulo</label>
+          <select id="u-modulo" value={moduloFilter} onChange={(e) => setModuloFilter(e.target.value)}>
+            <option value="">Todos</option>
+            <option value="Compras">Compras</option>
+            <option value="Bienestar">Bienestar y Fundación</option>
+          </select>
+        </div>
         <div className="spacer" />
         <button type="button" className="btn btn-primary" onClick={() => setModalUser(null)}>
           + Agregar usuario
         </button>
       </div>
 
-      {filtered.length === 0 ? (
+      {filtered.filter(cumpleModulo).length === 0 ? (
         <div className="table-card"><div className="empty">No hay usuarios que coincidan con la búsqueda.</div></div>
       ) : (
         <div className="user-grid">
-          {filtered.map((u) => {
+          {filtered.filter(cumpleModulo).map((u) => {
             const colorVar = `var(${ROLE_COLOR_VARS[u.role] || "--muted"})`;
             const confirming = confirmDeleteId === u.id;
             return (
@@ -133,9 +164,12 @@ export default function UsuariosView({ initialUsers, initialPermissionsMatrix })
                 <div className="user-card-email">{u.email}</div>
                 <div className="user-card-role">
                   <span className="role-badge">
-                    <span className="role-badge-ic">{ROLE_ICONS[u.role]}</span>
-                    {ROLE_LABELS[u.role] || u.role}
+                    <span className="role-badge-ic">{ROLE_ICONS[u.role] || nombreRol(u.role)[0]}</span>
+                    {nombreRol(u.role)}
                   </span>
+                </div>
+                <div className="user-card-modulos">
+                  {modulosDeRol(u.role).map((m) => <span key={m} className={`user-modulo ${m.toLowerCase()}`}>{m}</span>)}
                 </div>
 
                 <div className="user-card-actions">
@@ -165,7 +199,7 @@ export default function UsuariosView({ initialUsers, initialPermissionsMatrix })
       )}
 
       {modalUser !== undefined && (
-        <UserModal user={modalUser} onClose={() => setModalUser(undefined)} onSaved={handleSaved} />
+        <UserModal user={modalUser} roles={roles} onClose={() => setModalUser(undefined)} onSaved={handleSaved} />
       )}
         </>
       )}

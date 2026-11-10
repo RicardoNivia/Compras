@@ -8,9 +8,14 @@ export function makeTitle(text) {
   return t.length > TITLE_MAX ? `${t.slice(0, TITLE_MAX)}…` : t;
 }
 
+// "model: widget" son conversaciones efímeras del botón flotante de Agente IA
+// (ver FloatingAgentChat.jsx) — existen en la base de datos (para que el
+// historial de esa sesión de widget funcione igual de confiable que el chat
+// completo, sin confiar en nada que mande el cliente), pero nunca se listan
+// acá: no deben aparecer ni poder retomarse desde la sección Agente IA.
 export async function listConversations(userId) {
   const conversations = await prisma.conversation.findMany({
-    where: { userId },
+    where: { userId, model: { not: "widget" } },
     orderBy: { updatedAt: "desc" },
     select: { id: true, title: true, model: true, createdAt: true, updatedAt: true },
   });

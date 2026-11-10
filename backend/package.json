@@ -12,9 +12,17 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "db:seed": "node prisma/seed.mjs",
+    "db:verificar-texto": "node scripts/verificarTextoDanado.mjs",
+    "teams:probar": "node scripts/teams/probarConexion.mjs",
     "db:importar": "node prisma/importar-registros.mjs",
     "db:migrar-sqlite": "node prisma/migrar-sqlite-a-postgres.mjs",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "proveedores:validar": "node scripts/proveedores/migrarProveedoresExcel.mjs validar",
+    "proveedores:simular": "node scripts/proveedores/migrarProveedoresExcel.mjs simular",
+    "proveedores:maestros": "node scripts/proveedores/migrarProveedoresExcel.mjs maestros",
+    "proveedores:migrar": "node scripts/proveedores/migrarProveedoresExcel.mjs aplicar",
+    "proveedores:integridad": "node scripts/proveedores/verificarIntegridadProveedores.mjs",
+    "proveedores:test-ciclo": "node scripts/testProveedoresCiclo.mjs"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
@@ -22,9 +30,15 @@
   "dependencies": {
     "@prisma/client": "^5.20.0",
     "bcryptjs": "^2.4.3",
+    "iconv-lite": "^0.6.3",
     "next": "^14.2.15",
+    "nodemailer": "^6.10.1",
+    "pdfkit": "^0.15.2",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "swagger-jsdoc": "^6.3.0",
+    "swagger-ui-react": "^5.33.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "prisma": "^5.20.0"

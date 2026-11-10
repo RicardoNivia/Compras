@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { ROLES, ROLE_LIST, ROLE_LABELS } from "@/lib/roles";
+import { ROLES, ROLES_COMPRAS } from "@/lib/roles";
+import { todosLosRoles, esRolValido, nombreDeRol } from "@/lib/rolesCatalogo";
 import { logPermissionChange } from "@/lib/audit";
 
 function badRequest(message) {
@@ -15,18 +16,34 @@ function badRequest(message) {
 // Si agregas una funcionalidad nueva aquí, también debes leerla desde el
 // punto del código donde hoy se decide ese permiso (ver lib/roles.js y los
 // route handlers que la usan) para que la matriz tenga efecto real.
+// modulo: "Compras", "Bienestar" o "General" (lo de todos, sin importar el módulo). La Matriz y Roles se agrupan por él.
 export const FEATURES = [
-  { key: "viewDashboard", label: "Ver Dashboard de compras", section: "Dashboard", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR] },
-  { key: "viewAgenteIA", label: "Ver Agente IA", section: "Agente IA", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR] },
-  { key: "useAiPaidModels", label: "Usar modelos de pago del Agente IA", section: "Agente IA", defaultRoles: [ROLES.ADMIN] },
-  { key: "createRecord", label: "Crear registro de compra", section: "Registros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
-  { key: "editRecord", label: "Editar registro de compra", section: "Registros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR] },
-  { key: "deleteRecord", label: "Eliminar registro de compra", section: "Registros", defaultRoles: [ROLES.ADMIN] },
-  { key: "toggleRadicado", label: "Marcar radicado", section: "Registros", defaultRoles: [ROLES.ADMIN, ROLES.RADICAR] },
-  { key: "viewMaestros", label: "Ver y configurar Maestros", section: "Maestros", defaultRoles: [ROLES.ADMIN] },
-  { key: "viewPresupuesto", label: "Ver y configurar Presupuesto", section: "Presupuesto", defaultRoles: [ROLES.ADMIN] },
-  { key: "viewUsuarios", label: "Administrar Usuarios", section: "Usuarios", defaultRoles: [ROLES.ADMIN] },
-  { key: "viewAuditoria", label: "Ver Auditoría", section: "Auditoría", defaultRoles: [ROLES.ADMIN] },
+  { key: "viewDashboard", label: "Ver Dashboard de Compras", modulo: "Compras", section: "Dashboard", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR] },
+  { key: "viewRegistros", label: "Ver Registros de compra", modulo: "Compras", section: "Registros", defaultRoles: ROLES_COMPRAS },
+  { key: "createRecord", label: "Crear registro de compra", modulo: "Compras", section: "Registros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  { key: "editRecord", label: "Editar registro de compra", modulo: "Compras", section: "Registros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR] },
+  { key: "deleteRecord", label: "Eliminar registro de compra", modulo: "Compras", section: "Registros", defaultRoles: [ROLES.ADMIN] },
+  { key: "toggleRadicado", label: "Marcar radicado", modulo: "Compras", section: "Registros", defaultRoles: [ROLES.ADMIN, ROLES.RADICAR] },
+  { key: "viewProveedores", label: "Ver Proveedores (maestro, ciclo e indicadores)", modulo: "Compras", section: "Proveedores", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.PROVEEDORES] },
+  { key: "editProveedores", label: "Editar proveedores (estados, checklist, excepciones)", modulo: "Compras", section: "Proveedores", defaultRoles: [ROLES.ADMIN, ROLES.PROVEEDORES] },
+  { key: "viewPresupuesto", label: "Ver y configurar Presupuesto", modulo: "Compras", section: "Presupuesto", defaultRoles: [ROLES.ADMIN] },
+  { key: "viewReportes", label: "Ver y configurar Informes automáticos", modulo: "Compras", section: "Informes", defaultRoles: [ROLES.ADMIN] },
+  { key: "viewAgentesCompras", label: "Agentes de Compras (revisor, también en el formulario de Registros; proveedor y precio, cotizador y verificar factura)", modulo: "Compras", section: "Agentes", defaultRoles: [ROLES.ADMIN] },
+  { key: "viewAnomaliasCompras", label: "Agente detector de anomalías en compras", modulo: "Compras", section: "Agentes", defaultRoles: [ROLES.ADMIN] },
+  { key: "viewMaestros", label: "Maestros de Compras y Proveedores (incluye el ciclo de proveedores)", modulo: "Compras", section: "Maestros", defaultRoles: [ROLES.ADMIN, ROLES.PROVEEDORES] },
+  { key: "viewDashboardBienestar", label: "Ver Dashboard de Bienestar", modulo: "Bienestar", section: "Bienestar", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  { key: "viewBienestar", label: "Ver actividades y cronograma de Bienestar", modulo: "Bienestar", section: "Bienestar", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  { key: "editBienestar", label: "Crear, editar, cerrar y eliminar actividades de Bienestar", modulo: "Bienestar", section: "Bienestar", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  { key: "viewDashboardFundacion", label: "Ver Dashboard de Fundación", modulo: "Bienestar", section: "Fundación", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  { key: "viewFundacion", label: "Ver actividades y cronograma de Fundación", modulo: "Bienestar", section: "Fundación", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  { key: "editFundacion", label: "Crear, editar, cerrar y eliminar actividades de Fundación", modulo: "Bienestar", section: "Fundación", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  { key: "viewMaestrosBienestar", label: "Maestros de Bienestar y Fundación", modulo: "Bienestar", section: "Maestros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  { key: "viewAlertas", label: "Ver Mi día y alertas", modulo: "General", section: "Alertas y notificaciones", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR, ROLES.PROVEEDORES] },
+  { key: "viewNotificaciones", label: "Configurar mis notificaciones (app y Teams)", modulo: "General", section: "Alertas y notificaciones", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR, ROLES.PROVEEDORES] },
+  { key: "vincularCorreo", label: "Vincular mi correo (el agente lee las solicitudes de proveedor y las deja en la Bandeja)", modulo: "General", section: "Mi correo", defaultRoles: [ROLES.ADMIN, ROLES.PROVEEDORES] },
+  { key: "viewAgenteIA", label: "Ver Nova", modulo: "General", section: "Nova", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR, ROLES.PROVEEDORES] },
+  { key: "viewUsuarios", label: "Administrar Usuarios", modulo: "General", section: "Usuarios", defaultRoles: [ROLES.ADMIN] },
+  { key: "viewAuditoria", label: "Ver Auditoría", modulo: "General", section: "Auditoría", defaultRoles: [ROLES.ADMIN] },
 ];
 
 const FEATURE_MAP = new Map(FEATURES.map((f) => [f.key, f]));
@@ -55,15 +72,18 @@ export async function isRoleAllowed(role, featureKey) {
 }
 
 // Matriz completa para la UI de administración: una fila por funcionalidad,
-// con el valor efectivo (excepción guardada, o por defecto) para cada rol.
+// con el valor efectivo (excepción guardada, o por defecto) para cada rol —
+// los del sistema y los personalizados (ver lib/rolesCatalogo.js).
 export async function getFullMatrix() {
-  const overrides = await prisma.rolePermission.findMany();
+  const [overrides, roles] = await Promise.all([prisma.rolePermission.findMany(), todosLosRoles()]);
   const overrideMap = new Map(overrides.map((o) => [`${o.role}|${o.feature}`, o.allowed]));
+  const claves = roles.map((r) => r.clave);
   return FEATURES.map((f) => ({
     key: f.key,
     label: f.label,
     section: f.section,
-    roles: Object.fromEntries(ROLE_LIST.map((role) => [
+    modulo: f.modulo,
+    roles: Object.fromEntries(claves.map((role) => [
       role,
       role === ROLES.ADMIN ? true : (overrideMap.has(`${role}|${f.key}`) ? overrideMap.get(`${role}|${f.key}`) : f.defaultRoles.includes(role)),
     ])),
@@ -80,7 +100,7 @@ export async function getEffectivePermissions(role) {
 }
 
 export async function setPermission({ role, feature, allowed }, actor) {
-  if (!ROLE_LIST.includes(role)) throw badRequest("Rol inválido.");
+  if (!(await esRolValido(role))) throw badRequest("Rol inválido.");
   if (role === ROLES.ADMIN) throw badRequest("El rol Administrador siempre tiene todos los permisos y no se puede modificar.");
   const featureDef = FEATURE_MAP.get(feature);
   if (!featureDef) throw badRequest("Funcionalidad inválida.");
@@ -95,6 +115,6 @@ export async function setPermission({ role, feature, allowed }, actor) {
     create: { role, feature, allowed },
   });
 
-  await logPermissionChange(actor, role, ROLE_LABELS[role] || role, featureDef.label, before, allowed).catch(() => {});
+  await logPermissionChange(actor, role, await nombreDeRol(role), featureDef.label, before, allowed).catch(() => {});
   return row;
 }

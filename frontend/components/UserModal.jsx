@@ -5,7 +5,9 @@ import { ROLE_LABELS, ROLE_LIST } from "@/lib/roles";
 
 const emptyForm = { nombre: "", email: "", role: "registro", activo: true, password: "" };
 
-export default function UserModal({ user, onClose, onSaved }) {
+// roles: [{ clave, nombre }] — del sistema y personalizados; sin la lista, solo los del sistema.
+export default function UserModal({ user, roles, onClose, onSaved }) {
+  const opcionesRol = roles?.length ? roles : ROLE_LIST.map((clave) => ({ clave, nombre: ROLE_LABELS[clave] }));
   const isEdit = !!user;
   const [form, setForm] = useState(() => (user ? { ...emptyForm, ...user, password: "" } : emptyForm));
   const [error, setError] = useState("");
@@ -71,7 +73,7 @@ export default function UserModal({ user, onClose, onSaved }) {
             <div className="field">
               <label htmlFor="u-role">Rol</label>
               <select id="u-role" value={form.role} onChange={(e) => update("role", e.target.value)}>
-                {ROLE_LIST.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                {opcionesRol.map((r) => <option key={r.clave} value={r.clave}>{r.nombre}</option>)}
               </select>
             </div>
             <div className="field">
