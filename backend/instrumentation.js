@@ -42,6 +42,11 @@ export async function register() {
     const { startAgenteAsociador } = await import("@/lib/agenteAsociador");
     startAgenteAsociador();
 
+    // Agente de correo: cada 10 min lee el correo vinculado (con el agente encendido) y deja en la Bandeja las
+    // solicitudes de creación de proveedor (ver lib/agenteCorreoProveedores.js). Solo con CORREO_MODO=real.
+    const { startAgenteCorreo } = await import("@/lib/agenteCorreoProveedores");
+    startAgenteCorreo();
+
     // Una vez por despliegue: manito de todos los comentarios y recalificación de todas las actividades (ver lib/agenteDespliegue.js).
     const { startAgenteAlDesplegar } = await import("@/lib/agenteDespliegue");
     startAgenteAlDesplegar();

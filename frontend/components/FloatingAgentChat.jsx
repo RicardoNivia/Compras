@@ -10,7 +10,7 @@ import { ALL_NAV_ITEMS } from "@/components/Sidebar";
 import { useAutoGrow } from "@/lib/useAutoGrow";
 import AssistantContent, { ThinkingLabel } from "@/components/AgentMessageContent";
 import { IconSpark, IconSend, IconPlus } from "@/components/icons";
-import { PREGUNTAS_BIENESTAR, PREGUNTAS_COMPRAS, preguntasAlAzar } from "@/lib/preguntasGerente";
+import { PREGUNTAS_BIENESTAR, PREGUNTAS_TESORERIA, PREGUNTAS_COMPRAS, preguntasAlAzar } from "@/lib/preguntasGerente";
 
 // Duración de la animación de cierre (debe calzar con la transición de
 // .floating-agent-panel en globals.css) — el panel se queda montado hasta que
@@ -80,7 +80,7 @@ export default function FloatingAgentChat({ user }) {
   // Dos preguntas de gerente al azar (se eligen al abrir, en el cliente, para no descuadrar el render del servidor).
   const [alAzar, setAlAzar] = useState([]);
   useEffect(() => {
-    if (open) setAlAzar(preguntasAlAzar(modulo === "bienestar" ? PREGUNTAS_BIENESTAR : PREGUNTAS_COMPRAS, 2).map((p) => p.prompt));
+    if (open) setAlAzar(preguntasAlAzar(modulo === "tesoreria" ? PREGUNTAS_TESORERIA : modulo === "bienestar" ? PREGUNTAS_BIENESTAR : PREGUNTAS_COMPRAS, 2).map((p) => p.prompt));
   }, [open, modulo]);
 
   useEffect(() => {

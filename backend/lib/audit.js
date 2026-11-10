@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { FIELD_LABELS, TOKEN_FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS, NOTIFICACION_FIELD_LABELS, ACTIVIDAD_FIELD_LABELS, SOLICITUD_COMPRA_FIELD_LABELS, ROL_FIELD_LABELS, DETALLE_FIELD_LABELS } from "@/lib/auditLabels";
+import { FIELD_LABELS, TOKEN_FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS, NOTIFICACION_FIELD_LABELS, ACTIVIDAD_FIELD_LABELS, SOLICITUD_COMPRA_FIELD_LABELS, ROL_FIELD_LABELS, DETALLE_FIELD_LABELS, CUENTA_CORREO_FIELD_LABELS, SOLICITUD_PROVEEDOR_CORREO_FIELD_LABELS, MOVIMIENTO_TESORERIA_FIELD_LABELS, MAESTRO_TESORERIA_FIELD_LABELS, ACCESO_TESORERIA_FIELD_LABELS, CONCILIACION_TESORERIA_FIELD_LABELS, CIERRE_TESORERIA_FIELD_LABELS, EXTRACTO_TESORERIA_FIELD_LABELS, SOPORTE_TESORERIA_FIELD_LABELS } from "@/lib/auditLabels";
 
 export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, TOKEN_FIELD_LABELS, ACTION_LABELS, ENTITY_LABELS } from "@/lib/auditLabels";
 
@@ -683,4 +683,36 @@ export async function logNotificacionEnvio(actor, n, action, detalle) {
 export async function logNotificacionSuscripcion(actor, n, action, personaNombre) {
   const changes = [{ field: "destinatariosTexto", label: NOTIFICACION_FIELD_LABELS.destinatariosTexto, before: action === "baja" ? personaNombre : null, after: action === "alta" ? personaNombre : null }];
   await writeLog({ action, entityType: "notificacion", recordId: String(n.id), recordInfo: `${notificacionSummary(n)} · ${personaNombre} ${action === "baja" ? "dejó de recibirla" : "vuelve a recibirla"}`, actor, changes });
+}
+
+// ---------- Correo vinculado y agente de correo (solicitudes de proveedor) ----------
+// Nunca se auditan los tokens: solo el buzón, el estado y el encendido del agente.
+
+export async function logCuentaCorreo(actor, action, cuenta, before = null, after = null) {
+  const changes = diffFields(before, after, CUENTA_CORREO_FIELD_LABELS);
+  await writeLog({ action, entityType: "cuentaCorreo", recordId: String(cuenta.id), recordInfo: `Correo ${cuenta.email} de ${cuenta.userNombre}`, actor, changes });
+}
+
+const solicitudCorreoSummary = (s) => `Solicitud de proveedor del correo «${s.asunto || "sin asunto"}»${s.userNombre ? ` (buzón de ${s.userNombre})` : ""}`;
+
+export async function logSolicitudProveedorCorreo(actor, action, s, before = null, after = null) {
+  const changes = diffFields(before, after, SOLICITUD_PROVEEDOR_CORREO_FIELD_LABELS);
+  await writeLog({ action, entityType: "solicitudProveedorCorreo", recordId: String(s.id), recordInfo: solicitudCorreoSummary(s), actor, changes });
+}
+
+// ---------- Tesorería (flujo de caja, soportes, conciliación y cierre; ver lib/tesoreria/*) ----------
+// Un solo punto de entrada: cada cambio del módulo queda con su entidad (ENTITY_LABELS) y el diff por campos.
+const TESORERIA_LABELS = {
+  movimientoTesoreria: MOVIMIENTO_TESORERIA_FIELD_LABELS,
+  maestroTesoreria: MAESTRO_TESORERIA_FIELD_LABELS,
+  accesoTesoreria: ACCESO_TESORERIA_FIELD_LABELS,
+  conciliacionTesoreria: CONCILIACION_TESORERIA_FIELD_LABELS,
+  cierreTesoreria: CIERRE_TESORERIA_FIELD_LABELS,
+  extractoTesoreria: EXTRACTO_TESORERIA_FIELD_LABELS,
+  soporteTesoreria: SOPORTE_TESORERIA_FIELD_LABELS,
+};
+
+export async function logTesoreria(actor, { action, entityType, recordId, recordInfo, before = null, after = null }) {
+  const changes = diffFields(before, after, TESORERIA_LABELS[entityType] || {});
+  await writeLog({ action, entityType, recordId: String(recordId), recordInfo, actor, changes });
 }

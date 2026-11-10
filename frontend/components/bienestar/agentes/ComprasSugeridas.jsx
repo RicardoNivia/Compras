@@ -6,6 +6,7 @@ import { fetchActividadesApi, sugerirComprasApi, crearComprasSugeridasApi } from
 import { fmtCOP } from "@/lib/format";
 import { IconSpark, IconBag, IconMoney, IconList, IconAlert, IconCheck, IconInfo, IconCalendar, IconSend } from "@/components/icons";
 import { CabezaAgente, CifraAgente, VacioAgente } from "@/components/bienestar/agentes/comun";
+import MoneyInput from "@/components/MoneyInput";
 
 const hoy = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
 
@@ -190,7 +191,7 @@ export default function ComprasSugeridas({ actividadInicial }) {
                         <td><input className="agente-input" aria-label="Qué comprar" value={f.descripcion} onChange={(e) => cambiar(f.clave, "descripcion", e.target.value)} /></td>
                         <td>{f.categoria ? <span className="ag-pill">{f.categoria}</span> : <span className="muted">—</span>}</td>
                         <td>{f.proveedorSugerido || <span className="muted">—</span>}</td>
-                        <td className="num"><input className="agente-input num" type="number" min="0" step="1000" aria-label="Valor estimado" value={f.valorEstimado ?? ""} onChange={(e) => cambiar(f.clave, "valorEstimado", e.target.value)} /></td>
+                        <td className="num"><MoneyInput prefix={null} className="agente-input num" ariaLabel="Valor estimado" value={f.valorEstimado ?? ""} onChange={(x) => cambiar(f.clave, "valorEstimado", x)} /></td>
                         <td><input className="agente-input" type="date" aria-label="Debe llegar" value={f.fechaRequerida || ""} onChange={(e) => cambiar(f.clave, "fechaRequerida", e.target.value)} /></td>
                         <td>
                           <span className="desc-tooltip-wrap" style={{ maxWidth: 200 }}>

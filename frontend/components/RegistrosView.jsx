@@ -12,6 +12,7 @@ import { getDiasInfo } from "@/lib/diasInfo";
 import { patchRecordApi, deleteRecordApi, searchFiltersWithAiApi } from "@/lib/api";
 import { canCreateRecord, canEditRecord, canDeleteRecord, canToggleRadicado, getEditableFields, canViewAgentesCompras } from "@/lib/roles";
 import { IconPlus, IconEdit, IconTrash, IconCheck, IconAlert, IconSpark, IconSearch, IconStar } from "@/components/icons";
+import MoneyInput from "@/components/MoneyInput";
 
 const PAGE_SIZES = [25, 50, 100, 250];
 
@@ -522,11 +523,11 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
           </div>
           <div className="field">
             <label htmlFor="reg-valor-min">Valor desde</label>
-            <input id="reg-valor-min" type="number" min="0" placeholder="Ej. 5000000" value={valorMin} onChange={(e) => setValorMin(e.target.value)} />
+            <MoneyInput id="reg-valor-min" placeholder="Ej. 5.000.000" value={valorMin} onChange={setValorMin} />
           </div>
           <div className="field">
             <label htmlFor="reg-valor-max">Valor hasta</label>
-            <input id="reg-valor-max" type="number" min="0" placeholder="Ej. 20000000" value={valorMax} onChange={(e) => setValorMax(e.target.value)} />
+            <MoneyInput id="reg-valor-max" placeholder="Ej. 20.000.000" value={valorMax} onChange={setValorMax} />
           </div>
           <div className="filter-actions">{accionesFiltro}</div>
         </div>

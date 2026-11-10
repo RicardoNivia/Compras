@@ -24,6 +24,7 @@ import { ComentarioConMano } from "@/components/bienestar/Sentimiento";
 import { IconPlus, IconTrash, IconDownload, IconCheck } from "@/components/icons";
 import { estadoActividad, pctClase, rangoFechas } from "@/components/bienestar/actividadesUi";
 import { crossfade } from "@/lib/crossfade";
+import MoneyInput from "@/components/MoneyInput";
 
 const PAGE_SIZES = [25, 50, 100];
 const entero = (v) => Math.round(v).toLocaleString("es-CO");
@@ -490,7 +491,7 @@ function TabInventario({ act, puedeEditar, onCambio }) {
           <input aria-label="Ítem" placeholder="Ítem (ej. Refrigerios)" value={nuevo.item} onChange={(e) => setNuevo({ ...nuevo, item: e.target.value })} />
           <input aria-label="Cantidad" type="number" min="0" step="any" placeholder="Cantidad" value={nuevo.cantidad} onChange={(e) => setNuevo({ ...nuevo, cantidad: e.target.value })} style={{ width: 110 }} />
           <select aria-label="Unidad" value={nuevo.unidad} onChange={(e) => setNuevo({ ...nuevo, unidad: e.target.value })} style={{ width: 120 }}><option value="">Unidad</option>{unidades.map((u) => <option key={u} value={u}>{u}</option>)}</select>
-          <input aria-label="Costo unitario" type="number" min="0" step="any" placeholder="Costo unitario" value={nuevo.costoUnitario} onChange={(e) => setNuevo({ ...nuevo, costoUnitario: e.target.value })} style={{ width: 140 }} />
+          <MoneyInput prefix={null} ariaLabel="Costo unitario" placeholder="Costo unitario" value={nuevo.costoUnitario} onChange={(x) => setNuevo({ ...nuevo, costoUnitario: x })} decimales={2} style={{ width: 140 }} />
           <button type="submit" className="btn btn-primary"><IconPlus size={13} /> Agregar</button>
         </form>
       )}

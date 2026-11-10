@@ -3,17 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, canViewNotificaciones, canViewBienestar, canEditBienestar, canViewAgentesCompras, ROLE_LABELS } from "@/lib/roles";
+import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, canViewNotificaciones, canViewBienestar, canEditBienestar, canViewAgentesCompras, canVincularCorreo, ROLE_LABELS } from "@/lib/roles";
 import { EVENTO_NO_LEIDAS, EVENTO_SOLICITUDES } from "@/lib/notificacionesApi";
 import { MODULOS } from "@/lib/modulos";
 import { useModulo } from "@/components/ModuloShell";
 import {
-  IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail,
-  IconBell, IconBuilding, IconEye, IconCalendar, IconBag, IconHeart, IconList,
+  IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail, IconInbox,
+  IconBell, IconBuilding, IconEye, IconCalendar, IconBag, IconHeart, IconList, IconCheck,
 } from "@/components/icons";
 import { fetchCompartidosApi } from "@/lib/api";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 import CommandPalette from "@/components/CommandPalette";
+import ModuloSwitcher from "@/components/ModuloSwitcher";
 
 // Menú compacto por módulos: un riel de íconos que se expande al pasar el mouse (sin quitarle espacio al contenido).
 // Solo muestra el menú del módulo activo más el grupo "General"; el módulo se cambia desde la barra superior
@@ -63,11 +64,33 @@ const GRUPOS = {
       ],
     },
   ],
+  // Tesorería: acceso NOMINAL (user.tesoreria, de /api/auth/me), no por rol ni por la Matriz.
+  tesoreria: [
+    {
+      titulo: "Tesorería",
+      items: [
+        { key: "tesoreria", href: "/tesoreria", label: "Resumen", Icon: IconDashboard, permite: (u) => !!u.tesoreria },
+        { key: "tesoreria-movimientos", href: "/tesoreria/movimientos", label: "Movimientos", Icon: IconTable, permite: (u) => !!u.tesoreria },
+        { key: "tesoreria-conciliacion", href: "/tesoreria/conciliacion", label: "Conciliación", Icon: IconCheck, permite: (u) => !!u.tesoreria },
+        // El cierre de mes (/tesoreria/cierre) sigue existiendo pero no está en el menú: lo reemplazan los reportes.
+        { key: "tesoreria-reportes", href: "/tesoreria/reportes", label: "Reportes", Icon: IconLayers, permite: (u) => !!u.tesoreria },
+      ],
+    },
+    {
+      titulo: "Configuración",
+      items: [
+        { key: "tesoreria-maestros", href: "/tesoreria/maestros", label: "Maestros", Icon: IconLayers, permite: (u) => !!u.tesoreria },
+        // Arranque: mientras nadie tiene acceso, un admin del panel solo ve esto, para dar el primer acceso.
+        { key: "tesoreria-accesos", href: "/tesoreria/accesos", label: "Accesos", Icon: IconKey, permite: (u) => !!u.tesoreria?.puedeFirmar || !!u.tesoreriaArranque },
+      ],
+    },
+  ],
 };
 
 const GENERALES = [
   { key: "alertas", href: "/alertas", label: "Alertas y notificaciones", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas, alt: { feature: "viewNotificaciones", show: canViewNotificaciones } },
   { key: "agente-ia", href: "/agente-ia", label: "Nova", Icon: IconSpark, feature: "viewAgenteIA", show: canViewAgenteIA },
+  { key: "mi-correo", href: "/mi-correo", label: "Mi correo", Icon: IconInbox, feature: "vincularCorreo", show: canVincularCorreo },
   { key: "usuarios", href: "/usuarios", label: "Usuarios y roles", Icon: IconUsers, feature: "viewUsuarios", show: canViewUsuarios },
   { key: "auditoria", href: "/auditoria", label: "Auditoría", Icon: IconHistory, feature: "viewAuditoria", show: canViewAuditoria },
   // Solo para administradores (no es un permiso de la Matriz: se valida el rol).
@@ -77,7 +100,7 @@ const GENERALES = [
 // Todos los destinos (los usa la paleta de comandos y el chat flotante para saber en qué página está la persona).
 export const ALL_NAV_ITEMS = [...Object.values(GRUPOS).flat().flatMap((g) => g.items), ...GENERALES];
 
-const permiteA = (user, it) => (it.feature ? (user.permissions?.[it.feature] ?? it.show(user.role)) : it.show(user.role))
+const permiteA = (user, it) => (it.permite ? it.permite(user) : it.feature ? (user.permissions?.[it.feature] ?? it.show(user.role)) : it.show(user.role))
   || (it.alt && (user.permissions?.[it.alt.feature] ?? it.alt.show(user.role)));
 
 // Módulos que la persona puede usar: los que tienen al menos una opción permitida por su rol (Matriz de permisos).
@@ -92,7 +115,7 @@ export function modulosDelUsuario(user) {
   return out;
 }
 
-export const ICONOS_MODULO = { compras: IconBag, bienestar: IconHeart };
+export const ICONOS_MODULO = { compras: IconBag, bienestar: IconHeart, tesoreria: IconMoney };
 
 function initials(name) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -201,18 +224,7 @@ export default function Sidebar({ user }) {
             <span className="sidebar-brand-label">Sinco · {MODULOS[moduloMenu]?.nombre || "Panel"}</span>
           </div>
         ) : (
-          <nav className="sidebar-modulos" aria-label="Cambiar de módulo">
-            {modulosPropios.map(([m, href]) => {
-              const Icono = ICONOS_MODULO[m];
-              const activo = m === moduloMenu;
-              return (
-                <Link key={m} href={href} className={`sidebar-link sidebar-modulo m-${m}${activo ? " activo" : ""}`} aria-current={activo ? "true" : undefined} title={MODULOS[m].descripcion}>
-                  <span className="sidebar-link-ic"><Icono size={16} /></span>
-                  <span className="label">{MODULOS[m].nombre}</span>
-                </Link>
-              );
-            })}
-          </nav>
+          <ModuloSwitcher modulos={modulosPropios} actual={moduloMenu} iconos={ICONOS_MODULO} />
         )}
 
         <nav className="sidebar-nav" aria-label="Navegación principal">

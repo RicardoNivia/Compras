@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { listarBandeja, marcarLeidas, cambiarSuscripcion, avisarNoLeidas } from "@/lib/notificacionesApi";
 import ContenidoNotificacion from "@/components/notificaciones/ContenidoNotificacion";
+import SolicitudProveedorCorreo from "@/components/correo/SolicitudProveedorCorreo";
 import ConfirmarModal from "@/components/notificaciones/ConfirmarModal";
 import { FuenteIcono, haceCuanto, grupoDia, Paginacion } from "@/components/notificaciones/ui";
 import { IconCheck, IconBell, IconChevronDown, IconClock } from "@/components/icons";
@@ -131,7 +132,7 @@ export default function BandejaView() {
                       </div>
                       {it.contenido?.texto && <p>{it.contenido.texto}</p>}
                       <span className="nx-item-de">
-                        {it.contenido?.sistema ? (it.contenido.fuente === "bienestar" ? `Aviso de ${it.contenido.notificacionNombre || "Bienestar"}` : "Aviso de solicitudes de compra") : <>De la notificación <b>«{it.notificacionNombre || "eliminada"}»</b></>}
+                        {it.contenido?.sistema ? (it.contenido.fuente === "bienestar" ? `Aviso de ${it.contenido.notificacionNombre || "Bienestar"}` : it.contenido.fuente === "correo" ? "Aviso del agente de correo" : "Aviso de solicitudes de compra") : <>De la notificación <b>«{it.notificacionNombre || "eliminada"}»</b></>}
                         {it.propietarioNombre ? <> · configurada por {it.deOtro ? it.propietarioNombre : "ti"}</> : null}
                         {it.cuando ? <> · <IconClock size={11} /> {it.cuando}</> : null}
                       </span>
@@ -144,7 +145,9 @@ export default function BandejaView() {
                   </button>
                   {abiertaEsta && (
                     <div className="nx-item-detalle">
-                      <ContenidoNotificacion c={it.contenido} />
+                      {it.contenido?.solicitudCorreoId
+                        ? <SolicitudProveedorCorreo id={it.contenido.solicitudCorreoId} />
+                        : <ContenidoNotificacion c={it.contenido} />}
                       {it.deOtro && it.origen !== "prueba" && (
                         <div className="nx-item-pie">
                           <button type="button" className="btn small btn-ghost" onClick={() => dejarDeRecibir(it)}>Dejar de recibir esta notificación</button>
