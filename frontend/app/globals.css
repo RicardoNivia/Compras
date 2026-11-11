@@ -6125,3 +6125,16 @@ tr.tes-ex-no td{ opacity:.45; text-decoration:line-through; }
 .sb-detalle{ display:flex; flex-direction:column; gap:14px; }
 .sb-detalle .card-head, .sb-detalle .sb-cuenta-mes, .sb-detalle .tes-resultado{ margin:0; }
 .sb-detalle > .tes-cabecera{ padding-top:2px; }
+/* Pago extraordinario que se repite (PagoModales.jsx#PagoFormModal). */
+.pg-repite{ margin-top:14px; }
+.pg-repite.on{ border-color:color-mix(in srgb, var(--marca) 40%, var(--border)); background:color-mix(in srgb, var(--marca) 4%, var(--surface)); }
+.pg-repite-t{ display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; }
+.pg-repite-t > span{ display:flex; flex-direction:column; gap:3px; font-size:13.5px; font-weight:800; }
+.pg-repite-t > span small{ font-size:11.5px; font-weight:500; color:var(--muted); }
+.pg-bloque-num{ display:inline-grid; place-items:center; width:22px; height:22px; margin-right:6px; border-radius:50%; font-size:11.5px; color:#fff; background:linear-gradient(135deg, var(--marca), var(--marca-2)); }
+.pg-repite-res{ display:flex; flex-direction:column; gap:8px; padding:12px 14px; border-radius:var(--r); background:var(--surface); border:1px dashed color-mix(in srgb, var(--marca) 40%, var(--border)); }
+.pg-repite-res strong{ font-size:13.5px; color:var(--marca); }
+.pg-repite-res small{ font-size:11.5px; color:var(--ink-2); }
+.pg-repite-fechas{ display:flex; flex-wrap:wrap; gap:6px; }
+.pg-repite-t > span{ display:block; }
+.pg-repite-t > span small{ display:block; margin-top:4px; }

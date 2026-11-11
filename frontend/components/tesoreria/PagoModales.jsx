@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { tesPago, tesCrearPago, tesEditarPago, tesBorrarPago, tesAsociarPago, tesMovimientos, tesProponerPagos, tesAplicarPropuestos } from "@/lib/tesoreriaApi";
+import { tesCrearPeriodico, tesPago, tesCrearPago, tesEditarPago, tesBorrarPago, tesAsociarPago, tesMovimientos, tesProponerPagos, tesAplicarPropuestos } from "@/lib/tesoreriaApi";
 import { fmtMoneda } from "@/lib/moneda";
 import { crossfade } from "@/lib/crossfade";
 import { IconSpark, IconTrash, IconSearch } from "@/components/icons";
 import MoneyInput from "@/components/MoneyInput";
-import { Modal, MESES, hoyCO, fechaCorta, EstadoPago, TipoPago, TIPOS_PAGO, SelectorAnio } from "@/components/tesoreria/comun";
+import { Modal, MESES, hoyCO, fechaCorta, EstadoPago, TipoPago, TIPOS_PAGO, SelectorAnio, PERIODICIDADES } from "@/components/tesoreria/comun";
 
 const num = (v) => Number(String(v ?? "").replace(",", ".")) || 0;
 
@@ -103,18 +103,81 @@ function CamposPago({ v, set, cat }) {
   );
 }
 
+// Fechas que tendría el pago si se vuelve periódico: desde su fecha hasta diciembre de ESE año (o la fecha fin), con la
+// misma regla del backend (periodicos.js#periodosDe): el día de corte es el día de la fecha; quincenal = ese día y 15
+// días después; en meses cortos, el último día.
+const PASO_MESES = { quincenal: 1, mensual: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
+function fechasPeriodicas(fecha, periodicidad, fechaFin) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha || "")) return [];
+  const fin = fechaFin && fechaFin < `${fecha.slice(0, 4)}-12-31` ? fechaFin : `${fecha.slice(0, 4)}-12-31`;
+  const dia = Number(fecha.slice(8, 10));
+  let a = Number(fecha.slice(0, 4));
+  let m = Number(fecha.slice(5, 7));
+  const out = [];
+  for (let i = 0; i < 60; i++) {
+    const ultimo = new Date(Date.UTC(a, m, 0)).getUTCDate();
+    const f1 = `${a}-${String(m).padStart(2, "0")}-${String(Math.min(dia, ultimo)).padStart(2, "0")}`;
+    const lista = [f1];
+    if (periodicidad === "quincenal") lista.push(new Date(Date.parse(`${f1}T12:00:00Z`) + 15 * 86400000).toISOString().slice(0, 10));
+    for (const f of lista) if (f >= fecha && f <= fin) out.push(f);
+    if (f1 > fin) break;
+    m += PASO_MESES[periodicidad] || 1;
+    while (m > 12) { m -= 12; a += 1; }
+  }
+  return out;
+}
+
 export function PagoFormModal({ cat, onClose, onSaved }) {
   const [v, set] = useState({ tipo: "E", sentido: "sale", conceptoId: "", itemId: "", valor: "", fecha: hoyCO(), medioPagoId: "", pagadorId: "", observacion: "" });
+  const [repite, setRepite] = useState(false);
+  const [periodicidad, setPeriodicidad] = useState("mensual");
+  const [fechaFin, setFechaFin] = useState("");
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const fechas = repite ? fechasPeriodicas(v.fecha, periodicidad, fechaFin) : [];
+  const anioPago = (v.fecha || hoyCO()).slice(0, 4);
   async function guardar() {
     setGuardando(true); setError("");
-    try { const p = await tesCrearPago({ ...v, estado: "P" }); onSaved(p, "Pago extraordinario creado en P."); } catch (e) { setError(e.message); } finally { setGuardando(false); }
+    try {
+      if (repite) {
+        // Se vuelve gasto periódico: el gasto crea sus pagos en P desde esta fecha hasta diciembre de ese año.
+        const g = await tesCrearPeriodico({
+          tipo: v.tipo, sentido: v.sentido, conceptoId: v.conceptoId, itemId: v.itemId, medioPagoId: v.medioPagoId, pagadorId: v.pagadorId, valor: v.valor,
+          periodicidad, diaCorte: Number(v.fecha.slice(8, 10)), fechaInicio: v.fecha, fechaFin: fechaFin || null, activo: true, observacion: v.observacion, desdeSuFecha: true,
+        });
+        onSaved(null, `Gasto periódico creado: ${g.pagosCreados} pago(s) en P hasta ${fechaFin && fechaFin < `${anioPago}-12-31` ? fechaCorta(fechaFin) : `diciembre de ${anioPago}`}. Lo ves en Gastos periódicos.`);
+      } else {
+        const p = await tesCrearPago({ ...v, estado: "P" });
+        onSaved(p, "Pago extraordinario creado en P.");
+      }
+    } catch (e) { setError(e.message); } finally { setGuardando(false); }
   }
   return (
-    <Modal titulo="Nuevo pago extraordinario" sub="Un pago que no se repite: un arreglo, una compra, un impuesto puntual. Queda pendiente (P) hasta que lo pagues o le asocies el movimiento del banco." onClose={onClose} ancho={820}
-      pie={<><button type="button" className="btn" onClick={onClose}>Cancelar</button><div className="spacer" /><button type="button" className="btn btn-primary" onClick={guardar} disabled={guardando || !v.conceptoId || !num(v.valor) || !v.fecha}>{guardando ? <span className="spinner" /> : null} Crear pago pendiente</button></>}>
+    <Modal titulo={repite ? "Nuevo pago que se repite" : "Nuevo pago extraordinario"} sub={repite ? "Se crea como gasto periódico: sus pagos quedan pendientes (P) desde esta fecha hasta diciembre." : "Un pago que no se repite: un arreglo, una compra, un impuesto puntual. Queda pendiente (P) hasta que lo pagues o le asocies el movimiento del banco."} onClose={onClose} ancho={820}
+      pie={<><button type="button" className="btn" onClick={onClose}>Cancelar</button><div className="spacer" /><button type="button" className="btn btn-primary" onClick={guardar} disabled={guardando || !v.conceptoId || !num(v.valor) || !v.fecha || (repite && !fechas.length)}>{guardando ? <span className="spinner" /> : null} {repite ? `Crear ${fechas.length} pago(s) periódicos` : "Crear pago pendiente"}</button></>}>
       <CamposPago v={v} set={set} cat={cat} />
+      <section className={`pg-bloque pg-repite${repite ? " on" : ""}`}>
+        <label className="pg-repite-t">
+          <span><span className="pg-bloque-num">5</span> ¿Se repite?<small>Márcalo si este pago vuelve cada cierto tiempo (arriendo, servicio, cuota…): se convierte en gasto periódico.</small></span>
+          <input type="checkbox" role="switch" checked={repite} onChange={(e) => setRepite(e.target.checked)} aria-label="Se repite" />
+        </label>
+        {repite && (
+          <>
+            <div className="field"><label>¿Cada cuánto?</label>
+              <div className="tes-seg" style={{ flexWrap: "wrap" }}>{Object.entries(PERIODICIDADES).map(([k, t]) => <button key={k} type="button" className={periodicidad === k ? "on" : ""} onClick={() => setPeriodicidad(k)}>{t}</button>)}</div>
+              <small className="pg-ayuda">{periodicidad === "quincenal" ? `El día ${Number(v.fecha.slice(8, 10))} de cada mes y 15 días después.` : `El día ${Number(v.fecha.slice(8, 10))} (el de la fecha de vencimiento); en meses más cortos, el último día.`}</small>
+            </div>
+            <div className="pg-grid">
+              <div className="field"><label htmlFor="pg-hasta">Hasta (opcional)</label><input id="pg-hasta" type="date" min={v.fecha} max={`${anioPago}-12-31`} value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} /><small className="pg-ayuda">Vacío = hasta diciembre de {anioPago}. Para el año siguiente usa «Llenar un año» en Gastos periódicos.</small></div>
+            </div>
+            <div className="pg-repite-res" aria-live="polite">
+              <strong>{fechas.length ? `Se van a crear ${fechas.length} pago(s) hasta ${fechaFin && fechaFin < `${anioPago}-12-31` ? fechaCorta(fechaFin) : `diciembre de ${anioPago}`}` : "Con esa fecha no queda ningún pago este año"}</strong>
+              {fechas.length > 0 && <div className="pg-repite-fechas">{fechas.map((f) => <span key={f} className="pill accent">{fechaCorta(f)}</span>)}</div>}
+              {fechas.length > 0 && num(v.valor) > 0 && <small>Cada uno por {fmtMoneda(num(v.valor), "COP")} · en total {fmtMoneda(num(v.valor) * fechas.length, "COP")}.</small>}
+            </div>
+          </>
+        )}
+      </section>
       {error && <p className="modal-error">{error}</p>}
     </Modal>
   );

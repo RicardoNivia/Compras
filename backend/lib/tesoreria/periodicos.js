@@ -193,7 +193,11 @@ const nombreGasto = async (g) => `${(await prisma.conceptoTesoreria.findUnique({
 export async function crearGasto(actor, body, { generar = true, silencioso = false } = {}) {
   const data = await datosGastoValidos(body);
   const g = await prisma.gastoPeriodico.create({ data: { ...data, creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null } });
-  const creados = generar ? await generarPagosDe(actor, g, inicioMesActual(), finDeAnio()) : 0;
+  // desdeSuFecha (pago extraordinario que se vuelve periódico): sus pagos van desde la fecha del pago hasta diciembre de
+  // ESE año (aunque sea otro año); si no, desde el mes en curso hasta diciembre del año actual.
+  const desde = body.desdeSuFecha ? g.fechaInicio : inicioMesActual();
+  const hasta = body.desdeSuFecha ? `${g.fechaInicio.slice(0, 4)}-12-31` : finDeAnio();
+  const creados = generar ? await generarPagosDe(actor, g, desde, hasta) : 0;
   if (!silencioso) logTesoreria(actor, { action: "crear", entityType: "gastoPeriodicoTesoreria", recordId: g.id, recordInfo: `${await nombreGasto(g)} · generó ${creados} pago(s)`, after: await paraAuditoria(g) }).catch(() => {});
   return { ...g, pagosCreados: creados };
 }
