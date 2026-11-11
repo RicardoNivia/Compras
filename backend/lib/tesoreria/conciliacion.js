@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { logTesoreria } from "@/lib/audit";
 import { revisarArchivoImportacion } from "@/lib/archivoSeguro";
-import { leerExtracto, patronDe } from "@/lib/tesoreria/parsersExtracto";
+import { leerExtracto, patronDe, conClaves } from "@/lib/tesoreria/parsersExtracto";
+import { leerExtractoPdf } from "@/lib/tesoreria/extractoPdf";
 import { emparejar, signoEnCuenta, reglaPara, dias } from "@/lib/tesoreria/emparejar";
 import { badRequest, notFound, rangoMes, exigirMesAbierto, fmtMoneda, limpiar } from "@/lib/tesoreria/comun";
 import { crearMovimiento, mapasCatalogos, toClientMovimiento } from "@/lib/tesoreria/movimientos";
@@ -39,10 +40,29 @@ async function aprenderRegla(actor, descripcion, mv) {
 export async function importarExtracto(actor, cuentaId, buffer, nombre) {
   const cuenta = await prisma.cuentaTesoreria.findUnique({ where: { id: Number(cuentaId) || 0 } });
   if (!cuenta) throw badRequest("Elige la cuenta del extracto.");
-  if (!/\.(xlsx|xls|csv)$/i.test(nombre || "")) throw badRequest("Por ahora el extracto se importa en Excel (.xlsx, .xls) o CSV, como lo descarga el portal del banco.");
-  revisarArchivoImportacion(buffer, nombre); // contenido seguro: sin macros, objetos ni fórmulas peligrosas
-  const { formato, lineas } = leerExtracto(buffer, cuenta.formatoExtracto);
-  if (!lineas.length) throw badRequest("No se reconocieron movimientos en el archivo: revisa que tenga columnas de fecha, descripción y valor.");
+  const esPdf = /\.pdf$/i.test(nombre || "");
+  if (!esPdf && !/\.(xlsx|xls|csv)$/i.test(nombre || "")) throw badRequest("El extracto se sube en PDF, Excel (.xlsx, .xls) o CSV, como lo descarga el portal del banco.");
+  let formato, lineas, aviso = null;
+  if (esPdf) {
+    // PDF: se revisa por contenido y Nova transcribe los movimientos; el código los valida (ver extractoPdf.js).
+    let leido;
+    try {
+      leido = await leerExtractoPdf(buffer, nombre, cuenta);
+    } catch (err) {
+      if (err.rechazado) {
+        logTesoreria(actor, { action: "rechazar", entityType: "extractoTesoreria", recordId: cuenta.id, recordInfo: `Extracto PDF rechazado (${cuenta.nombre})`, after: { archivo: limpiar(nombre, 200), motivo: err.motivo } }).catch(() => {});
+      }
+      throw err;
+    }
+    formato = "pdf";
+    lineas = conClaves(leido.lineas);
+    aviso = leido.aviso;
+    if (!lineas.length) throw badRequest("Nova no encontró movimientos en el PDF: revisa que sea el extracto de la cuenta, no un certificado o un resumen.");
+  } else {
+    revisarArchivoImportacion(buffer, nombre); // contenido seguro: sin macros, objetos ni fórmulas peligrosas
+    ({ formato, lineas } = leerExtracto(buffer, cuenta.formatoExtracto));
+    if (!lineas.length) throw badRequest("No se reconocieron movimientos en el archivo: revisa que tenga columnas de fecha, descripción y valor.");
+  }
   const firmados = new Set((await prisma.cierreMes.findMany({ select: { anio: true, mes: true } })).map((c) => `${c.anio}-${String(c.mes).padStart(2, "0")}`));
   const validas = lineas.filter((l) => !firmados.has(l.fecha.slice(0, 7)));
   const existentes = new Set((await prisma.lineaExtracto.findMany({ where: { cuentaId: cuenta.id, clave: { in: validas.map((l) => l.clave) } }, select: { clave: true } })).map((x) => x.clave));
@@ -60,9 +80,9 @@ export async function importarExtracto(actor, cuentaId, buffer, nombre) {
   const enlazadas = nuevas.length ? await autoConciliar(cuenta.id, { desde: fechas[0], hasta: fechas.at(-1) }) : 0;
   logTesoreria(actor, {
     action: "importar", entityType: "extractoTesoreria", recordId: extracto.id, recordInfo: `Extracto de ${cuenta.nombre} (${fechas[0]} a ${fechas.at(-1)})`,
-    after: { cuenta: cuenta.nombre, archivo: extracto.archivo, lineasNuevas: nuevas.length, lineasRepetidas: lineas.length - nuevas.length, enlazadas },
+    after: { cuenta: cuenta.nombre, archivo: extracto.archivo, formato: formato || null, lineasNuevas: nuevas.length, lineasRepetidas: lineas.length - nuevas.length, enlazadas },
   }).catch(() => {});
-  return { formato, lineas: lineas.length, nuevas: nuevas.length, repetidas: lineas.length - nuevas.length, enMesesFirmados: lineas.length - validas.length, enlazadas, desde: fechas[0], hasta: fechas.at(-1) };
+  return { formato, aviso, lineas: lineas.length, nuevas: nuevas.length, repetidas: lineas.length - nuevas.length, enMesesFirmados: lineas.length - validas.length, enlazadas, desde: fechas[0], hasta: fechas.at(-1) };
 }
 
 // ---------- Enlace automático ----------

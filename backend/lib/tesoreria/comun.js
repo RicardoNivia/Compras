@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth-server";
+import { isRoleAllowed } from "@/lib/permissions";
 
-// Utilidades del módulo de Tesorería. El acceso es NOMINAL (tabla tesoreria_accesos), no por rol ni por la Matriz:
-// ser administrador del panel no da acceso, porque el módulo tiene finanzas personales y patrimoniales.
+// Utilidades del módulo de Tesorería. El acceso se da por ROL en la Matriz de permisos (Usuarios y roles), con tres
+// funcionalidades: verTesoreria / registrarTesoreria / firmarTesoreria (por defecto solo admin, que siempre tiene todo).
+// La antigua lista nominal (tabla tesoreria_accesos) ya no da ni quita acceso.
 //   consulta: ve todo · registro: además registra y edita movimientos, importa extractos y concilia
 //   firma: además firma el cierre del mes y administra accesos y maestros.
 // Arranque: mientras no haya NINGÚN acceso, un administrador del panel puede dar el primero (y solo eso).
@@ -15,18 +17,21 @@ export const badRequest = (m) => Object.assign(new Error(m), { status: 400 });
 export const notFound = (m = "No se encontró.") => Object.assign(new Error(m), { status: 404 });
 export const forbidden = (m = "No tienes acceso a Tesorería.") => Object.assign(new Error(m), { status: 403 });
 
-export async function accesoDe(userId) {
-  if (!userId) return null;
-  const a = await prisma.accesoTesoreria.findUnique({ where: { userId } });
-  return a ? { nivel: a.nivel, puedeRegistrar: RANGO[a.nivel] >= 2, puedeFirmar: RANGO[a.nivel] >= 3 } : null;
+// Acepta el usuario (con role) o su id.
+export async function accesoDe(usuario) {
+  const u = typeof usuario === "string" ? await prisma.user.findUnique({ where: { id: usuario }, select: { id: true, role: true, activo: true } }) : usuario;
+  if (!u?.role || u.activo === false) return null;
+  const [ver, registrar, firmar] = await Promise.all(["verTesoreria", "registrarTesoreria", "firmarTesoreria"].map((f) => isRoleAllowed(u.role, f)));
+  const nivel = firmar ? "firma" : registrar ? "registro" : ver ? "consulta" : null;
+  return nivel ? { nivel, puedeRegistrar: RANGO[nivel] >= 2, puedeFirmar: RANGO[nivel] >= 3 } : null;
 }
 
 // Para los route handlers: { user, acceso, denied }.
 export async function requireTesoreria(nivelMinimo = "consulta") {
   const user = await getSessionUser();
   if (!user) return { denied: NextResponse.json({ error: "No autenticado." }, { status: 401 }) };
-  const acceso = await accesoDe(user.id);
-  if (!acceso) return { denied: NextResponse.json({ error: "No tienes acceso a Tesorería." }, { status: 403 }) };
+  const acceso = await accesoDe(user);
+  if (!acceso) return { denied: NextResponse.json({ error: "No tienes acceso a Tesorería: pídelo a un administrador en Usuarios y roles." }, { status: 403 }) };
   if (RANGO[acceso.nivel] < RANGO[nivelMinimo]) {
     return { denied: NextResponse.json({ error: `Necesitas acceso de ${nivelMinimo} en Tesorería.` }, { status: 403 }) };
   }

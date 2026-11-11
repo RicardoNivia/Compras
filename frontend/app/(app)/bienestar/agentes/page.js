@@ -6,7 +6,7 @@ import AgentesCompras from "@/components/bienestar/agentes/AgentesCompras";
 
 export const dynamic = "force-dynamic";
 
-// Agentes de Bienestar: asociador, compras sugeridas y cotizador. Para quien registra las compras y quien
+// Agentes de Bienestar: asociador y compras sugeridas (el cotizador se quitó; sigue en Compras). Para quien registra las compras y quien
 // edita Bienestar o Fundación.
 export default async function AgentesComprasPage({ searchParams }) {
   const user = await getSessionUser();

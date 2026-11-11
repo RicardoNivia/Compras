@@ -164,7 +164,7 @@ export default function ConciliacionTesoreria({ acceso }) {
     setError(""); setFase("corriendo"); setSegundos(0);
     try {
       const r = await tesImportarExtracto(cuentaId, file);
-      setAviso(`Extracto leído: ${r.nuevas} línea(s) nuevas${r.repetidas ? `, ${r.repetidas} ya estaban` : ""}.`);
+      setAviso(`Extracto ${r.formato === "pdf" ? "PDF leído por Nova" : "leído"}: ${r.nuevas} línea(s) nuevas${r.repetidas ? `, ${r.repetidas} ya estaban` : ""}.${r.aviso ? ` ${r.aviso}` : ""}`);
       // El agente trabaja sobre el mes del extracto (el último que trae).
       const [a, m] = (r.hasta || `${periodo.anio}-${periodo.mes}`).split("-").map(Number);
       if (a !== periodo.anio || m !== periodo.mes) setPeriodo({ anio: a, mes: m });
@@ -233,9 +233,9 @@ export default function ConciliacionTesoreria({ acceso }) {
             onDrop={(e) => { e.preventDefault(); setArrastrando(false); puede && subir(e.dataTransfer.files?.[0]); }}>
             <span className="tca-drop-icono" aria-hidden="true"><IconFile size={26} /></span>
             <strong>Suelta aquí el extracto de {cuenta?.nombre || "la cuenta"}</strong>
-            <span>Excel o CSV, como lo descargas del portal del banco. El agente arranca solo.</span>
+            <span>PDF, Excel o CSV, como lo descargas del portal del banco. El agente arranca solo (un PDF lo lee Nova y tarda un poco más).</span>
             <span className="btn btn-primary ag-btn-grande">Elegir archivo</span>
-            <input type="file" accept=".xlsx,.xls,.csv" disabled={!puede} onChange={(e) => { subir(e.target.files?.[0]); e.target.value = ""; }} />
+            <input type="file" accept=".pdf,.xlsx,.xls,.csv" disabled={!puede} onChange={(e) => { subir(e.target.files?.[0]); e.target.value = ""; }} />
           </label>
           <div className="tca-ya">
             <span className="tca-ya-icono" aria-hidden="true">{estadoMes.tieneExtracto ? <IconCheck size={20} /> : <IconFile size={20} />}</span>

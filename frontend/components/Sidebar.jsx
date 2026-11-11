@@ -43,7 +43,7 @@ const GRUPOS = {
       ],
     },
   ],
-  // Bienestar y Fundación van muy aparte: cada línea con su resumen, sus actividades y su cronograma.
+  // Bienestar y la Fundación (en el menú se llama "Conectando Corazones", el nombre del programa) van muy aparte: cada línea con su resumen, sus actividades y su cronograma.
   bienestar: [
     {
       titulo: "Bienestar",
@@ -52,16 +52,17 @@ const GRUPOS = {
         { key: "bienestar-actividades", href: "/bienestar/actividades", label: "Actividades", Icon: IconList, feature: "viewBienestar", show: canViewBienestar },
         { key: "bienestar-cronograma", href: "/bienestar/cronograma", label: "Cronograma", Icon: IconCalendar, feature: "viewBienestar", show: canViewBienestar },
         { key: "bienestar-agentes", href: "/bienestar/agentes", label: "Agentes", Icon: IconSpark, feature: "editBienestar", show: canEditBienestar },
+        { key: "bienestar-inventario", href: "/bienestar/inventario", label: "Inventario", Icon: IconLayers, feature: "viewBienestar", show: canViewBienestar, alt: { feature: "viewFundacion", show: () => false } },
         { key: "bienestar-maestros", href: "/bienestar/maestros", label: "Maestros", Icon: IconLayers, feature: "viewMaestrosBienestar", show: canViewBienestar },
       ],
     },
     {
-      titulo: "Fundación",
+      titulo: "Conectando Corazones",
       items: [
-        { key: "fundacion", href: "/bienestar/fundacion", label: "Resumen Fundación", Icon: IconDashboard, feature: "viewDashboardFundacion", show: canViewBienestar },
-        { key: "fundacion-actividades", href: "/bienestar/fundacion/actividades", label: "Actividades Fundación", Icon: IconList, feature: "viewFundacion", show: canViewBienestar },
-        { key: "fundacion-cronograma", href: "/bienestar/fundacion/cronograma", label: "Cronograma Fundación", Icon: IconCalendar, feature: "viewFundacion", show: canViewBienestar },
-        { key: "fundacion-historias", href: "/bienestar/fundacion/historias", label: "Historias", Icon: IconHeart, feature: "viewFundacion", show: canViewBienestar },
+        { key: "fundacion", href: "/bienestar/fundacion", label: "Resumen", buscar: "Resumen · Conectando Corazones", Icon: IconDashboard, feature: "viewDashboardFundacion", show: canViewBienestar },
+        { key: "fundacion-actividades", href: "/bienestar/fundacion/actividades", label: "Actividades", buscar: "Actividades · Conectando Corazones", Icon: IconList, feature: "viewFundacion", show: canViewBienestar },
+        { key: "fundacion-cronograma", href: "/bienestar/fundacion/cronograma", label: "Cronograma", buscar: "Cronograma · Conectando Corazones", Icon: IconCalendar, feature: "viewFundacion", show: canViewBienestar },
+        { key: "fundacion-historias", href: "/bienestar/fundacion/historias", label: "Historias", buscar: "Historias · Conectando Corazones", Icon: IconHeart, feature: "viewFundacion", show: canViewBienestar },
       ],
     },
   ],
@@ -82,25 +83,25 @@ const GRUPOS = {
       titulo: "Configuración",
       items: [
         { key: "tesoreria-maestros", href: "/tesoreria/maestros", label: "Maestros", Icon: IconLayers, permite: (u) => !!u.tesoreria },
-        // Arranque: mientras nadie tiene acceso, un admin del panel solo ve esto, para dar el primer acceso.
-        { key: "tesoreria-accesos", href: "/tesoreria/accesos", label: "Accesos", Icon: IconKey, permite: (u) => !!u.tesoreria?.puedeFirmar || !!u.tesoreriaArranque },
+        // Accesos: ya no se dan aquí sino en Usuarios y roles (Matriz de permisos, pestaña Tesorería).
+        // { key: "tesoreria-accesos", href: "/tesoreria/accesos", label: "Accesos", Icon: IconKey, permite: (u) => !!u.tesoreria?.puedeFirmar || !!u.tesoreriaArranque },
       ],
     },
   ],
 };
 
 const GENERALES = [
-  { key: "alertas", href: "/alertas", label: "Alertas y notificaciones", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas, alt: { feature: "viewNotificaciones", show: canViewNotificaciones } },
+  { key: "alertas", href: "/alertas", label: "Alertas y notificaciones", corto: "Alertas", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas, alt: { feature: "viewNotificaciones", show: canViewNotificaciones } },
   { key: "agente-ia", href: "/agente-ia", label: "Nova", Icon: IconSpark, feature: "viewAgenteIA", show: canViewAgenteIA },
   // "Mi correo" está oculto del menú y del buscador (noviembre 2026); la página /mi-correo y el agente siguen existiendo.
-  { key: "usuarios", href: "/usuarios", label: "Usuarios y roles", Icon: IconUsers, feature: "viewUsuarios", show: canViewUsuarios },
+  { key: "usuarios", href: "/usuarios", label: "Usuarios y roles", corto: "Usuarios", Icon: IconUsers, feature: "viewUsuarios", show: canViewUsuarios },
   { key: "auditoria", href: "/auditoria", label: "Auditoría", Icon: IconHistory, feature: "viewAuditoria", show: canViewAuditoria },
   // Solo para administradores (no es un permiso de la Matriz: se valida el rol).
-  { key: "conectar-claude", href: "/conectar-claude", label: "Conectar con Claude", Icon: IconKey, feature: null, show: (role) => role === "admin" },
+  { key: "conectar-claude", href: "/conectar-claude", label: "Conectar con Claude", corto: "Claude", Icon: IconKey, feature: null, show: (role) => role === "admin" },
 ];
 
 // Todos los destinos (los usa la paleta de comandos y el chat flotante para saber en qué página está la persona).
-export const ALL_NAV_ITEMS = [...Object.values(GRUPOS).flat().flatMap((g) => g.items), ...GENERALES];
+export const ALL_NAV_ITEMS = [...Object.values(GRUPOS).flat().flatMap((g) => g.items), ...GENERALES].map((it) => (it.buscar ? { ...it, label: it.buscar } : it));
 
 const permiteA = (user, it) => (it.permite ? it.permite(user) : it.feature ? (user.permissions?.[it.feature] ?? it.show(user.role)) : it.show(user.role))
   || (it.alt && (user.permissions?.[it.alt.feature] ?? it.alt.show(user.role)));
@@ -166,11 +167,14 @@ export default function Sidebar({ user, plegadoInicial = true }) {
     }
     return out;
   }, [user, hayCompartidos]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Lo general (Alertas, Nova, Usuarios y roles, Auditoría, Conectar con Claude) va en el riel como accesos directos:
+  // cada uno lleva a su página, sin abrir un menú (antes se repetía al final del menú de cada módulo).
   const generales = GENERALES.filter(permite);
   const modulosVisibles = Object.keys(menu);
   const modulosPropios = Object.entries(modulosDelUsuario(user));
   const moduloMenu = menu[modulo] ? modulo : modulosVisibles[0];
-  const itemsPaleta = [...Object.values(menu).flat().flatMap((g) => g.items), ...generales];
+  // En el buscador (Ctrl+K) cada opción lleva su nombre completo ("Resumen · Conectando Corazones"), para no confundirla con la de Bienestar.
+  const itemsPaleta = ([...Object.values(menu).flat().flatMap((g) => g.items), ...generales]).map((it) => (it.buscar ? { ...it, label: it.buscar } : it));
 
   // Punto rojo en "Alertas y notificaciones": notificaciones no leídas + solicitudes de compra por atender (lo publica
   // components/notificaciones/AvisosEnVivo.jsx).
@@ -288,6 +292,20 @@ export default function Sidebar({ user, plegadoInicial = true }) {
             </button>
           );
         })}
+        {generales.length > 0 && <span className="nav2-rail-div" aria-hidden="true" />}
+        {generales.map(({ key, href, label, corto, Icon }) => {
+          const activo = pathname === href || pathname.startsWith(`${href}/`);
+          return (
+            <Link key={key} href={href} className={`nav2-mod nav2-directo${activo ? " activo" : ""}`} aria-current={activo ? "page" : undefined} title={label}
+              onClick={() => setAbierto(false)}>
+              <span className="nav2-mod-chip">
+                <Icon size={18} />
+                {key === "alertas" && noLeidas > 0 && <span className="notif-dot" aria-label={`${noLeidas} sin leer`} />}
+              </span>
+              <span>{corto || label}</span>
+            </Link>
+          );
+        })}
         <span className="nav2-rail-sep" />
         <button type="button" className="nav2-rail-btn" onClick={() => setPaletteOpen(true)} title="Buscar (Ctrl+K)" aria-label="Buscar">
           <IconSearch size={17} />
@@ -325,12 +343,6 @@ export default function Sidebar({ user, plegadoInicial = true }) {
               {g.items.map(enlace)}
             </div>
           ))}
-          {generales.length > 0 && (
-            <div className="nav2-grupo">
-              <span className="nav2-grupo-titulo">General</span>
-              {generales.map(enlace)}
-            </div>
-          )}
         </nav>
 
         <div className="nav2-user">

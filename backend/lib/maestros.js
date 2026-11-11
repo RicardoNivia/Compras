@@ -128,6 +128,7 @@ export function toClientMaestro(m, enUso = false, usadoEn = []) {
     valor: m.valor,
     userId: m.userId,
     aplicaEstrellas: m.aplicaEstrellas,
+    lider: m.lider ?? null,
     activo: m.activo,
     enUso,
     usadoEn, // módulos donde está en uso: ["Compras"] o ["Proveedores"]
@@ -286,6 +287,12 @@ async function exigirNoParecido(tipo, valor, exceptoId = null) {
   if (igual) throw badRequest(`Ya existe «${igual.valor}» en este maestro (es el mismo escrito de otra forma). Usa ese.`);
 }
 
+// Líder (opcional) de un área de los participantes de Bienestar; los demás maestros no lo usan.
+function liderDe(tipo, v) {
+  if (tipo !== "areaParticipante") return null;
+  return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, 120) || null;
+}
+
 export async function createMaestro(body, actor) {
   const tipo = body.tipo;
   if (!TIPOS_MAESTRO.includes(tipo)) throw badRequest("Tipo de maestro inválido.");
@@ -304,10 +311,11 @@ export async function createMaestro(body, actor) {
     await exigirNoParecido(tipo, valor);
   }
   const aplicaEstrellas = resolveAplicaEstrellas(tipo, body.aplicaEstrellas);
+  const lider = liderDe(tipo, body.lider);
 
   try {
     const row = await prisma.maestro.create({
-      data: { tipo, valor, userId, aplicaEstrellas, activo: body.activo ?? true, creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null },
+      data: { tipo, valor, userId, aplicaEstrellas, lider, activo: body.activo ?? true, creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null },
     });
     const maestro = toClientMaestro(row, false);
     await logMaestroCreate(actor, maestro).catch(() => {});
@@ -335,6 +343,8 @@ export async function updateMaestro(id, body, actor) {
   const data = {};
   if (TIPOS_FIJOS.includes(current.tipo) && body.activo === false) throw badRequest("Este maestro tiene valores fijos: no se pueden inactivar.");
   if (body.activo !== undefined) data.activo = !!body.activo;
+  // El líder del área no cambia el significado del valor: se puede editar aunque el área esté en uso.
+  if (body.lider !== undefined) data.lider = liderDe(current.tipo, body.lider);
 
   if (TIPOS_USUARIO.includes(current.tipo)) {
     // Caso distinto al resto: reasignar a otro usuario SÍ se bloquea si está

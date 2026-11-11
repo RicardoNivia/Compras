@@ -64,8 +64,9 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
   const asistieron = p?.asistieron || a.asistentes || 0;
   const noFueron = p?.noAsistieron || 0;
   // De mayor a menor participación; a igual porcentaje, primero el área con más inscritos.
-  const participacionDe = (x) => (x.inscritos ? x.asistieron / x.inscritos : -1);
-  const areas = [...(p?.porArea || [])].sort((x, y) => participacionDe(y) - participacionDe(x) || y.inscritos - x.inscritos);
+  // Participación por área = asistieron / convocados (todas las personas de la lista del área, también quien fue sin inscribirse).
+  const participacionDe = (x) => (x.convocados ? x.asistieron / x.convocados : -1);
+  const areas = [...(p?.porArea || [])].sort((x, y) => participacionDe(y) - participacionDe(x) || y.convocados - x.convocados);
   const areaTotal = Math.max(1, Math.ceil(areas.length / areaSize));
   const areaActual = Math.min(areaPage, areaTotal);
   const areasPagina = areas.slice((areaActual - 1) * areaSize, areaActual * areaSize);
@@ -152,21 +153,23 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
               <div className="detalle-indicadores">
                 <section className="resumen-card detalle-card" aria-labelledby="det-areas">
                   <h2 id="det-areas">Participación por área</h2>
-                  <p className="card-sub">Participación: asistieron ÷ inscritos de cada área.</p>
+                  <p className="card-sub">Participación: asistieron ÷ personas de la lista del área (también quien fue sin inscribirse). Pasa el mouse por el área para ver su líder.</p>
                   {p.porArea.length ? (
                     <>
                       <div className="table-scroll">
                         <table className="records detalle-numeros">
-                          <thead><tr><th className="nombre">Área</th><th className="num">Inscritos</th><th className="num">Asistieron</th><th className="num">No fueron</th><th className="barra">Participación</th></tr></thead>
+                          <thead><tr><th className="nombre">Área</th><th className="num">Inscritos</th><th className="num">Asistieron</th><th className="num">No fueron</th><th>Por qué no fueron</th><th className="barra">Participación</th></tr></thead>
                           <tbody>
                             {areasPagina.map((x) => {
-                              const v = x.inscritos ? x.asistieron / x.inscritos : null;
+                              const v = x.convocados ? x.asistieron / x.convocados : null;
+                              const motivo = x.motivos?.[0];
                               return (
                                 <tr key={x.area}>
-                                  <td><span className="desc-tooltip-wrap"><span className="desc-text">{x.area}</span><span className="desc-tooltip-bubble">{x.area}</span></span></td>
+                                  <td><span className="desc-tooltip-wrap"><span className="desc-text">{x.area}</span><span className="desc-tooltip-bubble">{x.area}{x.lider ? ` · Líder: ${x.lider}` : ""}{x.sinRegistrar ? ` · ${x.sinRegistrar} sin registro de asistencia` : ""}</span></span></td>
                                   <td className="num">{entero(x.inscritos)}</td>
                                   <td className="num">{entero(x.asistieron)}</td>
                                   <td className="num">{entero(x.noAsistieron)}</td>
+                                  <td>{motivo ? <span className="desc-tooltip-wrap"><span className="desc-text">{motivo.motivo}{x.motivos.length > 1 ? ` +${x.motivos.length - 1}` : ""}</span><span className="desc-tooltip-bubble">{x.motivos.map((m) => `${m.motivo}: ${m.n}`).join(" · ")}</span></span> : <span className="muted">—</span>}</td>
                                   <td><div className="detalle-pct"><div className="mes-medidor-barra"><span className="asistencia" style={{ width: `${Math.min(100, (v || 0) * 100)}%` }} /></div><b>{pct(v)}</b></div></td>
                                 </tr>
                               );

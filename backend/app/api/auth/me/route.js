@@ -3,7 +3,6 @@ import { getSessionUser } from "@/lib/auth-server";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { nombreDeRol } from "@/lib/rolesCatalogo";
 import { accesoDe } from "@/lib/tesoreria/comun";
-import { puedeAdministrarAccesos } from "@/lib/tesoreria/accesos";
 
 /**
  * @openapi
@@ -41,8 +40,8 @@ export async function GET() {
   // base de datos directamente — solo lee vía HTTP, igual que el resto.
   // roleLabel: nombre del rol para mostrar (los personalizados no están en lib/roles.js del frontend).
   // tesoreria: acceso nominal a Tesorería (null si no tiene); no es un permiso de la Matriz.
-  const [permissions, roleLabel, tesoreria] = await Promise.all([getEffectivePermissions(user.role), nombreDeRol(user.role), accesoDe(user.id)]);
+  const [permissions, roleLabel, tesoreria] = await Promise.all([getEffectivePermissions(user.role), nombreDeRol(user.role), accesoDe(user)]);
   // tesoreriaArranque: nadie tiene acceso todavía y esta persona (admin) puede dar el primero.
-  const tesoreriaArranque = !tesoreria && (await puedeAdministrarAccesos(user));
+  const tesoreriaArranque = false; // el acceso se da en Usuarios y roles (Matriz de permisos)
   return NextResponse.json({ user: { ...user, roleLabel, permissions, tesoreria, tesoreriaArranque } });
 }

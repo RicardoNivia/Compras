@@ -40,7 +40,7 @@ export function FormasCayendo({ modulo, cantidad = 5, grande = false, className 
     <span className={`nav2-caen ${className}`} aria-hidden="true">
       {(grande ? CAIDAS_GRANDE : CAIDAS).slice(0, cantidad).map(([x, tam, dur, retraso, giro], i) => (
         <span key={i} className={`cae${i % 3 === 1 ? " clara" : ""}`} style={{ "--x": `${x}%`, "--tam": `${tam}px`, "--dur": `${dur}s`, "--retraso": `${retraso}s`, "--giro": `${giro}deg` }}>
-          <svg viewBox="0 0 24 24">{FORMAS[modulo || ORDEN[i % 3]]}</svg>
+          <svg viewBox="0 0 24 24">{FORMAS[modulo] || FORMAS[ORDEN[i % 3]]}</svg>
         </span>
       ))}
     </span>

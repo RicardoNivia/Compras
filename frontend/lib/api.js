@@ -724,3 +724,13 @@ export function subirFotoApi(actividadId, { imagen, miniatura, nombre, ancho, al
   if (descripcion) fd.append("descripcion", descripcion);
   return fetch(`/api/actividades/${actividadId}/fotos`, { method: "POST", body: fd }).then(handle);
 }
+
+// Inventario (bodega) de Bienestar: artículos, movimientos, entradas por compra y salidas para actividades.
+export const fetchBodegaApi = (soloActivos) => fetch(`/api/inventario${soloActivos ? "?activos=1" : ""}`, { cache: "no-store" }).then(handle);
+export const crearArticuloApi = (data) => jsonPost("/api/inventario", "POST", data);
+export const editarArticuloApi = (id, data) => jsonPost(`/api/inventario/${id}`, "PATCH", data);
+export const fetchMovimientosArticuloApi = (id) => fetch(`/api/inventario/${id}/movimientos`, { cache: "no-store" }).then(handle);
+export const registrarMovimientoApi = (id, data) => jsonPost(`/api/inventario/${id}/movimientos`, "POST", data);
+export const fetchEntradasCompraApi = (recordId) => fetch(`/api/records/${recordId}/inventario`, { cache: "no-store" }).then(handle);
+export const entradaPorCompraApi = (recordId, data) => jsonPost(`/api/records/${recordId}/inventario`, "POST", data);
+export const salidaBodegaApi = (actividadId, data) => jsonPost(`/api/actividades/${actividadId}/inventario/bodega`, "POST", data);

@@ -175,7 +175,8 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
 
   const esCiclo = tab === CICLO;
   const conEstrellas = tab === "causaCalificacion" || tab === "escalaCalificacion";
-  const colSpan = conEstrellas ? 5 : 4;
+  const conLider = tab === "areaParticipante"; // áreas de Bienestar: su líder (opcional)
+  const colSpan = (conEstrellas ? 5 : 4) + (conLider ? 1 : 0);
   const esFijo = TIPOS_FIJOS.includes(tab);
 
   return (
@@ -261,6 +262,7 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
               <thead>
                 <tr>
                   <th>{COLUMN_LABELS[tab]}</th>
+                  {conLider && <th>Líder</th>}
                   {conEstrellas && <th className="col-estrellas">{tab === "causaCalificacion" ? "Aplica a estrellas" : "Estrellas"}</th>}
                   <th className="col-uso">En uso</th>
                   <th className="col-activo">Activo</th>
@@ -286,6 +288,7 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
                           <span className="desc-tooltip-bubble">{m.valor}</span>
                         </span>
                       </td>
+                      {conLider && <td className="truncate">{m.lider || <span className="muted">—</span>}</td>}
                       {conEstrellas && <td>{"★".repeat(m.aplicaEstrellas || 0)}</td>}
                       <td>{m.enUso ? <span className="pill accent" title={enUsoTitle(m)}>{m.usadoEn?.join(" · ") || "Sí"}</span> : <span className="pill good" title="Sin uso: se puede editar o eliminar">Libre</span>}</td>
                       <td>

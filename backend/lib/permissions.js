@@ -38,6 +38,10 @@ export const FEATURES = [
   { key: "viewFundacion", label: "Ver actividades y cronograma de Fundación", modulo: "Bienestar", section: "Fundación", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
   { key: "editFundacion", label: "Crear, editar, cerrar y eliminar actividades de Fundación", modulo: "Bienestar", section: "Fundación", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
   { key: "viewMaestrosBienestar", label: "Maestros de Bienestar y Fundación", modulo: "Bienestar", section: "Maestros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  // Tesorería: se da por rol desde Usuarios y roles (antes era una lista nominal dentro del módulo). Por defecto solo admin.
+  { key: "verTesoreria", label: "Ver Tesorería (resumen, movimientos, conciliación, cierre y reportes)", modulo: "Tesorería", section: "Tesorería", defaultRoles: [ROLES.ADMIN] },
+  { key: "registrarTesoreria", label: "Registrar en Tesorería (movimientos, soportes, extractos, conciliación y recurrentes)", modulo: "Tesorería", section: "Tesorería", defaultRoles: [ROLES.ADMIN] },
+  { key: "firmarTesoreria", label: "Firmar el cierre del mes y administrar los maestros de Tesorería", modulo: "Tesorería", section: "Tesorería", defaultRoles: [ROLES.ADMIN] },
   { key: "viewAlertas", label: "Ver Mi día y alertas", modulo: "General", section: "Alertas y notificaciones", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR, ROLES.PROVEEDORES] },
   { key: "viewNotificaciones", label: "Configurar mis notificaciones (app y Teams)", modulo: "General", section: "Alertas y notificaciones", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR, ROLES.PROVEEDORES] },
   { key: "vincularCorreo", label: "Vincular mi correo (el agente lee las solicitudes de proveedor y las deja en la Bandeja)", modulo: "General", section: "Mi correo", defaultRoles: [ROLES.ADMIN, ROLES.PROVEEDORES] },

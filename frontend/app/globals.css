@@ -3562,6 +3562,7 @@ button.ficha-cierre:hover, button.ficha-cierre:focus-visible{ border-color: var(
 .user-card-modulos{ display:flex; flex-wrap:wrap; justify-content:center; gap:4px; margin-top:6px; min-height:20px; }
 .user-modulo{ padding:1px 8px; border-radius:99px; font-size:10px; font-weight:700; background: #e3eefa; color:#1a5a96; }
 .user-modulo.bienestar{ background:#dff3e8; color:#1f7a4d; }
+.user-modulo.tesorería{ background:#efe7fb; color:#6a3fb5; }
 .maestros-nav-nota{ margin:10px 12px; font-size:10.5px; line-height:1.45; color: var(--muted); }
 
 /* ===== Formulario de actividad (ActividadFormulario.jsx) ===== */
@@ -5616,3 +5617,108 @@ select option, select optgroup{ color:var(--ink); background-color:var(--surface
 .detalle-motivo h3{ margin:0 0 2px; font-size:10.5px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--muted); font-family:"Inter", sans-serif; }
 .detalle-motivo p{ margin:0; font-size:13px; line-height:1.5; color:var(--ink); white-space:pre-wrap; overflow-wrap:anywhere; }
 .detalle-motivo p.muted{ color:var(--muted); }
+
+/* ===== Inventario (bodega) de Bienestar (InventarioBodegaView.jsx) ===== */
+.inv{ display:flex; flex-direction:column; gap:14px; }
+.inv-cab{ display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:10px 16px; }
+.inv-cab p{ margin:0; max-width:78ch; font-size:12.5px; color:var(--ink-2); }
+.inv-kpis{ display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:10px; }
+.inv-kpi{ appearance:none; display:flex; flex-direction:column; gap:2px; padding:11px 14px; border:1px solid var(--border); border-radius:var(--r-s); background:var(--surface); box-shadow:var(--elev); color:inherit; font:inherit; text-align:left; cursor:pointer; transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.inv-kpi:hover{ transform:translateY(-2px); border-color:color-mix(in srgb, var(--k) 50%, var(--border)); }
+.inv-kpi.activo{ border-color:var(--k); box-shadow:0 0 0 3px color-mix(in srgb, var(--k) 18%, transparent); }
+.inv-kpi span{ font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+.inv-kpi strong{ font-family:var(--f-display); font-size:21px; font-weight:800; color:var(--k); font-variant-numeric:tabular-nums; }
+.inv-kpi small{ font-size:11.5px; color:var(--ink-2); }
+.inv-barra{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:10px 14px; border-bottom:1px solid var(--border); }
+.inv-cuenta{ font:600 10.5px "IBM Plex Mono", monospace; padding:0 6px; border-radius:99px; background:var(--surface-2); }
+.inv-buscar{ flex:0 1 360px; margin-left:auto; display:flex; align-items:center; gap:8px; min-height:36px; padding:0 12px; border:1px solid var(--border-strong, var(--border)); border-radius:var(--r-s, 10px); background:var(--surface); color:var(--muted); cursor:text; transition:border-color .15s ease, box-shadow .15s ease; }
+.inv-buscar:focus-within{ border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); color:var(--accent); }
+.inv-buscar input{ flex:1; min-width:0; border:0 !important; background:transparent !important; box-shadow:none !important; outline:none; padding:6px 0 !important; font-size:13px; color:var(--ink, inherit); }
+.inv-buscar-n{ flex:none; font-size:11px; font-weight:600; color:var(--muted); white-space:nowrap; }
+@media (max-width:700px){ .inv-buscar{ flex:1 1 100%; margin-left:0; } }
+table.inv-tabla{ min-width:980px; }
+table.inv-tabla tbody td{ padding:8px 12px; vertical-align:middle; }
+.inv-prod{ display:flex; flex-direction:column; line-height:1.25; max-width:280px; }
+.inv-prod .desc-text{ font-weight:600; max-width:280px; }
+.inv-prod small{ font-size:11px; color:var(--muted); }
+.inv-stock{ display:flex; align-items:center; gap:8px; min-width:130px; }
+.inv-stock strong{ min-width:36px; text-align:right; font:600 13px "IBM Plex Mono", monospace; }
+.inv-mini{ flex:1; height:6px; min-width:50px; border-radius:99px; background:var(--surface-2); overflow:hidden; }
+.inv-mini i{ display:block; height:100%; border-radius:inherit; background:var(--accent); transition:width .4s cubic-bezier(.2,.8,.2,1); }
+.inv-mini i.bajo{ background:var(--warning); } .inv-mini i.cero{ background:var(--critical); }
+.inv-inactivo td{ opacity:.55; }
+.inv-leyenda{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin:0; }
+.inv-fondo{ align-items:center; }
+.inv-modal{ max-width:460px; }
+.inv-modal-cuerpo{ display:flex; flex-direction:column; gap:12px; padding:14px 22px; }
+.inv-campos{ display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px 12px; }
+.inv-num{ max-width:160px; font-family:"IBM Plex Mono", monospace; }
+.inv-tipos{ display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; }
+.inv-tipos button{ appearance:none; display:flex; flex-direction:column; align-items:center; gap:1px; padding:8px 6px; border:1.5px solid var(--border); border-radius:var(--r-s); background:var(--surface); color:var(--ink-2); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; }
+.inv-tipos button small{ font-size:10.5px; font-weight:400; color:var(--muted); }
+.inv-tipos button.activo{ border-color:var(--accent); background:var(--accent-wash); color:var(--accent); }
+.inv-antes-despues{ display:flex; align-items:center; justify-content:center; gap:16px; padding:10px; border-radius:var(--r-s); background:var(--surface-2); }
+.inv-antes-despues div{ display:flex; flex-direction:column; align-items:center; }
+.inv-antes-despues span{ font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+.inv-antes-despues strong{ font:700 22px "IBM Plex Mono", monospace; color:var(--ink); }
+.inv-antes-despues strong.bien{ color:var(--accent); } .inv-antes-despues strong.mal{ color:var(--critical); }
+.inv-lado{ position:fixed; inset:0; z-index:320; display:flex; justify-content:flex-end; background:rgba(13,18,40,0.45); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); animation:ldFade .18s ease; }
+.inv-panel{ width:min(500px, 100%); height:100%; display:flex; flex-direction:column; background:var(--surface); border-left:1px solid var(--border); box-shadow:-24px 0 60px -30px rgba(13,18,40,0.6); animation:acEntra .28s cubic-bezier(.2,.8,.2,1); }
+.inv-panel-cuerpo{ flex:1; min-height:0; overflow-y:auto; padding:8px 22px; }
+.inv-linea{ list-style:none; margin:0; padding:0; }
+.inv-linea li{ display:grid; grid-template-columns:12px minmax(0,1fr) auto; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); font-size:12.5px; animation:ldFila .3s ease backwards; }
+.inv-linea li > i{ width:10px; height:10px; margin-top:4px; border-radius:50%; background:var(--muted); }
+.inv-linea .t-entrada > i, .inv-linea .t-devolucion > i{ background:var(--good); } .inv-linea .t-salida > i{ background:var(--warning); } .inv-linea .t-ajuste > i, .inv-linea .t-inicial > i{ background:var(--accent); }
+.inv-linea small{ display:block; font-size:11px; color:var(--muted); }
+.inv-linea a{ color:var(--accent); font-weight:600; text-decoration:none; }
+.inv-motivo{ color:var(--ink-2); }
+.inv-linea strong{ font:600 13px "IBM Plex Mono", monospace; }
+.inv-linea strong.mas{ color:var(--good); } .inv-linea strong.menos{ color:var(--warning); }
+
+/* Sacar de la bodega desde la ficha de una actividad (SacarDeBodega.jsx) */
+.sacar-bodega{ display:flex; flex-direction:column; gap:8px; padding:12px 14px; border:1.5px solid color-mix(in srgb, var(--accent) 35%, var(--border)); border-radius:var(--r); background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, var(--surface)), var(--surface)); }
+.sacar-bodega-cab{ display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; }
+.sacar-bodega-cab strong{ font-family:var(--f-display); font-size:14px; }
+.sacar-bodega-cab a{ color:var(--accent); font-weight:600; }
+.sacar-bodega-fila{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; }
+.sacar-bodega-art{ flex:1 1 320px; max-width:520px; }
+.sacar-bodega-num{ width:120px; font-family:"IBM Plex Mono", monospace; }
+.inv-de-bodega{ margin-left:6px; vertical-align:middle; }
+
+/* Formulario de compra: lo que entra a la bodega de Bienestar (EntradaBodegaCompra.jsx) */
+.entrada-bodega{ border:1px solid var(--border); border-radius:var(--r-s); background:var(--surface); }
+.entrada-bodega > summary{ display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; padding:9px 12px; cursor:pointer; list-style:none; font-size:12.5px; font-weight:700; color:var(--ink); }
+.entrada-bodega > summary::-webkit-details-marker{ display:none; }
+.entrada-bodega > summary::before{ content:"›"; display:inline-block; width:10px; color:var(--accent); font-size:15px; line-height:1; transition:transform .2s ease; }
+.entrada-bodega[open] > summary::before{ transform:rotate(90deg); }
+.entrada-bodega > summary small{ font-weight:400; color:var(--ink-2); }
+.entrada-bodega > p{ margin:0; padding:0 12px 10px; }
+.entrada-bodega-cuerpo{ display:flex; flex-direction:column; gap:8px; padding:0 12px 12px; }
+.entrada-bodega-fila{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; }
+.entrada-bodega-art{ flex:1 1 260px; }
+.entrada-bodega-num{ width:120px; font-family:"IBM Plex Mono", monospace; }
+.entrada-bodega-lista{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; }
+.entrada-bodega-lista li{ display:flex; justify-content:space-between; gap:10px; padding:6px 10px; border-radius:var(--r-s); background:var(--surface-2); font-size:12.5px; }
+.entrada-bodega-lista b{ font-family:"IBM Plex Mono", monospace; color:var(--good); }
+
+/* Encuesta y observaciones: tarjetas del tono de los comentarios (ObservacionesActividad.jsx#TarjetasTono) */
+.tono-tarjetas{ display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:10px; }
+.tono-tarjeta{ position:relative; display:flex; flex-direction:column; gap:2px; padding:11px 14px 11px 16px; border:1px solid var(--border); border-left:4px solid var(--t, var(--accent)); border-radius:var(--r-s); background:var(--surface); box-shadow:var(--elev); animation:ldSube .4s ease backwards; }
+.tono-tarjeta > svg, .tono-tarjeta > .mano{ position:absolute; top:10px; right:12px; }
+.tono-tarjeta span{ font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+.tono-tarjeta strong{ font-family:var(--f-display); font-size:22px; font-weight:800; color:var(--t, var(--ink)); font-variant-numeric:tabular-nums; }
+.tono-tarjeta small{ font-size:11.5px; color:var(--ink-2); }
+.tono-tarjeta.positivo{ --t:var(--good); } .tono-tarjeta.negativo{ --t:var(--critical); } .tono-tarjeta.neutro{ --t:var(--warning); } .tono-tarjeta.part{ --t:var(--accent); }
+.tono-tarjeta:nth-child(2){ animation-delay:.05s; } .tono-tarjeta:nth-child(3){ animation-delay:.1s; } .tono-tarjeta:nth-child(4){ animation-delay:.15s; }
+
+/* Desplegables nativos: sin el estilo de barras de desplazamiento de la página. En Chrome de Windows, scrollbar-color /
+   scrollbar-width heredados por un <select> pueden dejar su lista en blanco (las opciones no se pintan). */
+select, select option, select optgroup{ scrollbar-color:auto; scrollbar-width:auto; }
+
+/* Accesos directos de lo general en el riel (Alertas, Nova, Usuarios, Auditoría, Claude): llevan a su página sin abrir
+   menú, así que pasar el mouse por ellos no descubre el panel del módulo. */
+.nav2-rail-div{ flex:none; width:34px; height:1px; margin:4px 0; background:rgba(255,255,255,0.14); }
+.nav2-directo{ text-decoration:none; --m:var(--marca); }
+.nav2-directo .nav2-mod-chip{ position:relative; width:36px; height:36px; }
+.nav2-directo .notif-dot{ position:absolute; top:3px; right:3px; }
+.nav2.plegado:has(.nav2-directo:hover):not(.abierto) .nav2-panel{ clip-path:inset(0 100% 0 0); pointer-events:none; }

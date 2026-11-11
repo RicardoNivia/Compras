@@ -10,7 +10,7 @@ import { importarExtracto } from "@/lib/tesoreria/conciliacion";
  *     summary: "Importaciones de extracto (paginado: cuentaId, page, size)."
  *   post:
  *     tags: [Tesorería]
- *     summary: "Importa el extracto de una cuenta (multipart: cuentaId, archivo Excel/CSV) y enlaza solo lo que coincide sin dudas. Nivel registro."
+ *     summary: "Importa el extracto de una cuenta (multipart: cuentaId, archivo PDF/Excel/CSV; el PDF lo revisa por contenido y lo transcribe Nova, ver lib/tesoreria/extractoPdf.js) y enlaza solo lo que coincide sin dudas. Nivel registro."
  */
 export const GET = conTesoreria("consulta", async ({ query }) => {
   const size = [10, 25, 50, 100].includes(Number(query.size)) ? Number(query.size) : 10;

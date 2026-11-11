@@ -10,7 +10,8 @@ const nextConfig = {
     // webpack lo empaqueta normalmente esos .afm no se copian al build y
     // falla con ENOENT. Declararlo "external" hace que se cargue tal cual
     // desde node_modules en runtime, sin pasar por el bundler.
-    serverComponentsExternalPackages: ["pdfkit"],
+    // pdfjs-dist (lib/tesoreria/extractoPdf.js lee el texto de los extractos en PDF) carga su worker desde node_modules.
+    serverComponentsExternalPackages: ["pdfkit", "pdfjs-dist"],
   },
 };
 
