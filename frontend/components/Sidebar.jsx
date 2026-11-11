@@ -128,8 +128,9 @@ const UN_ANIO = 31536000;
 const guardarCookie = (nombre, valor) => { document.cookie = `${nombre}=${valor}; path=/; max-age=${UN_ANIO}; samesite=lax`; };
 
 export default function Sidebar({ user, plegadoInicial = true }) {
-  // plegado (lo normal): el panel no ocupa espacio; se abre al hacer clic en un módulo del riel y se oculta solo
-  // cuando el mouse sale del menú. Con el botón del riel se puede dejar fijo (cookie "menu" = abierto).
+  // plegado (lo normal): el panel no ocupa espacio; se descubre encima de la página al acercar el mouse al menú —la
+  // misma mecánica y animación del menú de Selvana, hecha en CSS— o con clic en un módulo del riel (para pantallas
+  // táctiles), y se oculta cuando el mouse sale. Con el botón del riel se puede dejar fijo (cookie "menu" = abierto).
   const [plegado, setPlegado] = useState(plegadoInicial);
   const [abierto, setAbierto] = useState(false);
   const cierre = useRef(null);
@@ -293,7 +294,7 @@ export default function Sidebar({ user, plegadoInicial = true }) {
           aria-label={tema === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}>
           {tema === "dark" ? <IconSun size={17} /> : <IconMoon size={17} />}
         </button>
-        <button type="button" className="nav2-rail-btn" onClick={alternarPanel} title={plegado ? "Dejar el menú fijo" : "Ocultar el menú (se abre al hacer clic en el módulo)"}
+        <button type="button" className="nav2-rail-btn" onClick={alternarPanel} title={plegado ? "Dejar el menú fijo" : "Ocultar el menú (se abre al acercar el mouse)"}
           aria-label={plegado ? "Dejar el menú fijo" : "Plegar el menú"} aria-pressed={!plegado}>
           <IconPanel size={17} />
         </button>

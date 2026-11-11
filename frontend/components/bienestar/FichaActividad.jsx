@@ -276,16 +276,16 @@ function TabParticipantes({ act, puedeEditar, onCambio }) {
 
       {puedeEditar && (
         <div className="importar-tarjetas" aria-label="Importar desde Excel con Nova">
-          {[
-            ["programados", "Programados", "Quiénes se inscribieron o están citados"],
-            ["asistentes", "Asistentes", "La planilla o lista de quiénes fueron"],
-          ].map(([tipo, titulo, nota]) => (
-            <label key={tipo} className="importar-tarjeta">
-              <input type="file" accept=".xlsx,.xls" className="importar-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) { setError(""); setAviso(""); setImportar({ tipo, archivo: f }); } }} />
-              <IconDownload size={15} style={{ transform: "rotate(180deg)" }} />
-              <span><strong>Importar {titulo.toLowerCase()}</strong><span className="count-note">{nota}. Nova lo lee y te muestra qué va a cargar.</span></span>
-            </label>
-          ))}
+          {/* Un solo archivo, sea cual sea: Nova decide si es la lista de programados, la de quienes fueron o una
+              planilla con quién vino, quién no y por qué, y lee la asistencia y el motivo de cada persona. */}
+          <label className="importar-tarjeta">
+            <input type="file" accept=".xlsx,.xls" className="importar-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) { setError(""); setAviso(""); setImportar({ tipo: "lista", archivo: f }); } }} />
+            <IconDownload size={15} style={{ transform: "rotate(180deg)" }} />
+            <span>
+              <strong>Importar participantes y asistencia</strong>
+              <span className="count-note">Sube el archivo que tengas: inscritos, lista de asistencia o una planilla con quién vino, quién no y por qué. Nova lo lee, marca a cada persona como asistió o no asistió con su motivo, y te muestra qué va a cargar antes de guardar.</span>
+            </span>
+          </label>
         </div>
       )}
       {importar && (
