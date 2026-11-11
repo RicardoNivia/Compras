@@ -174,8 +174,8 @@ export default function RecurrentesTesoreria({ acceso }) {
           <table className="records tes-tabla">
             <thead><tr><th>Nombre</th><th>Tipo</th><th style={{ textAlign: "right" }}>Valor</th><th>Cuenta</th><th>Concepto</th><th>Frecuencia</th><th>Próximo</th><th>Generados</th><th>Activo</th>{puede && <th aria-label="Acciones" />}</tr></thead>
             <tbody>
-              {!lista && <tr><td colSpan={10} style={{ padding: 0 }}><FilasEsqueleto filas={5} columnas={8} /></td></tr>}
-              {lista && !pagina.length && <tr><td colSpan={10}><VacioAgente icono={<IconClock size={26} />} titulo={filtro === "activos" ? "Aún no hay pagos recurrentes" : "Nada en este filtro"}>{filtro === "activos" ? "Crea el primero o usa «Detectar recurrentes» para que el sistema te proponga los que ya se repiten." : null}</VacioAgente></td></tr>}
+              {!lista && <tr><td colSpan={puede ? 10 : 9} style={{ padding: 0 }}><FilasEsqueleto filas={5} columnas={8} /></td></tr>}
+              {lista && !pagina.length && <tr><td colSpan={puede ? 10 : 9}><VacioAgente icono={<IconClock size={26} />} titulo={filtro === "activos" ? "Aún no hay pagos recurrentes" : "Nada en este filtro"}>{filtro === "activos" ? "Crea el primero o usa «Detectar recurrentes» para que el sistema te proponga los que ya se repiten." : null}</VacioAgente></td></tr>}
               {pagina.map((r) => (
                 <tr key={r.id}>
                   <td><Celda v={r.nombre} ancha /></td>

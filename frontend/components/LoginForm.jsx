@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconArrowRight, IconCheck } from "@/components/icons";
 import ContactAdminModal from "@/components/ContactAdminModal";
+import { MarcaAnimada, FormasCayendo } from "@/components/MarcaYFormas";
 
 const FEATURES = [
   "Compras, proveedores y presupuesto al día",
@@ -47,11 +48,12 @@ export default function LoginForm() {
   return (
     <div className="login-shell">
       <div className="login-side">
+        <FormasCayendo grande cantidad={11} className="login-caen" />
         <div className="login-side-blob login-side-blob-1" />
         <div className="login-side-blob login-side-blob-2" />
 
         <div className="login-side-top">
-          <div className="login-side-mark">S</div>
+          <MarcaAnimada tamano={46} />
           <span className="login-side-brand">Sinco · Panel de Compras y Bienestar</span>
         </div>
 

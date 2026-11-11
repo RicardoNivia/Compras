@@ -3,18 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, canViewNotificaciones, canViewBienestar, canEditBienestar, canViewAgentesCompras, canVincularCorreo, ROLE_LABELS } from "@/lib/roles";
+import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, canViewNotificaciones, canViewBienestar, canEditBienestar, canViewAgentesCompras, ROLE_LABELS } from "@/lib/roles";
 import { EVENTO_NO_LEIDAS, EVENTO_SOLICITUDES } from "@/lib/notificacionesApi";
 import { MODULOS } from "@/lib/modulos";
 import { useModulo } from "@/components/ModuloShell";
 import {
-  IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail, IconInbox,
+  IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail,
   IconBell, IconBuilding, IconEye, IconCalendar, IconBag, IconHeart, IconList, IconCheck, IconClock, IconSearch, IconPanel, IconSun, IconMoon,
 } from "@/components/icons";
 import { fetchCompartidosApi } from "@/lib/api";
 import { crossfade } from "@/lib/crossfade";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 import CommandPalette from "@/components/CommandPalette";
+import { MarcaAnimada, FormasCayendo } from "@/components/MarcaYFormas";
 
 // Menú en dos piezas, las dos fijas a todo el alto (nunca se desplazan con el contenido): un riel oscuro con los
 // módulos que la persona puede usar (cada uno con su color; Alt+1/2/3 cambian directo) y, al lado, el panel con el
@@ -91,7 +92,7 @@ const GRUPOS = {
 const GENERALES = [
   { key: "alertas", href: "/alertas", label: "Alertas y notificaciones", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas, alt: { feature: "viewNotificaciones", show: canViewNotificaciones } },
   { key: "agente-ia", href: "/agente-ia", label: "Nova", Icon: IconSpark, feature: "viewAgenteIA", show: canViewAgenteIA },
-  { key: "mi-correo", href: "/mi-correo", label: "Mi correo", Icon: IconInbox, feature: "vincularCorreo", show: canVincularCorreo },
+  // "Mi correo" está oculto del menú y del buscador (noviembre 2026); la página /mi-correo y el agente siguen existiendo.
   { key: "usuarios", href: "/usuarios", label: "Usuarios y roles", Icon: IconUsers, feature: "viewUsuarios", show: canViewUsuarios },
   { key: "auditoria", href: "/auditoria", label: "Auditoría", Icon: IconHistory, feature: "viewAuditoria", show: canViewAuditoria },
   // Solo para administradores (no es un permiso de la Matriz: se valida el rol).
@@ -275,7 +276,8 @@ export default function Sidebar({ user, plegadoInicial = true }) {
   return (
     <div className={`nav2${plegado ? " plegado" : ""}${abierto ? " abierto" : ""}`} onMouseLeave={alSalir} onMouseEnter={alEntrar}>
       <div className="nav2-rail">
-        <span className="nav2-marca" aria-hidden="true">S</span>
+        <FormasCayendo modulo={moduloMenu} cantidad={4} />
+        <MarcaAnimada key={moduloMenu} />
         {modulosPropios.map(([m, href], i) => {
           const Icono = ICONOS_MODULO[m];
           return (
@@ -301,6 +303,7 @@ export default function Sidebar({ user, plegadoInicial = true }) {
       </div>
 
       <aside className="nav2-panel">
+        <FormasCayendo modulo={moduloMenu} cantidad={6} />
         <div className="nav2-head">
           <span className="nav2-chip">{IconoModulo && <IconoModulo size={19} />}</span>
           <span className="nav2-head-txt">

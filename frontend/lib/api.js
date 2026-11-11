@@ -512,6 +512,9 @@ export async function fetchActividadesApi(anio) {
   return handle(res);
 }
 
+// Filtro "Área" del cronograma: participación de cada área (la de los participantes) en las actividades del año.
+export const fetchParticipacionPorAreaApi = (anio, linea) => fetch(`/api/actividades/por-area?anio=${encodeURIComponent(anio)}&linea=${encodeURIComponent(linea)}`, { cache: "no-store" }).then(handle);
+
 export const fetchComprasSinActividadApi = (anio, mes) => fetch(`/api/actividades/compras-sin-actividad?anio=${encodeURIComponent(anio)}${mes ? `&mes=${mes}` : ""}`, { cache: "no-store" }).then(handle);
 
 export async function fetchActividadApi(id) {

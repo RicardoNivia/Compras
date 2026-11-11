@@ -5,6 +5,7 @@
 // contenido de la página. El selector de módulo (Compras / Bienestar) está en el menú lateral.
 // La campana de notificaciones va siempre a la derecha; se oculta sola si la persona no tiene el permiso.
 import CampanaNotificaciones from "@/components/CampanaNotificaciones";
+import DuplicarPestana from "@/components/DuplicarPestana";
 
 export default function AppShell({ user, title, subtitle, actions, children }) {
   return (
@@ -21,6 +22,7 @@ export default function AppShell({ user, title, subtitle, actions, children }) {
         </div>
         <div className="spacer" />
         {actions}
+        <DuplicarPestana />
         <CampanaNotificaciones />
       </header>
       <main>{children}</main>
