@@ -85,6 +85,28 @@ export async function listActividades({ anio, linea } = {}) {
   return rows.map((r) => sinConteosSiNoAplica(toClientActividad(r, gastos.get(r.id))));
 }
 
+// Filtro "Área" del cronograma: de las actividades del año (que manejan participantes), cuántas personas de cada área
+// estaban inscritas y cuántas asistieron. El área es la del participante (las actividades no tienen área propia).
+// Solo conteos, nunca nombres.
+export async function participacionPorArea({ anio, linea } = {}) {
+  const ids = (await listActividades({ anio, linea })).filter((a) => a.aplicaParticipantes).map((a) => a.id);
+  if (!ids.length) return { areas: [], porArea: {} };
+  const filas = await prisma.participanteActividad.groupBy({
+    by: ["actividadId", "area", "inscrito", "asistio"],
+    where: { actividadId: { in: ids }, area: { not: null } },
+    _count: { _all: true },
+  });
+  const porArea = {};
+  for (const f of filas) {
+    const area = String(f.area || "").trim();
+    if (!area) continue;
+    const act = ((porArea[area] ||= {})[f.actividadId] ||= { inscritos: 0, asistentes: 0 });
+    if (f.inscrito) act.inscritos += f._count._all;
+    if (f.asistio === true) act.asistentes += f._count._all;
+  }
+  return { areas: Object.keys(porArea).sort((a, b) => a.localeCompare(b, "es")), porArea };
+}
+
 // Una actividad sin participantes no muestra ni suma inscritos o asistentes. Lo guardado se conserva por si se vuelve a activar.
 function sinConteosSiNoAplica(a) {
   return a.aplicaParticipantes ? a : { ...a, inscritos: null, asistentes: null };

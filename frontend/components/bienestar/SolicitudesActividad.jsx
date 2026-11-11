@@ -41,9 +41,16 @@ export default function SolicitudesActividad({ actividadId, puedeSolicitar, onCa
   return (
     <section className="solicitudes-actividad" aria-labelledby="sa-titulo">
       <div className="solicitudes-actividad-head">
-        <h3 id="sa-titulo">Solicitudes a Compras</h3>
-        {puedeSolicitar && <Link href={`/bienestar/agentes?tab=sugeridas&actividad=${actividadId}`} className="btn small"><IconSpark size={13} /> Sugerir compras con Nova</Link>}
-        {puedeSolicitar && <button type="button" className="btn btn-primary small" onClick={() => setNueva(true)}><IconPlus size={13} /> Solicitar compra</button>}
+        <div>
+          <h3 id="sa-titulo">Solicitudes a Compras</h3>
+          <p className="solicitudes-actividad-ayuda">¿Falta comprar algo? Pídeselo a Compras desde aquí y sigue en qué va cada solicitud.</p>
+        </div>
+        {puedeSolicitar && (
+          <div className="solicitudes-actividad-acciones">
+            <Link href={`/bienestar/agentes?tab=sugeridas&actividad=${actividadId}`} className="btn small" title="Nova propone la lista de compras a partir de actividades parecidas"><IconSpark size={13} /> Sugerir compras con Nova</Link>
+            <button type="button" className="btn btn-primary small" onClick={() => setNueva(true)}><IconPlus size={13} /> Solicitar compra</button>
+          </div>
+        )}
       </div>
       {error && <div className="modal-error">{error}</div>}
       {lista === null ? (

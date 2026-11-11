@@ -80,7 +80,6 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
               <span className={`pill ${est.pill}`}>{est.label}</span>
               {rangoHumano(a)}{a.fechaFin ? ` · ${diasDeActividad(a)} días` : ""} · {a.linea} · Responsable: {a.responsableNombre || "sin asignar"}
             </p>
-            {a.descripcion && <p className="detalle-desc">{a.descripcion}</p>}
           </div>
           <button ref={cerrar} type="button" className="btn-ghost icon-btn" onClick={onClose} aria-label="Cerrar">✕</button>
         </header>
@@ -103,6 +102,11 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
           {!act && !error && <EsqueletoFicha />}
           {act && tab === "resumen" && (
             <>
+              {/* Para qué se hace la actividad: la descripción que se escribe en Datos de la actividad. */}
+              <section className="detalle-motivo" aria-labelledby="det-motivo">
+                <h3 id="det-motivo">Para qué se hace</h3>
+                {(act.descripcion || a.descripcion) ? <p>{act.descripcion || a.descripcion}</p> : <p className="muted">Aún no se ha escrito la descripción de esta actividad. Se agrega en «Datos de la actividad».</p>}
+              </section>
               <div className="detalle-kpis">
                 <Tarjeta titulo="Presupuesto y gasto">
                   <ComparaPresupuesto presupuesto={act.presupuesto || 0} gastado={act.gastado || 0} />
@@ -229,8 +233,8 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
                   <table className="records detalle-tabla">
                     <thead><tr><th>Nombre</th><th>Área</th>{vista === "no" && <th>Motivo</th>}<th className="num">Calificación</th></tr></thead>
                     <tbody>
-                      {personas === null && <tr><td colSpan={4}><div className="skeleton-bar" style={{ height: 34, borderRadius: 8 }} /></td></tr>}
-                      {personas !== null && pageRows.length === 0 && <tr><td colSpan={4}><div className="empty">No hay personas en este grupo.</div></td></tr>}
+                      {personas === null && <tr><td colSpan={vista === "no" ? 4 : 3}><div className="skeleton-bar" style={{ height: 34, borderRadius: 8 }} /></td></tr>}
+                      {personas !== null && pageRows.length === 0 && <tr><td colSpan={vista === "no" ? 4 : 3}><div className="empty">No hay personas en este grupo.</div></td></tr>}
                       {pageRows.map((x) => (
                         <tr key={x.id}>
                           <td><span className="desc-tooltip-wrap"><span className="desc-text">{x.nombre}</span><span className="desc-tooltip-bubble">{x.nombre}</span></span></td>
@@ -268,8 +272,8 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
         </div>
 
         <footer className="modal-foot">
-          <Link className="btn btn-primary" href={fichaHref(a)}>Ver ficha completa</Link>
-          {editarHref && a.estado !== "cerrada" && <Link className="btn" href={editarHref(a)}>Editar</Link>}
+          {/* Un solo botón: la actividad se ve y se edita en la misma página. */}
+          <Link className="btn btn-primary" href={fichaHref(a)}>Abrir la actividad</Link>
           <button type="button" className="btn" onClick={onClose}>Cerrar</button>
         </footer>
       </div>
