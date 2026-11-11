@@ -4,16 +4,15 @@ import { useState } from "react";
 import { crossfade } from "@/lib/crossfade";
 import AgenteAsociador from "@/components/bienestar/agentes/AgenteAsociador";
 import ComprasSugeridas from "@/components/bienestar/agentes/ComprasSugeridas";
-import Cotizador from "@/components/bienestar/agentes/Cotizador";
-import { IconLayers, IconBag, IconMoney, IconSpark, IconCheck } from "@/components/icons";
+import { IconLayers, IconBag, IconSpark, IconCheck } from "@/components/icons";
 
 const AGENTES = [
   { k: "asociador", color: "verde", icono: <IconLayers size={22} />, titulo: "Asociar compras", nota: "Encuentra a qué actividad pertenece cada compra que quedó suelta", cuando: "Úsalo cuando hay compras de Bienestar sin actividad" },
   { k: "sugeridas", color: "azul", icono: <IconBag size={22} />, titulo: "Compras de una actividad", nota: "Arma la lista de compras con lo que se compró en actividades parecidas", cuando: "Úsalo al planear una actividad" },
-  { k: "cotizador", color: "ambar", icono: <IconMoney size={22} />, titulo: "Cotizador", nota: "Lee las cotizaciones y arma el cuadro comparativo por ti", cuando: "Úsalo cuando tienes 2 o más cotizaciones" },
+  // El Cotizador se quitó de Bienestar (noviembre 2026); sigue en Compras › Agentes (Cotizador.jsx se reutiliza allá).
 ];
 
-// Los tres agentes de Bienestar en una página. Ninguno guarda nada sin que una persona confirme.
+// Los dos agentes de Bienestar en una página. Ninguno guarda nada sin que una persona confirme.
 export default function AgentesCompras({ tabInicial, actividadInicial }) {
   const [tab, setTab] = useState(AGENTES.some((a) => a.k === tabInicial) ? tabInicial : actividadInicial ? "sugeridas" : "asociador");
   return (
@@ -44,7 +43,6 @@ export default function AgentesCompras({ tabInicial, actividadInicial }) {
       <div data-crossfade>
         {tab === "asociador" && <AgenteAsociador />}
         {tab === "sugeridas" && <ComprasSugeridas actividadInicial={actividadInicial} />}
-        {tab === "cotizador" && <Cotizador />}
       </div>
     </div>
   );

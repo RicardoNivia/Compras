@@ -8,7 +8,7 @@ import {
   fetchActividadApi, updateActividadApi, fetchParticipantesApi, actualizarParticipanteApi, eliminarParticipanteApi,
   crearParticipanteApi, fetchInventarioApi, generarAnalisisActividadApi, fetchMaestroTipoApi, crearItemApi,
   actualizarItemApi, eliminarItemApi, importarInventarioApi, fetchPlantillasFormularioApi, configurarFormularioApi,
-  asociarCompraApi, desasociarCompraApi,
+  asociarCompraApi, desasociarCompraApi, salidaBodegaApi,
 } from "@/lib/api";
 import ActividadFormulario from "@/components/bienestar/ActividadFormulario";
 import AsociarComprasPanel from "@/components/bienestar/AsociarComprasPanel";
@@ -23,6 +23,7 @@ import { Estrellas, CalificacionModal, TabCalificaciones } from "@/components/bi
 import FotosActividad from "@/components/bienestar/FotosActividad";
 import ObservacionesActividad from "@/components/bienestar/ObservacionesActividad";
 import AgenteImportacion from "@/components/bienestar/AgenteImportacion";
+import SacarDeBodega from "@/components/bienestar/SacarDeBodega";
 import { ComentarioConMano } from "@/components/bienestar/Sentimiento";
 import {
   IconPlus, IconTrash, IconDownload, IconCheck, IconDashboard, IconEdit, IconMoney, IconBag, IconUsers, IconMano,
@@ -573,6 +574,21 @@ function TabInventario({ act, puedeEditar, onCambio }) {
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
   const archivo = useRef(null);
+  const [devolver, setDevolver] = useState(null); // ítem que salió de la bodega y se va a devolver
+  const [cantDevolver, setCantDevolver] = useState("");
+
+  async function confirmarDevolucion(e) {
+    e.preventDefault();
+    setError("");
+    try {
+      const r = await salidaBodegaApi(act.id, { accion: "devolver", itemId: devolver.id, cantidad: Math.floor(Number(cantDevolver) || 0) });
+      setAviso(`Volvieron ${cantDevolver} a la bodega: ahora hay ${r.articulo.stock}.`);
+      setDevolver(null);
+      await recargar();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
   const recargar = async () => {
     const r = await fetchInventarioApi(act.id);
@@ -628,9 +644,10 @@ function TabInventario({ act, puedeEditar, onCambio }) {
         <div><span>Costo de lo que sobró</span><strong className={resumen.costoSobrante ? "actividad-warning-color" : ""}>{fmtCOP(resumen.costoSobrante)}</strong></div>
         <div><span>Sin registrar cuánto se usó</span><strong>{resumen.sinRegistrarUso}</strong></div>
       </div>
+      {puedeEditar && <SacarDeBodega actividadId={act.id} onListo={async (txt) => { setAviso(txt); await recargar(); }} />}
       {puedeEditar && (
         <form className="ficha-import" onSubmit={agregar}>
-          <span className="ficha-import-titulo">Agregar ítem</span>
+          <span className="ficha-import-titulo">Agregar ítem que no está en la bodega</span>
           <input aria-label="Ítem" placeholder="Ítem (ej. Refrigerios)" value={nuevo.item} onChange={(e) => setNuevo({ ...nuevo, item: e.target.value })} />
           <input aria-label="Cantidad" type="number" min="0" step="any" placeholder="Cantidad" value={nuevo.cantidad} onChange={(e) => setNuevo({ ...nuevo, cantidad: e.target.value })} style={{ width: 110 }} />
           <select aria-label="Unidad" value={nuevo.unidad} onChange={(e) => setNuevo({ ...nuevo, unidad: e.target.value })} style={{ width: 120 }}><option value="">Unidad</option>{unidades.map((u) => <option key={u} value={u}>{u}</option>)}</select>
@@ -657,7 +674,7 @@ function TabInventario({ act, puedeEditar, onCambio }) {
               {pageRows.length === 0 && <tr><td colSpan={9}><div className="empty">Sin inventario. Agrega ítems o sube un Excel con Ítem, Cantidad, Unidad, Costo unitario y Usado.</div></td></tr>}
               {pageRows.map((it) => (
                 <tr key={it.id}>
-                  <td><span className="desc-tooltip-wrap"><span className="desc-text">{it.item}</span><span className="desc-tooltip-bubble">{it.item}</span></span></td>
+                  <td><span className="desc-tooltip-wrap"><span className="desc-text">{it.item}</span><span className="desc-tooltip-bubble">{it.item}</span></span>{it.articuloId && <span className="pill accent inv-de-bodega" title="Salió de la bodega de Bienestar">Bodega</span>}</td>
                   <td>{it.unidad || "—"}</td>
                   <td className="num">{it.cantidad}</td>
                   <td className="num">
@@ -669,7 +686,10 @@ function TabInventario({ act, puedeEditar, onCambio }) {
                   <td className="num">{it.costoUnitario != null ? fmtCOP(it.costoUnitario) : "—"}</td>
                   <td className="num">{it.costoTotal != null ? fmtCOP(it.costoTotal) : "—"}</td>
                   <td className="num">{it.costoSobrante != null ? fmtCOP(it.costoSobrante) : "—"}</td>
-                  <td className="actions-cell">{puedeEditar && <button type="button" className="icon-action-btn delete" aria-label={`Quitar ${it.item}`} onClick={async () => { if (window.confirm(`¿Quitar "${it.item}" del inventario?`)) { await eliminarItemApi(act.id, it.id).catch((e) => setError(e.message)); recargar(); } }}><IconTrash size={13} /></button>}</td>
+                  <td className="actions-cell"><div className="row-actions">
+                    {puedeEditar && it.articuloId && it.cantidad - (it.usado ?? 0) > 0 && <button type="button" className="btn small" title="Devolver a la bodega lo que sobró" onClick={() => { setDevolver(it); setCantDevolver(String(Math.floor(it.cantidad - (it.usado ?? 0)))); }}>Devolver</button>}
+                    {puedeEditar && <button type="button" className="icon-action-btn delete" aria-label={`Quitar ${it.item}`} onClick={async () => { if (window.confirm(it.articuloId ? `¿Quitar "${it.item}" de la actividad? Lo que no se usó vuelve a la bodega.` : `¿Quitar "${it.item}" del inventario?`)) { await eliminarItemApi(act.id, it.id).catch((e) => setError(e.message)); recargar(); } }}><IconTrash size={13} /></button>}
+                  </div></td>
                 </tr>
               ))}
             </tbody>
@@ -688,6 +708,17 @@ function TabInventario({ act, puedeEditar, onCambio }) {
           <div className="spacer" />
           <span className="count-note">{items.length} ítem(s)</span>
         </div>
+        {devolver && (
+          <div className="modal-overlay inv-fondo" onMouseDown={(e) => { if (e.target === e.currentTarget) setDevolver(null); }}>
+            <form className="modal inv-modal" role="dialog" aria-modal="true" aria-labelledby="dev-t" onSubmit={confirmarDevolucion}>
+              <div className="modal-head"><div><h3 id="dev-t">Devolver a la bodega</h3><span className="count-note">{devolver.item}: se sacaron {devolver.cantidad}{devolver.usado != null ? ` y se usaron ${devolver.usado}` : ""}.</span></div><button type="button" className="btn-ghost icon-btn" onClick={() => setDevolver(null)} aria-label="Cerrar">✕</button></div>
+              <div className="inv-modal-cuerpo">
+                <div className="field"><label htmlFor="dev-cant">¿Cuántas vuelven a la bodega? (máx. {Math.floor(devolver.cantidad - (devolver.usado ?? 0))})</label><input id="dev-cant" type="number" min="1" max={Math.floor(devolver.cantidad - (devolver.usado ?? 0))} step="1" className="inv-num" value={cantDevolver} onChange={(e) => setCantDevolver(e.target.value)} autoFocus /></div>
+              </div>
+              <div className="modal-foot"><button type="submit" className="btn btn-primary">Devolver</button><button type="button" className="btn" onClick={() => setDevolver(null)}>Cancelar</button></div>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );

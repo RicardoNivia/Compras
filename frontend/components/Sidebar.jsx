@@ -43,7 +43,7 @@ const GRUPOS = {
       ],
     },
   ],
-  // Bienestar y Fundación van muy aparte: cada línea con su resumen, sus actividades y su cronograma.
+  // Bienestar y la Fundación (en el menú se llama "Conectando Corazones", el nombre del programa) van muy aparte: cada línea con su resumen, sus actividades y su cronograma.
   bienestar: [
     {
       titulo: "Bienestar",
@@ -52,16 +52,17 @@ const GRUPOS = {
         { key: "bienestar-actividades", href: "/bienestar/actividades", label: "Actividades", Icon: IconList, feature: "viewBienestar", show: canViewBienestar },
         { key: "bienestar-cronograma", href: "/bienestar/cronograma", label: "Cronograma", Icon: IconCalendar, feature: "viewBienestar", show: canViewBienestar },
         { key: "bienestar-agentes", href: "/bienestar/agentes", label: "Agentes", Icon: IconSpark, feature: "editBienestar", show: canEditBienestar },
+        { key: "bienestar-inventario", href: "/bienestar/inventario", label: "Inventario", Icon: IconLayers, feature: "viewBienestar", show: canViewBienestar, alt: { feature: "viewFundacion", show: () => false } },
         { key: "bienestar-maestros", href: "/bienestar/maestros", label: "Maestros", Icon: IconLayers, feature: "viewMaestrosBienestar", show: canViewBienestar },
       ],
     },
     {
-      titulo: "Fundación",
+      titulo: "Conectando Corazones",
       items: [
-        { key: "fundacion", href: "/bienestar/fundacion", label: "Resumen Fundación", Icon: IconDashboard, feature: "viewDashboardFundacion", show: canViewBienestar },
-        { key: "fundacion-actividades", href: "/bienestar/fundacion/actividades", label: "Actividades Fundación", Icon: IconList, feature: "viewFundacion", show: canViewBienestar },
-        { key: "fundacion-cronograma", href: "/bienestar/fundacion/cronograma", label: "Cronograma Fundación", Icon: IconCalendar, feature: "viewFundacion", show: canViewBienestar },
-        { key: "fundacion-historias", href: "/bienestar/fundacion/historias", label: "Historias", Icon: IconHeart, feature: "viewFundacion", show: canViewBienestar },
+        { key: "fundacion", href: "/bienestar/fundacion", label: "Resumen", buscar: "Resumen · Conectando Corazones", Icon: IconDashboard, feature: "viewDashboardFundacion", show: canViewBienestar },
+        { key: "fundacion-actividades", href: "/bienestar/fundacion/actividades", label: "Actividades", buscar: "Actividades · Conectando Corazones", Icon: IconList, feature: "viewFundacion", show: canViewBienestar },
+        { key: "fundacion-cronograma", href: "/bienestar/fundacion/cronograma", label: "Cronograma", buscar: "Cronograma · Conectando Corazones", Icon: IconCalendar, feature: "viewFundacion", show: canViewBienestar },
+        { key: "fundacion-historias", href: "/bienestar/fundacion/historias", label: "Historias", buscar: "Historias · Conectando Corazones", Icon: IconHeart, feature: "viewFundacion", show: canViewBienestar },
       ],
     },
   ],
@@ -100,7 +101,7 @@ const GENERALES = [
 ];
 
 // Todos los destinos (los usa la paleta de comandos y el chat flotante para saber en qué página está la persona).
-export const ALL_NAV_ITEMS = [...Object.values(GRUPOS).flat().flatMap((g) => g.items), ...GENERALES];
+export const ALL_NAV_ITEMS = [...Object.values(GRUPOS).flat().flatMap((g) => g.items), ...GENERALES].map((it) => (it.buscar ? { ...it, label: it.buscar } : it));
 
 const permiteA = (user, it) => (it.permite ? it.permite(user) : it.feature ? (user.permissions?.[it.feature] ?? it.show(user.role)) : it.show(user.role))
   || (it.alt && (user.permissions?.[it.alt.feature] ?? it.alt.show(user.role)));
@@ -170,7 +171,8 @@ export default function Sidebar({ user, plegadoInicial = true }) {
   const modulosVisibles = Object.keys(menu);
   const modulosPropios = Object.entries(modulosDelUsuario(user));
   const moduloMenu = menu[modulo] ? modulo : modulosVisibles[0];
-  const itemsPaleta = [...Object.values(menu).flat().flatMap((g) => g.items), ...generales];
+  // En el buscador (Ctrl+K) cada opción lleva su nombre completo ("Resumen · Conectando Corazones"), para no confundirla con la de Bienestar.
+  const itemsPaleta = ([...Object.values(menu).flat().flatMap((g) => g.items), ...generales]).map((it) => (it.buscar ? { ...it, label: it.buscar } : it));
 
   // Punto rojo en "Alertas y notificaciones": notificaciones no leídas + solicitudes de compra por atender (lo publica
   // components/notificaciones/AvisosEnVivo.jsx).

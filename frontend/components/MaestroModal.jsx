@@ -16,6 +16,8 @@ export default function MaestroModal({ tipo, maestro, onClose, onSaved }) {
   const [valor, setValor] = useState(maestro?.valor || "");
   const [userId, setUserId] = useState(maestro?.userId || "");
   const [aplicaEstrellas, setAplicaEstrellas] = useState(maestro?.aplicaEstrellas ? String(maestro.aplicaEstrellas) : "");
+  const esAreaBienestar = tipo === "areaParticipante";
+  const [lider, setLider] = useState(maestro?.lider || "");
   const [usuarios, setUsuarios] = useState([]);
   const [loadingUsuarios, setLoadingUsuarios] = useState(esResponsable);
   const [activo, setActivo] = useState(maestro ? maestro.activo : true);
@@ -59,6 +61,8 @@ export default function MaestroModal({ tipo, maestro, onClose, onSaved }) {
         ? { userId, activo }
         : esCausaCalificacion
         ? { valor, activo, aplicaEstrellas: Number(aplicaEstrellas) }
+        : esAreaBienestar
+        ? { valor, activo, lider }
         : { valor, activo };
       let saved;
       if (isEdit) {
@@ -146,6 +150,14 @@ export default function MaestroModal({ tipo, maestro, onClose, onSaved }) {
                 <span className="card-sub" style={{ margin: 0 }}>
                   Esta causa solo se ofrecerá al calificar con esta cantidad exacta de estrellas.
                 </span>
+              </div>
+            )}
+
+            {esAreaBienestar && (
+              <div className="field">
+                <label htmlFor="m-lider">Líder del área <small>(opcional)</small></label>
+                <input id="m-lider" type="text" maxLength={120} value={lider} onChange={(e) => setLider(e.target.value)} placeholder="Ej.: Laura Gómez" />
+                <span className="card-sub" style={{ margin: 0 }}>Se muestra al pasar el mouse por el área en la participación por área de las actividades.</span>
               </div>
             )}
 

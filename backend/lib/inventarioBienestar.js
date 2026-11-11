@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { leerInventarioExcel } from "@/lib/bienestarExcel";
 import { logInventario } from "@/lib/audit";
+import { devolverABodega } from "@/lib/inventarioBodega";
 import { unidadDelCatalogo, resolvedoresImportacion } from "@/lib/catalogosBienestar";
 
 // Inventario de una actividad de Bienestar: lo que había (comprado o en bodega), cuánto se usó y cuánto quedó. Con
@@ -26,6 +27,7 @@ export function toClientItem(i) {
     costoTotal: i.costoUnitario != null ? i.costoUnitario * i.cantidad : null,
     costoSobrante: i.costoUnitario != null && sobrante != null ? i.costoUnitario * sobrante : null,
     recordId: i.recordId,
+    articuloId: i.articuloId ?? null, // salió de la bodega de Bienestar (se puede devolver lo que sobre)
     observacion: i.observacion,
     createdAt: i.createdAt,
     creadoPorNombre: i.creadoPorNombre,
@@ -92,6 +94,8 @@ export async function actualizarItem(actividadId, id, body, actor) {
   const before = await prisma.inventarioActividad.findFirst({ where: { id: Number(id), actividadId: a.id } });
   if (!before) throw badRequest("Ítem no encontrado.", 404);
   const data = leerItem(body || {}, { parcial: true });
+  // Lo que salió de la bodega solo cambia su cantidad con «Sacar de bodega» o «Devolver»: si no, la bodega se descuadra.
+  if (before.articuloId && "cantidad" in data && data.cantidad !== before.cantidad) throw badRequest("Este ítem salió de la bodega: para cambiar la cantidad, saca más de la bodega o devuelve lo que sobró.");
   if ("unidad" in data) Object.assign(data, await unidadDelCatalogo(data.unidad));
   const cantidad = data.cantidad ?? before.cantidad;
   const usado = "usado" in data ? data.usado : before.usado;
@@ -105,8 +109,13 @@ export async function eliminarItem(actividadId, id, actor) {
   const a = await actividadEditable(actividadId);
   const row = await prisma.inventarioActividad.findFirst({ where: { id: Number(id), actividadId: a.id } });
   if (!row) throw badRequest("Ítem no encontrado.", 404);
+  // Si salió de la bodega, lo que no se usó vuelve a la bodega al quitarlo de la actividad.
+  const vuelve = row.articuloId ? Math.max(0, Math.floor(row.cantidad - (row.usado ?? 0))) : 0;
+  if (vuelve > 0) {
+    await devolverABodega(a.id, { itemId: row.id, cantidad: vuelve }, actor);
+  }
   await prisma.inventarioActividad.delete({ where: { id: row.id } });
-  logInventario(actor, a, "eliminar", row.item).catch(() => {});
+  logInventario(actor, a, "eliminar", `${row.item}${vuelve > 0 ? ` (volvieron ${vuelve} a la bodega)` : ""}`).catch(() => {});
 }
 
 // Sube el inventario desde un Excel (Ítem, Cantidad, Unidad, Costo unitario, Usado). Los ítems con el mismo nombre se

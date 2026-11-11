@@ -47,6 +47,7 @@ export const MAESTRO_FIELD_LABELS = {
   tipo: "Tipo",
   valor: "Valor",
   aplicaEstrellas: "Aplica a estrellas",
+  lider: "Líder del área",
   activo: "Activo",
 };
 
@@ -260,6 +261,9 @@ Object.assign(ENTITY_LABELS, { rol: "Rol" });
 export const DETALLE_FIELD_LABELS = { detalle: "Detalle" };
 Object.assign(ACTION_LABELS, { importar: "Importó", clasificar: "Clasificó", rechazar: "Rechazó" });
 Object.assign(ENTITY_LABELS, { participante: "Participantes de actividad", inventario: "Inventario de actividad", formularioActividad: "Formulario de inscripción", fotoActividad: "Fotos de actividad", observacionActividad: "Observaciones de actividad", sentimientoComentario: "Sentimiento de comentarios (Nova)", agenteImportacion: "Agente de importación", analisisBienestar: "Análisis de Bienestar (Nova)", analisisActividad: "Análisis de actividad (Nova)", solicitudCompra: "Solicitud de compra", agenteEvaluacion: "Agente de evaluación de actividades", propuestaAsociacion: "Agente asociador de compras", cuadroComparativo: "Cuadro comparativo (agente cotizador)", salarioMinimo: "Salario mínimo (SMMLV)", configAgente: "Encendido de agentes", verificacionFactura: "Verificación de factura (agente de Compras)" });
+// Inventario (bodega) de Bienestar: artículos y sus movimientos (lib/inventarioBodega.js).
+Object.assign(ENTITY_LABELS, { inventarioBodega: "Inventario de Bienestar (bodega)" });
+export const INVENTARIO_BODEGA_FIELD_LABELS = { producto: "Artículo", bodega: "Bodega", referencia: "Referencia", unidad: "Unidad", minimo: "Mínimo", vence: "Vence", activo: "Activo", detalle: "Detalle" };
 
 export const SOLICITUD_COMPRA_FIELD_LABELS = {
   actividad: "Actividad",
