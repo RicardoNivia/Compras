@@ -102,7 +102,7 @@ function validarParametros(consulta, p = {}) {
   }
   if (consulta === "lista_compras" && !out.preset) throw err(400, "Indica qué compras quieres ver.");
   if (consulta === "proveedores_ciclo" && !out.preset) out.preset = "desactualizados";
-  if (consulta === "pagos_tesoreria") { out.preset ||= "por_pagar"; if (out.preset !== "vencidos") out.periodo ||= "esta_semana"; }
+  if (consulta === "pagos_tesoreria") { out.preset ||= "por_pagar"; if (out.preset === "resumen_semanal") delete out.periodo; else if (out.preset !== "vencidos") out.periodo ||= "esta_semana"; }
   if (consulta === "movimientos_tesoreria") out.periodo ||= "ayer";
   if ((out.periodo === "ultimos_n_dias" || out.periodo === "proximos_n_dias") && !out.dias) out.dias = 7;
   return out;

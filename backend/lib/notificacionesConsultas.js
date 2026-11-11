@@ -215,6 +215,7 @@ async function pagosTesoreria(p) {
   const { agendaPagos } = await import("@/lib/tesoreria/consultas");
   const { rangoTesoreria } = await import("@/lib/tesoreria/periodos");
   const preset = p.preset || "por_pagar";
+  if (preset === "resumen_semanal") return resumenSemanalTesoreria(p, agendaPagos, rangoTesoreria);
   const r = rangoTesoreria(preset === "vencidos" ? "vencidos" : p.periodo || "esta_semana", { dias: p.dias });
   const comun = { desde: r.desde, hasta: r.hasta, texto: p.texto || null, item: p.item || null, limite: 200 };
   const porPagar = preset === "pagados" ? null : await agendaPagos({ ...comun, estado: "pendientes" });
@@ -232,6 +233,31 @@ async function pagosTesoreria(p) {
     total: items.length,
     items,
     valores: { total: String(items.length), por_pagar: porPagar ? porPagar.totales.porPagar : "", pagado: pagados ? pagados.totales.pagado : "", periodo: preset === "vencidos" ? "vencidos a la fecha" : r.label },
+    enlace: "/tesoreria/pagos",
+  };
+}
+
+// Resumen del lunes: lo pagado la semana pasada (por el día en que se pagó), lo atrasado y lo que vence esta semana.
+async function resumenSemanalTesoreria(p, agendaPagos, rangoTesoreria) {
+  const pasada = rangoTesoreria("semana_anterior");
+  const esta = rangoTesoreria("esta_semana");
+  const comun = { texto: p.texto || null, item: p.item || null, limite: 200 };
+  const pagados = await agendaPagos({ ...comun, desde: pasada.desde, hasta: pasada.hasta, estado: "pagados" });
+  const porPagar = await agendaPagos({ ...comun, desde: "2000-01-01", hasta: esta.hasta, estado: "pendientes", sentido: "egresos" });
+  const atrasados = porPagar.pagos.filter((x) => x.vence < esta.desde);
+  const semana = porPagar.pagos.filter((x) => x.vence >= esta.desde);
+  const fila = (x, ref, detalle) => ({ ref, titulo: x.concepto, contexto: [x.item, x.medioPago, x.paga].filter(Boolean).join(" · "), detalle, dato: x.valor, href: `/tesoreria/pagos?id=${x.id}` });
+  const items = [
+    ...pagados.pagos.map((x) => fila(x, "Pagado", String(x.pagadoEl || "").startsWith("sin") ? "Semana pasada · marcado a mano" : `Pagado el ${x.pagadoEl}`)),
+    ...semana.map((x) => fila(x, "Esta semana", `Vence ${x.vence}`)),
+    ...atrasados.map((x) => fila(x, "Atrasado", `Venció ${x.vence} · ${x.estado.replace("P · ", "")}`)),
+  ];
+  const suma = (l) => l.reduce((s, x) => s + Math.abs(Number(String(x.valor).replace(/[^0-9,-]/g, "").replace(",", ".")) || 0), 0);
+  const cop = (v) => `COP ${Math.round(v).toLocaleString("es-CO")}`;
+  return {
+    total: items.length,
+    items,
+    valores: { total: String(items.length), pagado: pagados.totales.pagado, por_pagar: cop(suma(semana)), periodo: `se pagó ${pasada.label.replace("la semana pasada, ", "")}; por pagar ${esta.label}${atrasados.length ? ` (+${atrasados.length} atrasado(s) por ${cop(suma(atrasados))})` : ""}` },
     enlace: "/tesoreria/pagos",
   };
 }

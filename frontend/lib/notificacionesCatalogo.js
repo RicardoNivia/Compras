@@ -39,6 +39,7 @@ export const PRESETS_TESORERIA = {
   pagados: "Lo que se pagó en el período (pasó a E)",
   pagados_y_por_pagar: "Lo pagado y lo que falta por pagar del período",
   vencidos: "Pagos vencidos sin pagar (a la fecha)",
+  resumen_semanal: "Lo que se pagó la semana pasada y lo que hay que pagar esta semana (más lo atrasado)",
 };
 
 export const SENTIDOS_TESORERIA = { egresos: "Solo lo que sale", ingresos: "Solo lo que entra" };

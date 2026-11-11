@@ -113,7 +113,7 @@ Valores válidos:
 - campoFecha: fechaSolicitud (fecha de solicitud de la compra) | fechaRegistro (día en que se creó en el sistema).
 - preset de lista_compras: ${Object.entries(PRESETS_COMPRAS).map(([k, v]) => `${k} = ${v}`).join("; ")}.
 - preset de proveedores_ciclo: ${Object.entries(PRESETS_PROVEEDORES).map(([k, v]) => `${k} = ${v}`).join("; ")}.
-- TESORERÍA (fuente tesoreria; solo si está en la lista de esta persona): consulta pagos_tesoreria con preset ${Object.entries(PRESETS_TESORERIA).map(([k, v]) => `${k} = ${v}`).join("; ")}; consulta movimientos_tesoreria (movimientos del banco). Su "periodo" usa OTROS valores: ${Object.entries(PERIODOS_TESORERIA).map(([k, v]) => `${k} = ${v}`).join("; ")} (con proximos_n_dias / ultimos_n_dias usa "dias"). Filtros de texto opcionales: item (propiedad, p. ej. Bahía), texto (concepto, p. ej. «gas»), banco; sentido: ${Object.entries(SENTIDOS_TESORERIA).map(([k, v]) => `${k} = ${v}`).join("; ")}. Ejemplos: «los lunes a las 8 dime qué se pagó y qué hay que pagar esta semana» = programado, pagos_tesoreria, preset pagados_y_por_pagar, periodo esta_semana, frecuencia semanal, diaSemana 1, hora 08:00; «todos los días a las 7 lo que vence hoy» = pagos_tesoreria preset por_pagar periodo hoy, frecuencia diaria; «el 1 de cada mes lo que hay que pagar en el mes» = periodo este_mes, frecuencia mensual diaMes 1; «avísame apenas se pague algo» = evento tesoreria.pago_pagado, agrupacion inmediato; «cuando se registre un movimiento» = evento tesoreria.movimiento_registrado. "Pagado" en Tesorería = el pago pasó a E (no son compras).
+- TESORERÍA (fuente tesoreria; solo si está en la lista de esta persona): consulta pagos_tesoreria con preset ${Object.entries(PRESETS_TESORERIA).map(([k, v]) => `${k} = ${v}`).join("; ")}; consulta movimientos_tesoreria (movimientos del banco). Su "periodo" usa OTROS valores: ${Object.entries(PERIODOS_TESORERIA).map(([k, v]) => `${k} = ${v}`).join("; ")} (con proximos_n_dias / ultimos_n_dias usa "dias"). Filtros de texto opcionales: item (propiedad, p. ej. Bahía), texto (concepto, p. ej. «gas»), banco; sentido: ${Object.entries(SENTIDOS_TESORERIA).map(([k, v]) => `${k} = ${v}`).join("; ")}. Ejemplos: «los lunes a las 7 dime lo que se pagó la semana pasada y lo que tengo por pagar esta semana» = programado, pagos_tesoreria, preset resumen_semanal (sin periodo), frecuencia semanal, diaSemana 1, hora 07:00; «dime qué se pagó y qué hay que pagar esta semana» (la misma semana) = preset pagados_y_por_pagar, periodo esta_semana; «todos los días a las 7 lo que vence hoy» = pagos_tesoreria preset por_pagar periodo hoy, frecuencia diaria; «el 1 de cada mes lo que hay que pagar en el mes» = periodo este_mes, frecuencia mensual diaMes 1; «avísame apenas se pague algo» = evento tesoreria.pago_pagado, agrupacion inmediato; «cuando se registre un movimiento» = evento tesoreria.movimiento_registrado. "Pagado" en Tesorería = el pago pasó a E (no son compras).
 - alcance: general (todos reciben lo mismo) | personal (cada quien recibe lo suyo, p. ej. solo las compras de las que es responsable).
 - condicion: ${Object.keys(CONDICIONES).join(", ")} (umbral necesita "umbral" = mínimo de resultados).
 - frecuencia: ${FRECUENCIAS.join(", ")}. diaria = cada día hábil. semanal usa diaSemana (0=domingo … 6=sábado). mensual usa diaMes (31 = fin de mes). mensual_semana usa ordinal (1..4, -1 = último) + diaSemana. unica usa fechaUnica YYYY-MM-DD.
@@ -128,6 +128,7 @@ REGLAS:
 4. NUNCA supongas lo ambiguo: pregunta. Máximo 3 preguntas por turno, cada una con opciones cortas (2 a 4). Preguntas típicas: hora; qué hacer si el día es festivo; si se envía cuando no hay resultados; fecha de solicitud o de creación; lo de todos o lo de cada quien.
 5. "Compras que se vencen": las compras NO tienen fecha de vencimiento. Se usa el plazo de 8 días hábiles desde la solicitud sin fecha de entrega: preset vencen_hoy (cumplen hoy el plazo), por_vencer (les quedan 1 o 2 días) o atrasadas (ya lo pasaron). Explícalo y pregunta si incluye también las ya vencidas.
 6. La valoración de Nova de una compra se genera al RADICARLA, no al legalizarla: "cuando se legalice, dime qué valoración sacó" es el evento compra.valorada (explícalo en "mensaje"). La calificación del proveedor (estrellas) es compra.calificada. Si pide ambas (valoración y calificación), son DOS notificaciones: arma la primera y dilo en "mensaje".
+6a. TESORERÍA vs COMPRAS: si la persona tiene la fuente tesoreria y habla de lo que «se pagó», «está por pagar», «vence», «pagos», gastos, servicios, arriendos, nómina o bancos, son los PAGOS de Tesorería (pagos_tesoreria), aunque diga «compras» (mucha gente le dice «compras» a sus pagos). Si en el MISMO pedido aparecen «compras» junto con «se pagó» / «por pagar», es UNA sola notificación de pagos_tesoreria (no la partas en dos ni uses la consulta de compras): «las compras que se pagaron la semana pasada y las que tengo por pagar esta semana» = preset resumen_semanal. Solo si de verdad no queda claro, pregunta «¿Te refieres a tus pagos de Tesorería o a las compras del módulo de Compras?» con esas dos opciones.
 6b. Este panel es de COMPRAS: no hay datos de ventas, ingresos ni facturación de clientes. Si dice "ventas", lo más probable es que se refiera a las compras registradas: usa la consulta de compras y PREGUNTA para confirmarlo ("¿Te refieres a las compras registradas?"). Nunca respondas "no_permitido" por esto: "no_permitido" es SOLO para una fuente de la lista de no permitidas.
 7. Filtros (area, categoria, estado…): si la persona quiere "todas"/"todos"/"cualquiera", deja el filtro VACÍO; nunca escribas "todas" como valor. "Semana anterior" es de lunes a domingo. "Registradas" puede ser por fecha de solicitud o por creación: pregunta.
 8. Cuando ya está todo, estado "lista": "nombre" corto, "titulo" corto (puede usar variables) y "plantilla" de 1 o 2 frases con variables, sin cifras inventadas; "resumen" en lenguaje claro de lo que hará.
@@ -192,6 +193,22 @@ function fusionar(previa, res) {
 // Nova tiende a "completar" lo ambiguo (8:00, siguiente día hábil, fecha de creación…). Esos campos solo se aceptan
 // si la persona los dijo (explicitos, y para la hora además debe aparecer en el pedido) o si ya venían confirmados de
 // un turno anterior; si no, se borran y preguntasFaltantes los vuelve pregunta.
+// Hora dicha sin lugar a dudas en el pedido («7 am», «7:30 p. m.», «7 de la mañana», «19:00»). Sin am/pm («a las 7») no se
+// supone nada: se pregunta.
+export function horaDelTexto(texto) {
+  const t = String(texto || "").toLowerCase();
+  const m = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?\s?m\.?|p\.?\s?m\.?|de la ma[nñ]ana|de la tarde|de la noche)/) || t.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const mi = Number(m[2] || 0);
+  const suf = m[3] || "";
+  if (/^p|tarde|noche/.test(suf) && h < 12) h += 12;
+  if (/^a|ma[nñ]ana/.test(suf) && h === 12) h = 0;
+  if (!suf && h < 13 && !m[2]) return null;
+  if (h > 23 || mi > 59) return null;
+  return `${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`;
+}
+
 const HORA_EN_TEXTO = /\b(a\s+las?\s+\d|\d{1,2}:\d{2}|\d{1,2}\s*(am|pm|a\.\s?m|p\.\s?m)|mediod[ií]a|medianoche)/i;
 
 function sinSuposiciones(regla, previa, explicitos, pedido) {
@@ -299,6 +316,8 @@ Devuelve la regla COMPLETA con SOLO ese cambio aplicado (todo lo demás igual). 
 
   const regla = aplicarRespuestas(sinSuposiciones(fusionar(entrada.reglaParcial, res), entrada.reglaParcial, res.explicitos, `${pedido} ${instruccion}`), respuestas);
   regla.pedido = pedido;
+  // La hora que la persona dijo claramente no se vuelve a preguntar (Nova a veces la deja vacía).
+  if (!regla.hora && (regla.disparador !== "evento" || regla.agrupacion === "resumen_diario")) { const h = horaDelTexto(`${pedido} ${instruccion}`); if (h) regla.hora = h; }
   const p = regla.disparador === "evento" ? plantillaEvento(regla.evento, regla.agrupacion) : PLANTILLAS[regla.consulta];
   regla.titulo ||= p.titulo;
   regla.plantilla ||= p.plantilla;
@@ -315,7 +334,7 @@ Devuelve la regla COMPLETA con SOLO ese cambio aplicado (todo lo demás igual). 
   ].map((q) => [q.id, q]));
   const horaCanonica = preguntasFaltantes({ consulta: "conteo_compras", parametros: {} }).find((q) => q.id === "hora");
   const deNova = (res.preguntas || [])
-    .filter((q) => q?.id && !respondidas.has(q.id) && Array.isArray(q.opciones) && q.opciones.length)
+    .filter((q) => q?.id && !respondidas.has(q.id) && !(q.id === "hora" && regla.hora) && Array.isArray(q.opciones) && q.opciones.length)
     .map((q) => {
       if (q.id === "hora") {
         const validas = q.opciones.filter((o) => /^([01]\d|2[0-3]):[0-5]\d$/.test(o.valor));
