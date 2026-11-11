@@ -178,6 +178,11 @@ export async function logPropuestaAsociacion(actor, propuesta, action, detalle) 
   await writeLog({ action, entityType: "propuestaAsociacion", recordId: String(propuesta.recordId), recordInfo: `Compra #${propuesta.recordSeq ?? "?"} → ${propuesta.actividad || "sin actividad"}`, actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: detalle }] });
 }
 
+// Cada búsqueda del agente asociador (a pedido o la revisión diaria): cuántas compras revisó y cuántas propuestas dejó.
+export async function logBusquedaAsociador(actor, r) {
+  await writeLog({ action: "buscar", entityType: "propuestaAsociacion", recordId: "busqueda", recordInfo: "Agente asociador de compras", actor, changes: [{ field: "detalle", label: "Detalle", before: null, after: `Revisó ${r.revisadas} compra(s) del área Bienestar sin actividad: ${r.propuestas} propuesta(s), ${r.sinCoincidencia} sin coincidencia y ${r.sinCandidatas} sin actividades cercanas${actor ? "" : " (revisión automática)"}.` }] });
+}
+
 // Salario mínimo (SMMLV) de un año en Maestros de Compras. antes: { valor, norma } al editar o eliminar.
 export async function logSalarioMinimo(actor, row, action, antes) {
   const changes = [

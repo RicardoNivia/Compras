@@ -23,6 +23,7 @@ export default async function FichaPagina({ id, linea = "Bienestar" }) {
       <FichaActividad
         actividadId={Number(id)}
         puedeEditar={puedeEditar}
+        puedeUsarBodega={!!(user.permissions?.usarInventarioBienestar ?? puedeEditar)}
         basePath={basePath}
         responsables={maestros.filter((m) => m.userId).map((m) => ({ userId: m.userId, nombre: m.valor }))}
         lineasPermitidas={[user.permissions?.editBienestar ?? canEditBienestar(user.role) ? "Bienestar" : null, user.permissions?.editFundacion ?? canEditBienestar(user.role) ? "Fundación" : null].filter(Boolean)}

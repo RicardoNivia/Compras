@@ -13,7 +13,7 @@ import { entradasDeCompra, entradaPorCompra } from "@/lib/inventarioBodega";
  *     summary: Registra que con esta compra llegaron artículos a la bodega ({ articuloId, cantidad }): suma al stock como entrada enlazada a la compra. Crear o editar compras.
  */
 export async function GET(_request, { params }) {
-  const { denied } = await requireAlgunPermiso(["createRecord", "editRecord", "viewBienestar", "viewFundacion"]);
+  const { denied } = await requireAlgunPermiso(["entradaInventarioCompra", "viewInventarioBienestar"]);
   if (denied) return denied;
   try {
     return NextResponse.json({ entradas: await entradasDeCompra(params.id) });
@@ -23,7 +23,7 @@ export async function GET(_request, { params }) {
 }
 
 export async function POST(request, { params }) {
-  const { user, denied } = await requireAlgunPermiso(["createRecord", "editRecord"]);
+  const { user, denied } = await requireAlgunPermiso(["entradaInventarioCompra"]);
   if (denied) return denied;
   try {
     return NextResponse.json(await entradaPorCompra(params.id, await request.json(), user), { status: 201 });

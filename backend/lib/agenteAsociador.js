@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { generateStructuredJson } from "@/lib/aiStructured";
 import { AREAS_BIENESTAR } from "@/lib/actividadesBienestar";
 import { asignarActividadACompra } from "@/lib/records";
-import { logPropuestaAsociacion } from "@/lib/audit";
+import { logPropuestaAsociacion, logBusquedaAsociador } from "@/lib/audit";
 import { isRoleAllowed } from "@/lib/permissions";
 import { hoyColombia } from "@/lib/hoyColombia";
 import { agenteActivo } from "@/lib/configAgentes";
@@ -161,6 +161,7 @@ export async function buscarPropuestas({ actor = null, avisar = false } = {}) {
     }
     if (propuestas && avisar) avisarPropuestas(propuestas).catch(() => {});
     estado.ultima = { at: new Date().toISOString(), revisadas: compras.length, propuestas, sinCoincidencia, sinCandidatas, ms: Date.now() - inicio };
+    logBusquedaAsociador(actor, estado.ultima).catch(() => {});
     return estado.ultima;
   } finally {
     estado.corriendo = false;

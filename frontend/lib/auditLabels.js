@@ -276,6 +276,7 @@ export const SOLICITUD_COMPRA_FIELD_LABELS = {
 };
 
 // Correo vinculado (Microsoft 365) y agente de correo que detecta solicitudes de creación de proveedor.
+Object.assign(ACTION_LABELS, { buscar: "Buscó" });
 Object.assign(ACTION_LABELS, { vincular: "Vinculó", desvincular: "Desvinculó", aprobar: "Aprobó", descartar: "Descartó", detectar: "Detectó" });
 Object.assign(ENTITY_LABELS, { cuentaCorreo: "Correo vinculado", solicitudProveedorCorreo: "Solicitud de proveedor por correo" });
 export const CUENTA_CORREO_FIELD_LABELS = {

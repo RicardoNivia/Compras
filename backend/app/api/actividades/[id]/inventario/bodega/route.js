@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePermisoActividad, apiError } from "@/lib/apiGuard";
+import { requirePermisoActividad, requireAlgunPermiso, apiError } from "@/lib/apiGuard";
 import { salidaParaActividad, devolverABodega, ajustarCantidadDeBodega } from "@/lib/inventarioBodega";
 
 /**
@@ -12,6 +12,9 @@ import { salidaParaActividad, devolverABodega, ajustarCantidadDeBodega } from "@
 export async function POST(request, { params }) {
   const { user, denied } = await requirePermisoActividad(params.id, "editar");
   if (denied) return denied;
+  // Además de editar la actividad, usar la bodega es un permiso propio de la Matriz.
+  const bodega = await requireAlgunPermiso(["usarInventarioBienestar"]);
+  if (bodega.denied) return bodega.denied;
   try {
     const body = await request.json();
     const r = body?.accion === "devolver" ? await devolverABodega(params.id, body, user)

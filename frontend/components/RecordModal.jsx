@@ -57,7 +57,7 @@ const emptyForm = {
   actividadId: "",
 };
 
-export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true, editableFields = null, maestros = [], proveedores = [], presupuestos = [], actividades = [], crear = null, actividadFija = null, prefill = null, puedeRevisar = false }) {
+export default function RecordModal({ record, records, onClose, onSaved, onDeleted, allowDelete = true, editableFields = null, maestros = [], proveedores = [], presupuestos = [], actividades = [], crear = null, actividadFija = null, prefill = null, puedeRevisar = false, puedeBodega = false }) {
   const isEdit = !!record;
   // editableFields null = todos los campos editables (admin, registro).
   // Con lista (p.ej. legalizar), los demás campos quedan solo-lectura.
@@ -515,7 +515,7 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
               ) : null}
             </div>
 
-            <EntradaBodegaCompra recordId={record?.id || null} />
+            {puedeBodega && <EntradaBodegaCompra recordId={record?.id || null} />}
 
             {presupuestoInfo && (
               <div className="dias-preview">

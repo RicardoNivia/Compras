@@ -48,7 +48,7 @@ const pct = (v) => (v == null ? "—" : `${(Math.round(v * 1000) / 10).toString(
 // responsable) · Presupuesto (cuánto se asigna y en qué va) · Compras (asociar, quitar, solicitar) · Participantes y asistencia (si
 // aplica, los totales o la lista con su importación). Las partes editables son el mismo ActividadFormulario, incrustado.
 const TABS_VALIDAS = ["resumen", "datos", "presupuesto", "compras", "participantes", "observaciones", "inventario", "fotos", "calificaciones", "agente"];
-export default function FichaActividad({ actividadId, puedeEditar, basePath, responsables = [], lineasPermitidas }) {
+export default function FichaActividad({ actividadId, puedeEditar, puedeUsarBodega = false, basePath, responsables = [], lineasPermitidas }) {
   const [act, setAct] = useState(null);
   const [error, setError] = useState("");
   // ?tab= abre directo en una pestaña (los enlaces viejos a /editar llegan con tab=datos; al cerrar, calificaciones).
@@ -262,7 +262,7 @@ export default function FichaActividad({ actividadId, puedeEditar, basePath, res
       )}
       {tab === "observaciones" && <ObservacionesActividad act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
       {tab === "agente" && <AgenteImportacion act={act} onCambio={cargar} />}
-      {tab === "inventario" && <TabInventario act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
+      {tab === "inventario" && <TabInventario act={act} puedeEditar={puedeEditar && !cerrada} puedeUsarBodega={puedeUsarBodega} onCambio={cargar} />}
       {tab === "fotos" && <FotosActividad actividadId={act.id} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
       {tab === "formulario" && <TabFormulario act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
         </div>
@@ -562,7 +562,7 @@ function ModalNuevoParticipante({ act, motivos, areas, onClose, onCreado }) {
 }
 
 // ---------- Inventario ----------
-function TabInventario({ act, puedeEditar, onCambio }) {
+function TabInventario({ act, puedeEditar, puedeUsarBodega, onCambio }) {
   const [items, setItems] = useState(act.inventario.items);
   const [resumen, setResumen] = useState(act.inventario.resumen);
   const [unidades, setUnidades] = useState([]);
@@ -648,7 +648,7 @@ function TabInventario({ act, puedeEditar, onCambio }) {
         <div><span>Ítems</span><strong>{resumen.items}</strong></div>
         <div><span>Costo de lo usado</span><strong>{fmtCOP(resumen.costoTotal)}</strong></div>
       </div>
-      {puedeEditar && <SacarDeBodega actividadId={act.id} onListo={async (txt) => { setAviso(txt); await recargar(); }} />}
+      {puedeEditar && puedeUsarBodega && <SacarDeBodega actividadId={act.id} onListo={async (txt) => { setAviso(txt); await recargar(); }} />}
       {puedeEditar && (
         <form className="ficha-import" onSubmit={agregar}>
           <span className="ficha-import-titulo">Agregar ítem que no está en la bodega</span>
@@ -684,8 +684,8 @@ function TabInventario({ act, puedeEditar, onCambio }) {
                   <td className="num">{it.costoUnitario != null ? fmtCOP(it.costoUnitario) : "—"}</td>
                   <td className="num">{it.costoTotal != null ? fmtCOP(it.costoTotal) : "—"}</td>
                   <td className="actions-cell"><div className="row-actions">
-                    {puedeEditar && <button type="button" className="icon-action-btn" aria-label={`Editar la cantidad de ${it.item}`} title="Editar la cantidad usada" onClick={() => { setEditarCant(it); setCantNueva(String(it.usado)); setErrorCant(""); }}><IconEdit size={13} /></button>}
-                    {puedeEditar && <button type="button" className="icon-action-btn delete" aria-label={`Quitar ${it.item}`} onClick={async () => { if (window.confirm(it.articuloId ? `¿Quitar "${it.item}" de la actividad? Las ${it.usado} usadas vuelven a la bodega.` : `¿Quitar "${it.item}" del inventario?`)) { await eliminarItemApi(act.id, it.id).catch((e) => setError(e.message)); recargar(); } }}><IconTrash size={13} /></button>}
+                    {puedeEditar && (!it.articuloId || puedeUsarBodega) && <button type="button" className="icon-action-btn" aria-label={`Editar la cantidad de ${it.item}`} title="Editar la cantidad usada" onClick={() => { setEditarCant(it); setCantNueva(String(it.usado)); setErrorCant(""); }}><IconEdit size={13} /></button>}
+                    {puedeEditar && (!it.articuloId || puedeUsarBodega) && <button type="button" className="icon-action-btn delete" aria-label={`Quitar ${it.item}`} onClick={async () => { if (window.confirm(it.articuloId ? `¿Quitar "${it.item}" de la actividad? Las ${it.usado} usadas vuelven a la bodega.` : `¿Quitar "${it.item}" del inventario?`)) { await eliminarItemApi(act.id, it.id).catch((e) => setError(e.message)); recargar(); } }}><IconTrash size={13} /></button>}
                   </div></td>
                 </tr>
               ))}

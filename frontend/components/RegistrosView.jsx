@@ -730,6 +730,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
       {modalRecord !== undefined && (
         <RecordModal
           puedeRevisar={permissions?.viewAgentesCompras ?? canViewAgentesCompras(role)}
+          puedeBodega={!!permissions?.entradaInventarioCompra}
           record={modalRecord}
           records={records}
           onClose={() => { setModalRecord(undefined); setPrefillCompra(null); }}

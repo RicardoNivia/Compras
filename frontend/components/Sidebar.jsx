@@ -52,7 +52,7 @@ const GRUPOS = {
         { key: "bienestar-actividades", href: "/bienestar/actividades", label: "Actividades", Icon: IconList, feature: "viewBienestar", show: canViewBienestar },
         { key: "bienestar-cronograma", href: "/bienestar/cronograma", label: "Cronograma", Icon: IconCalendar, feature: "viewBienestar", show: canViewBienestar },
         { key: "bienestar-agentes", href: "/bienestar/agentes", label: "Agentes", Icon: IconSpark, feature: "editBienestar", show: canEditBienestar },
-        { key: "bienestar-inventario", href: "/bienestar/inventario", label: "Inventario", Icon: IconLayers, feature: "viewBienestar", show: canViewBienestar, alt: { feature: "viewFundacion", show: () => false } },
+        { key: "bienestar-inventario", href: "/bienestar/inventario", label: "Inventario", Icon: IconLayers, feature: "viewInventarioBienestar", show: canViewBienestar },
         { key: "bienestar-maestros", href: "/bienestar/maestros", label: "Maestros", Icon: IconLayers, feature: "viewMaestrosBienestar", show: canViewBienestar },
       ],
     },

@@ -37,6 +37,11 @@ export const FEATURES = [
   { key: "viewDashboardFundacion", label: "Ver Dashboard de Fundación", modulo: "Bienestar", section: "Fundación", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
   { key: "viewFundacion", label: "Ver actividades y cronograma de Fundación", modulo: "Bienestar", section: "Fundación", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
   { key: "editFundacion", label: "Crear, editar, cerrar y eliminar actividades de Fundación", modulo: "Bienestar", section: "Fundación", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  // Inventario (bodega) de Bienestar: se asigna por rol, aparte de las actividades.
+  { key: "viewInventarioBienestar", label: "Ver el inventario (bodega) y el historial de cada artículo", modulo: "Bienestar", section: "Inventario", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  { key: "editInventarioBienestar", label: "Gestionar el inventario: crear y editar artículos, entradas, salidas y ajustes", modulo: "Bienestar", section: "Inventario", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  { key: "usarInventarioBienestar", label: "Registrar lo usado de la bodega en una actividad (además de poder editar la actividad)", modulo: "Bienestar", section: "Inventario", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
+  { key: "entradaInventarioCompra", label: "Registrar en la bodega lo que llega con una compra (formulario de Registros)", modulo: "Bienestar", section: "Inventario", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR] },
   { key: "viewMaestrosBienestar", label: "Maestros de Bienestar y Fundación", modulo: "Bienestar", section: "Maestros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
   // Tesorería: se da por rol desde Usuarios y roles (antes era una lista nominal dentro del módulo). Por defecto solo admin.
   { key: "verTesoreria", label: "Ver Tesorería (resumen, movimientos, conciliación, cierre y reportes)", modulo: "Tesorería", section: "Tesorería", defaultRoles: [ROLES.ADMIN] },

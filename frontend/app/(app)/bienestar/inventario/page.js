@@ -11,9 +11,9 @@ export const dynamic = "force-dynamic";
 export default async function InventarioBienestarPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  const ver = (user.permissions?.viewBienestar ?? canViewBienestar(user.role)) || user.permissions?.viewFundacion;
+  const ver = user.permissions?.viewInventarioBienestar ?? canViewBienestar(user.role);
   if (!ver) redirect("/registros");
-  const puedeEditar = !!((user.permissions?.editBienestar ?? canEditBienestar(user.role)) || user.permissions?.editFundacion);
+  const puedeEditar = !!(user.permissions?.editInventarioBienestar ?? canEditBienestar(user.role));
   return (
     <AppShell user={user} title="Inventario" subtitle="Lo que hay en bodega para las actividades: las compras lo alimentan y las actividades lo consumen">
       <InventarioBodegaView puedeEditar={puedeEditar} />

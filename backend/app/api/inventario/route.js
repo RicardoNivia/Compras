@@ -15,7 +15,7 @@ import { listArticulos, crearArticulo } from "@/lib/inventarioBodega";
  *     summary: Crea un artículo (producto, bodega bodega|sst|aseo, unidad, referencia, minimo, vence). Queda con stock 0. Editar Bienestar o Fundación.
  */
 export async function GET(request) {
-  const { denied } = await requireAlgunPermiso(["viewBienestar", "viewFundacion", "createRecord", "editRecord"]);
+  const { denied } = await requireAlgunPermiso(["viewInventarioBienestar", "usarInventarioBienestar", "entradaInventarioCompra"]);
   if (denied) return denied;
   try {
     const soloActivos = new URL(request.url).searchParams.get("activos") === "1";
@@ -26,7 +26,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const { user, denied } = await requireAlgunPermiso(["editBienestar", "editFundacion"]);
+  const { user, denied } = await requireAlgunPermiso(["editInventarioBienestar"]);
   if (denied) return denied;
   try {
     return NextResponse.json({ articulo: await crearArticulo(await request.json(), user) }, { status: 201 });
