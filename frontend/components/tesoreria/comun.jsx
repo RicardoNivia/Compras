@@ -116,7 +116,7 @@ export function useAniosTesoreria(fuente = "pagos") {
     (aniosCache || refrescarAnios()).then(setR);
     return () => { oyentesAnios.delete(setR); };
   }, []);
-  return r ? (fuente === "movimientos" ? r.aniosMovimientos : r.anios) : null;
+  return r ? (fuente === "movimientos" ? r.aniosMovimientos : fuente === "saldos" ? r.aniosSaldos || r.aniosMovimientos : r.anios) : null;
 }
 
 // Selector de año: los años de Tesorería (del actual hasta 2028, los anteriores con datos y los creados a mano). Un año nuevo

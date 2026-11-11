@@ -20,7 +20,12 @@ export async function listAnios() {
   // años con movimientos del banco (aniosMovimientos).
   const anios = [...new Set([...porDefecto, ...pagos.map((p) => p.anio), ...creados.map((c) => c.anio)])].filter(Boolean).sort((a, b) => a - b);
   const aniosMovimientos = [...new Set([...anios, ...movs.map((m) => Number(m.anio))])].filter(Boolean).sort((a, b) => a - b);
-  return { anios, aniosMovimientos, actual, creados: creados.map((c) => ({ anio: c.anio, creadoPorNombre: c.creadoPorNombre, createdAt: c.createdAt })) };
+  // Saldos: un año anterior solo tiene saldos si tiene algún saldo del banco (extracto), un saldo inicial digitado o el
+  // saldo de diciembre del año anterior; con solo movimientos sueltos no hay con qué calcular el saldo.
+  const [inis, reps] = await Promise.all([prisma.saldoInicialBanco.groupBy({ by: ["anio"] }), prisma.saldoReportadoBanco.groupBy({ by: ["anio", "mes", "tipo"] })]);
+  const conSaldo = new Set([...inis.map((x) => x.anio), ...reps.map((x) => x.anio), ...reps.filter((x) => x.mes === 12 && x.tipo === "final").map((x) => x.anio + 1)]);
+  const aniosSaldos = [...new Set([...anios.filter((a) => a >= actual), ...[...conSaldo].filter((a) => a <= actual)])].sort((a, b) => a - b);
+  return { anios, aniosMovimientos, aniosSaldos, actual, creados: creados.map((c) => ({ anio: c.anio, creadoPorNombre: c.creadoPorNombre, createdAt: c.createdAt })) };
 }
 
 export async function crearAnio(actor, body) {

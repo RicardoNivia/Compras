@@ -28,7 +28,7 @@ const ESTADOS = {
 // salió, con cuánto terminó y qué dice el banco. El saldo inicial del año queda al final: solo hace falta si no hay
 // extracto de diciembre del año anterior.
 export default function SaldosTesoreria({ acceso }) {
-  const aniosTes = useAniosTesoreria("movimientos");
+  const aniosTes = useAniosTesoreria("saldos"); // años anteriores solo si tienen algún saldo (extracto o saldo inicial)
   const { cat, recargar: recargarCat } = useCatalogos();
   const [anio, setAnio] = useState(anioActual());
   const [d, setD] = useState(null);
