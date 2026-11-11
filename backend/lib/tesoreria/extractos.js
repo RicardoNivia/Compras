@@ -18,7 +18,9 @@ import { diagnosticar } from "@/lib/tesoreria/conciliacion";
 const num = (d) => (d == null ? null : Number(d));
 
 // Análisis guardados en memoria hasta que la persona los aprueba (30 min): así el PDF no se vuelve a leer con Nova.
-const ANALISIS = new Map();
+// En globalThis: Next carga el módulo por separado en cada ruta (analizar y aplicar), así que un Map del módulo no se
+// compartía y la aprobación siempre decía «el análisis venció».
+const ANALISIS = (globalThis.__tesAnalisisExtractos ||= new Map());
 const VIGENCIA_MS = 30 * 60 * 1000;
 const purgar = () => { const ya = Date.now(); for (const [k, v] of ANALISIS) if (ya - v.creado > VIGENCIA_MS) ANALISIS.delete(k); };
 const diaAntes = (f) => new Date(Date.parse(`${f}T12:00:00Z`) - 86400000).toISOString().slice(0, 10);
