@@ -6121,3 +6121,7 @@ tr.tes-ex-no td{ opacity:.45; text-decoration:line-through; }
 .sb-inicial-estado{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
 .sb-inicial-cuerpo{ display:flex; flex-direction:column; gap:8px; margin-top:12px; }
 @media (max-width: 760px){ .sb-op{ display:none; } .sb-inicial-cab{ flex-wrap:wrap; } }
+/* Saldos: aire entre el resumen del mes, la alerta y los botones. */
+.sb-detalle{ display:flex; flex-direction:column; gap:14px; }
+.sb-detalle .card-head, .sb-detalle .sb-cuenta-mes, .sb-detalle .tes-resultado{ margin:0; }
+.sb-detalle > .tes-cabecera{ padding-top:2px; }

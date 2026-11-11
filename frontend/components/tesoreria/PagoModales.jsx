@@ -6,7 +6,7 @@ import { fmtMoneda } from "@/lib/moneda";
 import { crossfade } from "@/lib/crossfade";
 import { IconSpark, IconTrash, IconSearch } from "@/components/icons";
 import MoneyInput from "@/components/MoneyInput";
-import { Modal, MESES, hoyCO, fechaCorta, EstadoPago, TipoPago, TIPOS_PAGO } from "@/components/tesoreria/comun";
+import { Modal, MESES, hoyCO, fechaCorta, EstadoPago, TipoPago, TIPOS_PAGO, SelectorAnio } from "@/components/tesoreria/comun";
 
 const num = (v) => Number(String(v ?? "").replace(",", ".")) || 0;
 
@@ -350,7 +350,7 @@ export function ProponerModal({ anio: anioIni, mes: mesIni, onClose, onListo }) 
       pie={<><button type="button" className="btn" onClick={onClose}>Cancelar</button><div className="spacer" />{r && <button type="button" className="btn btn-primary" onClick={crear} disabled={!marcadas.length || creando}>{creando ? <span className="spinner" /> : null} Crear {marcadas.length} pago(s)</button>}</>}>
       <div className="tes-filtros">
         <div className="field"><label>¿Para cuándo?</label><div className="tes-seg"><button type="button" className={alcance === "mes" ? "on" : ""} onClick={() => setAlcance("mes")}>Un mes</button><button type="button" className={alcance === "anio" ? "on" : ""} onClick={() => setAlcance("anio")}>Todo el año</button></div></div>
-        <div className="field" style={{ width: 110 }}><label htmlFor="pp-anio">Año</label><input id="pp-anio" type="number" value={anio} onChange={(e) => setAnio(Number(e.target.value))} /></div>
+        <SelectorAnio id="pp-anio" value={anio} onChange={(x) => x && setAnio(x)} ancho={150} />
         {alcance === "mes" && <div className="field" style={{ width: 150 }}><label htmlFor="pp-mes">Mes</label><select id="pp-mes" value={mes} onChange={(e) => setMes(Number(e.target.value))}>{MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select></div>}
         <button type="button" className="btn btn-primary" onClick={proponer} disabled={cargando}>{cargando ? <span className="spinner" /> : <IconSpark size={13} />} {r ? "Proponer de nuevo" : "Proponer"}</button>
       </div>
