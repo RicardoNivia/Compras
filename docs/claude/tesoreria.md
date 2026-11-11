@@ -64,3 +64,9 @@ Conciliación starts each month from `saldoInicialPrevio`, so it also follows th
   - movement created by hand or with a receipt, approved from an extract, recorded from the conciliation.
 - **No events from the template import.**
 - **Fix that applies to every scheduled notification:** `ejecutarConsulta` converts the parameters stored as JSON text. Before, they ran with their default values.
+
+**Saldos page (`SaldosTesoreria.jsx`), redesigned.**
+- **Top:** each account with today's balance and whether it is confirmed by an extract, or which months are missing, with «Subir extracto».
+- **Account × month map:** colored by `meses[].estado`, one of confirmado / diferencia / parcial / estimado / futuro / sinDatos (`reporteSaldos`).
+- **Selected month in words:** «empezó con X», where X comes from `inicioFuente`: extracto / digitado / estimado. Then it came in, it went out, it ended at Y, and what the bank says.
+- **Saldo inicial del año:** collapsible. It is only needed when the December extract is missing.

@@ -126,6 +126,10 @@ export async function reporteSaldos(anio, { bancoId = null, dias: diasPedidos = 
       // Con lo que venía del mes anterior (sin el saldo inicial que trae el extracto de este mes).
       const sp = saldoAl(diaAntes(primero), { sinInicialDesde: diaAntes(primero) });
       m.saldoInicialPrevio = sp ? redondear(sp.valor) : null;
+      // De dónde sale el saldo con que empieza el mes: extracto del banco (su saldo final del mes anterior o su saldo
+      // inicial), el saldo inicial digitado, o estimado (calculado desde otro saldo con los movimientos registrados).
+      m.inicioFuente = !si ? null : si.ancla.fuente === "digitado" && si.ancla.dia === diaAntes(primero) ? "digitado" : si.ancla.fuente === "banco" && si.ancla.dia === diaAntes(primero) ? "extracto" : "estimado";
+      m.inicioDesde = si && si.ancla.dia !== diaAntes(primero) ? si.ancla.dia : null;
       m.saldoFinal = sf ? redondear(sf.valor) : null;
       // Lo que reportó el banco ese mes (el más reciente) y lo que daba lo registrado SIN usar ese saldo.
       const delMes = anclas.filter((a) => a.fuente === "banco" && a.dia >= primero && a.dia <= fin && repBanco.some((r) => r.tipo === "final" && (r.fecha || ultimoDia(r.anio, r.mes)) === a.dia));
@@ -138,6 +142,10 @@ export async function reporteSaldos(anio, { bancoId = null, dias: diasPedidos = 
       // Del banco solo si el saldo sale de un ancla DENTRO del mes y no posterior (lo calculado hacia atrás desde un
       // extracto más nuevo es «calculado»).
       m.fuente = !sf ? null : sf.ancla.fuente === "banco" && sf.ancla.dia >= primero && sf.ancla.dia <= fin ? (sf.ancla.dia === fin ? "banco" : "parcial") : "calculado";
+      // Estado del mes para la pantalla: confirmado (extracto de fin de mes y cuadra), diferencia (hay extracto y no
+      // cuadra), parcial (extracto hasta un día del mes), estimado (sin extracto) o sinDatos.
+      m.estado = primero > hoy ? "futuro" : m.reportado != null && m.diferencia != null && Math.abs(m.diferencia) > 0.5 ? "diferencia"
+        : m.fuente === "banco" ? "confirmado" : m.fuente === "parcial" ? "parcial" : m.saldoFinal != null && (m.movimientos || m.saldoInicial != null) ? "estimado" : "sinDatos";
     }
     const finAnio = saldoAl(`${anio}-12-31`);
     const aHoy = anio === Number(hoy.slice(0, 4)) ? saldoAl(hoy) : null;

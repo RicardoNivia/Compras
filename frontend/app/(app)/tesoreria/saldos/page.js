@@ -11,7 +11,7 @@ export default async function Pagina() {
   if (!user) redirect("/login");
   if (!user.tesoreria) redirect("/");
   return (
-    <AppShell user={user} title="Saldos de bancos" subtitle="Saldo inicial de enero y saldo de cada mes">
+    <AppShell user={user} title="Saldos de las cuentas" subtitle="Con cuánto empieza y termina cada mes, y si lo confirma el extracto del banco">
       <SaldosTesoreria acceso={user.tesoreria} />
     </AppShell>
   );
