@@ -211,3 +211,8 @@ export function getPatchableFields(role) {
   if (role === ROLES.RADICAR) return ["radicado"];
   return null;
 }
+
+// Vincular el correo de Microsoft 365 para que el agente lea las solicitudes de creación de proveedor (Mi correo).
+export function canVincularCorreo(role) {
+  return role === ROLES.ADMIN || role === ROLES.PROVEEDORES;
+}

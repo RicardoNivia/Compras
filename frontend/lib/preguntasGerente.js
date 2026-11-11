@@ -35,6 +35,16 @@ export const PREGUNTAS_BIENESTAR = [
 ];
 
 // n preguntas al azar, sin repetir (Fisher-Yates sobre una copia).
+// Tesorería (solo aparecen a quien tiene acceso nominal al módulo).
+export const PREGUNTAS_TESORERIA = [
+  { prompt: '¿Cómo cerró el flujo de caja del mes pasado?', title: 'Flujo del mes pasado', sub: 'Ingresos, egresos y neto', icon: 'money' },
+  { prompt: '¿En qué ítems se fue más plata este año?', title: 'Dónde se va la plata', sub: 'Egresos por ítem', icon: 'chart' },
+  { prompt: '¿Qué pagos vienen en los próximos días?', title: 'Próximos pagos', sub: 'Proyectados del mes', icon: 'doc' },
+  { prompt: '¿Qué falta para cerrar el mes pasado?', title: 'Cierre pendiente', sub: 'Conciliación y soportes', icon: 'user' },
+  { prompt: '¿Cuánto hay hoy en cada cuenta?', title: 'Saldos por cuenta', sub: 'Según el libro', icon: 'money' },
+  { prompt: '¿Qué movimientos del extracto de AV Villas no están en el libro este mes?', title: 'Solo en el banco', sub: 'Conciliación AV Villas', icon: 'doc' },
+];
+
 export function preguntasAlAzar(lista, n) {
   const copia = [...lista];
   for (let i = copia.length - 1; i > 0; i--) {

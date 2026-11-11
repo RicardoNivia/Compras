@@ -337,3 +337,30 @@ export function IconList(props) {
     </Svg>
   );
 }
+
+// Bandeja de entrada (Mi correo / agente de correo).
+export function IconInbox(props) {
+  return (
+    <Svg {...props} viewBox="0 0 16 16">
+      <path d="M2 9.5l1.6-5.2A1.4 1.4 0 0 1 4.9 3.3h6.2a1.4 1.4 0 0 1 1.3 1L14 9.5V12a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12V9.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M2 9.5h3.2l.9 1.6h3.8l.9-1.6H14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconSun(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="8.5" cy="8.5" r="3" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M8.5 1.5v1.8M8.5 13.7v1.8M1.5 8.5h1.8M13.7 8.5h1.8M3.6 3.6l1.2 1.2M12.2 12.2l1.2 1.2M3.6 13.4l1.2-1.2M12.2 4.8l1.2-1.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function IconMoon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M14.2 10.1A6 6 0 0 1 6.9 2.8a6 6 0 1 0 7.3 7.3Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </Svg>
+  );
+}

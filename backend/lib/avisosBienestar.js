@@ -45,7 +45,7 @@ export async function avisarActividadesVencidas() {
       texto: `La fecha de la actividad (${a.fechaFin && a.fechaFin !== a.fecha ? `${a.fecha} a ${a.fechaFin}` : a.fecha}) ya pasó. Márcala como ejecutada y carga la asistencia, o cámbiale la fecha si se movió.`,
       notificacionNombre: `Actividades de ${a.linea}`,
       tituloItems: "Actividad por resolver",
-      items: [{ ref: a.fecha, titulo: a.nombre, contexto: `${a.linea} · ${a.estado}`, href: `${base}/actividades/${a.id}/editar` }],
+      items: [{ ref: a.fecha, titulo: a.nombre, contexto: `${a.linea} · ${a.estado}`, href: `${base}/actividades/${a.id}?tab=datos` }],
     });
     for (const u of destinatarios[a.linea] || []) {
       if (enviados.has(`${u.id}#${claveDe(a)}`)) continue;

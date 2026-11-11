@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { IconTable, IconBuilding, IconMoney, IconBell, IconClock, IconCalendar } from "@/components/icons";
+import { IconTable, IconBuilding, IconMoney, IconBell, IconClock, IconCalendar, IconInbox } from "@/components/icons";
 
 // Los modales se dibujan en <body>: si quedan dentro de un contenedor con animación o transform, el
 // position:fixed del fondo se recorta a ese contenedor en lugar de cubrir toda la pantalla.
@@ -20,6 +20,7 @@ export const FUENTE_VISUAL = {
   presupuesto: { Icon: IconMoney, color: "var(--warning)" },
   bienestar: { Icon: IconCalendar, color: "#1e8a6e" },
   mi_dia: { Icon: IconBell, color: "var(--good)" },
+  correo: { Icon: IconInbox, color: "var(--secondary)" }, // avisos del agente de correo (solicitudes de proveedor)
 };
 
 export function FuenteIcono({ fuente, size = 40 }) {

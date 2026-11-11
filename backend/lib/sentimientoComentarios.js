@@ -115,6 +115,14 @@ export function clasificarEnSegundoPlano(actividadId) {
   setTimeout(() => enSegundoPlano(() => clasificarComentarios({ actividadId }).catch((e) => console.error("[sentimiento]", e.message))), 0);
 }
 
+// Cuando la persona acaba de escribir una observación y espera ver la manito: clasifica ya y espera el resultado, pero
+// nunca más de `ms` (si Nova tarda o falla, la escritura queda hecha y la clasificación sigue en segundo plano).
+export async function clasificarAhora(actividadId, ms = 15000) {
+  if (apagado()) return;
+  const tarea = clasificarComentarios({ actividadId }).catch((e) => console.error("[sentimiento]", e.message));
+  await Promise.race([tarea, new Promise((r) => setTimeout(r, ms))]);
+}
+
 // Ya no hay revisiones periódicas: la manito se pone solo cuando se guarda o se importa un comentario
 // (clasificarEnSegundoPlano). Se deja la función para no romper el arranque en instrumentation.js.
 export function startClasificacionSentimientos() {}

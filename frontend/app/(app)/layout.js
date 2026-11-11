@@ -27,7 +27,8 @@ export default async function AppLayout({ children }) {
 
   return (
     <ModuloShell moduloInicial={jar.get(COOKIE_MODULO)?.value}>
-      <Sidebar user={user} />
+      {/* Cookie "menu": "abierto" si la persona dejó el panel del menú fijo; si no, se abre con clic en el módulo y se oculta al salir el mouse. */}
+      <Sidebar user={user} plegadoInicial={jar.get("menu")?.value !== "abierto"} />
       <div className="app-main">{children}</div>
       <FloatingAgentChat user={user} />
       {(user.permissions?.viewNotificaciones ?? canViewNotificaciones(user.role)) && <AvisosEnVivo />}

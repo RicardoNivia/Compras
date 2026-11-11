@@ -270,3 +270,101 @@ export const SOLICITUD_COMPRA_FIELD_LABELS = {
   fechaRequerida: "Para cuándo",
   observaciones: "Observaciones",
 };
+
+// Correo vinculado (Microsoft 365) y agente de correo que detecta solicitudes de creación de proveedor.
+Object.assign(ACTION_LABELS, { vincular: "Vinculó", desvincular: "Desvinculó", aprobar: "Aprobó", descartar: "Descartó", detectar: "Detectó" });
+Object.assign(ENTITY_LABELS, { cuentaCorreo: "Correo vinculado", solicitudProveedorCorreo: "Solicitud de proveedor por correo" });
+export const CUENTA_CORREO_FIELD_LABELS = {
+  email: "Buzón",
+  estado: "Estado",
+  agenteActivo: "Agente de correo encendido",
+};
+export const SOLICITUD_PROVEEDOR_CORREO_FIELD_LABELS = {
+  estado: "Estado",
+  remitente: "Remitente",
+  asunto: "Asunto",
+  nit: "NIT",
+  nombre: "Razón social",
+  descripcion: "Descripción",
+  faltantes: "Faltantes",
+  proveedorNit: "Proveedor creado (NIT)",
+  motivoDescarte: "Motivo del descarte",
+};
+
+// Tesorería (flujo de caja, soportes, conciliación y cierre de mes).
+Object.assign(ACTION_LABELS, { analizar: "Analizó", conciliar: "Concilió", desconciliar: "Quitó la conciliación", firmar: "Firmó", importar: "Importó", otorgar: "Dio acceso", quitar: "Quitó el acceso" });
+Object.assign(ENTITY_LABELS, {
+  movimientoTesoreria: "Movimiento de tesorería",
+  maestroTesoreria: "Maestro de tesorería",
+  accesoTesoreria: "Acceso a tesorería",
+  conciliacionTesoreria: "Conciliación bancaria",
+  cierreTesoreria: "Cierre de mes de tesorería",
+  extractoTesoreria: "Extracto bancario",
+  soporteTesoreria: "Soporte de movimiento",
+});
+export const MOVIMIENTO_TESORERIA_FIELD_LABELS = {
+  fecha: "Fecha",
+  tipo: "Tipo",
+  estado: "Estado",
+  valor: "Valor",
+  moneda: "Moneda (ISO 4217)",
+  cuenta: "Cuenta",
+  cuentaDestino: "Cuenta destino",
+  item: "Ítem",
+  concepto: "Concepto",
+  pagador: "Paga",
+  tercero: "Tercero",
+  referencia: "Referencia",
+  observacion: "Observación",
+};
+export const MAESTRO_TESORERIA_FIELD_LABELS = {
+  tipoMaestro: "Catálogo",
+  nombre: "Nombre",
+  tipo: "Tipo de cuenta",
+  moneda: "Moneda (ISO 4217)",
+  formatoExtracto: "Formato de extracto",
+  saldoInicial: "Saldo inicial",
+  saldoInicialFecha: "Fecha del saldo inicial",
+  item: "Ítem por defecto",
+  activo: "Activo",
+};
+export const ACCESO_TESORERIA_FIELD_LABELS = {
+  persona: "Persona",
+  nivel: "Nivel de acceso",
+};
+export const CONCILIACION_TESORERIA_FIELD_LABELS = {
+  cuenta: "Cuenta",
+  linea: "Línea del extracto",
+  movimiento: "Movimiento",
+  como: "Cómo se enlazó",
+};
+export const CIERRE_TESORERIA_FIELD_LABELS = {
+  periodo: "Mes",
+  diferencias: "Diferencias por cuenta",
+};
+export const EXTRACTO_TESORERIA_FIELD_LABELS = {
+  cuenta: "Cuenta",
+  archivo: "Archivo",
+  lineasNuevas: "Líneas nuevas",
+  lineasRepetidas: "Líneas ya cargadas",
+  enlazadas: "Enlazadas solas",
+};
+export const SOPORTE_TESORERIA_FIELD_LABELS = {
+  archivo: "Archivo",
+  movimiento: "Movimiento",
+};
+
+// Pagos recurrentes de Tesorería.
+Object.assign(ACTION_LABELS, { generar: "Generó" });
+Object.assign(ENTITY_LABELS, { recurrenciaTesoreria: "Pago recurrente de tesorería" });
+export const RECURRENCIA_TESORERIA_FIELD_LABELS = {
+  nombre: "Nombre",
+  tipo: "Tipo",
+  valor: "Valor",
+  cuenta: "Cuenta",
+  concepto: "Concepto",
+  item: "Ítem",
+  frecuencia: "Frecuencia",
+  vigencia: "Vigencia",
+  activo: "Activo",
+};

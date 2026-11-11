@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { crearObservacionApi, eliminarObservacionApi, fetchObservacionesApi } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
 import HBarChartSvg from "@/components/charts/HBarChartSvg";
@@ -30,6 +30,18 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
   }, [act.id]);
   useEffect(() => { cargar(); }, [cargar]);
 
+  // Mientras Nova clasifica comentarios recién escritos o importados (corre en segundo plano en el servidor), la tabla
+  // se vuelve a consultar sola cada 4 s para que las manitos aparezcan sin recargar. Se detiene cuando no queda nada
+  // por clasificar o tras 2 minutos (comentarios viejos que quedaron sin clasificar no se esperan para siempre).
+  const intentos = useRef(0);
+  const porClasificar = datos?.resumen?.sinClasificar || 0;
+  const analizando = porClasificar > 0 && intentos.current < 30;
+  useEffect(() => {
+    if (!porClasificar || intentos.current >= 30) return undefined;
+    const t = setTimeout(() => { intentos.current += 1; cargar(); }, 4000);
+    return () => clearTimeout(t);
+  }, [datos, porClasificar, cargar]);
+
   const filtradas = useMemo(() => {
     const q = buscar.trim().toLowerCase();
     return (datos?.observaciones || []).filter((o) => (!filtro || (filtro === "comentario" ? !!o.texto : filtro.startsWith("s:") ? o.sentimiento === filtro.slice(2) : o.tipo === filtro))
@@ -43,9 +55,10 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
     setError("");
     setAviso("");
     try {
-      await crearObservacionApi(act.id, { texto });
+      const { observacion: nueva } = await crearObservacionApi(act.id, { texto });
       setTexto("");
-      setAviso("Observación agregada.");
+      setAviso(nueva?.sentimiento ? "Observación agregada y analizada por Nova." : "Observación agregada. Nova la está analizando: la manito aparece en unos segundos.");
+      intentos.current = 0;
       cargar();
       onCambio();
     } catch (err) {
@@ -106,7 +119,7 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
           tipo="calificaciones"
           archivo={importar}
           onClose={() => setImportar(null)}
-          onListo={(msg) => { setImportar(null); setAviso(msg); cargar(); onCambio(); }}
+          onListo={(msg) => { setImportar(null); setAviso(msg); intentos.current = 0; cargar(); onCambio(); }}
         />
       )}
 
@@ -120,7 +133,7 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
                 <label htmlFor="ob-texto">Observación</label>
                 <textarea id="ob-texto" rows={3} maxLength={2000} placeholder="Qué pasó, qué salió bien, qué hay que tener en cuenta la próxima vez…" value={texto} onChange={(e) => setTexto(e.target.value)} />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={guardando || !texto.trim()}>{guardando ? <span className="spinner" /> : <IconPlus size={13} />} Agregar</button>
+              <button type="submit" className="btn btn-primary" disabled={guardando || !texto.trim()}>{guardando ? <span className="spinner" /> : <IconPlus size={13} />} {guardando ? "Nova está analizando…" : "Agregar"}</button>
             </form>
           </section>
         )}
@@ -136,6 +149,11 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
       </div>}
 
       {aviso && <div className="ficha-aviso" role="status">{aviso}</div>}
+      {analizando && (
+        <div className="ficha-aviso" role="status">
+          <span className="spinner" /> Nova está analizando {entero(porClasificar)} comentario(s) para ponerles la manito (a favor, neutro o en contra). Aparecen solas en la tabla.
+        </div>
+      )}
       {error && <div className="modal-error">{error}</div>}
 
       <div className="toolbar" style={{ flexWrap: "wrap", gap: 10 }}>

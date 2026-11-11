@@ -9,7 +9,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
  * /api/actividades/{id}/participantes/importar-nova:
  *   post:
  *     tags: [Bienestar]
- *     summary: Importa un Excel de programados, asistentes o calificaciones; Nova identifica las columnas. multipart con archivo, tipo (programados|asistentes|calificaciones), noMarcadosNoAsistieron, y al confirmar confirmar=1 + mapeo (JSON de la vista previa). Sin confirmar no escribe nada. Requiere editBienestar.
+ *     summary: Importa un Excel de programados, asistentes o calificaciones; Nova identifica las columnas. multipart con archivo, tipo (lista = un solo archivo de participantes y asistencia, que Nova clasifica; o programados|asistentes|calificaciones), noMarcadosNoAsistieron, y al confirmar confirmar=1 + mapeo (JSON de la vista previa). Sin confirmar no escribe nada. Requiere editBienestar.
  *     responses:
  *       200: { description: "{ tipo, hoja, mapeo, columnas, muestra, descartadas, resultado, confirmado }" }
  */

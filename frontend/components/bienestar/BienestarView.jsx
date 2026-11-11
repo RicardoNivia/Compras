@@ -1,10 +1,12 @@
 "use client";
 
+import { fetchParticipacionPorAreaApi } from "@/lib/api";
+import NuevaActividadModal from "@/components/bienestar/NuevaActividadModal";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fmtCOP } from "@/lib/format";
-import { IconPlus, IconEdit } from "@/components/icons";
+import { IconPlus } from "@/components/icons";
 import CronogramaView from "@/components/bienestar/CronogramaView";
 import ResumenBienestar from "@/components/bienestar/ResumenBienestar";
 import ResumenFundacion from "@/components/bienestar/ResumenFundacion";
@@ -42,10 +44,24 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
 
-  const delAnio = useMemo(
-    () => actividades.filter((a) => (a.fecha ? a.fecha.startsWith(`${anio}-`) : anio === new Date().getFullYear())),
-    [actividades, anio]
-  );
+  // Filtro "Área" del cronograma: el área es la de los participantes (las actividades no tienen área propia). Con un
+  // área elegida quedan solo las actividades donde hubo gente de esa área, y sus inscritos y asistentes son los de ella.
+  const [area, setArea] = useState("");
+  const [porArea, setPorArea] = useState({ areas: [], porArea: {} });
+  useEffect(() => {
+    if (vista !== "cronograma") return undefined;
+    let vigente = true;
+    fetchParticipacionPorAreaApi(anio, linea).then((r) => { if (vigente) setPorArea(r); }).catch(() => { if (vigente) setPorArea({ areas: [], porArea: {} }); });
+    return () => { vigente = false; };
+  }, [vista, anio, linea]);
+  const areaActiva = porArea.areas.includes(area) ? area : "";
+
+  const delAnio = useMemo(() => {
+    const lista = actividades.filter((a) => (a.fecha ? a.fecha.startsWith(`${anio}-`) : anio === new Date().getFullYear()));
+    if (!areaActiva) return lista;
+    const deArea = porArea.porArea[areaActiva] || {};
+    return lista.filter((a) => deArea[a.id]).map((a) => ({ ...a, inscritos: deArea[a.id].inscritos, asistentes: deArea[a.id].asistentes }));
+  }, [actividades, anio, areaActiva, porArea]);
 
   const filtradas = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -70,10 +86,10 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
     return { presupuesto, gastado, gastadoConPresupuesto, asistentes, porEstado, sinPresupuesto };
   }, [delAnio]);
 
-  // Crear o editar es una página, no un modal: son muchos datos, con una pestaña por tema.
-  const nuevaHref = (fecha) => `${basePath}/actividades/nueva${fecha ? `?fecha=${fecha}` : ""}`;
+  // Crear una actividad: un modal que solo pregunta el nombre; al guardar se abre su página para completar lo demás.
+  const [nueva, setNueva] = useState(null); // null = cerrado; { fecha } = abierto (fecha si viene de un día del cronograma)
   const botonNueva = puedeEditar && (
-    <Link href={nuevaHref()} className="btn btn-primary bienestar-add"><IconPlus size={13} /> Nueva actividad</Link>
+    <button type="button" className="btn btn-primary bienestar-add" onClick={() => setNueva({ fecha: "" })}><IconPlus size={13} /> Nueva actividad</button>
   );
 
   const indicadores = (
@@ -131,7 +147,7 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
           actividad={{ id: comentarioDe.actividadId, nombre: comentarioDe.actividad, fecha: comentarioDe.fecha, fechaFin: comentarioDe.fechaFin, estado: comentarioDe.estado, linea: comentarioDe.linea }}
           tabInicial="comentarios"
           fichaHref={(a) => fichaDe(a.id)}
-          editarHref={puedeEditar ? (a) => `${fichaDe(a.id)}/editar` : null}
+          editarHref={puedeEditar ? (a) => `${fichaDe(a.id)}?tab=datos` : null}
           onClose={() => setComentarioDe(null)}
         />
       )}
@@ -164,20 +180,30 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
           anio={anio}
           actividades={delAnio}
           onAbrir={(a) => router.push(fichaDe(a.id))}
-          onNueva={puedeEditar ? (fecha) => router.push(nuevaHref(fecha)) : null}
+          onNueva={puedeEditar ? (fecha) => setNueva({ fecha: fecha || "" }) : null}
           fichaHref={(a) => fichaDe(a.id)}
           linea={linea}
           indicadores={indicadores}
           selectorAnio={(
-            <label className="cronograma-selector-anio">
-              Año
-              <select value={anio} onChange={(e) => setAnio(Number(e.target.value))}>
-                {anios.map((y) => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </label>
+            <>
+              <label className="cronograma-selector-anio">
+                Año
+                <select value={anio} onChange={(e) => setAnio(Number(e.target.value))}>
+                  {anios.map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </label>
+              <label className="cronograma-selector-anio" title="Área de los participantes: muestra las actividades donde hubo personas de esa área, con sus inscritos y asistentes">
+                Área
+                <select value={areaActiva} onChange={(e) => setArea(e.target.value)} disabled={porArea.areas.length === 0}>
+                  <option value="">{porArea.areas.length ? "Todas" : "Sin participantes"}</option>
+                  {porArea.areas.map((a) => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </label>
+              {areaActiva && <span className="count-note">Participación de {areaActiva}: {delAnio.length} actividad(es). Presupuesto y gasto son de toda la actividad.</span>}
+            </>
           )}
           accion={botonNueva}
-          editarHref={puedeEditar ? (a) => `${fichaDe(a.id)}/editar` : null}
+          editarHref={puedeEditar ? (a) => `${fichaDe(a.id)}?tab=datos` : null}
         />
       ) : (
         <>
@@ -254,12 +280,8 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
                         </td>
                         <td className="actions-cell">
                           <div className="row-actions">
-                            <Link href={fichaDe(a.id)} className="btn small">Ver ficha</Link>
-                            {puedeEditar && a.estado !== "cerrada" && (
-                              <Link href={`${fichaDe(a.id)}/editar`} className="icon-action-btn" title="Editar actividad" aria-label={`Editar ${a.nombre}`}>
-                                <IconEdit size={13} />
-                              </Link>
-                            )}
+                            {/* Un solo botón: la actividad se ve y se edita en la misma página. */}
+                            <Link href={fichaDe(a.id)} className="btn small" title={puedeEditar && a.estado !== "cerrada" ? "Ver y gestionar la actividad" : "Ver la actividad"}>Abrir</Link>
                           </div>
                         </td>
                       </tr>
@@ -286,6 +308,7 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
           </div>
         </>
       )}
+      {nueva && <NuevaActividadModal linea={linea} fecha={nueva.fecha} basePath={basePath} onClose={() => setNueva(null)} />}
       {verCalificacion != null && <CalificacionModal actividadId={verCalificacion} puedeEditar={puedeEditar} onClose={() => setVerCalificacion(null)} onCambio={() => router.refresh()} />}
     </div>
   );

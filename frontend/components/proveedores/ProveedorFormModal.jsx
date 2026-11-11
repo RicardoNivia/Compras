@@ -29,11 +29,14 @@ function opciones(lista, actualId) {
 // contra el catálogo y no se puede guardar si ya existe (al crear o al cambiarlo).
 // Tipo, clasificación por monto, tipo de servicio, área y motivo de excepción son maestros.
 // Al crear, se puede pegar el correo de solicitud y Nova precarga los campos.
-export default function ProveedorFormModal({ proveedor, catalogos = {}, inicioCiclo: inicioCicloProp, onClose, onSaved, onClasificado }) {
+export default function ProveedorFormModal({ proveedor, catalogos = {}, inicioCiclo: inicioCicloProp, onClose, onSaved, onClasificado, inicial = null, guardar = null, titulo = null, aviso = null }) {
   const { areas = [], tipos = [], clasificaciones = [], servicios = [], motivos = [] } = catalogos;
   const [inactivando, setInactivando] = useState(false);
   const [reactivando, setReactivando] = useState(false);
   const editando = !!proveedor;
+  // inicial: datos para precargar un proveedor NUEVO (p. ej. los que sacó el agente de correo); guardar: reemplaza
+  // la creación (la solicitud del correo se aprueba en su propia ruta); aviso: texto arriba del formulario.
+  const valores = proveedor || inicial;
   // Por defecto se muestra el llenado manual; "Pegar el correo de solicitud" abre la opción con Nova.
   const [pasteOpen, setPasteOpen] = useState(false);
   const [texto, setTexto] = useState("");
@@ -41,20 +44,20 @@ export default function ProveedorFormModal({ proveedor, catalogos = {}, inicioCi
   const [parseError, setParseError] = useState("");
   const [novaNota, setNovaNota] = useState("");
 
-  const [nombre, setNombre] = useState(proveedor?.nombre || "");
-  const [nit, setNit] = useState(proveedor?.nit || "");
-  const [descripcion, setDescripcion] = useState(proveedor?.descripcion || "");
-  const [telefono, setTelefono] = useState(proveedor?.telefono || "");
-  const [correo, setCorreo] = useState(proveedor?.correo || "");
-  const [areaId, setAreaId] = useState(proveedor?.areaId || "");
-  const [tipoServicioId, setTipoServicioId] = useState(proveedor?.tipoServicioId || "");
-  const [tipoProveedorId, setTipoProveedorId] = useState(proveedor?.tipoProveedorId || "");
-  const [clasificacionMontoId, setClasificacionMontoId] = useState(proveedor?.clasificacionMontoId || "");
-  const [revision, setRevision] = useState(proveedor?.revision || "");
-  const [observacion, setObservacion] = useState(proveedor?.observacion || "");
-  const [esExcepcion, setEsExcepcion] = useState(!!proveedor?.esExcepcion);
-  const [motivoExcepcionId, setMotivoExcepcionId] = useState(proveedor?.motivoExcepcionId || "");
-  const [justificacion, setJustificacion] = useState(proveedor?.justificacionExcepcion || "");
+  const [nombre, setNombre] = useState(valores?.nombre || "");
+  const [nit, setNit] = useState(valores?.nit || "");
+  const [descripcion, setDescripcion] = useState(valores?.descripcion || "");
+  const [telefono, setTelefono] = useState(valores?.telefono || "");
+  const [correo, setCorreo] = useState(valores?.correo || "");
+  const [areaId, setAreaId] = useState(valores?.areaId || "");
+  const [tipoServicioId, setTipoServicioId] = useState(valores?.tipoServicioId || "");
+  const [tipoProveedorId, setTipoProveedorId] = useState(valores?.tipoProveedorId || "");
+  const [clasificacionMontoId, setClasificacionMontoId] = useState(valores?.clasificacionMontoId || "");
+  const [revision, setRevision] = useState(valores?.revision || "");
+  const [observacion, setObservacion] = useState(valores?.observacion || "");
+  const [esExcepcion, setEsExcepcion] = useState(!!valores?.esExcepcion);
+  const [motivoExcepcionId, setMotivoExcepcionId] = useState(valores?.motivoExcepcionId || "");
+  const [justificacion, setJustificacion] = useState(valores?.justificacionExcepcion || "");
   const estadoActual = proveedor?.ciclo?.estado || "";
   const [estado, setEstado] = useState(estadoActual);
   // Al aprobar (pasar a Actualizado) se pide la fecha de actualización: del ciclo vigente y no futura.
@@ -91,7 +94,7 @@ export default function ProveedorFormModal({ proveedor, catalogos = {}, inicioCi
 
 
   // Validación al intentar guardar: los obligatorios que falten se resaltan en rojo.
-  const [intentado, setIntentado] = useState(false);
+  const [intentado, setIntentado] = useState(!!inicial); // con datos precargados, lo que falta se ve en rojo de una vez
   const faltantes = {
     nit: ["vacio", "invalido", "existe"].includes(nitCheck.estado),
     nombre: !nombre.trim(),
@@ -195,7 +198,7 @@ export default function ProveedorFormModal({ proveedor, catalogos = {}, inicioCi
 
     setSaving(true);
     try {
-      const saved = editando ? await updateProveedorApi(proveedor.nit, data) : await createProveedorApi(data);
+      const saved = editando ? await updateProveedorApi(proveedor.nit, data) : guardar ? await guardar(data) : await createProveedorApi(data);
       // El estado del ciclo se guarda aparte (valida el checklist completo para "Actualizado").
       if (editando && !esExcepcion && estadoActual && estado && estado !== estadoActual) await cambiarEstadoCicloApi(saved.nit, estado, aprobando ? fechaActualizacion : undefined);
       onSaved(saved);
@@ -219,7 +222,7 @@ export default function ProveedorFormModal({ proveedor, catalogos = {}, inicioCi
     <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal prov-form-modal" style={{ maxWidth: 680 }}>
         <div className="modal-head">
-          <h3>{editando ? "Editar proveedor" : "Registrar proveedor"}</h3>
+          <h3>{titulo || (editando ? "Editar proveedor" : "Registrar proveedor")}</h3>
           <button type="button" className="btn-ghost icon-btn" onClick={onClose} aria-label="Cerrar">✕</button>
         </div>
 
@@ -259,11 +262,12 @@ export default function ProveedorFormModal({ proveedor, catalogos = {}, inicioCi
                   <div><span>Alerta</span><strong>{proveedor.alerta && proveedor.alerta.nivel !== "ok" ? proveedor.alerta.titulo : "Sin alertas"}</strong></div>
                 </div>
               )}
-              {!editando && (
+              {!editando && !inicial && (
                 <button type="button" className="btn small" onClick={() => setPasteOpen(true)} style={{ width: "fit-content" }}>
                   <IconSpark size={12} /> Pegar el correo de solicitud y completar con Nova
                 </button>
               )}
+              {aviso && <p className="prov-note">{aviso}</p>}
               {novaNota && <p className="prov-note">{novaNota}</p>}
 
               <fieldset className="prov-form-section">

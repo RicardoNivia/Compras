@@ -512,6 +512,9 @@ export async function fetchActividadesApi(anio) {
   return handle(res);
 }
 
+// Filtro "Área" del cronograma: participación de cada área (la de los participantes) en las actividades del año.
+export const fetchParticipacionPorAreaApi = (anio, linea) => fetch(`/api/actividades/por-area?anio=${encodeURIComponent(anio)}&linea=${encodeURIComponent(linea)}`, { cache: "no-store" }).then(handle);
+
 export const fetchComprasSinActividadApi = (anio, mes) => fetch(`/api/actividades/compras-sin-actividad?anio=${encodeURIComponent(anio)}${mes ? `&mes=${mes}` : ""}`, { cache: "no-store" }).then(handle);
 
 export async function fetchActividadApi(id) {
@@ -701,12 +704,6 @@ export const eliminarCuadroApi = (id, base = COTIZADOR_BIENESTAR) => fetch(`${ba
 export const revisarCompraApi = (borrador, id) => postAgente("/api/agentes-compras/revisar", { borrador, id });
 export const proveedorPrecioApi = (texto) => postAgente("/api/agentes-compras/proveedor-precio", { texto });
 export const buscarComprasAgenteApi = (q) => fetch(`/api/agentes-compras/compras?q=${encodeURIComponent(q || "")}`, { cache: "no-store" }).then(handle);
-export function verificarFacturaApi(recordId, archivo) {
-  const fd = new FormData();
-  fd.append("recordId", recordId);
-  fd.append("archivo", archivo, archivo.name);
-  return fetch("/api/agentes-compras/factura", { method: "POST", body: fd }).then(handle);
-}
 export const vigiaPresupuestoApi = (anio) => fetch(`/api/agentes-compras/presupuesto?anio=${encodeURIComponent(anio)}`, { cache: "no-store" }).then(handle);
 export const anomaliasApi = (desde, hasta) => fetch(`/api/agentes-compras/anomalias?desde=${encodeURIComponent(desde || "")}&hasta=${encodeURIComponent(hasta || "")}`, { cache: "no-store" }).then(handle);
 export const lecturaNovaApi = (body) => postAgente("/api/agentes-compras/lectura", body);

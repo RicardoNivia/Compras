@@ -1,3 +1,4 @@
+import { accesoDe } from "@/lib/tesoreria/comun";
 import { getSessionUser } from "@/lib/auth-server";
 import { isRoleAllowed } from "@/lib/permissions";
 import { logAgentViolation } from "@/lib/audit";
@@ -28,7 +29,7 @@ const MAX_CHARS_MENSAJE_VIEJO = 1500;
 // pagar ese costo de nuevo en cada llamada.
 const NUMEROS_TEXTO = ["", "UNA", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO"];
 
-function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar) {
+function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar, canSeeTesoreria = false) {
   const sourceList = [
     "Los datos transaccionales de compras (registros de solicitudes) — se consultan con las herramientas \"resumen_compras\" (cifras exactas/agregadas) y \"buscar_registros\" (registros puntuales). Lo que le toca hacer HOY a quien te escribe (pendientes según su rol: compras por legalizar o radicar, solicitudes atrasadas, proveedores por actualizar, etc.) se consulta con \"mis_pendientes\" — úsala ante \"¿qué me toca hoy?\" o \"¿por dónde empiezo?\" y prioriza primero lo urgente. Las valoraciones de Nova de las compras radicadas (puntaje de la compra y del proveedor, y por qué se calificó así) se consultan con \"consultar_valoraciones\"; los PARÁMETROS con los que se califican compras y proveedores están en la guía (C), sección 9 — explícalos con esa sección, y para el porqué de un puntaje concreto cita la valoración guardada.",
     `El texto de referencia de "${PROCUREMENT_POLICY_TITLE}" — el procedimiento oficial de compras de la compañía (roles y responsabilidades, plazos, umbrales de cuadro comparativo, debida diligencia, aprobaciones por monto, flujo de actividades, etc.). Se consulta por secciones con la herramienta "consultar_referencia" (documento "procedimiento"); su índice está más abajo.`,
@@ -45,6 +46,9 @@ function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSee
   }
   if (canSeeBienestar) {
     sourceList.push(`El módulo de Bienestar y Fundación (actividades, cronograma, asistencia y participación por área, inventario, calificaciones y su costo) — se consulta con las herramientas "resumen_bienestar" (cifras), "buscar_actividades", "detalle_actividad" y "fotos_actividad" (fotos de una actividad). ${CONECTANDO_CORAZONES_RESUMEN} Si preguntan qué es Conectando Corazones, su propósito, misión, visión, valores, componentes, la Fundación Proyecto Unión o la alianza con Sincosoft, consulta el documento "fundacion" con "consultar_referencia" y responde con lo que dice. Las cifras de ese documento (niños que atienden los hogares, colaboradores que donan, trabajadores financiados) son datos de la fundación y de la alianza: puedes citarlas como tales, pero nunca como personas atendidas por las jornadas registradas en la app (de eso no tienes cifras de beneficiarios: no las des). Al analizar o resumir actividades de Fundación, puedes relacionarlas con los valores y componentes del programa (p. ej. una visita al hogar es una "Vivencia en el hogar"), sin inventar lo que no dicen los datos. En este módulo todo gasto es de compras asociadas a una actividad. Solo tienes cifras agregadas: no conoces nombres ni datos personales de los participantes, y no debes intentar deducirlos.`);
+  }
+  if (canSeeTesoreria) {
+    sourceList.push(`El módulo de Tesorería (flujo de caja: movimientos de ingreso, egreso y traslado por cuenta, ítem, concepto y quién paga; soportes; conciliación con los extractos bancarios y cierre de mes). Se consulta con "resumen_tesoreria" (cifras y saldos), "buscar_movimientos_tesoreria" (pagos puntuales), "estado_conciliacion_tesoreria" y "estado_cierre_tesoreria". Es información financiera personal y confidencial: úsala solo para responder a quien pregunta, sin repetirla fuera de lo que pide. El dinero va SIEMPRE con su código de moneda ISO 4217 (p. ej. «COP 1.234.567»), tal como lo devuelven las herramientas; nunca sumes monedas distintas. Proyectado = planeado sin ejecutar; un movimiento migrado del Excel con fechaAproximada solo tiene el mes. Tú no registras ni cambias movimientos: si te piden registrar uno, indícales Tesorería › Movimientos › Registrar con soporte.`);
   }
   const restricciones = [];
   if (!canSeeProveedoresGestion) restricciones.push("gestión de proveedores");
@@ -191,6 +195,8 @@ export async function POST(request) {
   const canSeeAuditoria = await isRoleAllowed(user.role, "viewAuditoria");
   const canSeeProveedoresGestion = await isRoleAllowed(user.role, "viewProveedores");
   const canSeeBienestar = (await Promise.all(["viewBienestar", "viewFundacion", "viewDashboardBienestar", "viewDashboardFundacion"].map((f) => isRoleAllowed(user.role, f)))).some(Boolean);
+  // Tesorería: acceso nominal (no por rol). Sus herramientas nunca van al servidor MCP.
+  const canSeeTesoreria = !!(await accesoDe(user.id));
 
   const body = await request.json().catch(() => ({}));
   const message = (body.message || "").toString().trim();
@@ -241,10 +247,10 @@ export async function POST(request) {
   const jobId = createJob(async () => {
     let fullText = "";
     try {
-      const tools = buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar });
+      const tools = buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar, canSeeTesoreria });
       const executeTool = buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, user });
       for await (const chunk of streamChatCascade({
-        staticPrefix: buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar),
+        staticPrefix: buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar, canSeeTesoreria),
         systemInstruction: buildDynamicInstructionSuffix(user, section, contexto),
         contents,
         tools,

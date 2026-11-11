@@ -40,6 +40,7 @@ export const FEATURES = [
   { key: "viewMaestrosBienestar", label: "Maestros de Bienestar y Fundación", modulo: "Bienestar", section: "Maestros", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO] },
   { key: "viewAlertas", label: "Ver Mi día y alertas", modulo: "General", section: "Alertas y notificaciones", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR, ROLES.PROVEEDORES] },
   { key: "viewNotificaciones", label: "Configurar mis notificaciones (app y Teams)", modulo: "General", section: "Alertas y notificaciones", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR, ROLES.PROVEEDORES] },
+  { key: "vincularCorreo", label: "Vincular mi correo (el agente lee las solicitudes de proveedor y las deja en la Bandeja)", modulo: "General", section: "Mi correo", defaultRoles: [ROLES.ADMIN, ROLES.PROVEEDORES] },
   { key: "viewAgenteIA", label: "Ver Nova", modulo: "General", section: "Nova", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR, ROLES.PROVEEDORES] },
   { key: "viewUsuarios", label: "Administrar Usuarios", modulo: "General", section: "Usuarios", defaultRoles: [ROLES.ADMIN] },
   { key: "viewAuditoria", label: "Ver Auditoría", modulo: "General", section: "Auditoría", defaultRoles: [ROLES.ADMIN] },

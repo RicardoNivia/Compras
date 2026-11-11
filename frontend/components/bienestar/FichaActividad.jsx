@@ -8,7 +8,10 @@ import {
   fetchActividadApi, updateActividadApi, fetchParticipantesApi, actualizarParticipanteApi, eliminarParticipanteApi,
   crearParticipanteApi, fetchInventarioApi, generarAnalisisActividadApi, fetchMaestroTipoApi, crearItemApi,
   actualizarItemApi, eliminarItemApi, importarInventarioApi, fetchPlantillasFormularioApi, configurarFormularioApi,
+  asociarCompraApi, desasociarCompraApi,
 } from "@/lib/api";
+import ActividadFormulario from "@/components/bienestar/ActividadFormulario";
+import AsociarComprasPanel from "@/components/bienestar/AsociarComprasPanel";
 import { AnimatedNumber } from "@/components/charts/chartKit";
 import HBarChartSvg from "@/components/charts/HBarChartSvg";
 import ImportarNovaModal from "@/components/bienestar/ImportarNovaModal";
@@ -21,9 +24,13 @@ import FotosActividad from "@/components/bienestar/FotosActividad";
 import ObservacionesActividad from "@/components/bienestar/ObservacionesActividad";
 import AgenteImportacion from "@/components/bienestar/AgenteImportacion";
 import { ComentarioConMano } from "@/components/bienestar/Sentimiento";
-import { IconPlus, IconTrash, IconDownload, IconCheck } from "@/components/icons";
-import { estadoActividad, pctClase, rangoFechas } from "@/components/bienestar/actividadesUi";
+import {
+  IconPlus, IconTrash, IconDownload, IconCheck, IconDashboard, IconEdit, IconMoney, IconBag, IconUsers, IconMano,
+  IconLayers, IconEye, IconStar, IconSpark,
+} from "@/components/icons";
+import { ESTADOS_ACTIVIDAD, estadoActividad, pctClase, rangoFechas } from "@/components/bienestar/actividadesUi";
 import { crossfade } from "@/lib/crossfade";
+import MoneyInput from "@/components/MoneyInput";
 
 const PAGE_SIZES = [25, 50, 100];
 const entero = (v) => Math.round(v).toLocaleString("es-CO");
@@ -32,11 +39,34 @@ const pct = (v) => (v == null ? "—" : `${(Math.round(v * 1000) / 10).toString(
 // Ficha de una actividad de Bienestar: todo su detalle para ir desglosando — presupuesto contra gasto, inscritos y
 // quiénes no asistieron (con su motivo), participación por área, inventario (qué se usó y qué quedó), compras,
 // formulario público de inscripción y el cierre con calificación.
-export default function FichaActividad({ actividadId, puedeEditar, basePath }) {
+// Diseño: arriba, la cabecera con el ciclo de la actividad (creada → programada → ejecutada → cerrada) y cuatro
+// medidores (presupuesto, compras, asistencia, calificación) que llevan a su sección; abajo, un menú lateral con las
+// secciones agrupadas por tema (La actividad · Dinero · Personas · Registro · Cierre) y el contenido a la derecha.
+// Es la ÚNICA página de la actividad: aquí se ve y aquí mismo se configura (antes había una página "Editar" aparte).
+// Cada pestaña junta lo que se configura con lo que se ve de ese tema: Datos de la actividad (nombre, fechas, estado,
+// responsable) · Presupuesto (cuánto se asigna y en qué va) · Compras (asociar, quitar, solicitar) · Participantes y asistencia (si
+// aplica, los totales o la lista con su importación). Las partes editables son el mismo ActividadFormulario, incrustado.
+const TABS_VALIDAS = ["resumen", "datos", "presupuesto", "compras", "participantes", "observaciones", "inventario", "fotos", "calificaciones", "agente"];
+export default function FichaActividad({ actividadId, puedeEditar, basePath, responsables = [], lineasPermitidas }) {
   const [act, setAct] = useState(null);
   const [error, setError] = useState("");
-  // Al cerrar desde el formulario llega con ?tab=calificaciones.
-  const [tab, setTab] = useState(useSearchParams().get("tab") === "calificaciones" ? "calificaciones" : "resumen");
+  // ?tab= abre directo en una pestaña (los enlaces viejos a /editar llegan con tab=datos; al cerrar, calificaciones).
+  const tabPedida = useSearchParams().get("tab");
+  const [tab, setTab] = useState(TABS_VALIDAS.includes(tabPedida) ? tabPedida : "resumen");
+  const sucio = useRef(false); // hay cambios sin guardar en la sección editable de la pestaña
+  const [guardado, setGuardado] = useState(false);
+  const [verConfig, setVerConfig] = useState(false); // configuración de la asistencia desplegada
+  useEffect(() => {
+    if (!guardado) return undefined;
+    const t = setTimeout(() => setGuardado(false), 3500);
+    return () => clearTimeout(t);
+  }, [guardado]);
+  function cambiarTab(k) {
+    if (k === tab) return;
+    if (sucio.current && !window.confirm("Tienes cambios sin guardar en esta sección. ¿Salir sin guardarlos?")) return;
+    sucio.current = false;
+    crossfade(() => setTab(k));
+  }
   const [cerrar, setCerrar] = useState(false);
   const [verCalificacion, setVerCalificacion] = useState(false);
 
@@ -54,78 +84,192 @@ export default function FichaActividad({ actividadId, puedeEditar, basePath }) {
   const disponible = presupuesto - act.gastado;
   const asistencia = p.inscritos ? p.asistieron / p.inscritos : act.inscritos ? (act.asistentes || 0) / act.inscritos : null;
   const cerrada = act.estado === "cerrada";
+  // La parte editable de una pestaña. La clave cambia con lo que se guarda o se importa, así el formulario siempre
+  // arranca de los datos vigentes (p. ej. los conteos después de importar la asistencia).
+  const formulario = (secciones, extra = {}) => (
+    <ActividadFormulario
+      key={`${secciones.join()}|${act.updatedAt}|${act.inscritos}|${act.asistentes}|${act.presupuesto}|${act.compras}`}
+      embebido
+      secciones={secciones}
+      actividad={act}
+      responsables={responsables}
+      lineasPermitidas={lineasPermitidas}
+      puedeEditar={puedeEditar && !cerrada}
+      basePath={basePath}
+      onGuardado={() => { setGuardado(true); cargar(); }}
+      onSucio={(s) => { sucio.current = s; }}
+      {...extra}
+    />
+  );
+
+  // ---- Lo que arma la página ----
+  const asistieronN = p.total ? p.asistieron : act.asistentes || 0;
+  const inscritosN = p.inscritos || act.inscritos || 0;
+  const costoAsistente = asistieronN && act.gastado ? act.gastado / asistieronN : null;
+  const iEstado = ESTADOS_ACTIVIDAD.findIndex((x) => x.value === act.estado);
+  const cuenta = (n) => (n ? String(n) : null);
+  // Las secciones, agrupadas por tema (antes eran once pestañas en dos filas). [clave, nombre, ícono, contador, aviso]
+  const grupos = [
+    { titulo: "La actividad", items: [["resumen", "Resumen", IconDashboard], ["datos", "Datos de la actividad", IconEdit]] },
+    { titulo: "Dinero", items: [["presupuesto", "Presupuesto", IconMoney, act.presupuesto == null && !cerrada ? "Falta" : null, true], ["compras", "Compras", IconBag, cuenta(act.compras)]] },
+    {
+      titulo: "Personas",
+      items: [
+        ["participantes", "Participantes y asistencia", IconUsers, act.aplicaParticipantes ? cuenta(p.total) : null],
+        ["observaciones", "Encuesta y observaciones", IconMano, cuenta(act.totalObservaciones)],
+        // "Formulario de inscripción" está oculto (noviembre 2026). TabFormulario, la ruta pública /inscripcion/<token> y el
+        // backend siguen existiendo; para mostrarlo de nuevo, descomentar esta línea y devolver "formulario" a TABS_VALIDAS:
+        // ...(act.aplicaParticipantes ? [["formulario", "Formulario de inscripción", IconFile, act.formularioAbierto ? "Abierto" : null]] : []),
+      ],
+    },
+    { titulo: "Registro", items: [["inventario", "Inventario", IconLayers, cuenta(act.inventario.items.length)], ["fotos", "Fotos", IconEye, cuenta(act.fotos)]] },
+    { titulo: "Cierre", items: [["calificaciones", "Calificación", IconStar]] },
+    ...(puedeEditar && !cerrada ? [{ titulo: "Ayuda de Nova", items: [["agente", "Agente de importación", IconSpark]] }] : []),
+  ];
+  const seccion = grupos.flatMap((g) => g.items).find((it) => it[0] === tab) || grupos[0].items[0];
+  const AYUDA = {
+    resumen: "Cómo va la actividad, de un vistazo.",
+    datos: "Nombre, fechas, estado y responsable. Guarda al terminar.",
+    presupuesto: "Cuánto se le asigna y en qué va el gasto.",
+    compras: "Lo que se compra para la actividad: solicitar, asociar o quitar compras.",
+    participantes: "Quiénes están inscritos, quién fue, quién no y por qué.",
+    observaciones: "Lo que opinaron los participantes y lo que anota el equipo.",
+    formulario: "El enlace para que las personas se inscriban solas.",
+    inventario: "Qué se llevó, cuánto se usó y qué sobró.",
+    fotos: "El registro fotográfico de la actividad.",
+    calificaciones: "La calificación de Nova y la del equipo al cerrar.",
+    agente: "Sube todos los archivos de la actividad y Nova los reparte.",
+  };
+  const medidor = (clave, etiqueta, valor, sub, barra) => (
+    <button type="button" className={`fx-medidor${tab === clave ? " activo" : ""}`} onClick={() => cambiarTab(clave)} title={`${sub} · clic para ir a ${etiqueta}`}>
+      <span className="fx-medidor-et">{etiqueta}</span>
+      <strong>{valor}</strong>
+      {barra && <span className="fx-barra" aria-hidden="true"><i className={barra.clase} style={{ width: `${Math.max(0, Math.min(100, barra.pct * 100))}%` }} /></span>}
+      <small>{sub}</small>
+    </button>
+  );
 
   return (
-    <div className="ficha">
-      <div className="ficha-head">
-        <div className="ficha-head-txt">
-          <Link href={`${basePath}/actividades`} className="ficha-volver">← Actividades {act.linea === "Fundación" ? "de Fundación" : ""}</Link>
-          <h1>{act.nombre}</h1>
-          <div className="actividad-chips">
-            <span className="actividad-chip">{rangoFechas(act)}</span>
-            <span className={`bienestar-linea ${act.linea === "Fundación" ? "fundacion" : ""}`}>{act.linea}</span>
-            <span className={`pill ${est.pill}`}>{est.label}</span>
-            {!act.enCronograma && <span className="actividad-chip">Fuera del cronograma</span>}
-            {act.responsableNombre && <span className="actividad-chip">Responsable: {act.responsableNombre}</span>}
+    <div className="ficha fx">
+      <header className={`fx-hero${act.linea === "Fundación" ? " af-fundacion" : ""}`}>
+        <div className="fx-hero-top">
+          <div className="ficha-head-txt">
+            <Link href={`${basePath}/actividades`} className="ficha-volver">← Actividades {act.linea === "Fundación" ? "de Fundación" : ""}</Link>
+            <h1>{act.nombre}</h1>
+            <div className="actividad-chips">
+              <span className="actividad-chip">{rangoFechas(act)}</span>
+              <span className={`bienestar-linea ${act.linea === "Fundación" ? "fundacion" : ""}`}>{act.linea}</span>
+              {!act.enCronograma && <span className="actividad-chip">Fuera del cronograma</span>}
+              <span className="actividad-chip">{act.responsableNombre ? `Responsable: ${act.responsableNombre}` : "Sin responsable"}</span>
+            </div>
+          </div>
+          <div className="ficha-head-acciones">
+            {(cerrada || act.analisisNova) && (
+              <button type="button" className="ficha-cierre" onClick={() => setVerCalificacion(true)} title="Ver la calificación y el análisis de Nova">
+                <Estrellas valor={act.calificacion ?? act.analisisNova?.puntaje} />
+                {cerrada ? `Cerrada por ${act.cerradaPorNombre || "—"}${act.cerradaAt ? ` · ${fmtDateTime(act.cerradaAt)}` : ""}` : "Análisis de Nova"}
+              </button>
+            )}
+            {puedeEditar && !cerrada && (
+              <button type="button" className="btn btn-primary" onClick={() => setCerrar(true)} disabled={!!razonParaNoCerrar(act)} title={razonParaNoCerrar(act) || "Calificar y cerrar la actividad"}>
+                <IconCheck size={13} /> Cerrar actividad
+              </button>
+            )}
           </div>
         </div>
-        <div className="ficha-head-acciones">
-          {puedeEditar && !cerrada && <Link className="btn" href={`${basePath}/actividades/${act.id}/editar`}>Editar</Link>}
-          {puedeEditar && !cerrada && (
-            <button type="button" className="btn btn-primary" onClick={() => setCerrar(true)} disabled={!!razonParaNoCerrar(act)} title={razonParaNoCerrar(act) || "Calificar y cerrar la actividad"}>
-              <IconCheck size={13} /> Cerrar actividad
-            </button>
+
+        {/* En qué va la actividad: creada → programada → ejecutada → cerrada */}
+        <ol className="fx-ciclo" aria-label={`Estado de la actividad: ${est.label}`}>
+          {ESTADOS_ACTIVIDAD.map((x, i) => (
+            <li key={x.value} className={i < iEstado ? "hecho" : i === iEstado ? "actual" : ""} aria-current={i === iEstado ? "step" : undefined}>
+              <span className="fx-ciclo-punto">{i < iEstado ? <IconCheck size={11} /> : i + 1}</span>
+              {x.label}
+            </li>
+          ))}
+        </ol>
+
+        {/* Cuatro medidores; cada uno lleva a su sección */}
+        <div className="fx-medidores">
+          {medidor(
+            "presupuesto", "Presupuesto",
+            act.presupuesto != null ? <><AnimatedNumber value={act.gastado} format={fmtCOP} /> <em>de {fmtCOP(presupuesto)}</em></> : "Sin asignar",
+            act.presupuesto != null ? `${pct(act.pctPresupuesto)} gastado · disponible ${fmtCOP(disponible)}` : (cerrada ? "No se asignó presupuesto" : "Asígnalo aquí"),
+            act.pctPresupuesto != null ? { pct: act.pctPresupuesto, clase: pctClase(act.pctPresupuesto) } : null,
           )}
-          {(cerrada || act.analisisNova) && (
-            <button type="button" className="ficha-cierre" onClick={() => setVerCalificacion(true)} title="Ver la calificación y el análisis de Nova">
-              <Estrellas valor={act.calificacion ?? act.analisisNova?.puntaje} />
-              {cerrada ? `Cerrada por ${act.cerradaPorNombre || "—"}${act.cerradaAt ? ` · ${fmtDateTime(act.cerradaAt)}` : ""}` : "Análisis de Nova"}
-            </button>
+          {medidor(
+            "compras", "Compras",
+            <><AnimatedNumber value={act.compras} format={entero} /> <em>compra(s)</em></>,
+            act.compras ? `${fmtCOP(act.gastado)} en total${costoAsistente ? ` · ${fmtCOP(costoAsistente)} por asistente` : ""}` : "Aún no hay compras asociadas",
+          )}
+          {act.aplicaParticipantes ? medidor(
+            "participantes", "Asistencia",
+            <><AnimatedNumber value={asistieronN} format={entero} /> <em>de {entero(inscritosN)} inscritos</em></>,
+            `Participación ${pct(asistencia)}${p.noAsistieron ? ` · ${p.noAsistieron} no asistieron${p.motivos[0] ? ` (${p.motivos[0].motivo})` : ""}` : ""}${p.sinRegistrar ? ` · ${p.sinRegistrar} sin registrar` : ""}${!p.total && !inscritosN ? " · sin lista de inscritos" : ""}`,
+            asistencia != null ? { pct: asistencia, clase: "good" } : null,
+          ) : medidor("participantes", "Asistencia", "No aplica", "Esta actividad no maneja participantes")}
+          {medidor(
+            "calificaciones", "Calificación",
+            <Estrellas valor={act.calificacion ?? act.analisisNova?.puntaje} />,
+            p.calificacionPromedio ? `Asistentes: ${p.calificacionPromedio.toFixed(1).replace(".", ",")} / 5 (${p.calificaciones})` : cerrada ? "Calificada al cerrar" : "Sin calificaciones todavía",
           )}
         </div>
-      </div>
+      </header>
 
-      <div className="resumen-kpis">
-        <Kpi label="Presupuesto" valor={act.presupuesto != null ? <AnimatedNumber value={presupuesto} format={fmtCOP} /> : "Sin asignar"} sub={act.presupuesto != null ? `Disponible ${fmtCOP(disponible)}` : (cerrada ? "No se asignó" : "Asígnalo en Editar")} />
-        <Kpi label="Gastado" valor={<AnimatedNumber value={act.gastado} format={fmtCOP} />} sub={act.pctPresupuesto != null ? `${pct(act.pctPresupuesto)} del presupuesto · ${act.compras} compra(s)` : `${act.compras} compra(s) asociada(s)`} clase={act.pctPresupuesto != null ? pctClase(act.pctPresupuesto) : ""} />
-        {act.aplicaParticipantes ? (
-          <>
-        <Kpi label="Inscritos" valor={<AnimatedNumber value={p.inscritos || act.inscritos || 0} format={entero} />} sub={p.total ? `${p.sinRegistrar} sin asistencia registrada` : "Sin lista de inscritos"} />
-        <Kpi label="Asistieron" valor={<AnimatedNumber value={p.total ? p.asistieron : act.asistentes || 0} format={entero} />} sub={`Participación ${pct(asistencia)}`} />
-        <Kpi label="No asistieron" valor={<AnimatedNumber value={p.noAsistieron} format={entero} />} sub={p.motivos[0] ? `Más frecuente: ${p.motivos[0].motivo}` : "—"} clase={p.noAsistieron ? "warning" : ""} />
-        <Kpi label="Costo por asistente" valor={(p.asistieron || act.asistentes) && act.gastado ? fmtCOP(act.gastado / (p.asistieron || act.asistentes)) : "—"} sub={p.calificacionPromedio ? `Calificación de asistentes ${p.calificacionPromedio.toFixed(1).replace(".", ",")} / 5 (${p.calificaciones})` : "Sin calificaciones de asistentes"} />
-          </>
-        ) : <Kpi label="Participantes y asistencia" valor="No aplica" sub="Esta actividad no los maneja" />}
-      </div>
+      <div className="fx-cuerpo">
+        <nav className="fx-nav" role="tablist" aria-label="Secciones de la actividad">
+          {grupos.map((g) => (
+            <div key={g.titulo} className="fx-nav-grupo">
+              <span className="fx-nav-titulo">{g.titulo}</span>
+              {g.items.map(([k, nombre, Icono, n, aviso]) => (
+                <button key={k} type="button" role="tab" aria-selected={tab === k} className="fx-nav-item" onClick={() => cambiarTab(k)}>
+                  <Icono size={15} />
+                  <span className="fx-nav-nombre">{nombre}</span>
+                  {n && <span className={`fx-nav-cuenta${aviso ? " aviso" : ""}`}>{n}</span>}
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
 
-      <div className="dash-tabs ficha-tabs" role="tablist" aria-label="Secciones de la actividad">
-        {[["resumen", "Resumen"], ["calificaciones", "Calificación Nova y calificación usuario"], ...(act.aplicaParticipantes ? [["participantes", `Participantes (${p.total})`]] : []), ["observaciones", `Encuesta y observaciones (${act.totalObservaciones})`], ["inventario", `Inventario (${act.inventario.items.length})`], ["fotos", `Fotos (${act.fotos})`], ["compras", `Compras (${act.compras})`], ...(puedeEditar && !cerrada ? [["agente", "Agente de importación"]] : []), ...(act.aplicaParticipantes ? [["formulario", "Formulario de inscripción"]] : [])].map(([k, l]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} className="dash-tab" onClick={() => crossfade(() => setTab(k))}>{l}</button>
-        ))}
-      </div>
+        <div className="fx-contenido">
+          <div className="fx-seccion">
+            <h2>{seccion[1]}</h2>
+            <p>{AYUDA[seccion[0]]}</p>
+          </div>
 
       {tab === "resumen" && <TabResumen act={act} />}
       {tab === "calificaciones" && <TabCalificaciones act={act} puedeEditar={puedeEditar} onCambio={cargar} />}
-      {tab === "participantes" && <TabParticipantes act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
+      {tab === "datos" && formulario(["actividad"])}
+      {tab === "presupuesto" && formulario(["presupuesto"])}
+      {tab === "compras" && <TabCompras act={act} puedeEditar={puedeEditar} cerrada={cerrada} onCambio={cargar} />}
+      {tab === "participantes" && (
+        <div className="ficha-unida">
+          {act.aplicaParticipantes && <TabParticipantes act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
+          {/* La configuración (si aplica participantes, totales a mano, observaciones) va plegada debajo de la lista:
+              una sola línea, para que la lista sea lo primero. Solo se abre sola si la actividad no maneja participantes. */}
+          <details className="fx-plegable" open={verConfig || !act.aplicaParticipantes} onToggle={(e) => setVerConfig(e.currentTarget.open)}>
+            <summary>
+              <span>Configuración de la asistencia</span>
+              <small>
+                {!act.aplicaParticipantes ? "Esta actividad no maneja participantes" : p.total ? "Los totales salen de la lista" : "Sin lista: aquí puedes escribir los totales a mano"}
+                {act.observaciones ? " · con observaciones" : ""}
+              </small>
+            </summary>
+            {formulario(["asistencia"], { conLista: p.total > 0 })}
+          </details>
+        </div>
+      )}
       {tab === "observaciones" && <ObservacionesActividad act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
       {tab === "agente" && <AgenteImportacion act={act} onCambio={cargar} />}
       {tab === "inventario" && <TabInventario act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
       {tab === "fotos" && <FotosActividad actividadId={act.id} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
-      {tab === "compras" && <TabCompras act={act} puedeEditar={puedeEditar} cerrada={cerrada} editarHref={`${basePath}/actividades/${act.id}/editar`} />}
       {tab === "formulario" && <TabFormulario act={act} puedeEditar={puedeEditar && !cerrada} onCambio={cargar} />}
+        </div>
+      </div>
 
+      {guardado && <div className="toast toast-good" role="status"><IconCheck size={13} /> Cambios guardados.</div>}
       {verCalificacion && <CalificacionModal actividadId={act.id} puedeEditar={puedeEditar} onClose={() => setVerCalificacion(false)} onCambio={cargar} />}
       {cerrar && <CerrarActividadModal act={act} onClose={() => setCerrar(false)} onCerrada={() => { setCerrar(false); setTab("calificaciones"); cargar(); }} />}
-    </div>
-  );
-}
-
-function Kpi({ label, valor, sub, clase = "" }) {
-  return (
-    <div className="resumen-kpi">
-      <div className="resumen-kpi-top"><span>{label}</span></div>
-      <strong className={clase ? `ficha-kpi-${clase}` : ""}>{valor}</strong>
-      <span className="count-note">{sub}</span>
     </div>
   );
 }
@@ -275,16 +419,16 @@ function TabParticipantes({ act, puedeEditar, onCambio }) {
 
       {puedeEditar && (
         <div className="importar-tarjetas" aria-label="Importar desde Excel con Nova">
-          {[
-            ["programados", "Programados", "Quiénes se inscribieron o están citados"],
-            ["asistentes", "Asistentes", "La planilla o lista de quiénes fueron"],
-          ].map(([tipo, titulo, nota]) => (
-            <label key={tipo} className="importar-tarjeta">
-              <input type="file" accept=".xlsx,.xls" className="importar-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) { setError(""); setAviso(""); setImportar({ tipo, archivo: f }); } }} />
-              <IconDownload size={15} style={{ transform: "rotate(180deg)" }} />
-              <span><strong>Importar {titulo.toLowerCase()}</strong><span className="count-note">{nota}. Nova lo lee y te muestra qué va a cargar.</span></span>
-            </label>
-          ))}
+          {/* Un solo archivo, sea cual sea: Nova decide si es la lista de programados, la de quienes fueron o una
+              planilla con quién vino, quién no y por qué, y lee la asistencia y el motivo de cada persona. */}
+          <label className="importar-tarjeta">
+            <input type="file" accept=".xlsx,.xls" className="importar-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) { setError(""); setAviso(""); setImportar({ tipo: "lista", archivo: f }); } }} />
+            <IconDownload size={15} style={{ transform: "rotate(180deg)" }} />
+            <span>
+              <strong>Importar participantes y asistencia</strong>
+              <span className="count-note">Sube el archivo que tengas: inscritos, lista de asistencia o una planilla con quién vino, quién no y por qué. Nova lo lee, marca a cada persona como asistió o no asistió con su motivo, y te muestra qué va a cargar antes de guardar.</span>
+            </span>
+          </label>
         </div>
       )}
       {importar && (
@@ -308,7 +452,7 @@ function TabParticipantes({ act, puedeEditar, onCambio }) {
               </tr>
             </thead>
             <tbody>
-              {pageRows.length === 0 && <tr><td colSpan={9}><div className="empty">{lista.length ? "Nadie coincide con los filtros." : "Aún no hay inscritos. Impórtalos de Excel, agrégalos o abre el formulario de inscripción."}</div></td></tr>}
+              {pageRows.length === 0 && <tr><td colSpan={9}><div className="empty">{lista.length ? "Nadie coincide con los filtros." : "Aún no hay inscritos. Impórtalos con el botón de arriba o agrégalos uno por uno."}</div></td></tr>}
               {pageRows.map((pp) => (
                 <tr key={pp.id}>
                   <td><span className="desc-tooltip-wrap"><span className="desc-text">{pp.nombre}</span><span className="desc-tooltip-bubble">{pp.nombre}</span></span></td>
@@ -490,7 +634,7 @@ function TabInventario({ act, puedeEditar, onCambio }) {
           <input aria-label="Ítem" placeholder="Ítem (ej. Refrigerios)" value={nuevo.item} onChange={(e) => setNuevo({ ...nuevo, item: e.target.value })} />
           <input aria-label="Cantidad" type="number" min="0" step="any" placeholder="Cantidad" value={nuevo.cantidad} onChange={(e) => setNuevo({ ...nuevo, cantidad: e.target.value })} style={{ width: 110 }} />
           <select aria-label="Unidad" value={nuevo.unidad} onChange={(e) => setNuevo({ ...nuevo, unidad: e.target.value })} style={{ width: 120 }}><option value="">Unidad</option>{unidades.map((u) => <option key={u} value={u}>{u}</option>)}</select>
-          <input aria-label="Costo unitario" type="number" min="0" step="any" placeholder="Costo unitario" value={nuevo.costoUnitario} onChange={(e) => setNuevo({ ...nuevo, costoUnitario: e.target.value })} style={{ width: 140 }} />
+          <MoneyInput prefix={null} ariaLabel="Costo unitario" placeholder="Costo unitario" value={nuevo.costoUnitario} onChange={(x) => setNuevo({ ...nuevo, costoUnitario: x })} decimales={2} style={{ width: 140 }} />
           <button type="submit" className="btn btn-primary"><IconPlus size={13} /> Agregar</button>
         </form>
       )}
@@ -550,31 +694,60 @@ function TabInventario({ act, puedeEditar, onCambio }) {
 }
 
 // ---------- Compras ----------
-function TabCompras({ act, puedeEditar, cerrada, editarHref }) {
+function TabCompras({ act, puedeEditar, cerrada, onCambio }) {
   const [buscar, setBuscar] = useState("");
+  const [error, setError] = useState("");
+  const editable = puedeEditar && !cerrada;
+  // "Asociar compras" abre un panel lateral donde se marcan varias a la vez (AsociarComprasPanel).
+  const [asociando, setAsociando] = useState(false);
+  const [aviso, setAviso] = useState("");
+  const disponible = act.presupuesto != null ? act.presupuesto - act.gastado : null;
+  async function quitar(c) {
+    setError("");
+    try { await desasociarCompraApi(act.id, c.id); onCambio(); } catch (e) { setError(e.message || "No se pudo quitar la compra."); }
+  }
   const filtradas = useMemo(() => {
     const q = buscar.trim().toLowerCase();
     return act.detalleCompras.filter((c) => !q || [c.localSeq, c.descripcion, c.proveedor, c.estadoLegalizacion, c.fechaSolicitud].some((v) => String(v ?? "").toLowerCase().includes(q)));
   }, [act.detalleCompras, buscar]);
   const pag = usePagina(filtradas, buscar);
   return (
-    <div className="ficha-seccion">
-      <SolicitudesActividad actividadId={act.id} puedeSolicitar={puedeEditar && !cerrada} />
-      <div className="ficha-import">
-        <span className="ficha-import-titulo">{act.compras} compra(s) · {fmtCOP(act.gastado)}{act.presupuesto != null ? ` de ${fmtCOP(act.presupuesto)}` : ""}</span>
-        <span className="spacer" />
-        {puedeEditar && !cerrada && <Link className="btn" href={`${editarHref}?paso=compras`}>Asociar compras</Link>}
+    <div className="ficha-seccion cx">
+      {/* De un vistazo: cuántas compras, cuánto suman y cuánto queda; a la derecha, la acción principal. */}
+      <div className="cx-barra">
+        <div className="cx-cifras">
+          <div><span>Compras asociadas</span><strong>{act.compras}</strong></div>
+          <div><span>Suman</span><strong>{fmtCOP(act.gastado)}</strong></div>
+          {disponible != null && <div className={disponible < 0 ? "negativo" : ""}><span>{disponible < 0 ? "Se pasó del presupuesto en" : "Queda del presupuesto"}</span><strong>{fmtCOP(Math.abs(disponible))}</strong></div>}
+        </div>
+        {editable && (
+          <button type="button" className="btn btn-primary" onClick={() => { setAviso(""); setAsociando(true); }}>
+            <IconPlus size={13} /> Asociar compras
+          </button>
+        )}
       </div>
-      <div className="field search-field" style={{ maxWidth: 360 }}>
-        <label htmlFor="fc-buscar">Buscar compra</label>
-        <input id="fc-buscar" type="search" placeholder="Número, descripción o proveedor…" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
-      </div>
+      {error && <div className="modal-error" role="alert">{error}</div>}
+
+      {editable && asociando && (
+        <AsociarComprasPanel
+          act={act}
+          onClose={() => setAsociando(false)}
+          onAsociadas={(n, quedaAbierto) => { setAviso(`${n} compra${n > 1 ? "s asociadas" : " asociada"} a la actividad.`); if (!quedaAbierto) setAsociando(false); onCambio(); }}
+        />
+      )}
+      {aviso && <div className="ficha-aviso" role="status">{aviso}</div>}
+
+      <section className="cx-bloque" aria-labelledby="cx-asociadas">
+        <div className="cx-bloque-cab">
+          <h3 id="cx-asociadas">Compras de esta actividad</h3>
+          {act.detalleCompras.length > 0 && <input id="fc-buscar" className="cx-buscar" type="search" aria-label="Buscar entre las compras de esta actividad" placeholder="Buscar por número, descripción o proveedor" value={buscar} onChange={(e) => setBuscar(e.target.value)} />}
+        </div>
       <div className="table-card">
         <div className="table-scroll">
           <table className="records ficha-tabla">
-            <thead><tr><th>#</th><th>Solicitud</th><th>Descripción</th><th>Proveedor</th><th className="num">Valor con IVA</th><th>Legalización</th><th>Radicada</th></tr></thead>
+            <thead><tr><th>#</th><th>Solicitud</th><th>Descripción</th><th>Proveedor</th><th className="num">Valor con IVA</th><th>Legalización</th><th>Radicada</th>{editable && <th className="actions-col">Acciones</th>}</tr></thead>
             <tbody>
-              {pag.pagina.length === 0 && <tr><td colSpan={7}><div className="empty">{act.detalleCompras.length ? "Ninguna compra coincide con la búsqueda." : "Aún no hay compras asociadas."}</div></td></tr>}
+              {pag.pagina.length === 0 && <tr><td colSpan={editable ? 8 : 7}><div className="empty">{act.detalleCompras.length ? "Ninguna compra coincide con la búsqueda." : editable ? "Esta actividad aún no tiene compras. Pulsa «Asociar compras» para elegir las que ya existen, o pídele una a Compras más abajo." : "Esta actividad aún no tiene compras."}</div></td></tr>}
               {pag.pagina.map((c) => (
                 <tr key={c.id}>
                   <td className="mono">#{c.localSeq ?? "—"}</td>
@@ -584,6 +757,7 @@ function TabCompras({ act, puedeEditar, cerrada, editarHref }) {
                   <td className="num">{fmtCOP(c.valorConIva || 0)}</td>
                   <td>{c.estadoLegalizacion || "—"}</td>
                   <td>{c.radicado ? "Sí" : "No"}</td>
+                  {editable && <td className="actions-cell"><button type="button" className="btn small" onClick={() => quitar(c)} title="Quitar esta compra de la actividad (la compra no se borra)">Quitar</button></td>}
                 </tr>
               ))}
             </tbody>
@@ -591,6 +765,11 @@ function TabCompras({ act, puedeEditar, cerrada, editarHref }) {
         </div>
         <PiePagina id="fc-size" p={pag} total={filtradas.length} etiqueta="compra(s)" />
       </div>
+      </section>
+
+      {/* Lo que aún no existe como compra se le pide a Compras. */}
+      <SolicitudesActividad actividadId={act.id} puedeSolicitar={editable} />
+      {cerrada && <span className="count-note">La actividad está cerrada: no recibe compras nuevas.</span>}
     </div>
   );
 }

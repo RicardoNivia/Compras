@@ -974,3 +974,306 @@ model ConfigAgente {
 
   @@map("config_agentes")
 }
+
+// Correo de Microsoft 365 vinculado por cada persona (Microsoft Graph, permiso de solo lectura Mail.Read), para que el
+// agente de correo lea las solicitudes de creación de proveedor (ver lib/correoCuentas.js y lib/agenteCorreoProveedores.js).
+// Los tokens se guardan cifrados (AES-256-GCM, lib/cifradoTokens.js) y nunca salen al cliente ni a la auditoría.
+model CuentaCorreo {
+  id              Int       @id @default(autoincrement())
+  userId          String    @unique // una cuenta por persona (sin FK, como el resto de referencias a User)
+  userNombre      String
+  email           String    // buzón vinculado (debe ser el mismo correo del usuario del panel)
+  proveedor       String    @default("microsoft") // "microsoft" | "simulado"
+  accessToken     String?   // cifrado
+  refreshToken    String?   // cifrado
+  expiraAt        DateTime?
+  agenteActivo    Boolean   @default(true) // el agente lee el correo solo con esto encendido
+  estado          String    @default("activa") // "activa" | "error" (hay que volver a vincular)
+  ultimoError     String?
+  revisadoHasta   DateTime? // fecha de recepción del último correo leído
+  ultimaRevision  DateTime?
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime  @updatedAt
+
+  @@map("cuentas_correo")
+}
+
+// Correos que el agente ya mandó a Nova (para no pagar dos veces el mismo). Solo el id del mensaje y el resultado.
+model CorreoRevisado {
+  id              Int      @id @default(autoincrement())
+  cuentaId        Int
+  mensajeId       String
+  resultado       String   // "solicitud" | "no_es" | "error"
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@unique([cuentaId, mensajeId])
+  @@map("correos_revisados")
+}
+
+// Solicitud de creación de proveedor que el agente encontró en el correo de una persona. Queda pendiente en su Bandeja
+// hasta que la apruebe (se crea el proveedor) o la descarte. Nunca se crea un proveedor sin que una persona lo confirme.
+model SolicitudProveedorCorreo {
+  id               Int       @id @default(autoincrement())
+  userId           String    // dueña del buzón: solo a ella le llega
+  userNombre       String
+  cuentaId         Int
+  mensajeId        String
+  webLink          String?   // abrir el correo en Outlook
+  remitente        String?
+  asunto           String?
+  recibidoAt       DateTime?
+  resumen          String?   // lo que Nova entendió, en una frase
+  datos            String    // JSON: campos del formulario de proveedor (con los ids de maestros ya resueltos)
+  faltantes        String    // JSON: obligatorios que faltan o no son válidos [{ campo, motivo }]
+  notas            String?   // JSON: avisos (adjunto no leído, valor de maestro que no existe…)
+  adjuntos         String?   // JSON: nombres de los adjuntos del correo
+  nit              String?   // NIT normalizado (si se encontró)
+  estado           String    @default("pendiente") // "pendiente" | "aprobada" | "descartada"
+  proveedorNit     String?   // el proveedor creado al aprobar
+  motivoDescarte   String?
+  resueltoAt       DateTime?
+  resueltoPorUserId String?
+  resueltoPorNombre String?
+  createdAt        DateTime  @default(now())
+  creadoPorUserId  String?
+  creadoPorNombre  String?   // "Agente de correo"
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId, mensajeId])
+  @@index([userId, estado])
+  @@map("solicitudes_proveedor_correo")
+}
+
+// ===================== Tesorería (flujo de caja, soportes, conciliación y cierre) =====================
+// Módulo aparte de Compras y Bienestar (ver lib/tesoreria/*). Tiene finanzas personales y patrimoniales, así que el
+// acceso es NOMINAL (AccesoTesoreria), no por rol: ser admin del panel no da acceso. Valores siempre positivos: el tipo
+// da el signo (ingreso suma, egreso resta, traslado mueve entre cuentas propias sin afectar el flujo).
+
+model AccesoTesoreria {
+  id              Int      @id @default(autoincrement())
+  userId          String   @unique
+  userNombre      String
+  nivel           String   // "consulta" | "registro" | "firma" (firma = además concilia, firma el cierre y administra accesos y maestros)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("tesoreria_accesos")
+}
+
+// Catálogos del módulo: cuenta (medio de pago), ítem (inmueble, oficinas, impuestos…), concepto y pagador.
+model CuentaTesoreria {
+  id                Int      @id @default(autoincrement())
+  nombre            String   @unique
+  tipo              String   @default("ahorros") // ahorros | inversion | tarjeta | efectivo | otro
+  moneda            String   @default("COP") // código ISO 4217 (COP, USD, EUR…)
+  formatoExtracto   String?  // "avvillas" | "credicorp" | null (sin importador)
+  saldoInicial      Decimal  @default(0) @db.Decimal(18, 2)
+  saldoInicialFecha String?  // AAAA-MM-DD desde el que cuenta el saldo inicial
+  activo            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+  updatedAt         DateTime @updatedAt
+
+  @@map("tesoreria_cuentas")
+}
+
+model ItemTesoreria {
+  id              Int      @id @default(autoincrement())
+  nombre          String   @unique
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("tesoreria_items")
+}
+
+model ConceptoTesoreria {
+  id              Int      @id @default(autoincrement())
+  nombre          String   @unique
+  itemId          Int?     // ítem por defecto al elegir el concepto
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("tesoreria_conceptos")
+}
+
+model PagadorTesoreria {
+  id              Int      @id @default(autoincrement())
+  nombre          String   @unique // JPA, SNC, Binoma, POINT, CRM, BNM
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("tesoreria_pagadores")
+}
+
+model MovimientoTesoreria {
+  id              Int       @id @default(autoincrement())
+  fecha           String    // AAAA-MM-DD
+  fechaAproximada Boolean   @default(false) // migrado del Excel solo con el mes (día 1)
+  tipo            String    // "ingreso" | "egreso" | "traslado"
+  estado          String    // "proyectado" | "ejecutado" (conciliado = tiene líneas del extracto enlazadas)
+  valor           Decimal   @db.Decimal(18, 2) // siempre positivo
+  moneda          String    @default("COP") // código ISO 4217: el de la cuenta
+  cuentaId        Int       // cuenta (origen si es traslado)
+  cuentaDestinoId Int?      // solo traslados
+  itemId          Int?
+  conceptoId      Int?
+  concepto        String    // snapshot del nombre del concepto
+  pagadorId       Int?
+  tercero         String?
+  referencia      String?   // CUS, número de aprobación, factura…
+  observacion     String?
+  origen          String    @default("manual") // manual | soporte | extracto | importacion | recurrente
+  recurrenciaId   Int?      // el pago recurrente que generó este proyectado
+  recurrencia     RecurrenciaTesoreria? @relation(fields: [recurrenciaId], references: [id], onDelete: SetNull)
+  periodoRecurrencia String? // AAAA-MM del periodo que cubre (uno por recurrente y periodo)
+  claveImportacion String?  @unique // huella de la fila del Excel importado: volver a importar no duplica (lib/tesoreria/importadorExcel.js)
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime  @updatedAt
+  soportes        SoporteMovimiento[]
+  lineas          LineaExtracto[]
+
+  @@unique([recurrenciaId, periodoRecurrencia])
+  @@index([fecha])
+  @@index([cuentaId, fecha])
+  @@index([estado])
+  @@map("tesoreria_movimientos")
+}
+
+model SoporteMovimiento {
+  id              Int                 @id @default(autoincrement())
+  movimientoId    Int
+  movimiento      MovimientoTesoreria @relation(fields: [movimientoId], references: [id], onDelete: Cascade)
+  nombre          String
+  tipoMime        String
+  tamano          Int
+  sha1            String
+  contenido       Bytes
+  datosLeidos     String?             // JSON: lo que leyó Nova
+  createdAt       DateTime            @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@index([sha1])
+  @@map("tesoreria_soportes")
+}
+
+// Una importación del extracto de una cuenta y sus líneas.
+model ExtractoBancario {
+  id              Int      @id @default(autoincrement())
+  cuentaId        Int
+  archivo         String
+  desde           String?
+  hasta           String?
+  lineasNuevas    Int      @default(0)
+  lineasRepetidas Int      @default(0)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@map("tesoreria_extractos")
+}
+
+model LineaExtracto {
+  id                Int                  @id @default(autoincrement())
+  cuentaId          Int
+  extractoId        Int?
+  fecha             String               // AAAA-MM-DD
+  descripcion       String
+  tercero           String?
+  valor             Decimal              @db.Decimal(18, 2) // con signo: + entra, − sale
+  clave             String               // huella para no importar dos veces la misma línea
+  etiqueta          String?              // concepto que alguien le puso a mano en el Excel
+  movimientoId      Int?
+  movimiento        MovimientoTesoreria? @relation(fields: [movimientoId], references: [id], onDelete: SetNull)
+  comoSeEnlazo      String?              // "exacto" | "manual" | "creado"
+  enlazadoAt        DateTime?
+  enlazadoPorNombre String?
+  ignorada          Boolean              @default(false) // saldos u otras filas que no son movimientos
+  createdAt         DateTime             @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+
+  @@unique([cuentaId, clave])
+  @@index([cuentaId, fecha])
+  @@index([movimientoId])
+  @@map("tesoreria_lineas_extracto")
+}
+
+// "La descripción del banco contiene X → concepto Y": aprendida del Excel y de cada movimiento creado desde el extracto.
+model ReglaClasificacion {
+  id              Int      @id @default(autoincrement())
+  patron          String   @unique // texto normalizado que debe contener la descripción
+  conceptoId      Int
+  itemId          Int?
+  pagadorId       Int?
+  usos            Int      @default(0)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("tesoreria_reglas")
+}
+
+model CierreMes {
+  id               Int      @id @default(autoincrement())
+  anio             Int
+  mes              Int
+  saldos           String   // JSON por cuenta: { cuenta, libro, extracto, diferencia }
+  firmadoPorUserId String?
+  firmadoPorNombre String?
+  createdAt        DateTime @default(now()) // = fecha de la firma
+  creadoPorUserId  String?
+  creadoPorNombre  String?
+
+  @@unique([anio, mes])
+  @@map("tesoreria_cierres")
+}
+
+// Pago recurrente de Tesorería (arriendo, administración, servicios, nómina, tarjeta…): genera solo el proyectado de cada
+// periodo (lib/tesoreria/recurrentes.js). Cuando llega el soporte o la línea del extracto, ese proyectado pasa a
+// ejecutado. Si el valor es variable (servicios), el proyectado lleva el estimado y se corrige con el valor real.
+model RecurrenciaTesoreria {
+  id              Int       @id @default(autoincrement())
+  nombre          String
+  tipo            String    // "ingreso" | "egreso" | "traslado"
+  valor           Decimal   @db.Decimal(18, 2) // positivo; estimado si valorVariable
+  valorVariable   Boolean   @default(false)
+  moneda          String    @default("COP") // ISO 4217: la de la cuenta
+  cuentaId        Int
+  cuentaDestinoId Int?
+  itemId          Int?
+  conceptoId      Int
+  pagadorId       Int?
+  tercero         String?
+  frecuencia      String    @default("mensual") // mensual | bimestral | trimestral | semestral | anual
+  diaDelMes       Int       // 1-31 (en meses más cortos, el último día)
+  desde           String    // AAAA-MM-DD: primer periodo
+  hasta           String?   // AAAA-MM-DD: último periodo (null = sin fin)
+  activo          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime  @updatedAt
+  movimientos     MovimientoTesoreria[]
+
+  @@map("tesoreria_recurrencias")
+}

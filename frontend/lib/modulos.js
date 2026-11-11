@@ -5,6 +5,7 @@
 export const MODULOS = {
   compras: { key: "compras", nombre: "Compras", descripcion: "Solicitudes, proveedores y presupuesto" },
   bienestar: { key: "bienestar", nombre: "Bienestar", descripcion: "Actividades, cronograma y su costo" },
+  tesoreria: { key: "tesoreria", nombre: "Tesorería", descripcion: "Flujo de caja, soportes, conciliación y cierre" },
 };
 
 export const MODULO_POR_DEFECTO = "compras";
@@ -12,6 +13,7 @@ export const COOKIE_MODULO = "modulo";
 
 const RUTAS = [
   ["/bienestar", "bienestar"],
+  ["/tesoreria", "tesoreria"],
   ["/dashboard", "compras"],
   ["/registros", "compras"],
   ["/proveedores", "compras"],

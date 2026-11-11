@@ -5,6 +5,7 @@ import { fetchSalariosMinimosApi, guardarSalarioMinimoApi, eliminarSalarioMinimo
 import { fmtCOP } from "@/lib/format";
 import PiePagina, { usePagina } from "@/components/bienestar/PiePagina";
 import { IconEdit, IconTrash } from "@/components/icons";
+import MoneyInput from "@/components/MoneyInput";
 
 // Salario mínimo mensual legal vigente (SMMLV) por año. Con él se mide el umbral del cuadro comparativo del
 // procedimiento de compras (2 SMMLV administrativas, 4 técnicas) en el agente cotizador.
@@ -73,7 +74,7 @@ export default function ConfigSalarioMinimo() {
           <input type="number" min={2000} max={2100} value={form.anio} onChange={(e) => setForm({ ...form, anio: e.target.value })} disabled={editando} />
         </label>
         <label>Valor mensual (pesos)
-          <input type="number" min={1} step={1} value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} placeholder="Ej. 1750905" />
+          <MoneyInput value={form.valor} onChange={(x) => setForm({ ...form, valor: x })} placeholder="Ej. 1.750.905" ariaLabel="Valor del salario mínimo" />
         </label>
         <label>Decreto (opcional)
           <input value={form.norma} onChange={(e) => setForm({ ...form, norma: e.target.value })} placeholder="Ej. Decreto 1469 de 2025" />

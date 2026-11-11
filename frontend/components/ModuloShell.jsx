@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { COOKIE_MODULO, MODULO_POR_DEFECTO, moduloDeRuta, moduloValido } from "@/lib/modulos";
 
@@ -32,9 +32,20 @@ export default function ModuloShell({ moduloInicial, children }) {
     document.cookie = `${COOKIE_MODULO}=${modulo}; path=/; max-age=31536000; samesite=lax`;
   }, [modulo]);
 
+  // Onda de color al cambiar de módulo (no al cargar la página): cada cambio monta un <span> nuevo que se anima y
+  // queda invisible (.modulo-ola en globals.css).
+  const anterior = useRef(modulo);
+  const [ola, setOla] = useState(0);
+  useEffect(() => {
+    if (anterior.current === modulo) return;
+    anterior.current = modulo;
+    setOla((n) => n + 1);
+  }, [modulo]);
+
   return (
     <ModuloContext.Provider value={modulo}>
       <div className="app-shell" data-modulo={modulo}>
+        {ola > 0 && <span key={ola} className="modulo-ola" aria-hidden="true" />}
         {children}
       </div>
     </ModuloContext.Provider>

@@ -52,7 +52,11 @@ const AYUDA_ESTADO = {
 // (/actividades/[id]/editar). A la izquierda los pasos, que se recorren en cualquier orden porque solo el primero es
 // obligatorio; a la derecha, fijo, cómo va quedando la actividad y qué le falta. Las compras se asocian aquí (entre las
 // que aún no tienen actividad) o desde el formulario de Compras; "Solicitar compra" le avisa a Compras, que la gestiona.
-export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bienestar", lineasPermitidas = LINEAS_ACTIVIDAD, fechaInicial, responsables = [], puedeEditar, basePath = "/bienestar" }) {
+// Para EDITAR ya no hay página aparte: la ficha (FichaActividad) incrusta este mismo formulario por secciones
+// (embebido + secciones: "actividad", "presupuesto", "asistencia"), cada una en la pestaña donde se ven sus datos, con
+// su propio Guardar. onGuardado avisa a la ficha para que se recargue; onSucio le dice si hay cambios sin guardar;
+// conLista = ya hay lista de participantes, así que los conteos salen de ella y no se escriben a mano.
+export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bienestar", lineasPermitidas = LINEAS_ACTIVIDAD, fechaInicial, responsables = [], puedeEditar, basePath = "/bienestar", embebido = false, secciones = [], conLista = false, onGuardado, onSucio }) {
   const router = useRouter();
   const isEdit = !!actividad;
   // ?paso=compras (botón "Asociar compras" de la ficha) abre directo en esa pestaña.
@@ -84,6 +88,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
 
   useEffect(() => {
     if (!isEdit) { setCompras([]); return; }
+    if (actividad.detalleCompras) { setCompras(actividad.detalleCompras); return; } // la ficha ya las trae
     fetchActividadApi(actividad.id).then((r) => setCompras(r.actividad.detalleCompras || [])).catch(() => setCompras([]));
   }, [isEdit, actividad?.id]);
 
@@ -99,6 +104,11 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
     const avisar = (e) => { if (sucio && !guardado.current) { e.preventDefault(); e.returnValue = ""; } };
     window.addEventListener("beforeunload", avisar);
     return () => window.removeEventListener("beforeunload", avisar);
+  }, [sucio]);
+  useEffect(() => {
+    onSucio?.(sucio);
+    return () => onSucio?.(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sucio]);
 
   const update = (k, v) => {
@@ -179,10 +189,15 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
         saved = (await updateActividadApi(actividad.id, payload)).actividad;
         setGuardada((g) => ({ ...g, ...saved }));
         setInicial(form);
-        setAvisoGuardado(true);
-        // Se queda aquí; solo si cambió de línea pasa a la misma página en la otra línea.
-        if (saved.linea !== actividad.linea) router.replace(`${baseDe(saved.linea)}/actividades/${saved.id}/editar`);
-        router.refresh();
+        if (embebido) {
+          // Dentro de la ficha: ella se recarga sola; solo si cambió de línea se pasa a la ficha de la otra línea.
+          onGuardado?.(saved);
+          if (saved.linea !== actividad.linea) { guardado.current = true; router.replace(`${baseDe(saved.linea)}/actividades/${saved.id}?tab=datos`); }
+        } else {
+          setAvisoGuardado(true);
+          if (saved.linea !== actividad.linea) router.replace(`${baseDe(saved.linea)}/actividades/${saved.id}?tab=datos`);
+          router.refresh();
+        }
       } else {
         saved = await createActividadApi(payload);
         for (const c of porAsociar) await asociarCompraApi(saved.id, c.id);
@@ -243,28 +258,30 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
   }
 
   const vistaPrevia = { fecha: form.fecha, fechaFin: variosDias ? form.fechaFin : "" };
+  const oculto = (id) => (embebido ? !secciones.includes(id) : paso !== id);
 
   return (
-    <div className={`af${form.linea === "Fundación" ? " af-fundacion" : ""}`}>
-      <header className="af-cabecera">
+    <div className={`af${form.linea === "Fundación" ? " af-fundacion" : ""}${embebido ? " af-embebido" : ""}`}>
+      {!embebido && <header className="af-cabecera">
         <Link href={urlVolver} className="af-volver">‹ {isEdit ? "Volver a la actividad" : "Volver a actividades"}</Link>
         <h1>{isEdit ? form.nombre || actividad.nombre : "Registra una nueva actividad"}</h1>
         <p>{isEdit ? `Registrada por ${actividad.creadoPorNombre || "—"} el ${fmtDateTime(actividad.createdAt)}` : "Solo el nombre es obligatorio para empezar. El resto lo puedes completar cuando lo tengas."}</p>
-      </header>
+      </header>}
 
       <form onSubmit={handleSubmit} noValidate>
         <div className="af-cuerpo">
           <div className="af-principal" data-crossfade-raiz>
-            <div className="af-pasos" role="tablist" aria-label="Secciones del formulario">
+            {!embebido && <div className="af-pasos" role="tablist" aria-label="Secciones del formulario">
               {PASOS.map((p, i) => (
                 <button key={p.id} type="button" role="tab" id={`af-tab-${p.id}`} aria-selected={paso === p.id} aria-controls={`af-panel-${p.id}`} className={`af-paso${paso === p.id ? " activo" : ""}${completo[p.id] ? " listo" : ""}`} onClick={() => crossfade(() => setPaso(p.id))}>
                   <span className="af-paso-num" aria-hidden="true">{completo[p.id] ? <IconCheck size={13} /> : i + 1}</span>
                   <span className="af-paso-txt"><b>{p.label}{p.id === "compras" && lista.length ? ` (${lista.length})` : ""}</b><small>{p.ayuda}</small></span>
                 </button>
               ))}
-            </div>
+            </div>}
 
-            <section className="af-panel" data-crossfade role="tabpanel" id="af-panel-actividad" aria-labelledby="af-tab-actividad" hidden={paso !== "actividad"}>
+            <section className="af-panel" data-crossfade role="tabpanel" id="af-panel-actividad" aria-labelledby="af-tab-actividad" hidden={oculto("actividad")}>
+              {embebido && <h2 className="af-panel-titulo">Datos de la actividad</h2>}
               <div className={`af-campo af-nombre${errores.nombre ? " con-error" : ""}`}>
                 <label htmlFor="act-nombre">¿Cómo se llama la actividad? *</label>
                 <input id="act-nombre" type="text" autoFocus={!isEdit} value={form.nombre} onChange={(e) => update("nombre", e.target.value)} disabled={ro} maxLength={200} placeholder="Ej.: Fiesta de fin de año" aria-invalid={!!errores.nombre} />
@@ -341,7 +358,8 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
               </div>
             </section>
 
-            <section className="af-panel" data-crossfade role="tabpanel" id="af-panel-presupuesto" aria-labelledby="af-tab-presupuesto" hidden={paso !== "presupuesto"}>
+            <section className="af-panel" data-crossfade role="tabpanel" id="af-panel-presupuesto" aria-labelledby="af-tab-presupuesto" hidden={oculto("presupuesto")}>
+              {embebido && <h2 className="af-panel-titulo">Presupuesto de la actividad</h2>}
               <div className="af-campo af-monto">
                 <label htmlFor="act-presupuesto">¿Cuánto se le asigna?</label>
                 <MoneyInput id="act-presupuesto" value={form.presupuesto ?? ""} onChange={(v) => update("presupuesto", v)} disabled={ro} placeholder="Sin asignar" />
@@ -365,13 +383,14 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
               </div>
             </section>
 
-            <section className="af-panel" data-crossfade role="tabpanel" id="af-panel-asistencia" aria-labelledby="af-tab-asistencia" hidden={paso !== "asistencia"}>
+            <section className="af-panel" data-crossfade role="tabpanel" id="af-panel-asistencia" aria-labelledby="af-tab-asistencia" hidden={oculto("asistencia")}>
+              {embebido && <h2 className="af-panel-titulo">Cómo se maneja la asistencia</h2>}
               <label htmlFor="act-aplica" className="actividad-check af-check">
                 <span>Aplica participantes y listas de asistencia</span>
                 <input id="act-aplica" type="checkbox" checked={form.aplicaParticipantes !== false} disabled={ro} onChange={(e) => update("aplicaParticipantes", e.target.checked)} />
               </label>
               {form.aplicaParticipantes !== false ? (
-                <>
+                conLista ? <p className="af-nota">Los inscritos y los asistentes salen de la lista de participantes de abajo: se actualizan solos cuando registras o importas la asistencia.</p> : <>
               <div className="af-fila">
                 <div className="af-campo">
                   <label htmlFor="act-inscritos">Inscritos</label>
@@ -386,7 +405,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
                 <div><span>Asistencia</span><strong>{pctAsistencia != null ? `${Math.round(pctAsistencia * 1000) / 10} %` : "—"}</strong></div>
                 <div className={inscritos && asistentes != null && inscritos - asistentes > 0 ? "aviso" : ""}><span>No asistieron</span><strong>{inscritos && asistentes != null ? Math.max(0, inscritos - asistentes) : "—"}</strong></div>
               </div>
-              <p className="af-nota">{isEdit ? "¿Tienes la lista de personas? Impórtala desde Excel en la pestaña Participantes de la ficha: estos números se actualizan solos." : "Después de guardar podrás importar la lista de personas desde Excel, y estos números se actualizarán solos."}</p>
+              <p className="af-nota">{embebido ? "¿Tienes la lista de personas? Impórtala abajo con «Importar participantes y asistencia»: estos números se actualizan solos. Si no la tienes, escribe aquí solo los totales." : isEdit ? "¿Tienes la lista de personas? Impórtala desde Excel en la pestaña Participantes de la ficha: estos números se actualizan solos." : "Después de guardar podrás importar la lista de personas desde Excel, y estos números se actualizarán solos."}</p>
                 </>
               ) : (
                 <p className="af-nota">Esta actividad no maneja participantes ni asistencia. No se mostrarán esos datos, no contarán en los dashboards y Nova no los tendrá en cuenta al calificarla.</p>
@@ -398,7 +417,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
               </div>
             </section>
 
-            <section className="af-panel" data-crossfade role="tabpanel" id="af-panel-compras" aria-labelledby="af-tab-compras" hidden={paso !== "compras"}>
+            <section className="af-panel" data-crossfade role="tabpanel" id="af-panel-compras" aria-labelledby="af-tab-compras" hidden={oculto("compras")}>
               {solicitudEnviada && <div className="ficha-aviso" role="status">Solicitud enviada a Compras. Te avisaremos en tu Bandeja cuando la registren o la rechacen.</div>}
               {isEdit && puedeEditar && !cerrada && (
                 <button type="button" className="btn actividad-btn-compras af-solicitar" onClick={() => setSolicitar(true)}>
@@ -435,32 +454,32 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
                 <PiePagina id="af-compras-size" tamanos={PAGE_SIZES_MODAL} p={pagCompras} total={comprasVisibles.length} etiqueta="compra(s) asociada(s)" />
                 </>
               )}
-              {!ro && !cerrada && <BuscadorCompras yaElegidas={lista} onElegir={asociar} />}
+              {!ro && !cerrada && (!embebido || secciones.includes("compras")) && <BuscadorCompras yaElegidas={lista} onElegir={asociar} />}
               {cerrada && <span className="af-ayuda">La actividad está cerrada: no recibe compras nuevas.</span>}
             </section>
 
-            <div className="af-navegar">
+            {!embebido && <div className="af-navegar">
               <button type="button" className="btn" disabled={iPaso === 0} onClick={() => crossfade(() => setPaso(PASOS[iPaso - 1].id))}>‹ Anterior</button>
               <button type="button" className="btn" disabled={iPaso === PASOS.length - 1} onClick={() => crossfade(() => setPaso(PASOS[iPaso + 1].id))}>Siguiente ›</button>
-            </div>
+            </div>}
 
             {error && <div className="modal-error af-error-general" role="alert">{error}</div>}
 
-            <div className="af-pie">
+            {!(embebido && ro) && <div className="af-pie">
               {!ro && (
                 <button type="submit" className="btn btn-primary af-guardar" disabled={saving}>
                   {saving && <span className="spinner" />} {isEdit ? "Guardar cambios" : "Crear actividad"}
                 </button>
               )}
-              <Link className="btn" href={urlVolver}>{ro ? "Volver" : "Cancelar"}</Link>
+              {!embebido && <Link className="btn" href={urlVolver}>{ro ? "Volver" : "Cancelar"}</Link>}
               {sucio && !saving && <span className="af-ayuda">Cambios sin guardar</span>}
               <div className="spacer" />
-              {isEdit && !ro && (
+              {isEdit && !ro && !embebido && (
                 <button type="button" className="btn af-cerrar" disabled={sucio || !!razonParaNoCerrar(guardada)} title={sucio ? "Guarda los cambios antes de cerrar" : razonParaNoCerrar(guardada) || "Calificar y cerrar la actividad"} onClick={() => setCerrar(true)}>
                   <IconCheck size={13} /> Cerrar actividad
                 </button>
               )}
-              {isEdit && !ro && (confirmDelete ? (
+              {isEdit && !ro && (!embebido || secciones.includes("actividad")) && (confirmDelete ? (
                 <span className="confirm-del">
                   <span>¿Eliminar?</span>
                   <button type="button" className="btn btn-danger-solid small" onClick={handleDelete} disabled={saving}>Sí</button>
@@ -471,10 +490,10 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
                   <IconTrash size={13} /> Eliminar
                 </button>
               ))}
-            </div>
+            </div>}
           </div>
 
-          <aside className="af-resumen" aria-label="Así va quedando la actividad">
+          {!embebido && <aside className="af-resumen" aria-label="Así va quedando la actividad">
             <span className="af-resumen-titulo">Así va quedando</span>
             <div className={`af-tarjeta est-${form.estado}`}>
               <span className={`pill ${est.pill}`}>{est.label}</span>
@@ -494,7 +513,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
                 {sugerencias.map((f) => <li key={f.texto}><button type="button" onClick={() => crossfade(() => setPaso(f.paso))}>{f.texto}</button></li>)}
               </ul>
             )}
-          </aside>
+          </aside>}
         </div>
 
       </form>
@@ -516,7 +535,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
 }
 
 // Busca compras sin actividad (número, descripción, proveedor o área) para asociarlas.
-function BuscadorCompras({ yaElegidas, onElegir }) {
+export function BuscadorCompras({ yaElegidas, onElegir }) {
   const [q, setQ] = useState("");
   const [resultados, setResultados] = useState([]);
   const [buscando, setBuscando] = useState(false);

@@ -7,7 +7,7 @@ import { sendAgentChatApi } from "@/lib/api";
 import AssistantContent, { ThinkingLabel } from "@/components/AgentMessageContent";
 import { IconSend, IconPlus, IconTrash } from "@/components/icons";
 import { useAutoGrow } from "@/lib/useAutoGrow";
-import { PREGUNTAS_BIENESTAR, PREGUNTAS_COMPRAS, preguntasAlAzar } from "@/lib/preguntasGerente";
+import { PREGUNTAS_BIENESTAR, PREGUNTAS_COMPRAS, PREGUNTAS_TESORERIA, preguntasAlAzar } from "@/lib/preguntasGerente";
 
 // Barra de entrada compartida entre el estado "vacío" (centrada, junto al
 // saludo) y el estado "con mensajes" (pegada abajo) — mismo markup en ambos
@@ -81,8 +81,9 @@ function groupConversationsByDate(conversations) {
 export default function AgenteChat({ userName }) {
   const modulo = useModulo();
   const enBienestar = modulo === "bienestar";
-  const textoEntrada = enBienestar ? "Pregunta algo sobre las actividades de Bienestar o Fundación…" : "Pregunta algo sobre los datos de compras…";
-  const lista = enBienestar ? PREGUNTAS_BIENESTAR : PREGUNTAS_COMPRAS;
+  const enTesoreria = modulo === "tesoreria";
+  const textoEntrada = enTesoreria ? "Pregunta algo sobre el flujo de caja, una cuenta o un pago…" : enBienestar ? "Pregunta algo sobre las actividades de Bienestar o Fundación…" : "Pregunta algo sobre los datos de compras…";
+  const lista = enTesoreria ? PREGUNTAS_TESORERIA : enBienestar ? PREGUNTAS_BIENESTAR : PREGUNTAS_COMPRAS;
   // Cuatro preguntas de gerente al azar; arranca con las primeras para que el render del servidor y el del cliente
   // coincidan, y se barajan al montar o con "Otras preguntas".
   const [sugerencias, setSugerencias] = useState(() => lista.slice(0, 4));
@@ -249,7 +250,7 @@ export default function AgenteChat({ userName }) {
             <div className="agent-hero-centered">
               <div className="agent-empty">
                 <div className="agent-empty-mark"><img src={modulo === "bienestar" ? "/nova/nova-bienestar-saludo.png" : "/nova/nova-saludo.png"} alt="" /></div>
-                <h2>Hola{userName ? `, ${userName.split(" ")[0]}` : ""}. Soy Nova, tu asistente de IA de {enBienestar ? "Bienestar" : "compras"}.</h2>
+                <h2>Hola{userName ? `, ${userName.split(" ")[0]}` : ""}. Soy Nova, tu asistente de IA de {enTesoreria ? "Tesorería" : enBienestar ? "Bienestar" : "compras"}.</h2>
                 {enBienestar
                   ? <p>Respondo preguntas sobre las actividades de Bienestar y Fundación: participación, asistencia, inventario, calificaciones y su costo en compras asociadas. No invento información y no puedo crear, modificar ni aprobar nada.</p>
                   : <p>Respondo preguntas sobre los datos de compras, el procedimiento oficial de compras (ADM-P-01) y cómo usar esta aplicación según tu rol — no invento información y no puedo crear, modificar ni aprobar nada.</p>}

@@ -1,3 +1,4 @@
+import { TOOLS_TESORERIA, NOMBRES_TESORERIA, ejecutarTesoreria } from "@/lib/tesoreria/novaTesoreria";
 import { listRecords } from "@/lib/records";
 import { listPresupuestos } from "@/lib/presupuestos";
 import { listAuditLogs } from "@/lib/audit";
@@ -231,7 +232,7 @@ function buildAuditoriaResumen(logs) {
 // las herramientas de presupuesto/auditoría ni siquiera se le ofrecen al
 // modelo si el rol no tiene ese permiso, en vez de ofrecerlas y rechazarlas
 // después — así nunca "sabe" que existen si no puede usarlas.
-export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar }) {
+export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar, canSeeTesoreria = false }) {
   const tools = [
     CONSULTAR_REFERENCIA_TOOL,
     {
@@ -378,6 +379,8 @@ export function buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProvee
     });
   }
 
+  // Tesorería: solo con acceso nominal (lo decide el chat). El MCP nunca lo pasa, así que ahí no existen.
+  if (canSeeTesoreria) tools.push(...TOOLS_TESORERIA);
   if (canSeeBienestar) {
     const LINEA = { type: "string", enum: ["Bienestar", "Fundación"], description: "Línea: Bienestar (actividades de los colaboradores) o Fundación (acompañamiento a la Fundación)." };
     tools.push(
@@ -467,6 +470,7 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
 
   return async function executeTool(name, input) {
     const args = input || {};
+    if (NOMBRES_TESORERIA.has(name)) return ejecutarTesoreria(name, args, user);
     switch (name) {
       case "consultar_referencia":
         return consultarReferencia(args || {});

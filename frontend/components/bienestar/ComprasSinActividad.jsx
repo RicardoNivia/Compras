@@ -81,8 +81,8 @@ function ModalAsociar({ anio, mes, linea, puedeEditar, onClose, onCambio }) {
               <table className="records ficha-tabla">
                 <thead><tr><th>#</th><th>Solicitud</th><th>Descripción</th><th className="num">Valor con IVA</th>{puedeEditar && <th>Actividad</th>}{puedeEditar && <th className="actions-col">Acciones</th>}</tr></thead>
                 <tbody>
-                  {compras === null && <tr><td colSpan={6}><div className="skeleton-bar" style={{ height: 34, borderRadius: 8 }} /></td></tr>}
-                  {compras !== null && pag.pagina.length === 0 && <tr><td colSpan={6}><div className="empty">No quedan compras sin actividad.</div></td></tr>}
+                  {compras === null && <tr><td colSpan={puedeEditar ? 6 : 4}><div className="skeleton-bar" style={{ height: 34, borderRadius: 8 }} /></td></tr>}
+                  {compras !== null && pag.pagina.length === 0 && <tr><td colSpan={puedeEditar ? 6 : 4}><div className="empty">No quedan compras sin actividad.</div></td></tr>}
                   {pag.pagina.map((c) => (
                     <tr key={c.id}>
                       <td className="mono">#{c.localSeq ?? "—"}</td>
