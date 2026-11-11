@@ -242,6 +242,17 @@ export function IconLayers(props) {
   );
 }
 
+// Caja de bodega (inventario): caja en perspectiva con su cinta.
+export function IconBox(props) {
+  return (
+    <Svg {...props}>
+      <path d="M8.5 1.6 15 5v7.3l-6.5 3.4L2 12.3V5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M2 5l6.5 3.4L15 5M8.5 8.4v7.3" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M5.2 3.3l6.6 3.5v2.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function IconBuilding(props) {
   return (
     <Svg {...props}>

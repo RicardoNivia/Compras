@@ -9,8 +9,7 @@ import { MODULOS } from "@/lib/modulos";
 import { useModulo } from "@/components/ModuloShell";
 import {
   IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail,
-  IconBell, IconBuilding, IconEye, IconCalendar, IconBag, IconHeart, IconList, IconCheck, IconClock, IconSearch, IconPanel, IconSun, IconMoon,
-} from "@/components/icons";
+  IconBell, IconBuilding, IconEye, IconCalendar, IconBag, IconHeart, IconList, IconCheck, IconClock, IconSearch, IconPanel, IconSun, IconMoon, IconBox } from "@/components/icons";
 import { fetchCompartidosApi } from "@/lib/api";
 import { crossfade } from "@/lib/crossfade";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
@@ -52,7 +51,7 @@ const GRUPOS = {
         { key: "bienestar-actividades", href: "/bienestar/actividades", label: "Actividades", Icon: IconList, feature: "viewBienestar", show: canViewBienestar },
         { key: "bienestar-cronograma", href: "/bienestar/cronograma", label: "Cronograma", Icon: IconCalendar, feature: "viewBienestar", show: canViewBienestar },
         { key: "bienestar-agentes", href: "/bienestar/agentes", label: "Agentes", Icon: IconSpark, feature: "editBienestar", show: canEditBienestar },
-        { key: "bienestar-inventario", href: "/bienestar/inventario", label: "Inventario", Icon: IconLayers, feature: "viewInventarioBienestar", show: canViewBienestar },
+        { key: "bienestar-inventario", href: "/bienestar/inventario", label: "Inventario", Icon: IconBox, feature: "viewInventarioBienestar", show: canViewBienestar },
         { key: "bienestar-maestros", href: "/bienestar/maestros", label: "Maestros", Icon: IconLayers, feature: "viewMaestrosBienestar", show: canViewBienestar },
       ],
     },
