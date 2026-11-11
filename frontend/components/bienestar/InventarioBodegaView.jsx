@@ -29,6 +29,8 @@ function Estado({ a }) {
   if (a.faltan > 0) return <span className="pill warning">Faltan {num(a.faltan)}</span>;
   return <span className="pill good">Disponible</span>;
 }
+// Orden de la tabla: de lo disponible a lo agotado (los inactivos al final).
+const ORDEN_ESTADO = { disponible: 0, faltan: 1, agotado: 2, inactivo: 3 };
 // Filtros de la tabla por estado y por vencimiento (mismas reglas que las píldoras de las columnas).
 const ESTADOS = [["", "Todos los estados"], ["disponible", "Disponible"], ["faltan", "Faltan (bajo el mínimo)"], ["agotado", "Agotado"], ["inactivo", "Inactivo"]];
 const estadoDe = (a) => (!a.activo ? "inactivo" : a.stock <= 0 ? "agotado" : a.faltan > 0 ? "faltan" : "disponible");
@@ -79,7 +81,8 @@ export default function InventarioBodegaView({ puedeEditar }) {
   const buscando = terminos.length > 0;
   const filtradas = useMemo(() => {
     const base = buscando ? articulos || [] : deBodega;
-    return base.filter((a) => FILTROS[filtro](a) && (!fEstado || estadoDe(a) === fEstado) && (!fVence || vencimientoDe(a) === fVence) && (!buscando || terminos.every((t) => sinTildes(`${a.producto} ${a.referencia || ""} ${a.unidad || ""} ${NOMBRE_BODEGA[a.bodega] || ""}`).includes(t))));
+    // Orden fijo: disponibles, luego bajo el mínimo, agotados e inactivos; dentro de cada estado por nombre.
+    return base.filter((a) => FILTROS[filtro](a) && (!fEstado || estadoDe(a) === fEstado) && (!fVence || vencimientoDe(a) === fVence) && (!buscando || terminos.every((t) => sinTildes(`${a.producto} ${a.referencia || ""} ${a.unidad || ""} ${NOMBRE_BODEGA[a.bodega] || ""}`).includes(t)))).sort((x, y) => (ORDEN_ESTADO[estadoDe(x)] ?? 9) - (ORDEN_ESTADO[estadoDe(y)] ?? 9) || String(x.producto).localeCompare(String(y.producto), "es"));
   }, [articulos, deBodega, filtro, terminos, buscando, fEstado, fVence]);
   const pag = usePagina(filtradas, `${bodega}|${filtro}|${q}|${fEstado}|${fVence}`);
   const hayFiltros = !!(fEstado || fVence);
