@@ -8,6 +8,7 @@ import HallazgosRevision from "@/components/compras/agentes/HallazgosRevision";
 import { IconSpark } from "@/components/icons";
 import { IconTrash, IconClock, IconFile, IconLayers, IconMoney, IconEdit } from "@/components/icons";
 import ObservacionesReview from "@/components/ObservacionesReview";
+import EntradaBodegaCompra from "@/components/EntradaBodegaCompra";
 import MoneyInput from "@/components/MoneyInput";
 import InvoiceScanner from "@/components/InvoiceScanner";
 import ProveedorAutocomplete from "@/components/ProveedorAutocomplete";
@@ -513,6 +514,8 @@ export default function RecordModal({ record, records, onClose, onSaved, onDelet
                 </span>
               ) : null}
             </div>
+
+            <EntradaBodegaCompra recordId={record?.id || null} />
 
             {presupuestoInfo && (
               <div className="dias-preview">

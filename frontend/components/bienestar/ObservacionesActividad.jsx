@@ -104,6 +104,9 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
         </div>
       )}
 
+      {/* De un vistazo: cuántos comentarios a favor y en contra, su porcentaje y la participación de la actividad. */}
+      <TarjetasTono s={resumen.sentimientos} participacion={act.participacion} aplica={act.aplicaParticipantes} />
+
       {puedeEditar && act.aplicaParticipantes && (
         <div className="importar-tarjetas">
           <label className="importar-tarjeta">
@@ -206,6 +209,22 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
         </div>
         <PiePagina id="ob-size" p={pag} total={filtradas.length} etiqueta="registro(s)" tamanos={enModal ? PAGE_SIZES_MODAL : PAGE_SIZES} />
       </div>
+    </div>
+  );
+}
+
+// Tarjetas del tono: % sobre los comentarios con opinión (los N/A no cuentan). Participación = asistieron / inscritos.
+function TarjetasTono({ s, participacion: p, aplica }) {
+  const conOpinion = s.positivo + s.neutro + s.negativo;
+  const pct = (n) => (conOpinion ? `${Math.round((n / conOpinion) * 100)} %` : "—");
+  const base = p ? Math.max(p.inscritos || 0, p.asistieron || 0) : 0;
+  const part = aplica && base ? Math.round(((p.asistieron || 0) / base) * 1000) / 10 : null;
+  return (
+    <div className="tono-tarjetas">
+      <div className="tono-tarjeta positivo"><ManoSentimiento valor="positivo" /><span>A favor</span><strong>{entero(s.positivo)}</strong><small>{pct(s.positivo)} de los comentarios con opinión</small></div>
+      <div className="tono-tarjeta negativo"><ManoSentimiento valor="negativo" /><span>En contra</span><strong>{entero(s.negativo)}</strong><small>{pct(s.negativo)} de los comentarios con opinión</small></div>
+      <div className="tono-tarjeta neutro"><ManoSentimiento valor="neutro" /><span>Neutros</span><strong>{entero(s.neutro)}</strong><small>{pct(s.neutro)} · {entero(s.no_aplica)} sin opinión (N/A)</small></div>
+      <div className="tono-tarjeta part"><span>Participación</span><strong>{part != null ? `${String(part).replace(".", ",")} %` : "—"}</strong><small>{aplica && p ? `${entero(p.asistieron || 0)} asistieron de ${entero(base)} inscritos` : "Esta actividad no maneja participantes"}</small></div>
     </div>
   );
 }

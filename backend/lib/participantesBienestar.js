@@ -133,21 +133,31 @@ export async function listParticipantes(actividadId, actor) {
 }
 
 // Resumen de participación de una actividad: totales, por área y por motivo de inasistencia.
+// Por área: convocados = todas las personas de la lista del área (inscritas o no: quien asistió sin inscribirse también
+// cuenta), sus motivos de no participación y el líder del área si está en el maestro "areaParticipante".
 export async function resumenParticipacion(actividadId) {
-  const rows = await prisma.participanteActividad.findMany({ where: { actividadId: Number(actividadId) }, select: { area: true, inscrito: true, asistio: true, motivoInasistencia: true, calificacion: true } });
+  const rows = await prisma.participanteActividad.findMany({ where: { actividadId: Number(actividadId) }, select: { area: true, areaId: true, inscrito: true, asistio: true, motivoInasistencia: true, calificacion: true } });
+  const lideres = await lideresDeAreas();
   const porArea = new Map();
   const motivos = new Map();
   for (const r of rows) {
     const k = r.area || "Sin área";
-    const a = porArea.get(k) || { area: k, inscritos: 0, asistieron: 0, noAsistieron: 0 };
+    const a = porArea.get(k) || { area: k, lider: lideres.porId.get(r.areaId) || lideres.porNombre.get(claveArea(k)) || null, convocados: 0, inscritos: 0, asistieron: 0, noAsistieron: 0, sinRegistrar: 0, motivos: {} };
+    a.convocados++;
     if (r.inscrito) a.inscritos++;
     if (r.asistio === true) a.asistieron++;
+    if (r.asistio == null) a.sinRegistrar++;
     if (r.asistio === false) {
       a.noAsistieron++;
       const m = r.motivoInasistencia || "Sin motivo registrado";
       motivos.set(m, (motivos.get(m) || 0) + 1);
+      a.motivos[m] = (a.motivos[m] || 0) + 1;
     }
     porArea.set(k, a);
+  }
+  for (const a of porArea.values()) {
+    a.motivos = Object.entries(a.motivos).map(([motivo, n]) => ({ motivo, n })).sort((x, y) => y.n - x.n);
+    a.participacion = a.convocados ? a.asistieron / a.convocados : null;
   }
   const calif = rows.filter((r) => r.calificacion);
   return {
@@ -158,9 +168,16 @@ export async function resumenParticipacion(actividadId) {
     sinRegistrar: rows.filter((r) => r.asistio === null).length,
     calificacionPromedio: calif.length ? calif.reduce((s, r) => s + r.calificacion, 0) / calif.length : null,
     calificaciones: calif.length,
-    porArea: [...porArea.values()].sort((a, b) => b.inscritos - a.inscritos),
+    porArea: [...porArea.values()].sort((a, b) => b.convocados - a.convocados),
     motivos: [...motivos].map(([motivo, n]) => ({ motivo, n })).sort((a, b) => b.n - a.n),
   };
+}
+
+const claveArea = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+// Líderes de las áreas de Bienestar (maestro areaParticipante), por id y por nombre (participantes viejos sin areaId).
+async function lideresDeAreas() {
+  const filas = await prisma.maestro.findMany({ where: { tipo: "areaParticipante", lider: { not: null } }, select: { id: true, valor: true, lider: true } });
+  return { porId: new Map(filas.map((f) => [f.id, f.lider])), porNombre: new Map(filas.map((f) => [claveArea(f.valor), f.lider])) };
 }
 
 function leerParticipante(body, { parcial = false } = {}) {

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { FIELD_LABELS, TOKEN_FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS, NOTIFICACION_FIELD_LABELS, ACTIVIDAD_FIELD_LABELS, SOLICITUD_COMPRA_FIELD_LABELS, ROL_FIELD_LABELS, DETALLE_FIELD_LABELS, CUENTA_CORREO_FIELD_LABELS, SOLICITUD_PROVEEDOR_CORREO_FIELD_LABELS, MOVIMIENTO_TESORERIA_FIELD_LABELS, MAESTRO_TESORERIA_FIELD_LABELS, ACCESO_TESORERIA_FIELD_LABELS, CONCILIACION_TESORERIA_FIELD_LABELS, CIERRE_TESORERIA_FIELD_LABELS, EXTRACTO_TESORERIA_FIELD_LABELS, SOPORTE_TESORERIA_FIELD_LABELS, RECURRENCIA_TESORERIA_FIELD_LABELS } from "@/lib/auditLabels";
+import { FIELD_LABELS, TOKEN_FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, PROVEEDOR_PROCESO_FIELD_LABELS, PROVEEDOR_CHECKLIST_FIELD_LABELS, CICLO_PROVEEDOR_FIELD_LABELS, CONFIG_PROVEEDORES_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, VALORACION_FIELD_LABELS, NOTIFICACION_FIELD_LABELS, ACTIVIDAD_FIELD_LABELS, SOLICITUD_COMPRA_FIELD_LABELS, ROL_FIELD_LABELS, DETALLE_FIELD_LABELS, CUENTA_CORREO_FIELD_LABELS, SOLICITUD_PROVEEDOR_CORREO_FIELD_LABELS, MOVIMIENTO_TESORERIA_FIELD_LABELS, MAESTRO_TESORERIA_FIELD_LABELS, ACCESO_TESORERIA_FIELD_LABELS, CONCILIACION_TESORERIA_FIELD_LABELS, CIERRE_TESORERIA_FIELD_LABELS, EXTRACTO_TESORERIA_FIELD_LABELS, SOPORTE_TESORERIA_FIELD_LABELS, RECURRENCIA_TESORERIA_FIELD_LABELS, INVENTARIO_BODEGA_FIELD_LABELS } from "@/lib/auditLabels";
 
 export { FIELD_LABELS, MAESTRO_FIELD_LABELS, PROVEEDOR_FIELD_LABELS, USER_FIELD_LABELS, REPORT_FIELD_LABELS, CALIFICACION_FIELD_LABELS, TOKEN_FIELD_LABELS, ACTION_LABELS, ENTITY_LABELS } from "@/lib/auditLabels";
 
@@ -158,6 +158,15 @@ export async function logParticipantes(actor, actividad, action, detalle) {
 
 export async function logInventario(actor, actividad, action, detalle) {
   await writeLog({ action, entityType: "inventario", recordId: String(actividad.id), recordInfo: actividadSummary(actividad), actor, changes: [{ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle }] });
+}
+
+// Inventario (bodega) de Bienestar: crear o editar un artículo y cada movimiento (entrada, salida, ajuste, devolución).
+// recordId = id del artículo, así su historial de auditoría se lee junto.
+export async function logInventarioBodega(actor, articulo, action, detalle, cambios) {
+  const changes = cambios?.length
+    ? cambios.map((c) => ({ field: c.field, label: INVENTARIO_BODEGA_FIELD_LABELS[c.field] || c.field, before: c.before, after: c.after }))
+    : [{ field: "detalle", label: INVENTARIO_BODEGA_FIELD_LABELS.detalle, before: null, after: detalle }];
+  await writeLog({ action, entityType: "inventarioBodega", recordId: String(articulo.id), recordInfo: `${articulo.producto}${articulo.vence ? ` (vence ${articulo.vence})` : ""}`, actor, changes });
 }
 
 export async function logAgenteImportacion(actor, actividad, action, detalle) {
