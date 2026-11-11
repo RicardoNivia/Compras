@@ -1,5 +1,6 @@
 "use client";
 
+import BotonExcel from "@/components/BotonExcel";
 import { fetchParticipacionPorAreaApi } from "@/lib/api";
 import NuevaActividadModal from "@/components/bienestar/NuevaActividadModal";
 import { useEffect, useMemo, useState } from "react";
@@ -303,6 +304,13 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
               </div>
               <span className="count-note">Página {currentPage} de {totalPages}</span>
               <div className="spacer" />
+              <BotonExcel nombre={`actividades-${anio}`} hoja="Actividades" filas={filtradas} deshabilitado={!filtradas.length} columnas={[
+                { t: "Fecha", v: (a) => rangoFechas(a) }, { t: "Actividad", v: (a) => a.nombre }, { t: "Descripción", v: (a) => a.descripcion },
+                { t: "Estado", v: (a) => estadoActividad(a.estado).label }, { t: "Responsable", v: (a) => a.responsableNombre },
+                { t: "Inscritos", v: (a) => (a.aplicaParticipantes ? a.inscritos ?? null : "No aplica") }, { t: "Asistentes", v: (a) => (a.aplicaParticipantes ? a.asistentes ?? null : "No aplica") },
+                { t: "Presupuesto ($)", v: (a) => a.presupuesto }, { t: "Compras", v: (a) => a.compras || 0 }, { t: "Gastado ($)", v: (a) => a.gastado || 0 },
+                { t: "% del presupuesto", v: (a) => (a.pctPresupuesto != null ? Math.round(a.pctPresupuesto * 100) : null) }, { t: "Calificación", v: (a) => a.calificacion ?? a.puntajeNova ?? null },
+              ]} />
               <span className="count-note">{filtradas.length} actividad(es) (de {delAnio.length} en {anio})</span>
             </div>
           </div>

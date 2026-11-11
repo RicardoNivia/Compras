@@ -5,13 +5,13 @@ import MovimientosTesoreria from "@/components/tesoreria/MovimientosTesoreria";
 
 export const dynamic = "force-dynamic";
 
-// Tesorería: acceso NOMINAL (user.tesoreria viene de /api/auth/me), no por rol. Ver backend/lib/tesoreria/comun.js.
+// Tesorería: el acceso viene de la Matriz de permisos (user.tesoreria de /api/auth/me). Ver backend/lib/tesoreria/comun.js.
 export default async function Pagina() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (!user.tesoreria) redirect("/");
   return (
-    <AppShell user={user} title="Movimientos" subtitle="El libro de tesorería: cada ingreso, egreso o traslado con su soporte">
+    <AppShell user={user} title="Movimientos del banco" subtitle="Lo que entra y sale de cada banco, como en tus pestañas «Mvto»">
       <MovimientosTesoreria acceso={user.tesoreria} />
     </AppShell>
   );

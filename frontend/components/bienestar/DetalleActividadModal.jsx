@@ -193,7 +193,7 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
                         <span className="count-note">{entero(p.porArea.length)} área(s)</span>
                       </div>
                     </>
-                  ) : <p className="count-note">Aún no hay participantes registrados.</p>}
+                  ) : <div className="empty compacta">Aún no hay participantes registrados.</div>}
                 </section>
                 <section className="resumen-card detalle-card" aria-labelledby="det-motivos">
                   <h2 id="det-motivos">Motivos de no participación</h2>

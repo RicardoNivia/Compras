@@ -1,5 +1,6 @@
 "use client";
 
+import BotonExcel from "@/components/BotonExcel";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fmtPesos } from "@/lib/format";
 import { ACTION_LABELS, ENTITY_LABELS } from "@/lib/auditLabels";
@@ -292,6 +293,23 @@ export default function AuditoriaView({ initial, actors }) {
           </div>
           <span className="count-note">Página {page} de {totalPages}</span>
           <div className="spacer" />
+          <BotonExcel nombre="auditoria" hoja="Auditoría" deshabilitado={!total} obtener={async () => {
+            const filas = [];
+            for (let p = 1; p <= 50; p++) {
+              const params = new URLSearchParams({ page: String(p), pageSize: "200" });
+              for (const [k, v] of Object.entries({ from, to, userId, action, entityType })) if (v) params.set(k, v);
+              const res = await fetch(`/api/audit?${params}`);
+              const d = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(d.error || "No se pudo cargar la auditoría.");
+              filas.push(...(d.logs || []));
+              if (filas.length >= (d.total || 0) || !(d.logs || []).length) break;
+            }
+            return filas;
+          }} columnas={[
+            { t: "Fecha", v: (l) => fmtDateTime(l.createdAt) }, { t: "Usuario", v: (l) => l.userNombre }, { t: "Correo", v: (l) => l.userEmail },
+            { t: "Acción", v: (l) => ACTION_LABELS[l.action] || l.action }, { t: "Entidad", v: (l) => ENTITY_LABELS[l.entityType] || l.entityType },
+            { t: "Detalle", v: (l) => l.recordInfo }, { t: "Cambios", v: (l) => (l.changes || []).map((c) => `${c.label}: ${fmtValue(c.field, c.before)} → ${fmtValue(c.field, c.after)}`).join(" | ") },
+          ]} />
           <span className="count-note">{total} registro(s)</span>
         </div>
       </div>

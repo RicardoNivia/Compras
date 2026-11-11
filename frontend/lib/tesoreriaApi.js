@@ -12,51 +12,83 @@ const qs = (o) => {
   return p.toString();
 };
 const get = (url) => fetch(url, { cache: "no-store" }).then(handle);
-
-export const tesResumen = (anio, mes) => get(`/api/tesoreria/resumen?${qs({ anio, mes })}`);
-export const tesMaestros = () => get("/api/tesoreria/maestros");
-export const tesCrearMaestro = (tipo, datos) => fetch(`/api/tesoreria/maestros/${tipo}`, json("POST", datos)).then(handle);
-export const tesEditarMaestro = (tipo, id, datos) => fetch(`/api/tesoreria/maestros/${tipo}/${id}`, json("PATCH", datos)).then(handle);
-export const tesBorrarMaestro = (tipo, id) => fetch(`/api/tesoreria/maestros/${tipo}/${id}`, { method: "DELETE" }).then(handle);
-
-export const tesMovimientos = (filtros) => get(`/api/tesoreria/movimientos?${qs(filtros)}`);
-export const tesMovimiento = (id) => get(`/api/tesoreria/movimientos/${id}`);
-export const tesCrearMovimiento = (datos) => fetch("/api/tesoreria/movimientos", json("POST", datos)).then(handle);
-export const tesEditarMovimiento = (id, datos) => fetch(`/api/tesoreria/movimientos/${id}`, json("PATCH", datos)).then(handle);
-export const tesBorrarMovimiento = (id) => fetch(`/api/tesoreria/movimientos/${id}`, { method: "DELETE" }).then(handle);
-
 function multipart(url, campos) {
   const f = new FormData();
   for (const [k, v] of Object.entries(campos)) if (v !== undefined && v !== null) f.set(k, v);
   return fetch(url, { method: "POST", body: f }).then(handle);
 }
+
+// Resumen
+export const tesResumen = (anio, mes, vista) => get(`/api/tesoreria/resumen?${qs({ anio, mes, vista })}`);
+
+// Maestros (tipo: banco | medio | item | concepto | pagador)
+export const tesMaestros = () => get("/api/tesoreria/maestros");
+export const tesCrearMaestro = (tipo, datos) => fetch(`/api/tesoreria/maestros/${tipo}`, json("POST", datos)).then(handle);
+export const tesEditarMaestro = (tipo, id, datos) => fetch(`/api/tesoreria/maestros/${tipo}/${id}`, json("PATCH", datos)).then(handle);
+export const tesBorrarMaestro = (tipo, id) => fetch(`/api/tesoreria/maestros/${tipo}/${id}`, { method: "DELETE" }).then(handle);
+
+// Movimientos del banco
+export const tesMovimientos = (filtros) => get(`/api/tesoreria/movimientos?${qs(filtros)}`);
+export const tesMovimiento = (id) => get(`/api/tesoreria/movimientos/${id}`);
+export const tesCrearMovimiento = (datos) => fetch("/api/tesoreria/movimientos", json("POST", datos)).then(handle);
+export const tesEditarMovimiento = (id, datos) => fetch(`/api/tesoreria/movimientos/${id}`, json("PATCH", datos)).then(handle);
+export const tesBorrarMovimiento = (id) => fetch(`/api/tesoreria/movimientos/${id}`, { method: "DELETE" }).then(handle);
+export const tesAsociarMovimiento = (id, asociaciones) => fetch(`/api/tesoreria/movimientos/${id}/asociaciones`, json("PUT", { asociaciones })).then(handle);
 export const tesLeerSoporte = (archivo) => multipart("/api/tesoreria/soporte/leer", { archivo });
-export const tesGuardarConSoporte = ({ archivo, datos, proyectadoId, lineaId }) => multipart("/api/tesoreria/soporte/guardar", { archivo, datos: JSON.stringify(datos), proyectadoId, lineaId });
 export const tesAgregarSoporte = (movimientoId, archivo) => multipart(`/api/tesoreria/movimientos/${movimientoId}/soportes`, { archivo });
 export const tesBorrarSoporte = (id) => fetch(`/api/tesoreria/soportes/${id}`, { method: "DELETE" }).then(handle);
 export const urlSoporte = (id) => `/api/tesoreria/soportes/${id}`;
+// Extracto en dos pasos: analizar (no registra nada) y aplicar lo aprobado.
+export const tesAnalizarExtracto = (bancoId, archivo) => multipart("/api/tesoreria/extractos", { bancoId, archivo });
+export const tesAplicarExtracto = (token, aprobados, guardarSaldos) => fetch("/api/tesoreria/extractos/aplicar", json("POST", { token, aprobados, guardarSaldos })).then(handle);
 
-export const tesImportarExtracto = (cuentaId, archivo) => multipart("/api/tesoreria/extractos", { cuentaId, archivo });
-export const tesExtractos = (filtros) => get(`/api/tesoreria/extractos?${qs(filtros)}`);
-export const tesConciliacion = (cuentaId, anio, mes) => get(`/api/tesoreria/conciliacion?${qs({ cuentaId, anio, mes })}`);
-export const tesEnlazar = (lineaId, movimientoId) => fetch("/api/tesoreria/conciliacion/enlazar", json("POST", { lineaId, movimientoId })).then(handle);
-export const tesDesenlazar = (lineaId) => fetch("/api/tesoreria/conciliacion/desenlazar", json("POST", { lineaId })).then(handle);
-export const tesIgnorar = (lineaId, ignorar) => fetch("/api/tesoreria/conciliacion/ignorar", json("POST", { lineaId, ignorar })).then(handle);
-export const tesCrearDesdeLinea = (datos) => fetch("/api/tesoreria/conciliacion/crear", json("POST", datos)).then(handle);
-export const tesAutoConciliar = (cuentaId, anio, mes) => fetch("/api/tesoreria/conciliacion/auto", json("POST", { cuentaId, anio, mes })).then(handle);
+// Pagos programados
+export const tesPagos = (filtros) => get(`/api/tesoreria/pagos?${qs(filtros)}`);
+export const tesPago = (id) => get(`/api/tesoreria/pagos/${id}`);
+export const tesCrearPago = (datos) => fetch("/api/tesoreria/pagos", json("POST", datos)).then(handle);
+export const tesEditarPago = (id, datos) => fetch(`/api/tesoreria/pagos/${id}`, json("PATCH", datos)).then(handle);
+export const tesBorrarPago = (id) => fetch(`/api/tesoreria/pagos/${id}`, { method: "DELETE" }).then(handle);
+export const tesAsociarPago = (id, asociaciones) => fetch(`/api/tesoreria/pagos/${id}/asociaciones`, json("PUT", { asociaciones })).then(handle);
+export const tesProponerPagos = (anio, mes) => fetch("/api/tesoreria/pagos/proponer", json("POST", { anio, mes })).then(handle);
+export const tesAplicarPropuestos = (items) => fetch("/api/tesoreria/pagos/proponer/aplicar", json("POST", { items })).then(handle);
 
-export const tesCierre = (anio, mes) => get(`/api/tesoreria/cierre?${qs({ anio, mes })}`);
-export const tesFirmar = (anio, mes) => fetch("/api/tesoreria/cierre/firmar", json("POST", { anio, mes })).then(handle);
-export const urlReporteExcel = (anio) => `/api/tesoreria/reportes?${qs({ anio, formato: "xlsx" })}`;
+// Gastos periódicos
+export const tesPeriodicos = (anio) => get(`/api/tesoreria/periodicos?${qs({ anio })}`);
+export const tesCrearPeriodico = (datos) => fetch("/api/tesoreria/periodicos", json("POST", datos)).then(handle);
+export const tesEditarPeriodico = (id, datos) => fetch(`/api/tesoreria/periodicos/${id}`, json("PATCH", datos)).then(handle);
+export const tesVistaApagar = (id) => get(`/api/tesoreria/periodicos/${id}`);
+export const tesAnios = () => get("/api/tesoreria/anios");
+export const tesCrearAnio = (anio) => fetch("/api/tesoreria/anios", json("POST", { anio })).then(handle);
+export const tesBorrarPeriodico = (id) => fetch(`/api/tesoreria/periodicos/${id}`, { method: "DELETE" }).then(handle);
+export const tesReplicar = (anio, desde) => fetch("/api/tesoreria/periodicos/replicar", json("POST", { anio, desde })).then(handle);
+export const tesVistaReplicar = (anio, desde) => get(`/api/tesoreria/periodicos/replicar?${qs({ anio, desde })}`);
 
-export const tesAccesos = () => get("/api/tesoreria/accesos");
-export const tesPersonas = () => get("/api/tesoreria/accesos/personas");
-export const tesOtorgar = (userId, nivel) => fetch("/api/tesoreria/accesos", json("POST", { userId, nivel })).then(handle);
-export const tesQuitar = (id) => fetch(`/api/tesoreria/accesos/${id}`, { method: "DELETE" }).then(handle);
-export const tesExplicar = (datos) => fetch("/api/tesoreria/explicar", json("POST", datos)).then(handle);
-export const tesRecurrentes = () => get("/api/tesoreria/recurrentes");
-export const tesCrearRecurrente = (datos) => fetch("/api/tesoreria/recurrentes", json("POST", datos)).then(handle);
-export const tesEditarRecurrente = (id, datos) => fetch(`/api/tesoreria/recurrentes/${id}`, json("PATCH", datos)).then(handle);
-export const tesBorrarRecurrente = (id) => fetch(`/api/tesoreria/recurrentes/${id}`, { method: "DELETE" }).then(handle);
-export const tesDetectarRecurrentes = () => get("/api/tesoreria/recurrentes/detectar");
-export const tesGenerarProyectados = () => fetch("/api/tesoreria/recurrentes/generar", json("POST", {})).then(handle);
+// Importar plantilla
+export const tesAnalizarPlantilla = (archivo) => multipart("/api/tesoreria/importar/analizar", { archivo });
+export const tesAplicarPlantilla = (archivo, decisiones) => multipart("/api/tesoreria/importar/aplicar", { archivo, decisiones: JSON.stringify(decisiones) });
+
+// Agente de asociación
+export const tesPropuestas = (filtros) => get(`/api/tesoreria/agente?${qs(filtros)}`);
+// agente: "movimientos" (movimiento → pago, por defecto) | "pagos" (pago → movimiento, con anio/mes/alcance).
+export const tesBuscarPropuestas = (opciones = {}) => fetch("/api/tesoreria/agente/buscar", json("POST", opciones)).then(handle);
+export const tesResolverPropuesta = (id, accion) => fetch(`/api/tesoreria/agente/propuestas/${id}`, json("POST", { accion })).then(handle);
+export const tesAceptarAltas = (agente = "movimientos") => fetch("/api/tesoreria/agente/aceptar-altas", json("POST", { agente })).then(handle);
+
+// Saldos
+export const tesSaldos = (anio) => get(`/api/tesoreria/saldos?${qs({ anio })}`);
+export const tesGuardarSaldoInicial = (bancoId, anio, valor) => fetch("/api/tesoreria/saldos/iniciales", json("PUT", { bancoId, anio, valor })).then(handle);
+
+// Alertas
+export const tesAlertas = (filtros) => get(`/api/tesoreria/alertas?${qs(filtros)}`);
+export const tesRevisarAlertas = (ids, revisada = true) => fetch("/api/tesoreria/alertas/revisar", json("POST", { ids, revisada })).then(handle);
+
+// Reportes
+export const urlReporteExcel = (anio, estado = "E") => `/api/tesoreria/reportes?${qs({ anio, formato: "xlsx", estado })}`;
+
+// Conciliación y cierre
+export const tesConciliacionMes = (anio, mes) => get(`/api/tesoreria/conciliacion?${qs({ anio, mes })}`);
+export const tesConciliacionBanco = (bancoId, anio, mes) => get(`/api/tesoreria/conciliacion/banco?${qs({ bancoId, anio, mes })}`);
+export const tesResolverPendiente = (extractoId, clave, accion) => fetch("/api/tesoreria/conciliacion/pendiente", json("POST", { extractoId, clave, accion })).then(handle);
+export const tesVerificarMovimiento = (movimientoId, verificado = true) => fetch("/api/tesoreria/conciliacion/verificar", json("POST", { movimientoId, verificado })).then(handle);
+export const tesFirmarCierre = (anio, mes) => fetch("/api/tesoreria/cierre/firmar", json("POST", { anio, mes })).then(handle);
+export const tesReabrirCierre = (anio, mes) => fetch("/api/tesoreria/cierre/reabrir", json("POST", { anio, mes })).then(handle);

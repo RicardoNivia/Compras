@@ -1,11 +1,11 @@
 import { conTesoreria } from "@/lib/tesoreria/ruta";
-import { estadoConciliacion } from "@/lib/tesoreria/conciliacion";
+import { estadoMes } from "@/lib/tesoreria/conciliacion";
 
 /**
  * @openapi
  * /api/tesoreria/conciliacion:
  *   get:
  *     tags: [Tesorería]
- *     summary: "Conciliación de una cuenta en un mes (cuentaId, anio, mes): neto según banco y según libro, diferencia, enlazadas, sugerencias, solo en el banco (con la regla aprendida) y solo en el libro."
+ *     summary: "Conciliación de un mes (anio, mes): cada banco con su saldo calculado contra el del banco, lo que falta verificar y asociar, y si el mes se puede cerrar."
  */
-export const GET = conTesoreria("consulta", ({ query }) => estadoConciliacion(Number(query.cuentaId), Number(query.anio), Number(query.mes)));
+export const GET = conTesoreria("consulta", ({ query }) => estadoMes({ anio: query.anio, mes: query.mes }));

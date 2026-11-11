@@ -3323,7 +3323,7 @@ table.roles-table td{ white-space:nowrap; }
   :root:not([data-theme="light"]) .app-shell[data-modulo="bienestar"]{ --accent:#3fd29a; --accent-wash:#103528; --accent-ink:#0a0e19; --secondary:#2dd4bf; --s1:#3fd29a; }
 }
 :root[data-theme="dark"] .app-shell[data-modulo="bienestar"]{ --accent:#3fd29a; --accent-wash:#103528; --accent-ink:#0a0e19; --secondary:#2dd4bf; --s1:#3fd29a; }
-.app-shell[data-modulo="tesoreria"]{ --accent:#5a3fd0; --accent-wash:#ebe7fb; --secondary:#bb3a94; --s1:#5a3fd0; --marca:var(--marca-tesoreria); --marca-2:var(--marca-tesoreria-2); --r:6px; --r-b:4px; --r-s:4px; }
+.app-shell[data-modulo="tesoreria"]{ --accent:#5a3fd0; --accent-wash:#ebe7fb; --secondary:#bb3a94; --s1:#5a3fd0; --marca:var(--marca-tesoreria); --marca-2:var(--marca-tesoreria-2); --r:6px; --r-b:9px; --r-s:6px; }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]) .app-shell[data-modulo="tesoreria"]{ --accent:#ab98ff; --accent-wash:#27204d; --accent-ink:#0a0e19; --secondary:#e882c8; --s1:#ab98ff; }
 }
@@ -5722,3 +5722,344 @@ select, select option, select optgroup{ scrollbar-color:auto; scrollbar-width:au
 .nav2-directo .nav2-mod-chip{ position:relative; width:36px; height:36px; }
 .nav2-directo .notif-dot{ position:absolute; top:3px; right:3px; }
 .nav2.plegado:has(.nav2-directo:hover):not(.abierto) .nav2-panel{ clip-path:inset(0 100% 0 0); pointer-events:none; }
+
+/* ===================== Tesorería desde cero (movimientos, pagos programados, gastos periódicos, agente, saldos) =====================
+   Solo piezas nuevas; todo lo demás reutiliza las clases de la app (card, table-card, records, pill, dash-tabs, modal…). */
+.tes-num{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.tes-num.tes-neg{ color:var(--critical); }
+.tes-num.tes-pos{ color:var(--good); }
+.tes-ayuda{ display:flex; gap:12px; align-items:flex-start; padding:12px 14px; border-radius:var(--r); background:var(--accent-wash); border:1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); font-size:12.5px; line-height:1.5; color:var(--ink); }
+.tes-ayuda > div{ flex:1; }
+.tes-ayuda-btn{ align-self:flex-start; }
+.tes-cabecera{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.tes-cabecera .spacer{ flex:1; }
+.tes-flujo{ display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }
+.tes-flujo-paso{ display:flex; gap:12px; align-items:flex-start; padding:14px; border:1px dashed color-mix(in srgb, var(--accent) 40%, var(--border)); border-radius:var(--r); background:color-mix(in srgb, var(--accent-wash) 45%, var(--surface)); }
+.tes-flujo-n{ flex:none; width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; }
+.tes-flujo-paso strong{ display:block; font-size:13px; margin-bottom:2px; }
+.tes-flujo-paso span{ font-size:12px; color:var(--ink-2); line-height:1.45; }
+.tes-kpi-btn{ align-self:flex-start; margin-top:4px; }
+.tes-tarea{ display:flex; align-items:center; gap:12px; padding:11px 0; border-top:1px solid var(--border); flex-wrap:wrap; }
+.tes-tarea:first-child{ border-top:0; }
+.tes-tarea > div{ flex:1; min-width:200px; }
+.tes-tarea strong{ font-size:13px; }
+.tes-tarea small{ display:block; color:var(--ink-2); font-size:12px; }
+.tes-punto{ width:10px; height:10px; border-radius:50%; flex:none; }
+/* Asistente de importación */
+.tes-pasos-imp{ display:flex; flex-wrap:wrap; gap:8px; list-style:none; margin:0; padding:0; }
+.tes-pasos-imp li{ flex:1 1 170px; display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border); background:var(--surface); border-radius:var(--r); font-size:12.5px; font-weight:600; color:var(--muted); }
+.tes-pasos-imp li span{ width:26px; height:26px; border-radius:50%; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:12px; flex:none; }
+.tes-pasos-imp li.on{ border-color:var(--accent); color:var(--accent); background:var(--accent-wash); }
+.tes-pasos-imp li.on span{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.tes-pasos-imp li.hecho{ color:var(--good); }
+.tes-pasos-imp li.hecho span{ border-color:var(--good); background:color-mix(in srgb, var(--good) 14%, transparent); }
+.tes-hoja{ border:1px solid var(--border); border-radius:var(--r); padding:14px; background:var(--surface); display:flex; flex-direction:column; gap:10px; }
+.tes-hoja.sel{ border-color:var(--accent); box-shadow:inset 3px 0 0 var(--accent); }
+.tes-hoja.duda{ border-color:color-mix(in srgb, var(--warning) 55%, var(--border)); background:color-mix(in srgb, var(--warning) 6%, var(--surface)); }
+.tes-hoja-cab{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.tes-hoja-cab .spacer{ flex:1; }
+.tes-datos{ display:flex; flex-wrap:wrap; gap:4px 16px; font-size:12px; color:var(--ink-2); }
+.tes-datos b{ font-family:"IBM Plex Mono", ui-monospace, monospace; color:var(--ink); font-weight:600; }
+/* Meses de pagos programados */
+.tes-meses{ display:flex; flex-wrap:wrap; gap:6px; }
+.tes-mes{ min-width:62px; min-height:44px; padding:4px 8px; border:1px solid var(--border); background:var(--surface); border-radius:var(--r-b); font:inherit; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.15; color:var(--ink); }
+.tes-mes b{ font-size:12.5px; }
+.tes-mes span{ font-size:11px; color:var(--muted); font-family:"IBM Plex Mono", ui-monospace, monospace; }
+.tes-mes:hover{ border-color:var(--accent); }
+.tes-mes.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.tes-mes.on span{ color:color-mix(in srgb, #fff 80%, transparent); }
+.tes-mes.hoy{ border-width:2px; border-color:var(--accent); }
+/* Formulario del movimiento: asociar a pagos */
+.tes-seccion{ display:flex; flex-direction:column; gap:10px; }
+.tes-seccion-t{ display:flex; align-items:center; gap:10px; }
+.tes-seccion-t .n{ width:24px; height:24px; border-radius:50%; background:var(--accent-wash); color:var(--accent); font-weight:700; font-size:12px; display:flex; align-items:center; justify-content:center; flex:none; }
+.tes-seccion-t h4{ margin:0; font-family:"Plus Jakarta Sans", sans-serif; font-size:14px; }
+.tes-seccion-t small{ color:var(--muted); font-size:11.5px; }
+.tes-asoc{ display:grid; grid-template-columns:minmax(0, 1fr) 190px auto; gap:12px; align-items:center; padding:10px 12px; border:1px solid var(--border); border-radius:var(--r); background:var(--surface); }
+.tes-asoc > div:first-child{ display:flex; flex-direction:column; gap:2px; min-width:0; font-size:12.5px; }
+.tes-asoc small{ color:var(--ink-2); font-size:11.5px; }
+.tes-cuadre{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; padding:12px; border-radius:var(--r); background:var(--surface-2); border:1px solid var(--border); }
+.tes-cuadre > div{ display:flex; flex-direction:column; gap:2px; }
+.tes-cuadre span{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.tes-cand{ display:flex; align-items:center; gap:12px; padding:9px 12px; border:1px solid var(--border); border-radius:var(--r); background:var(--surface); flex-wrap:wrap; font-size:12.5px; }
+.tes-cand > div{ flex:1; min-width:200px; display:flex; flex-direction:column; gap:2px; }
+.tes-cand small{ color:var(--ink-2); font-size:11.5px; }
+.tes-lista-cands{ display:flex; flex-direction:column; gap:6px; max-height:280px; overflow:auto; }
+.tes-seg{ display:inline-flex; border:1px solid var(--border); border-radius:var(--r-b); overflow:hidden; }
+.tes-seg button{ min-height:36px; padding:6px 12px; border:0; background:var(--surface); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; color:var(--ink-2); }
+.tes-seg button + button{ border-left:1px solid var(--border); }
+.tes-seg button.on{ background:var(--accent); color:#fff; }
+.tes-seg button:disabled{ opacity:.5; cursor:not-allowed; }
+/* Agente de asociación */
+.tes-prop{ display:grid; grid-template-columns:minmax(0, 1fr) 30px minmax(0, 1fr) auto; gap:14px; align-items:center; padding:14px; border:1px solid var(--border); border-radius:var(--r); background:var(--surface); }
+.tes-prop-lado{ display:flex; flex-direction:column; gap:3px; min-width:0; font-size:12.5px; }
+.tes-prop-lado small{ color:var(--muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
+.tes-prop-lado strong{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tes-prop-lado span{ color:var(--ink-2); }
+.tes-prop-flecha{ color:var(--accent); display:flex; justify-content:center; }
+.tes-prop-acc{ display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
+.tes-prop-motivo{ grid-column:1 / -1; font-size:12px; color:var(--ink-2); display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.tes-motivo{ padding:2px 8px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border); font-size:11px; }
+@media (max-width: 760px){
+  .tes-asoc{ grid-template-columns:1fr; }
+  .tes-prop{ grid-template-columns:1fr; }
+  .tes-prop-flecha{ transform:rotate(90deg); }
+  .tes-prop-acc{ align-items:flex-start; }
+}
+/* Los modales se dibujan en <body> (fuera de .app-shell): llevan el tema de Tesorería con esta clase. */
+.tes-tema{ --accent:#5a3fd0; --accent-wash:#ebe7fb; --secondary:#bb3a94; --s1:#5a3fd0; --marca:var(--marca-tesoreria); --marca-2:var(--marca-tesoreria-2); --r:6px; --r-b:9px; --r-s:6px; }
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .tes-tema{ --accent:#ab98ff; --accent-wash:#27204d; --accent-ink:#0a0e19; --secondary:#e882c8; --s1:#ab98ff; }
+}
+:root[data-theme="dark"] .tes-tema{ --accent:#ab98ff; --accent-wash:#27204d; --accent-ink:#0a0e19; --secondary:#e882c8; --s1:#ab98ff; }
+.tes-vista .table-card .card-sub, .tes-vista .card-sub{ display:block; font-size:11.5px; color:var(--ink-2); }
+
+/* Conciliación de Tesorería: bancos como tarjetas, 4 pasos numerados, la ecuación del saldo y la lista para cerrar. */
+.tes-bancos{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:10px; }
+.tes-banco{ display:flex; flex-direction:column; gap:8px; padding:14px; border:1px solid var(--border); border-radius:var(--r); background:var(--surface); font:inherit; text-align:left; cursor:pointer; color:var(--ink); }
+.tes-banco:hover{ border-color:color-mix(in srgb, var(--accent) 50%, var(--border)); }
+.tes-banco.on{ border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); background:color-mix(in srgb, var(--accent-wash) 55%, var(--surface)); }
+.tes-banco-cab{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+.tes-banco-cab strong{ font-family:"Plus Jakarta Sans", sans-serif; font-size:14px; }
+.tes-banco-datos{ display:flex; flex-wrap:wrap; gap:4px 12px; font-size:11.5px; color:var(--ink-2); }
+.tes-paso{ display:flex; flex-direction:column; gap:12px; border-left:4px solid color-mix(in srgb, var(--warning) 70%, var(--border)); }
+.tes-paso.listo{ border-left-color:var(--good); }
+.tes-paso-cab{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.tes-paso-n{ width:32px; height:32px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; background:var(--accent-wash); color:var(--accent); }
+.tes-paso.listo .tes-paso-n{ background:color-mix(in srgb, var(--good) 16%, transparent); color:var(--good); }
+.tes-paso-cuerpo{ display:flex; flex-direction:column; gap:12px; }
+.tes-ecuacion{ display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; }
+.tes-ec-caja{ flex:1 1 150px; display:flex; flex-direction:column; gap:3px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--r); background:var(--surface-2); min-width:0; }
+.tes-ec-caja span{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; font-weight:700; }
+.tes-ec-caja strong{ font-size:15px; }
+.tes-ec-caja small{ font-size:11px; color:var(--ink-2); }
+.tes-ec-caja.fuerte{ background:var(--surface); border-color:color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.tes-ec-op{ align-self:center; font-size:20px; font-weight:800; color:var(--muted); padding:0 2px; }
+.tes-resultado{ display:flex; gap:10px; align-items:flex-start; padding:12px 14px; border-radius:var(--r); font-size:13px; line-height:1.5; }
+.tes-resultado.ok{ background:color-mix(in srgb, var(--good) 10%, var(--surface)); border:1px solid color-mix(in srgb, var(--good) 35%, var(--border)); color:var(--ink); }
+.tes-resultado.ok > svg{ color:var(--good); flex:none; margin-top:2px; }
+.tes-resultado.mal{ background:color-mix(in srgb, var(--critical) 8%, var(--surface)); border:1px solid color-mix(in srgb, var(--critical) 35%, var(--border)); }
+.tes-resultado.mal > svg{ color:var(--critical); flex:none; margin-top:2px; }
+.tes-resultado.aviso{ background:color-mix(in srgb, var(--warning) 9%, var(--surface)); border:1px solid color-mix(in srgb, var(--warning) 40%, var(--border)); }
+.tes-resultado.aviso > svg{ color:var(--warning); flex:none; margin-top:2px; }
+.tes-progreso{ height:10px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border); overflow:hidden; }
+.tes-progreso > div{ height:100%; background:var(--good); transition:width .4s ease; }
+.tes-checklist{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+.tes-checklist li{ display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--border); font-size:13px; }
+.tes-checklist li:first-child{ border-top:0; }
+.tes-checklist li > span:nth-child(2){ flex:1; }
+.tes-check-ic{ width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex:none; }
+.tes-checklist li.ok .tes-check-ic{ background:color-mix(in srgb, var(--good) 16%, transparent); color:var(--good); }
+.tes-checklist li.mal .tes-check-ic{ background:color-mix(in srgb, var(--critical) 14%, transparent); color:var(--critical); }
+.tes-checklist li.aviso .tes-check-ic{ background:color-mix(in srgb, var(--warning) 16%, transparent); color:var(--warning); }
+@media (max-width: 760px){ .tes-ec-op{ display:none; } }
+/* Inventario: filtros por estado y vencimiento, y «Buscar con Nova». */
+.inv-filtros{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.inv-filtros select{ min-height:36px; max-width:220px; }
+.inv-filtros select.activo{ border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+.inv-nova{ display:flex; gap:8px; align-items:center; padding:10px 14px; border-bottom:1px solid var(--border); background:color-mix(in srgb, var(--accent-wash) 40%, var(--surface)); flex-wrap:wrap; }
+.inv-nova input{ flex:1 1 280px; min-height:36px; }
+.inv-nova-ic{ color:var(--accent); display:flex; }
+.inv-nova-res{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 14px; font-size:12px; color:var(--ink-2); border-bottom:1px solid var(--border); }
+/* Agentes (todos los módulos): la tarjeta de cada propuesta toma el color de su confianza — verde alta, ámbar media,
+   rojizo baja — en el borde, el fondo y la píldora. Tarjeta completa del color de su confianza. */
+.ag-propuesta.conf-alta{ border-color: color-mix(in srgb, #1d8a4e 38%, var(--border)); border-left-color:#1d8a4e; background: color-mix(in srgb, #1d8a4e 7%, var(--surface)); }
+.ag-propuesta.conf-media{ border-color: color-mix(in srgb, #d4870a 40%, var(--border)); border-left-color:#d4870a; background: color-mix(in srgb, #d4870a 8%, var(--surface)); }
+.ag-propuesta.conf-baja{ border-color: color-mix(in srgb, #c2410c 32%, var(--border)); border-left-color:#c2410c; background: color-mix(in srgb, #c2410c 5%, var(--surface)); }
+.ag-propuesta.conf-ninguna{ border-left-color: var(--border); background: var(--surface-2); }
+.agente-conf.baja{ background: color-mix(in srgb, #c2410c 13%, var(--surface)); color:#b03a0a; }
+/* «Llenar un año»: dos caminos como tarjetas. */
+.tes-opciones{ display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px; }
+.tes-opcion{ display:flex; flex-direction:column; gap:6px; padding:16px; border:1px solid var(--border); border-radius:var(--r); background:var(--surface); font:inherit; text-align:left; cursor:pointer; color:var(--ink); transition:border-color .15s ease, box-shadow .15s ease; }
+.tes-opcion:hover{ border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+.tes-opcion strong{ font-family:"Plus Jakarta Sans", sans-serif; font-size:15px; }
+.tes-opcion span{ font-size:12.5px; color:var(--ink-2); line-height:1.5; }
+.tes-opcion em{ font-style:normal; font-size:11.5px; font-weight:600; color:var(--accent); }
+/* Registrar con soporte: pagos posibles del comprobante, del color de su confianza (mismo código de color que los agentes). */
+.tes-posible{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 12px; border:1px solid var(--border); border-left:4px solid var(--border); border-radius:var(--r); background:var(--surface); font-size:12.5px; }
+.tes-posible > div{ flex:1; min-width:220px; display:flex; flex-direction:column; gap:2px; }
+.tes-posible small{ color:var(--ink-2); font-size:11.5px; }
+.tes-posible-motivo{ color:var(--muted) !important; }
+.tes-posible.conf-alta{ border-color: color-mix(in srgb, #1d8a4e 38%, var(--border)); border-left-color:#1d8a4e; background: color-mix(in srgb, #1d8a4e 7%, var(--surface)); }
+.tes-posible.conf-media{ border-color: color-mix(in srgb, #d4870a 40%, var(--border)); border-left-color:#d4870a; background: color-mix(in srgb, #d4870a 8%, var(--surface)); }
+.tes-posible.conf-baja{ border-color: color-mix(in srgb, #c2410c 32%, var(--border)); border-left-color:#c2410c; background: color-mix(in srgb, #c2410c 5%, var(--surface)); }
+.tes-posible.elegido{ box-shadow: inset 0 0 0 2px var(--accent); }
+/* Gastos periódicos: aviso de por qué no se puede eliminar. */
+.confirm-del.tes-no-borrar{ flex-wrap:wrap; max-width:420px; white-space:normal; padding:8px 10px; border-radius:var(--r); background:color-mix(in srgb, var(--warning) 12%, var(--surface)); border:1px solid color-mix(in srgb, var(--warning) 40%, var(--border)); font-size:12px; }
+
+/* Tesorería: botones secundarios con el color del módulo (como .agente-boton), esquinas como en Compras. Mismo
+   peso que .btn (via :where) para no pisar los estilos propios de cada componente. */
+:is(.app-shell[data-modulo="tesoreria"], .tes-tema) .btn:where(:not(.btn-primary, .btn-ghost, .btn-danger-solid, .btn-danger-outline, .btn-nova)){
+  background:color-mix(in srgb, var(--marca) 6%, var(--surface)); border-color:color-mix(in srgb, var(--marca) 32%, var(--border));
+  color:color-mix(in srgb, var(--marca) 82%, var(--ink)); font-weight:700;
+}
+:is(.app-shell[data-modulo="tesoreria"], .tes-tema) .btn:where(:not(.btn-primary, .btn-ghost, .btn-danger-solid, .btn-danger-outline, .btn-nova)):hover:not(:disabled){
+  background:color-mix(in srgb, var(--marca) 13%, var(--surface)); border-color:color-mix(in srgb, var(--marca) 55%, var(--border));
+  transform:translateY(-1px); box-shadow:inset 0 1px 0 var(--brillo), 0 8px 16px -10px var(--marca);
+}
+.tes-ayuda-btn .tes-ayuda-ic{ display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:linear-gradient(135deg, var(--marca), var(--marca-2)); color:#fff; font-size:10px; font-weight:800; }
+/* Crear otro año: tres caminos lado a lado; aviso de desactivar. */
+.tes-opciones.tes-opciones-3{ grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); }
+.tes-opcion:disabled{ opacity:.55; cursor:not-allowed; transform:none; }
+.tes-ayuda.tes-ayuda-alerta{ background:color-mix(in srgb, var(--warning) 12%, var(--surface)); border-color:color-mix(in srgb, var(--warning) 40%, var(--border)); }
+/* Pagos programados: las tarjetas filtran la tabla con los pagos que forman la cifra. */
+.kpi.tes-kpi-filtro{ cursor:pointer; transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.kpi.tes-kpi-filtro:hover{ transform:translateY(-2px); border-color:color-mix(in srgb, var(--marca) 40%, var(--border)); }
+.kpi.tes-kpi-filtro.on{ border-color:var(--marca); box-shadow:0 0 0 2px color-mix(in srgb, var(--marca) 30%, transparent), var(--elev); }
+.kpi.tes-kpi-filtro:focus-visible{ outline:2px solid var(--marca); outline-offset:2px; }
+.tes-kpi-sub{ cursor:pointer; border-radius:4px; padding:1px 4px; margin-left:-4px; align-self:flex-start; }
+.tes-kpi-sub:hover, .tes-kpi-sub.on{ background:color-mix(in srgb, var(--marca) 14%, transparent); color:color-mix(in srgb, var(--marca) 85%, var(--ink)); }
+.tes-kpi-num{ all:unset; cursor:pointer; border-radius:4px; padding:0 4px; }
+.tes-kpi-num:hover, .tes-kpi-num.on{ background:color-mix(in srgb, var(--marca) 14%, transparent); color:var(--marca); }
+.tes-kpi-num:focus-visible{ outline:2px solid var(--marca); }
+
+/* Burbujas de texto largo flotando sobre todo (components/TooltipFlotante.jsx): la original se oculta y se muestra una
+   copia fija en <body>, sin recortes de filas, tablas con scroll ni columnas fijas. */
+html.tt-flotante-on .desc-tooltip-wrap:hover > .desc-tooltip-bubble{ display:none; }
+.tt-flotante{ position:fixed; z-index:2000; display:none; pointer-events:none; max-width:360px; width:max-content;
+  background:var(--ink); color:var(--page); font-size:11.5px; line-height:1.45; padding:10px 12px; border-radius:10px;
+  box-shadow:0 10px 24px rgba(24,39,75,.28); white-space:normal; word-break:break-word; animation:ldFade .12s ease; }
+.tt-flotante.on{ display:block; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .tt-flotante{ background:#eef2f7; color:#0b1220; } }
+:root[data-theme="dark"] .tt-flotante{ background:#eef2f7; color:#0b1220; }
+
+/* Tablero (dashboard) de Tesorería — components/tesoreria/ResumenTesoreria.jsx. */
+.tes-dash.cargando .kpi-row, .tes-dash.cargando .card{ opacity:.7; transition:opacity .2s ease; }
+.tes-dash-cabeza{ margin-bottom:12px; align-items:flex-end; }
+.tes-atencion{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 14px; margin-bottom:14px; border-radius:var(--r); background:color-mix(in srgb, var(--marca) 6%, var(--surface)); border:1px solid color-mix(in srgb, var(--marca) 22%, var(--border)); }
+.tes-atencion-t{ display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--marca); margin-right:4px; }
+.tes-atencion-pill{ text-decoration:none; display:inline-flex; align-items:center; gap:5px; font-size:11.5px; padding:4px 10px; transition:transform .15s ease, filter .15s ease; }
+.tes-atencion-pill:hover{ transform:translateY(-1px); filter:brightness(.97); }
+a.kpi.tes-dash-kpi{ text-decoration:none; color:inherit; cursor:pointer; transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+a.kpi.tes-dash-kpi:hover{ transform:translateY(-2px); border-color:color-mix(in srgb, var(--kpi-c, var(--marca)) 45%, var(--border)); }
+.tes-dash .kpi .value{ font-size:22px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tes-dash-fila{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+.tes-dash-tres{ display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:14px; margin-bottom:14px; }
+.tes-dash-bancos{ display:grid; gap:10px; }
+.tes-dash-banco{ display:flex; flex-direction:column; gap:4px; padding:12px 14px; border-radius:var(--r); border:1px solid var(--border); border-left:4px solid var(--bc); background:var(--surface); text-decoration:none; color:inherit; transition:transform .15s ease, box-shadow .15s ease; }
+.tes-dash-banco:hover{ transform:translateY(-1px); box-shadow:var(--elev); }
+.tes-dash-banco-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.tes-dash-banco-v{ font-size:20px; font-weight:600; }
+.tes-dash-mov{ display:flex; align-items:baseline; gap:8px; margin:4px 0 6px; }
+.tes-dash-mov-n{ font-size:30px; font-weight:600; }
+a.tes-tarea.tes-dash-fila-link{ text-decoration:none; color:inherit; border-radius:var(--r-s); transition:background .15s ease; }
+a.tes-tarea.tes-dash-fila-link:hover{ background:color-mix(in srgb, var(--marca) 6%, transparent); }
+.tes-dash-sub{ margin:14px 0 4px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+@media (max-width: 1100px){ .tes-dash-fila, .tes-dash-tres{ grid-template-columns:1fr; } }
+
+/* ===== Estado vacío (todo `.empty` de la app y components/EstadoVacio.jsx) =====
+   Ilustración con el color del módulo (--marca → --marca-2): un ícono de bandeja sobre degradado, con halo y un leve
+   flotar; título y texto centrados. `.compacta` (o dentro de .prov-compact / modales) para listas cortas. */
+.empty{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:36px 20px; text-align:center;
+  color:var(--ink-2); font-size:12.5px; line-height:1.55; animation:emptyIn .45s cubic-bezier(.16,1,.3,1) backwards; }
+.empty::before{ content:""; flex:none; width:52px; height:52px; margin-bottom:10px; border-radius:16px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-6l-2 3h-4l-2-3H2'/%3E%3Cpath d='M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'/%3E%3C/svg%3E") center/24px no-repeat,
+    linear-gradient(135deg, var(--marca), var(--marca-2));
+  box-shadow:0 0 0 7px color-mix(in srgb, var(--marca) 10%, transparent), 0 0 0 15px color-mix(in srgb, var(--marca) 5%, transparent), 0 14px 26px -12px var(--marca);
+  animation:emptyFlota 4.5s ease-in-out infinite; }
+.empty.con-icono::before{ display:none; }
+.empty .empty-ic{ width:52px; height:52px; margin-bottom:10px; display:grid; place-items:center; border-radius:16px; color:#fff;
+  background:linear-gradient(135deg, var(--marca), var(--marca-2));
+  box-shadow:0 0 0 7px color-mix(in srgb, var(--marca) 10%, transparent), 0 0 0 15px color-mix(in srgb, var(--marca) 5%, transparent), 0 14px 26px -12px var(--marca);
+  animation:emptyFlota 4.5s ease-in-out infinite; }
+.empty .empty-t{ font-family:"Plus Jakarta Sans", sans-serif; font-size:15px; font-weight:800; color:var(--ink); letter-spacing:-.01em; }
+.empty .empty-txt{ max-width:460px; color:var(--muted); }
+.empty:not(.empty-rico){ color:var(--muted); }
+.empty .empty-accion{ margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+/* Compacta: listas cortas, modales y tarjetas pequeñas. */
+.empty.compacta, .modal .empty, .prov-compact .empty, .card .empty.compacta{ padding:18px 12px; font-size:12px; gap:4px; }
+.empty.compacta::before, .modal .empty::before, .prov-compact .empty::before, .empty.compacta .empty-ic, .modal .empty .empty-ic{ width:36px; height:36px; border-radius:11px; margin-bottom:6px; background-size:18px, auto;
+  box-shadow:0 0 0 5px color-mix(in srgb, var(--marca) 9%, transparent), 0 8px 16px -10px var(--marca); }
+.empty.compacta .empty-t, .modal .empty .empty-t{ font-size:13.5px; }
+td > .empty{ padding:30px 16px; }
+@keyframes emptyFlota{ 0%, 100%{ transform:translateY(0); } 50%{ transform:translateY(-4px); } }
+@keyframes emptyIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce){ .empty, .empty::before, .empty .empty-ic{ animation:none; } }
+/* Agentes: su vacío con la misma ilustración. */
+.ag-vacio-icono{ color:#fff !important; background:linear-gradient(135deg, var(--marca), var(--marca-2)) !important;
+  box-shadow:0 0 0 7px color-mix(in srgb, var(--marca) 10%, transparent), 0 0 0 15px color-mix(in srgb, var(--marca) 5%, transparent), 0 14px 26px -12px var(--marca);
+  margin-bottom:12px !important; animation:emptyFlota 4.5s ease-in-out infinite; }
+/* En tablas más anchas que la pantalla, el vacío se centra en la parte visible (no en todo el ancho de la tabla). */
+.table-scroll{ container-type:inline-size; }
+.table-scroll td > .empty{ position:sticky; left:0; width:100cqw; box-sizing:border-box; }
+
+/* Nova flotante (126px abajo a la derecha) no debe tapar lo último de la página: el contenido termina por encima de ella
+   (botones «Siguiente», paginación, pies de tabla), siempre alcanzable con el scroll. */
+main{ padding-bottom:150px; }
+@media (max-width: 760px){ main{ padding-bottom:120px; } }
+
+/* Extracto: análisis antes de aprobar (MovimientoModales.jsx#ExtractoModal). */
+.tes-ex-saldos{ display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+.tes-ex-saldo{ display:flex; flex-direction:column; gap:3px; padding:12px 14px; border-radius:var(--r); border:1px solid var(--border); background:var(--surface); border-top:3px solid var(--border); }
+.tes-ex-saldo span{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:700; }
+.tes-ex-saldo strong{ font-size:17px; }
+.tes-ex-saldo small{ font-size:11.5px; color:var(--ink-2); line-height:1.4; }
+.tes-ex-saldo.ok{ border-top-color:var(--good); background:color-mix(in srgb, var(--good) 6%, var(--surface)); }
+.tes-ex-saldo.mal{ border-top-color:var(--critical); background:color-mix(in srgb, var(--critical) 6%, var(--surface)); }
+.tes-ex-lista{ max-height:340px; overflow:auto; border:1px solid var(--border); border-radius:var(--r); }
+tr.tes-ex-no td{ opacity:.45; text-decoration:line-through; }
+@media (max-width: 760px){ .tes-ex-saldos{ grid-template-columns:1fr; } }
+
+/* Conciliación bancaria contable y pistas de la diferencia (components/tesoreria/ConciliacionContable.jsx). */
+.tes-cc{ border:1px solid var(--border); border-radius:var(--r); overflow:hidden; background:var(--surface); }
+.tes-cc-tabla{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.tes-cc-tabla td{ padding:8px 14px; border-bottom:1px solid var(--border); vertical-align:top; }
+.tes-cc-tabla td small{ display:block; color:var(--muted); font-size:11px; }
+.tes-cc-signo{ width:24px; font-weight:800; color:var(--marca); text-align:center; }
+.tes-cc-cero td{ color:var(--muted); }
+.tes-cc-total td{ background:var(--surface-2); font-weight:700; }
+.tes-cc-dif td{ border-bottom:0; }
+.tes-cc-dif.ok td{ background:color-mix(in srgb, var(--good) 10%, var(--surface)); color:var(--good); }
+.tes-cc-dif.mal td{ background:color-mix(in srgb, var(--critical) 9%, var(--surface)); }
+.tes-cc-dif.mal td:last-child{ color:var(--critical); }
+.tes-pistas{ display:flex; flex-direction:column; gap:8px; }
+.tes-pistas-t{ margin:6px 0 2px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+.tes-pistas .tes-posible{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.tes-pistas .tes-posible > div:first-child{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+.tes-pistas-acc{ display:flex; gap:6px; flex:none; }
+.tes-dos-listas{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.tes-dos-listas h4{ margin:0 0 6px; font-size:12.5px; }
+@media (max-width: 1100px){ .tes-dos-listas{ grid-template-columns:1fr; } }
+.tes-pistas .tes-posible > .tes-pistas-acc{ flex:none; min-width:0; flex-direction:row; align-items:center; gap:6px; }
+.tes-ex-lista table.records, .modal table.records.tes-tabla{ min-width:0; }
+.ag-alcance .ag-busqueda select{ min-width:150px; }
+/* Leyenda interactiva (LineChartSvg): los chips son botones pero se ven como los chips de leyenda del resto de gráficas. */
+.legend button.chip{ appearance:none; -webkit-appearance:none; background:none; border:0; box-shadow:none; font:inherit; color:inherit; margin:0; cursor:pointer; border-radius:999px; transition:opacity .15s ease, background .15s ease; }
+.legend button.chip:hover, .legend button.chip:focus-visible{ background:color-mix(in srgb, var(--marca) 8%, transparent); outline:none; }
+
+/* Formulario de pago (PagoModales.jsx#CamposPago): bloques con preguntas, tarjetas de tipo y resumen en vivo. */
+.pg-form{ display:flex; flex-direction:column; gap:14px; }
+.pg-bloque{ display:flex; flex-direction:column; gap:10px; padding:14px 16px; border:1px solid var(--border); border-radius:var(--r); background:var(--surface); }
+.pg-bloque-t{ display:flex; align-items:center; gap:8px; margin:0; font-size:13.5px; font-weight:800; color:var(--ink); }
+.pg-bloque-t > span{ width:22px; height:22px; display:grid; place-items:center; border-radius:50%; font-size:11.5px; color:#fff; background:linear-gradient(135deg, var(--marca), var(--marca-2)); }
+.pg-bloque-t em{ font-style:normal; font-weight:600; font-size:11px; color:var(--muted); }
+.pg-tipos{ display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; }
+.pg-tipo{ --c:var(--marca); appearance:none; display:flex; flex-direction:column; align-items:flex-start; gap:3px; padding:10px 11px; text-align:left; border:1.5px solid var(--border); border-radius:var(--r); background:var(--surface); color:var(--ink); font:inherit; cursor:pointer; transition:border-color .15s ease, background .15s ease, transform .15s ease, box-shadow .15s ease; }
+.pg-tipo:hover{ transform:translateY(-1px); border-color:color-mix(in srgb, var(--c) 45%, var(--border)); }
+.pg-tipo strong{ font-size:13px; }
+.pg-tipo small{ font-size:11px; color:var(--muted); line-height:1.35; }
+.pg-tipo-ic{ width:26px; height:26px; display:grid; place-items:center; border-radius:8px; font-size:14px; font-weight:800; color:var(--c); background:color-mix(in srgb, var(--c) 12%, var(--surface)); }
+.pg-tipo.on{ border-color:var(--c); background:color-mix(in srgb, var(--c) 7%, var(--surface)); box-shadow:0 0 0 3px color-mix(in srgb, var(--c) 15%, transparent); }
+.pg-tipo.egreso, .pg-resumen.egreso{ --c:var(--critical); }
+.pg-tipo.ingreso, .pg-resumen.ingreso{ --c:var(--good); }
+.pg-tipo.jornal, .pg-resumen.jornal{ --c:var(--warning); }
+.pg-tipo.traslado, .pg-resumen.traslado{ --c:var(--marca); }
+.pg-tipo.saldo, .pg-resumen.saldo{ --c:var(--muted); }
+.pg-sentido{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:12.5px; font-weight:700; }
+.pg-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px 14px; }
+.pg-grid .field{ margin:0; }
+.pg-ancho{ grid-column:1 / -1; }
+.pg-ancho textarea{ resize:vertical; min-height:56px; }
+.pg-ayuda{ font-size:11px; color:var(--muted); line-height:1.4; }
+.pgf-valor input{ font-size:16px; font-weight:700; }
+.pg-rapidas{ display:flex; gap:6px; flex-wrap:wrap; margin-top:2px; }
+.pg-rapida{ appearance:none; font:inherit; font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--ink-2); cursor:pointer; }
+.pg-rapida:hover, .pg-rapida.on{ border-color:var(--marca); color:var(--marca); background:color-mix(in srgb, var(--marca) 8%, var(--surface)); }
+.pg-resumen{ --c:var(--marca); display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:var(--r); border:1px solid color-mix(in srgb, var(--c) 35%, var(--border)); background:color-mix(in srgb, var(--c) 6%, var(--surface)); }
+.pg-resumen-ic{ width:34px; height:34px; display:grid; place-items:center; border-radius:10px; font-weight:800; color:#fff; background:var(--c); flex:none; }
+.pg-resumen > div{ display:flex; flex-direction:column; gap:1px; min-width:0; flex:1; }
+.pg-resumen small{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:700; }
+.pg-resumen strong{ font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pg-resumen span{ font-size:12px; color:var(--ink-2); }
+.pg-resumen-v{ font-size:18px !important; font-weight:700; flex:none; }
+@media (max-width: 760px){ .pg-tipos{ grid-template-columns:1fr 1fr; } .pg-grid{ grid-template-columns:1fr; } }

@@ -105,7 +105,9 @@ function ModalAsociar({ anio, mes, linea, puedeEditar, onClose, onCambio }) {
                 </tbody>
               </table>
             </div>
-            <PiePagina id="sin-act-size" p={pag} total={lista.length} etiqueta="compra(s)" tamanos={PAGE_SIZES_MODAL} />
+            <PiePagina id="sin-act-size" p={pag} total={lista.length} etiqueta="compra(s)" tamanos={PAGE_SIZES_MODAL} excel={{ nombre: "compras-sin-actividad", hoja: "Compras sin actividad", filas: lista, columnas: [
+              { t: "#", v: (c) => c.localSeq }, { t: "Solicitud", v: (c) => c.fechaSolicitud }, { t: "Descripción", v: (c) => c.descripcion }, { t: "Proveedor", v: (c) => c.proveedor }, { t: "Valor con IVA ($)", v: (c) => c.valorConIva || 0 },
+            ] }} />
           </div>
         </div>
       </div>

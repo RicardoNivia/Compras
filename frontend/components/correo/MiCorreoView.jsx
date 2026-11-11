@@ -218,7 +218,7 @@ export default function MiCorreoView({ inicial, vinculado, errorVinculo, puedeRe
             </thead>
             <tbody>
               {lista.items.length === 0 && (
-                <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 20 }}>No hay solicitudes {filtro ? FILTROS.find((f) => f[0] === filtro)[1].toLowerCase() : ""}.</td></tr>
+                <tr><td colSpan={7} className="empty">No hay solicitudes {filtro ? FILTROS.find((f) => f[0] === filtro)[1].toLowerCase() : ""}.</td></tr>
               )}
               {lista.items.map((s) => {
                 const [cls, txt] = ESTADO_PILL[s.estado] || ["muted", s.estado];

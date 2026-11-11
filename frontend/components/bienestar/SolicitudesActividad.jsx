@@ -56,7 +56,7 @@ export default function SolicitudesActividad({ actividadId, puedeSolicitar, onCa
       {lista === null ? (
         <EsqueletoLista filas={2} etiqueta="Cargando las solicitudes" />
       ) : lista.length === 0 ? (
-        <p className="count-note">Aún no se ha solicitado ninguna compra para esta actividad.</p>
+        <div className="empty compacta">Aún no se ha solicitado ninguna compra para esta actividad.</div>
       ) : (
         <ul className="solicitudes-lista">
           {lista.map((s) => {

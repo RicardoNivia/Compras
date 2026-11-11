@@ -1,5 +1,6 @@
 "use client";
 
+import BotonExcel from "@/components/BotonExcel";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { reviewPendientesApi } from "@/lib/api";
@@ -35,6 +36,30 @@ function Texto({ v, ancho = false }) {
   );
 }
 
+// «Revisada» de una alerta de Tesorería (lo que no cuadró al importar): la marca y vuelve a calcular Mi día.
+function RevisarAlertaTesoreria({ id }) {
+  const router = useRouter();
+  const [estado, setEstado] = useState("");
+  async function revisar() {
+    setEstado("guardando");
+    try {
+      const r = await fetch("/api/tesoreria/alertas/revisar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [id] }) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Error ${r.status}`);
+      setEstado("lista");
+      router.refresh();
+    } catch (e) {
+      setEstado("");
+      window.alert(e.message);
+    }
+  }
+  if (estado === "lista") return <span className="pill good"><IconCheck size={11} /> Revisada</span>;
+  return (
+    <button type="button" className="btn small" onClick={revisar} disabled={estado === "guardando"} title="Ya la corregí o la revisé: quitarla de Mi día">
+      {estado === "guardando" ? <span className="spinner" /> : <IconCheck size={11} />} Revisada
+    </button>
+  );
+}
+
 function diasPill(dias, nivel) {
   const cls = nivel === "critico" ? "critical" : nivel === "atencion" ? "warning" : "muted";
   return <span className={`pill ${cls}`}><IconClock size={11} /> {dias}</span>;
@@ -52,6 +77,7 @@ function SeccionTabla({ items, dominio, onEnviarInforme }) {
   const esBienestar = dominio === "bienestar";
   const esPresupuesto = dominio === "presupuesto";
   const esInformes = dominio === "informes";
+  const esTesoreria = dominio === "tesoreria";
 
   // Si el filtro reduce la lista, la página actual no puede quedar fuera de rango.
   useEffect(() => { setPage(1); }, [items.length, pageSize]);
@@ -62,10 +88,10 @@ function SeccionTabla({ items, dominio, onEnviarInforme }) {
         <table className="audit-log mi-dia-tabla">
           <thead>
             <tr>
-              <th>{esProv ? "NIT" : esPresupuesto ? "" : esInformes ? "Período" : esBienestar ? "Línea" : "#"}</th>
-              <th>{esProv ? "Proveedor" : esPresupuesto ? "Área" : esInformes ? "Informe" : esBienestar ? "Actividad" : "Descripción"}</th>
-              <th>{esPresupuesto ? "Período" : esProv ? "Área · tipo" : esInformes ? "Para" : esBienestar ? "Línea · fecha" : "Proveedor · área"}</th>
-              <th>{esPresupuesto ? "% consumido" : esProv || esInformes || esBienestar ? "Días" : "Días háb."}</th>
+              <th>{esProv ? "NIT" : esPresupuesto ? "" : esInformes ? "Período" : esBienestar ? "Línea" : esTesoreria ? "Tipo" : "#"}</th>
+              <th>{esProv ? "Proveedor" : esPresupuesto ? "Área" : esInformes ? "Informe" : esBienestar ? "Actividad" : esTesoreria ? "Qué pasa" : "Descripción"}</th>
+              <th>{esPresupuesto ? "Período" : esProv ? "Área · tipo" : esInformes ? "Para" : esBienestar ? "Línea · fecha" : esTesoreria ? "Contexto" : "Proveedor · área"}</th>
+              <th>{esPresupuesto ? "% consumido" : esProv || esInformes || esBienestar || esTesoreria ? "Días" : "Días háb."}</th>
               <th>Detalle</th>
               <th></th>
             </tr>
@@ -84,6 +110,7 @@ function SeccionTabla({ items, dominio, onEnviarInforme }) {
                 <td style={{ whiteSpace: "nowrap" }}>
                   <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                     {it.recordId && <TimelineButton recordId={it.recordId} localSeq={Number(String(it.ref).replace("#", "")) || null} />}
+                    {it.accion === "revisarAlertaTesoreria" && <RevisarAlertaTesoreria id={it.alertaId} />}
                     {it.accion === "enviarInforme" ? (
                       <button type="button" className="btn small btn-primary" onClick={() => onEnviarInforme?.(it.edicionId)} title="Enviar el informe">
                         <IconMail size={11} /> Enviar
@@ -100,7 +127,7 @@ function SeccionTabla({ items, dominio, onEnviarInforme }) {
           </tbody>
         </table>
       </div>
-      {items.length > PAGE_SIZES[0] && (
+      {items.length > 0 && (
         <div className="table-footer">
           <div className="field" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <label style={{ marginBottom: 0 }}>Tamaño</label>
@@ -114,6 +141,10 @@ function SeccionTabla({ items, dominio, onEnviarInforme }) {
           </div>
           <span className="count-note">Página {current} de {totalPages}</span>
           <div className="spacer" />
+          <BotonExcel nombre={`mi-dia-${dominio || "pendientes"}`} hoja="Pendientes" filas={items} columnas={[
+            { t: "Ref.", v: (it) => it.ref }, { t: "Qué", v: (it) => it.titulo }, { t: "Contexto", v: (it) => it.contexto },
+            { t: "Días / dato", v: (it) => it.dato || it.dias }, { t: "Detalle", v: (it) => it.detalle }, { t: "Es mío", v: (it) => (it.mio ? "Sí" : "") },
+          ]} />
           <span className="count-note">{items.length} pendiente(s)</span>
         </div>
       )}

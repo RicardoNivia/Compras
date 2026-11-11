@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { fmtDateTime } from "@/lib/format";
 import { crossfade } from "@/lib/crossfade";
-import { fetchBodegaApi, crearArticuloApi, editarArticuloApi, fetchMovimientosArticuloApi, registrarMovimientoApi } from "@/lib/api";
+import { fetchBodegaApi, novaBodegaApi, crearArticuloApi, editarArticuloApi, fetchMovimientosArticuloApi, registrarMovimientoApi } from "@/lib/api";
 import PiePagina, { usePagina } from "@/components/bienestar/PiePagina";
 import { EsqueletoTabla } from "@/components/bienestar/Esqueletos";
-import { IconPlus, IconEdit, IconHistory } from "@/components/icons";
+import { IconPlus, IconEdit, IconHistory, IconSpark } from "@/components/icons";
 
 const BODEGAS = [["bodega", "Bodega"], ["sst", "SST"], ["aseo", "Desechables y aseo"]];
 const NOMBRE_BODEGA = Object.fromEntries(BODEGAS);
@@ -29,6 +29,11 @@ function Estado({ a }) {
   if (a.faltan > 0) return <span className="pill warning">Faltan {num(a.faltan)}</span>;
   return <span className="pill good">Disponible</span>;
 }
+// Filtros de la tabla por estado y por vencimiento (mismas reglas que las píldoras de las columnas).
+const ESTADOS = [["", "Todos los estados"], ["disponible", "Disponible"], ["faltan", "Faltan (bajo el mínimo)"], ["agotado", "Agotado"], ["inactivo", "Inactivo"]];
+const estadoDe = (a) => (!a.activo ? "inactivo" : a.stock <= 0 ? "agotado" : a.faltan > 0 ? "faltan" : "disponible");
+const VENCIMIENTOS = [["", "Todo vencimiento"], ["vencido", "Vencido"], ["porVencer", "Por vencer (0 a 30 días)"], ["alerta", "Alerta (31 a 70 días)"], ["vigente", "Vigente (71 días o más)"], ["sin", "Sin vencimiento"]];
+const vencimientoDe = (a) => { const d = a.diasParaVencer; return d == null ? "sin" : d < 0 ? "vencido" : d <= 30 ? "porVencer" : d <= 70 ? "alerta" : "vigente"; };
 const FILTROS = {
   todos: () => true,
   faltan: (a) => a.activo && a.faltan > 0,
@@ -51,6 +56,11 @@ export default function InventarioBodegaView({ puedeEditar }) {
   const [bodega, setBodega] = useState("bodega");
   const [filtro, setFiltro] = useState("todos");
   const [q, setQ] = useState("");
+  const [fEstado, setFEstado] = useState("");
+  const [fVence, setFVence] = useState("");
+  // «Buscar con Nova»: el pedido, si está pensando y lo que aplicó (o por qué no pudo).
+  const [pedido, setPedido] = useState("");
+  const [nova, setNova] = useState({ estado: "" });
   const [mov, setMov] = useState(null); // { articulo, tipo }
   const [hist, setHist] = useState(null); // articulo
   const [editar, setEditar] = useState(null); // articulo | {} (nuevo)
@@ -69,9 +79,25 @@ export default function InventarioBodegaView({ puedeEditar }) {
   const buscando = terminos.length > 0;
   const filtradas = useMemo(() => {
     const base = buscando ? articulos || [] : deBodega;
-    return base.filter((a) => FILTROS[filtro](a) && (!buscando || terminos.every((t) => sinTildes(`${a.producto} ${a.referencia || ""} ${a.unidad || ""} ${NOMBRE_BODEGA[a.bodega] || ""}`).includes(t))));
-  }, [articulos, deBodega, filtro, terminos, buscando]);
-  const pag = usePagina(filtradas, `${bodega}|${filtro}|${q}`);
+    return base.filter((a) => FILTROS[filtro](a) && (!fEstado || estadoDe(a) === fEstado) && (!fVence || vencimientoDe(a) === fVence) && (!buscando || terminos.every((t) => sinTildes(`${a.producto} ${a.referencia || ""} ${a.unidad || ""} ${NOMBRE_BODEGA[a.bodega] || ""}`).includes(t))));
+  }, [articulos, deBodega, filtro, terminos, buscando, fEstado, fVence]);
+  const pag = usePagina(filtradas, `${bodega}|${filtro}|${q}|${fEstado}|${fVence}`);
+  const hayFiltros = !!(fEstado || fVence);
+  async function buscarConNova(e) {
+    e.preventDefault();
+    if (!pedido.trim()) return;
+    setNova({ estado: "pensando" });
+    try {
+      const r = await novaBodegaApi(pedido);
+      if (!r.aplicable) { setNova({ estado: "no", motivo: r.motivo }); return; }
+      const x = r.filtros;
+      if (x.bodega) setBodega(x.bodega);
+      setFiltro("todos"); setFEstado(x.estado || ""); setFVence(x.vencimiento || ""); setQ(x.texto || "");
+      const chips = [x.bodega ? NOMBRE_BODEGA[x.bodega] : x.texto ? "Todas las bodegas" : null, ESTADOS.find(([k]) => k === x.estado)?.[1], VENCIMIENTOS.find(([k]) => k === x.vencimiento)?.[1], x.texto ? `«${x.texto}»` : null].filter((c) => c && !/^Todo/.test(c));
+      setNova({ estado: "ok", chips });
+    } catch (err) { setNova({ estado: "no", motivo: `No pude consultar a Nova (${err.message}).` }); }
+  }
+  const limpiarNova = () => { setNova({ estado: "" }); setPedido(""); setFEstado(""); setFVence(""); setQ(""); };
   const maxStock = Math.max(1, ...deBodega.map((a) => Math.max(a.stock, a.minimo || 0)));
   const lotes = useMemo(() => {
     const m = new Map();
@@ -106,6 +132,13 @@ export default function InventarioBodegaView({ puedeEditar }) {
       {aviso && <div className="ficha-aviso" role="status">{aviso}</div>}
 
       <div className="table-card">
+        <form className="inv-nova" onSubmit={buscarConNova}>
+          <span className="inv-nova-ic" aria-hidden="true"><IconSpark size={16} /></span>
+          <input aria-label="Buscar con Nova" value={pedido} onChange={(e) => setPedido(e.target.value)} maxLength={300} placeholder="Pregúntale a Nova: «lo de aseo que vence este mes» o «qué falta reponer en SST»" />
+          <button type="submit" className="btn btn-primary" disabled={!pedido.trim() || nova.estado === "pensando"}>{nova.estado === "pensando" ? <span className="spinner" /> : <IconSpark size={13} />} Buscar con Nova</button>
+        </form>
+        {nova.estado === "ok" && <div className="inv-nova-res" role="status"><span>Nova filtró:</span>{nova.chips.length ? nova.chips.map((c) => <span key={c} className="pill accent">{c}</span>) : <span>todo el inventario</span>}<span style={{ marginLeft: "auto" }}>{filtradas.length} artículo(s)</span><button type="button" className="btn small" onClick={limpiarNova}>Quitar</button></div>}
+        {nova.estado === "no" && <div className="inv-nova-res" role="alert"><span><strong>No pude buscar eso.</strong> {nova.motivo}</span></div>}
         <div className="inv-barra">
           <div className="dash-tabs" role="tablist" aria-label="Bodegas">
             {BODEGAS.map(([k, l]) => (
@@ -119,6 +152,11 @@ export default function InventarioBodegaView({ puedeEditar }) {
             <input type="search" aria-label="Buscar artículo en todas las bodegas" placeholder="Buscar artículo, referencia o unidad…" value={q} onChange={(e) => setQ(e.target.value)} />
             {buscando && <span className="inv-buscar-n">{filtradas.length} en todas las bodegas</span>}
           </label>
+          <div className="inv-filtros">
+            <select aria-label="Filtrar por estado" value={fEstado} onChange={(e) => setFEstado(e.target.value)} className={fEstado ? "activo" : ""}>{ESTADOS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+            <select aria-label="Filtrar por vencimiento" value={fVence} onChange={(e) => setFVence(e.target.value)} className={fVence ? "activo" : ""}>{VENCIMIENTOS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+            {hayFiltros && <button type="button" className="btn small" onClick={() => { setFEstado(""); setFVence(""); }}>Quitar filtros</button>}
+          </div>
         </div>
         <div className="table-scroll">
           <table className="records inv-tabla">
@@ -126,7 +164,7 @@ export default function InventarioBodegaView({ puedeEditar }) {
               <tr><th>Artículo</th><th className="num">Inicial</th><th className="num">Entradas</th><th className="num">Salidas</th><th>Stock actual</th><th className="num">Mínimo</th><th>Estado</th><th>Vencimiento</th><th className="actions-col">Acciones</th></tr>
             </thead>
             <tbody>
-              {pag.pagina.length === 0 && <tr><td colSpan={9}><div className="empty">{buscando ? `Ningún artículo de ninguna bodega coincide con «${q.trim()}». Prueba con otra palabra${filtro !== "todos" ? " o quita el filtro" : ""}.` : deBodega.length ? "Ningún artículo coincide con el filtro." : "Esta bodega aún no tiene artículos."}</div></td></tr>}
+              {pag.pagina.length === 0 && <tr><td colSpan={9}><div className="empty">{buscando ? `Ningún artículo de ninguna bodega coincide con «${q.trim()}». Prueba con otra palabra${filtro !== "todos" ? " o quita el filtro" : ""}.` : deBodega.length ? "Ningún artículo coincide con los filtros." : "Esta bodega aún no tiene artículos."}</div></td></tr>}
               {pag.pagina.map((a) => {
                 const l = lotes.get(`${a.bodega}|${a.producto}`) || [];
                 return (
@@ -163,7 +201,12 @@ export default function InventarioBodegaView({ puedeEditar }) {
             </tbody>
           </table>
         </div>
-        <PiePagina id="inv-size" p={pag} total={filtradas.length} etiqueta="artículo(s)" />
+        <PiePagina id="inv-size" p={pag} total={filtradas.length} etiqueta="artículo(s)" excel={{ nombre: `inventario-${buscando ? "todas-las-bodegas" : bodega}`, hoja: "Inventario", filas: filtradas, columnas: [
+          { t: "Bodega", v: (a) => NOMBRE_BODEGA[a.bodega] || a.bodega }, { t: "Artículo", v: (a) => a.producto }, { t: "Referencia", v: (a) => a.referencia }, { t: "Unidad", v: (a) => a.unidad },
+          { t: "Inicial", v: (a) => a.inicial }, { t: "Entradas", v: (a) => a.entradas }, { t: "Salidas", v: (a) => a.salidas }, { t: "Stock actual", v: (a) => a.stock }, { t: "Mínimo", v: (a) => a.minimo },
+          { t: "Estado", v: (a) => (!a.activo ? "Inactivo" : a.stock <= 0 ? "Agotado" : a.faltan > 0 ? `Faltan ${a.faltan}` : "Disponible") },
+          { t: "Vence", v: (a) => a.vence }, { t: "Días para vencer", v: (a) => a.diasParaVencer },
+        ] }} />
       </div>
       <p className="count-note inv-leyenda">
         <span className="pill critical">0 a 30 días · por vencer</span> <span className="pill warning">31 a 70 días · alerta</span> <span className="pill good">71 días o más · vigente</span> El mismo semáforo del Excel. Para que aparezca «Faltan», define el mínimo del artículo con el lápiz.

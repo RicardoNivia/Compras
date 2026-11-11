@@ -210,7 +210,56 @@ async function presupuestoEjecucion(p, ctx) {
   };
 }
 
+// ---------- Tesorería ----------
+async function pagosTesoreria(p) {
+  const { agendaPagos } = await import("@/lib/tesoreria/consultas");
+  const { rangoTesoreria } = await import("@/lib/tesoreria/periodos");
+  const preset = p.preset || "por_pagar";
+  const r = rangoTesoreria(preset === "vencidos" ? "vencidos" : p.periodo || "esta_semana", { dias: p.dias });
+  const comun = { desde: r.desde, hasta: r.hasta, texto: p.texto || null, item: p.item || null, limite: 200 };
+  const porPagar = preset === "pagados" ? null : await agendaPagos({ ...comun, estado: "pendientes" });
+  const pagados = preset === "pagados" || preset === "pagados_y_por_pagar" ? await agendaPagos({ ...comun, estado: "pagados" }) : null;
+  const fila = (x, pagado) => ({
+    ref: pagado ? "Pagado" : x.estado.startsWith("P · vencido") ? "Vencido" : "Por pagar",
+    titulo: x.concepto,
+    contexto: [x.item, x.medioPago, x.paga].filter(Boolean).join(" · "),
+    detalle: pagado ? `Pagado ${String(x.pagadoEl || "").startsWith("sin") ? "(marcado a mano)" : `el ${x.pagadoEl}`}` : `Vence ${x.vence}${x.estado.startsWith("P · vencido") ? ` · ${x.estado.replace("P · ", "")}` : ""}`,
+    dato: x.valor,
+    href: `/tesoreria/pagos?id=${x.id}`,
+  });
+  const items = [...(pagados?.pagos || []).map((x) => fila(x, true)), ...(porPagar?.pagos || []).map((x) => fila(x, false))];
+  return {
+    total: items.length,
+    items,
+    valores: { total: String(items.length), por_pagar: porPagar ? porPagar.totales.porPagar : "", pagado: pagados ? pagados.totales.pagado : "", periodo: preset === "vencidos" ? "vencidos a la fecha" : r.label },
+    enlace: "/tesoreria/pagos",
+  };
+}
+
+async function movimientosTesoreria(p) {
+  const { prisma } = await import("@/lib/prisma");
+  const { mapasCatalogos, claveNombre } = await import("@/lib/tesoreria/maestros");
+  const { rangoTesoreria } = await import("@/lib/tesoreria/periodos");
+  const { fmtMoneda } = await import("@/lib/tesoreria/comun");
+  const r = rangoTesoreria(p.periodo || "ayer", { dias: p.dias });
+  const mapas = await mapasCatalogos();
+  const bancos = p.banco ? [...mapas.bancos.values()].filter((b) => claveNombre(b.nombre).includes(claveNombre(p.banco))).map((b) => b.id) : null;
+  const movs = await prisma.movimientoBanco.findMany({
+    where: { fecha: { gte: r.desde, lte: r.hasta }, ...(bancos ? { bancoId: { in: bancos.length ? bancos : [-1] } } : {}), ...(p.sentido === "egresos" ? { tipo: "debito" } : p.sentido === "ingresos" ? { tipo: "credito" } : {}) },
+    orderBy: [{ fecha: "desc" }, { id: "desc" }], take: 300,
+  });
+  const suma = (t) => movs.filter((m) => m.tipo === t).reduce((s, m) => s + Number(m.valor), 0);
+  return {
+    total: movs.length,
+    items: movs.map((m) => ({ ref: m.fecha, titulo: m.descripcion, contexto: [mapas.bancos.get(m.bancoId)?.nombre, m.concepto].filter(Boolean).join(" · "), detalle: m.tipo === "debito" ? "Salió" : "Entró", dato: fmtMoneda(m.tipo === "debito" ? -Number(m.valor) : Number(m.valor), m.moneda), href: `/tesoreria/movimientos?id=${m.id}` })),
+    valores: { total: String(movs.length), salio: fmtMoneda(suma("debito"), "COP"), entro: fmtMoneda(suma("credito"), "COP"), periodo: r.label },
+    enlace: "/tesoreria/movimientos",
+  };
+}
+
 const EJECUTORES = {
+  pagos_tesoreria: pagosTesoreria,
+  movimientos_tesoreria: movimientosTesoreria,
   conteo_compras: conteoCompras,
   lista_compras: listaCompras,
   valoraciones_compras: valoracionesCompras,
@@ -237,7 +286,10 @@ export async function ejecutarConsulta(notif, ctxBase, destinatario = null) {
   if (!def || !fn) throw Object.assign(new Error(`Consulta desconocida: ${notif.consulta}`), { status: 400 });
   const personal = notif.alcance === "personal";
   const ctx = { ...ctxBase, personal, destinatario: personal ? destinatario : null };
-  const res = await fn(notif.parametros || {}, ctx);
+  // En la BD los parámetros se guardan como texto JSON: sin convertirlos, la consulta corría con sus valores por defecto.
+  let parametros = notif.parametros || {};
+  if (typeof parametros === "string") { try { parametros = JSON.parse(parametros); } catch { parametros = {}; } }
+  const res = await fn(parametros, ctx);
   res.valores = { ...res.valores, fecha: fechaLarga(ctxBase.ahora), nombre: (destinatario || ctxBase.propietario)?.nombre || "" };
   return res;
 }

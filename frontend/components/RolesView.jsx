@@ -1,5 +1,6 @@
 "use client";
 
+import BotonExcel from "@/components/BotonExcel";
 import { useEffect, useMemo, useState } from "react";
 import { ROLES, ROLE_COLOR_VARS } from "@/lib/roles";
 import { createRolApi, updateRolApi, deleteRolApi } from "@/lib/api";
@@ -129,6 +130,10 @@ export default function RolesView({ roles, features, onCambio }) {
           </div>
           <span className="count-note">Página {currentPage} de {totalPages}</span>
           <div className="spacer" />
+          <BotonExcel nombre="roles" hoja="Roles" filas={filtrados} deshabilitado={!filtrados.length} columnas={[
+            { t: "Rol", v: (r) => r.nombre }, { t: "Tipo", v: (r) => (r.sistema ? "Del sistema" : "Personalizado") }, { t: "Descripción", v: (r) => r.descripcion },
+            { t: "Usuarios", v: (r) => r.usuarios }, { t: "Funcionalidades", v: (r) => (r.clave === ROLES.ADMIN ? "Todas" : `${r.funcionalidades.length} de ${features.length}`) },
+          ]} />
           <span className="count-note">{filtrados.length} rol(es)</span>
         </div>
       </div>

@@ -207,7 +207,10 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
             </tbody>
           </table>
         </div>
-        <PiePagina id="ob-size" p={pag} total={filtradas.length} etiqueta="registro(s)" tamanos={enModal ? PAGE_SIZES_MODAL : PAGE_SIZES} />
+        <PiePagina id="ob-size" p={pag} total={filtradas.length} etiqueta="registro(s)" tamanos={enModal ? PAGE_SIZES_MODAL : PAGE_SIZES} excel={{ nombre: "observaciones", hoja: "Observaciones", filas: filtradas, columnas: [
+          { t: "Origen", v: (o) => ORIGENES[o.tipo] || o.tipo }, { t: "Quién", v: (o) => o.quien }, { t: "Área", v: (o) => o.area }, { t: "Calificación", v: (o) => o.calificacion },
+          { t: "Observación", v: (o) => o.texto }, { t: "Sentimiento", v: (o) => o.sentimiento }, { t: "Fecha", v: (o) => (o.fecha ? fmtDateTime(o.fecha) : "") },
+        ] }} />
       </div>
     </div>
   );

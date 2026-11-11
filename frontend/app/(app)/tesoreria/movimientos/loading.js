@@ -2,5 +2,5 @@ import { PaginaTesoreria, FiltrosEsqueleto, TableSkeleton } from "@/components/t
 
 // Forma de la pantalla mientras el servidor resuelve la sesión y el acceso (igual que las demás rutas).
 export default function Loading() {
-  return <PaginaTesoreria titulo="Movimientos"><div className="tes-vista"><FiltrosEsqueleto campos={6} /><TableSkeleton rows={10} /></div></PaginaTesoreria>;
+  return <PaginaTesoreria titulo="Movimientos del banco"><div className="tes-vista"><FiltrosEsqueleto campos={5} /><TableSkeleton rows={10} /></div></PaginaTesoreria>;
 }

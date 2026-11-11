@@ -159,14 +159,14 @@ export default function ResumenFundacion({ anio, anios = [], onAnio, puedeEditar
           <p className="card-sub">Personas de cada área que asistieron.</p>
           {porAcompanamiento.length ? (
             <HBarChartSvg data={porAcompanamiento.slice(0, 10).map((a) => ({ key: a.area, label: a.area, value: a.asistieron, detalle: `${a.inscritos} inscritos · ${a.noAsistieron} no pudieron ir` }))} formatValue={entero} color="var(--accent)" />
-          ) : <p className="count-note">Aún no hay asistencia registrada por área en el período.</p>}
+          ) : <div className="empty compacta">Aún no hay asistencia registrada por área en el período.</div>}
         </section>
         <section className="resumen-card" aria-labelledby="fund-costo">
           <h2 id="fund-costo">Costo por persona, por jornada</h2>
           <p className="card-sub">Compras de la jornada ÷ personas que asistieron.</p>
           {costoPorActividad.length ? (
             <HBarChartSvg data={costoPorActividad.slice(0, 8).map((a) => ({ key: String(a.id), id: a.id, label: a.nombre, value: Math.round(a.costoPorAsistente), detalle: `${fmtCOP(a.gastado)} · ${a.asistentes} personas` }))} formatLabel={fmtCOP} color="var(--secondary)" onSelect={(d) => onAbrirActividad(d.id)} />
-          ) : <p className="count-note">Ninguna jornada tiene todavía compras asociadas y asistentes registrados.</p>}
+          ) : <div className="empty compacta">Ninguna jornada tiene todavía compras asociadas y asistentes registrados.</div>}
         </section>
       </div>
 
@@ -176,7 +176,7 @@ export default function ResumenFundacion({ anio, anios = [], onAnio, puedeEditar
           <p className="card-sub">Por jornada; al pasar el cursor, su presupuesto.</p>
           {presupuestoVsGasto.length ? (
             <HBarChartSvg data={presupuestoVsGasto.slice(0, 8).map((a) => ({ key: String(a.id), id: a.id, label: a.nombre, value: a.gastado, detalle: a.presupuesto ? `Presupuesto ${fmtCOP(a.presupuesto)} · ${pct(a.gastado / a.presupuesto)} usado` : "Sin presupuesto asignado" }))} color="var(--secondary)" onSelect={(d) => onAbrirActividad(d.id)} />
-          ) : <p className="count-note">Ninguna jornada del período tiene presupuesto ni compras asociadas.</p>}
+          ) : <div className="empty compacta">Ninguna jornada del período tiene presupuesto ni compras asociadas.</div>}
         </section>
         <section className="resumen-card" aria-labelledby="fund-cat">
           <h2 id="fund-cat">En qué se convierte el aporte</h2>
@@ -198,7 +198,7 @@ export default function ResumenFundacion({ anio, anios = [], onAnio, puedeEditar
         <section className="resumen-card" aria-labelledby="fund-prox">
           <h2 id="fund-prox">Próximas jornadas</h2>
           <p className="card-sub">Lo que viene, para sumar a más personas.</p>
-          {proximas.length === 0 ? <p className="count-note">No hay jornadas programadas desde hoy.</p> : (
+          {proximas.length === 0 ? <div className="empty compacta">No hay jornadas programadas desde hoy.</div> : (
             <ul className="fundacion-proximas">
               {proximas.map((a) => (
                 <li key={a.id}>

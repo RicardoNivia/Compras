@@ -351,6 +351,10 @@ export const EXTRACTO_TESORERIA_FIELD_LABELS = {
   cuenta: "Cuenta",
   archivo: "Archivo",
   lineasNuevas: "Líneas nuevas",
+  lineasAprobadas: "Líneas aprobadas y registradas",
+  lineasNoAprobadas: "Líneas no aprobadas",
+  soloEnSistema: "En el sistema y no en el extracto",
+  saldosGuardados: "Saldos del extracto guardados",
   lineasRepetidas: "Líneas ya cargadas",
   enlazadas: "Enlazadas solas",
 };
@@ -373,3 +377,89 @@ export const RECURRENCIA_TESORERIA_FIELD_LABELS = {
   vigencia: "Vigencia",
   activo: "Activo",
 };
+
+// Tesorería desde cero (bancos, movimientos, pagos programados, gastos periódicos, asociaciones, agente y saldos).
+Object.assign(ACTION_LABELS, { asociar: "Asoció", aceptar: "Aceptó", revisar: "Revisó", reabrir: "Reabrió" });
+Object.assign(ENTITY_LABELS, {
+  pagoTesoreria: "Pago programado",
+  gastoPeriodicoTesoreria: "Gasto periódico",
+  anioTesoreria: "Año de Tesorería",
+  asociacionTesoreria: "Asociación movimiento ↔ pago",
+  propuestaPagoTesoreria: "Propuesta del agente de asociación",
+  saldoTesoreria: "Saldo inicial de banco",
+  alertaTesoreria: "Alerta de tesorería",
+  importacionTesoreria: "Importación de la plantilla de tesorería",
+  movimientoTesoreria: "Movimiento del banco",
+});
+Object.assign(MOVIMIENTO_TESORERIA_FIELD_LABELS, {
+  banco: "Banco",
+  descripcion: "Descripción del banco",
+  tipoCarga: "Tipo de carga",
+  tipoSolicitud: "Tipo de solicitud",
+  preparador: "Preparador",
+  formato: "Formato",
+});
+Object.assign(MAESTRO_TESORERIA_FIELD_LABELS, { numeroCuenta: "Número de cuenta" });
+export const PAGO_TESORERIA_FIELD_LABELS = {
+  fecha: "Vence",
+  tipo: "Tipo",
+  estado: "Estado",
+  valor: "Valor",
+  item: "Ítem",
+  concepto: "Concepto",
+  medioPago: "Medio de pago",
+  pagador: "Paga",
+  observacion: "Observación",
+  pagos: "Pagos",
+};
+export const ANIO_TESORERIA_FIELD_LABELS = { anio: "Año" };
+
+export const GASTO_PERIODICO_TESORERIA_FIELD_LABELS = {
+  tipo: "Tipo",
+  concepto: "Concepto",
+  item: "Ítem",
+  medioPago: "Medio de pago",
+  pagador: "Paga",
+  valor: "Valor",
+  periodicidad: "Periodicidad",
+  diaCorte: "Día de corte",
+  vigencia: "Vigencia",
+  activo: "Activo",
+  anio: "Año",
+  gastos: "Gastos periódicos",
+  pagosCreados: "Pagos creados",
+};
+export const ASOCIACION_TESORERIA_FIELD_LABELS = {
+  movimiento: "Movimiento",
+  pagos: "Pagos y valor asociado",
+};
+export const PROPUESTA_PAGO_TESORERIA_FIELD_LABELS = {
+  propuestas: "Propuestas",
+  alta: "Confianza alta",
+  media: "Confianza media",
+  baja: "Confianza baja",
+  desempatesNova: "Desempates de Nova",
+  confianza: "Confianza",
+  motivo: "Motivo",
+  valor: "Valor",
+};
+export const SALDO_TESORERIA_FIELD_LABELS = {
+  banco: "Banco",
+  anio: "Año",
+  valor: "Saldo inicial",
+};
+export const ALERTA_TESORERIA_FIELD_LABELS = {
+  alertas: "Alertas",
+  estado: "Estado",
+};
+export const IMPORTACION_TESORERIA_FIELD_LABELS = {
+  archivo: "Archivo",
+  resumen: "Resumen",
+  alertas: "Alertas creadas",
+  catalogos: "Maestros creados",
+};
+Object.assign(EXTRACTO_TESORERIA_FIELD_LABELS, { banco: "Banco", aMano: "Ya registrados a mano" });
+
+// Conciliación de Tesorería por banco y mes.
+Object.assign(ACTION_LABELS, { verificar: "Verificó", desverificar: "Quitó la verificación" });
+Object.assign(CONCILIACION_TESORERIA_FIELD_LABELS, { verificado: "Confirmado por el banco" });

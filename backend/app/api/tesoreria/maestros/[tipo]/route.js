@@ -6,6 +6,6 @@ import { crearMaestro } from "@/lib/tesoreria/maestros";
  * /api/tesoreria/maestros/{tipo}:
  *   post:
  *     tags: [Tesorería]
- *     summary: "Crea un valor del catálogo (tipo: cuenta | item | concepto | pagador). Nivel firma."
+ *     summary: "Crea un valor del catálogo (tipo: banco | medio | item | concepto | pagador). Nivel firma."
  */
 export const POST = conTesoreria("firma", ({ user, params, body }) => crearMaestro(user, params.tipo, body || {}));

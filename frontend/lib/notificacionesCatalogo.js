@@ -15,7 +15,33 @@ export const FUENTES = {
   mi_dia: { label: "Mi día", descripcionPermiso: "Mi día y alertas" },
   proveedores: { label: "Proveedores", descripcionPermiso: "Proveedores" },
   presupuesto: { label: "Presupuesto", descripcionPermiso: "Presupuesto" },
+  tesoreria: { label: "Tesorería", descripcionPermiso: "Tesorería (verTesoreria en la Matriz de permisos)" },
 };
+
+// Tesorería: períodos completos (esta semana = lunes a domingo, este mes = del 1 al último día) y hacia adelante.
+export const PERIODOS_TESORERIA = {
+  hoy: "Hoy",
+  manana: "Mañana",
+  esta_semana: "Esta semana (lunes a domingo)",
+  proxima_semana: "La próxima semana",
+  esta_semana_y_mes: "Esta semana y el resto del mes",
+  este_mes: "Este mes (completo)",
+  mes_siguiente: "El mes que viene",
+  ayer: "Ayer",
+  semana_anterior: "La semana pasada",
+  mes_anterior: "El mes pasado",
+  proximos_n_dias: "Los próximos N días",
+  ultimos_n_dias: "Los últimos N días",
+};
+
+export const PRESETS_TESORERIA = {
+  por_pagar: "Lo que hay que pagar (pendientes P que vencen en el período)",
+  pagados: "Lo que se pagó en el período (pasó a E)",
+  pagados_y_por_pagar: "Lo pagado y lo que falta por pagar del período",
+  vencidos: "Pagos vencidos sin pagar (a la fecha)",
+};
+
+export const SENTIDOS_TESORERIA = { egresos: "Solo lo que sale", ingresos: "Solo lo que entra" };
 
 export const PERIODOS = {
   hoy: "Hoy",
@@ -104,6 +130,26 @@ export const CONSULTAS = {
     parametros: ["preset"],
     variables: ["total", "fecha", "nombre"],
   },
+  pagos_tesoreria: {
+    fuente: "tesoreria",
+    label: "Pagos de Tesorería: por pagar, pagados o vencidos",
+    tipo: "lista",
+    alcances: ["general"],
+    usaPeriodo: true,
+    usaCampoFecha: false,
+    parametros: ["preset", "periodo", "dias", "item", "texto"],
+    variables: ["total", "por_pagar", "pagado", "periodo", "fecha", "nombre"],
+  },
+  movimientos_tesoreria: {
+    fuente: "tesoreria",
+    label: "Movimientos del banco de un período",
+    tipo: "lista",
+    alcances: ["general"],
+    usaPeriodo: true,
+    usaCampoFecha: false,
+    parametros: ["periodo", "dias", "banco", "sentido"],
+    variables: ["total", "salio", "entro", "periodo", "fecha", "nombre"],
+  },
   presupuesto_ejecucion: {
     fuente: "presupuesto",
     label: "Áreas que superan un % de su presupuesto",
@@ -134,6 +180,8 @@ export const EVENTOS = {
   "proveedor.eliminado": { fuente: "proveedores", label: "Se elimina un proveedor", accion: "se elimina un proveedor", filtros: ["proveedor"] },
   "proveedor.ciclo_cambio": { fuente: "proveedores", label: "Cambia el estado del ciclo de un proveedor", accion: "cambia el estado del ciclo de un proveedor", filtros: ["estadoCiclo", "proveedor"] },
   "presupuesto.actualizado": { fuente: "presupuesto", label: "Se configura, modifica o elimina un presupuesto", accion: "se configura o modifica un presupuesto", filtros: ["area"] },
+  "tesoreria.pago_pagado": { fuente: "tesoreria", label: "Un pago programado pasa a pagado (E)", accion: "se paga un pago programado", filtros: ["item", "texto"] },
+  "tesoreria.movimiento_registrado": { fuente: "tesoreria", label: "Se registra un movimiento del banco", accion: "se registra un movimiento del banco", filtros: ["banco", "sentido", "texto"] },
   "presupuesto.umbral": { fuente: "presupuesto", label: "Se supera el 80 % o el 100 % del presupuesto (general, por área o por categoría)", accion: "se supera el 80 % o el 100 % de un presupuesto", filtros: ["nivel", "area", "soloExcedido"] },
 };
 
@@ -149,7 +197,7 @@ export const NIVELES_PRESUPUESTO = { general: "Presupuesto general (todas las á
 export const ESTADOS_CICLO = { desactualizado: "Desactualizado", en_proceso: "En proceso", en_aprobacion: "En aprobación", actualizado: "Actualizado" };
 
 // Variables del mensaje de una notificación por evento (además de total, fecha y nombre).
-export const VARIABLES_EVENTO = ["total", "evento", "numero", "descripcion", "proveedor", "area", "valor", "puntaje_compra", "puntaje_proveedor", "estrellas", "detalle", "fecha", "nombre"];
+export const VARIABLES_EVENTO = ["total", "evento", "numero", "descripcion", "proveedor", "area", "valor", "puntaje_compra", "puntaje_proveedor", "estrellas", "detalle", "fecha", "nombre", "concepto", "item", "banco"];
 
 export const CONDICIONES = {
   si_hay_resultados: "Solo si hay resultados",
@@ -211,6 +259,13 @@ export const VARIABLES = {
   puntaje_proveedor: "Puntaje del proveedor (1 a 5)",
   estrellas: "Estrellas de la calificación",
   detalle: "Detalle del evento",
+  por_pagar: "Total por pagar (Tesorería)",
+  pagado: "Total pagado (Tesorería)",
+  salio: "Total que salió del banco",
+  entro: "Total que entró al banco",
+  concepto: "Concepto del pago o movimiento",
+  item: "Ítem o propiedad",
+  banco: "Banco",
 };
 
 // Preguntas que el servidor exige aunque Nova no las haga (ver docs, §5.2). Devuelve [{ id, texto, opciones }].

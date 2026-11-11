@@ -1,5 +1,6 @@
 "use client";
 
+import BotonExcel from "@/components/BotonExcel";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fmtDateTime } from "@/lib/format";
@@ -131,6 +132,10 @@ export default function SolicitudesCompraView({ initialSolicitudes = [], records
           </div>
           <span className="count-note">Página {currentPage} de {totalPages}</span>
           <div className="spacer" />
+          <BotonExcel nombre="solicitudes-de-compra" hoja="Solicitudes" filas={filtradas} deshabilitado={!filtradas.length} columnas={[
+            { t: "Solicitada", v: (s) => fmtDateTime(s.createdAt) }, { t: "Actividad", v: (s) => s.actividad }, { t: "Línea", v: (s) => s.linea },
+            { t: "Qué se pide", v: (s) => s.descripcion }, { t: "Debe llegar", v: (s) => s.fechaRequerida }, { t: "Quién la pidió", v: (s) => s.creadoPorNombre },
+          ]} />
           <span className="count-note">{filtradas.length} solicitud(es) pendiente(s)</span>
         </div>
       </div>

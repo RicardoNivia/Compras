@@ -234,6 +234,14 @@ export function cumpleFiltros(n, ev) {
     if (esNit ? nit.replace(/[^0-9a-z]/g, "") !== buscado.replace(/[^0-9a-z]/g, "") : !nombre.includes(buscado)) return false;
   }
   if (p.soloExcedido && !(d.umbral >= 100)) return false;
+  // Tesorería
+  if (p.item && !norm(d.item).includes(norm(p.item))) return false;
+  if (p.banco && !norm(d.banco).includes(norm(p.banco))) return false;
+  if (p.sentido && d.sentido !== (p.sentido === "egresos" ? "sale" : "entra")) return false;
+  if (p.texto) {
+    const hay = norm([d.concepto, d.descripcion, d.item, d.tercero, d.banco, d.medio].filter(Boolean).join(" "));
+    if (!norm(p.texto).split(/\s+/).filter((w) => w.length >= 3).every((w) => hay.includes(w))) return false;
+  }
   return true;
 }
 
@@ -277,6 +285,10 @@ export function itemDeEvento(ev) {
       const borrados = d.accion === "modo" && d.presupuestosBorrados ? ` · se borraron ${d.presupuestosBorrados} presupuesto(s)` : "";
       return { ref: d.accion === "eliminado" ? "Eliminado" : "", titulo, contexto: que, detalle: `${lista}${mas}${borrados}${d.actualizadoPor ? ` · por ${d.actualizadoPor}` : ""}`, dato: d.total != null ? fmtCOP(d.total) : null, href: "/presupuesto" };
     }
+    case "tesoreria.pago_pagado":
+      return { ref: "Pagado", titulo: d.concepto || "(sin concepto)", contexto: [d.item, d.medio, d.paga].filter(Boolean).join(" · "), detalle: `${d.via || "Pasó a E"}${d.pagadoEl ? ` · el ${d.pagadoEl}` : ""}${d.banco ? ` · ${d.banco}` : ""}${d.actualizadoPor ? ` · por ${d.actualizadoPor}` : ""}`, dato: d.valorTexto || null, href: `/tesoreria/pagos?id=${d.pagoId}` };
+    case "tesoreria.movimiento_registrado":
+      return { ref: d.fecha || "", titulo: d.descripcion || "(sin descripción)", contexto: [d.banco, d.concepto, d.tercero].filter(Boolean).join(" · "), detalle: `${d.sentido === "sale" ? "Salió" : "Entró"} · ${d.via || "registrado"}${d.registradoPor ? ` por ${d.registradoPor}` : ""}`, dato: d.valorTexto || null, href: `/tesoreria/movimientos?id=${d.movimientoId}` };
     case "presupuesto.umbral": {
       const nivel = d.nivel || "area";
       const titulo = nivel === "general" ? "Presupuesto general" : nivel === "categoria" ? `${d.area} · ${d.categoria}` : d.area;
@@ -302,13 +314,16 @@ export function resultadoDeEventos(n, eventos, destinatario = null) {
     descripcion: d.descripcion || d.nombre || d.area || "",
     proveedor: d.proveedor || d.nombre || "",
     area: d.area || "",
-    valor: d.valorConIva != null ? fmtCOP(d.valorConIva) : "",
+    valor: d.valorConIva != null ? fmtCOP(d.valorConIva) : d.valorTexto || "",
+    concepto: d.concepto || "",
+    item: d.item || "",
+    banco: d.banco || "",
     puntaje_compra: d.puntajeCompra != null ? String(d.puntajeCompra) : "",
     puntaje_proveedor: d.puntajeProveedor != null ? String(d.puntajeProveedor) : "",
     estrellas: d.estrellas != null ? String(d.estrellas) : "",
     detalle: lista[0] ? itemDeEvento(lista[0]).detalle : "",
   };
-  const enlace = ev?.fuente === "proveedores" ? "/proveedores" : ev?.fuente === "presupuesto" ? "/presupuesto" : "/registros";
+  const enlace = ev?.fuente === "proveedores" ? "/proveedores" : ev?.fuente === "presupuesto" ? "/presupuesto" : ev?.fuente === "tesoreria" ? (n.evento === "tesoreria.movimiento_registrado" ? "/tesoreria/movimientos" : "/tesoreria/pagos") : "/registros";
   return { total: lista.length, items: lista.map(itemDeEvento), valores, enlace };
 }
 

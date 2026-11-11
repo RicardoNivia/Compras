@@ -1,5 +1,6 @@
 "use client";
 
+import BotonExcel from "@/components/BotonExcel";
 import { useState } from "react";
 import {
   deleteProveedorApi, fetchMaestroProveedores, cambiarEstadoCicloApi, cambiarClasificacionApi, setDocumentoCicloApi, accionMasivaProveedoresApi,
@@ -569,6 +570,14 @@ export default function MaestroProveedores({ initial, catalogos = {}, canEdit, i
           </div>
           <span className="count-note">Página {currentPage} de {totalPages}</span>
           <div className="spacer" />
+          <BotonExcel nombre={`proveedores-${pestana}`} hoja="Proveedores" filas={filas} deshabilitado={!filas.length} columnas={[
+            { t: "Proveedor", v: (r) => r.nombre }, { t: "NIT", v: (r) => r.nit }, { t: "Clasificación", v: (r) => r.clasificacionLabel },
+            { t: "Estado del ciclo", v: (r) => r.ciclo?.estadoLabel }, { t: "Criticidad", v: (r) => r.criticidad }, { t: "Área", v: (r) => r.area },
+            { t: "Clasificación por monto", v: (r) => r.clasificacionMonto }, { t: "Tipo de servicio", v: (r) => r.servicio }, { t: "Excepción", v: (r) => (r.esExcepcion ? "Sí" : "No") },
+            { t: "Registrado", v: (r) => (r.clasificacion === "por_registrar" ? "Sin registrar" : fmtFecha(r.createdAt)) }, { t: "Últ. actualización", v: (r) => fmtFecha(r.fechaActualizacion) },
+            { t: "Calificación Nova", v: (r) => r.valoracionIA?.promedio ?? null }, { t: "Checklist", v: (r) => (r.checklist ? `${r.checklist.completos}/${r.checklist.total}` : null) },
+            { t: "Radica facturas", v: (r) => (r.radicaFacturas ? "Sí" : "No") },
+          ]} />
           <span className="count-note">{filas.length} proveedor(es) (de {data.total})</span>
         </div>
       </div>

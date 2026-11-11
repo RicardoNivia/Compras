@@ -1,5 +1,6 @@
 "use client";
 
+import BotonExcel from "@/components/BotonExcel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -290,7 +291,7 @@ function TabResumen({ act }) {
               formatValue={entero}
               color="var(--accent)"
             />
-          ) : <p className="count-note">Aún no hay participantes registrados.</p>}
+          ) : <div className="empty compacta">Aún no hay participantes registrados.</div>}
         </section>
         <section className="resumen-card" aria-labelledby="f-motivos">
           <h2 id="f-motivos">Por qué no asistieron</h2>
@@ -412,7 +413,7 @@ function TabParticipantes({ act, puedeEditar, onCambio }) {
           </select>
         </div>
         <div className="filter-actions">
-          <button type="button" className="btn" onClick={exportarCsv}><IconDownload size={13} /> Exportar</button>
+          <button type="button" className="btn" onClick={exportarCsv}><IconDownload size={13} /> CSV</button>
           {puedeEditar && <button type="button" className="btn btn-primary" onClick={() => setNuevo(true)}><IconPlus size={13} /> Agregar persona</button>}
         </div>
       </div>
@@ -498,6 +499,11 @@ function TabParticipantes({ act, puedeEditar, onCambio }) {
           </div>
           <span className="count-note">Página {currentPage} de {totalPages}</span>
           <div className="spacer" />
+          <BotonExcel nombre={`participantes-${act.id}`} hoja="Participantes" filas={filtrados} deshabilitado={!filtrados.length} columnas={[
+            { t: "Nombre", v: (pp) => pp.nombre }, { t: "Documento", v: (pp) => pp.documento }, { t: "Área", v: (pp) => pp.area },
+            { t: "Asistencia", v: (pp) => (pp.asistio === true ? "Sí" : pp.asistio === false ? "No" : "Sin marcar") }, { t: "Motivo", v: (pp) => pp.motivoInasistencia },
+            { t: "Calificación", v: (pp) => pp.calificacion }, { t: "Observación", v: (pp) => pp.observacion }, { t: "Origen", v: (pp) => ({ formulario: "Formulario", importacion: "Excel", manual: "Manual" }[pp.origen] || pp.origen) },
+          ]} />
           <span className="count-note">{filtrados.length} persona(s) (de {lista.length})</span>
         </div>
       </div>
@@ -703,6 +709,10 @@ function TabInventario({ act, puedeEditar, puedeUsarBodega, onCambio }) {
           </div>
           <span className="count-note">Página {currentPage} de {totalPages}</span>
           <div className="spacer" />
+          <BotonExcel nombre={`inventario-actividad-${act.id}`} hoja="Inventario usado" filas={items} deshabilitado={!items.length} columnas={[
+            { t: "Ítem", v: (it) => it.item }, { t: "Unidad", v: (it) => it.unidad }, { t: "Usado", v: (it) => it.usado },
+            { t: "Costo unitario ($)", v: (it) => it.costoUnitario }, { t: "Costo total ($)", v: (it) => it.costoTotal }, { t: "De la bodega", v: (it) => (it.articuloId ? "Sí" : "No") },
+          ]} />
           <span className="count-note">{items.length} ítem(s)</span>
         </div>
         {editarCant && (() => {
@@ -797,7 +807,10 @@ function TabCompras({ act, puedeEditar, cerrada, onCambio }) {
             </tbody>
           </table>
         </div>
-        <PiePagina id="fc-size" p={pag} total={filtradas.length} etiqueta="compra(s)" />
+        <PiePagina id="fc-size" p={pag} total={filtradas.length} etiqueta="compra(s)" excel={{ nombre: `compras-actividad-${act.id}`, hoja: "Compras", filas: filtradas, columnas: [
+          { t: "#", v: (c) => c.localSeq }, { t: "Solicitud", v: (c) => c.fechaSolicitud }, { t: "Descripción", v: (c) => c.descripcion }, { t: "Proveedor", v: (c) => c.proveedor },
+          { t: "Valor con IVA ($)", v: (c) => c.valorConIva || 0 }, { t: "Legalización", v: (c) => c.estadoLegalizacion }, { t: "Radicada", v: (c) => (c.radicado ? "Sí" : "No") },
+        ] }} />
       </div>
       </section>
 

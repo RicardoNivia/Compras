@@ -5,6 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import ModuloShell from "@/components/ModuloShell";
 import FloatingAgentChat from "@/components/FloatingAgentChat";
 import AvisosEnVivo from "@/components/notificaciones/AvisosEnVivo";
+import TooltipFlotante from "@/components/TooltipFlotante";
 import { canViewNotificaciones } from "@/lib/roles";
 import { COOKIE_MODULO } from "@/lib/modulos";
 
@@ -31,6 +32,7 @@ export default async function AppLayout({ children }) {
       <Sidebar user={user} plegadoInicial={jar.get("menu")?.value !== "abierto"} />
       <div className="app-main">{children}</div>
       <FloatingAgentChat user={user} />
+      <TooltipFlotante />
       {(user.permissions?.viewNotificaciones ?? canViewNotificaciones(user.role)) && <AvisosEnVivo />}
     </ModuloShell>
   );

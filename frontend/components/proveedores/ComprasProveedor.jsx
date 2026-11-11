@@ -104,7 +104,7 @@ export default function ComprasProveedor({ nit }) {
       <div className="prov-porque">
         <h4>Por qué tiene esta calificación</h4>
         {general.comprasValoradas === 0 ? (
-          <p className="muted">Todavía no hay compras valoradas por Nova para este proveedor. La valoración se genera al radicar cada compra.</p>
+          <div className="empty compacta">Todavía no hay compras valoradas por Nova para este proveedor. La valoración se genera al radicar cada compra.</div>
         ) : (
           <ul>
             <li>

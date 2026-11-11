@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { FRECUENCIAS, esFechaDeEnvio, esHabil, describirProgramacion, formatoHora, ymd } from "@/lib/reportSchedule";
 import {
-  LIMITES, FUENTES, CONSULTAS, PERIODOS, CAMPOS_FECHA, PRESETS_COMPRAS, PRESETS_PROVEEDORES,
+  LIMITES, FUENTES, CONSULTAS, PERIODOS, CAMPOS_FECHA, PRESETS_COMPRAS, PRESETS_PROVEEDORES, PERIODOS_TESORERIA, PRESETS_TESORERIA, SENTIDOS_TESORERIA,
   CONDICIONES, SI_FESTIVO, CANALES, ESTADOS, EVENTOS, AGRUPACIONES, ESTADOS_CICLO, NIVELES_PRESUPUESTO, preguntasFaltantes,
 } from "@/lib/notificacionesCatalogo";
 import { puedeVerFuente, puedeUsarNotificaciones, puedeGestionar, mensajeSinPermiso } from "@/lib/notificacionesPermisos";
@@ -68,8 +68,11 @@ function validarParametros(consulta, p = {}) {
     if (v == null || v === "") continue;
     switch (k) {
       case "periodo":
-        if (!PERIODOS[v]) throw err(400, `Período no válido: ${v}`);
+        if (!(def.fuente === "tesoreria" ? PERIODOS_TESORERIA : PERIODOS)[v]) throw err(400, `Período no válido: ${v}`);
         out.periodo = v; break;
+      case "sentido":
+        if (!SENTIDOS_TESORERIA[v]) throw err(400, "Indica si es lo que sale o lo que entra.");
+        out.sentido = v; break;
       case "dias": {
         const n = parseInt(v, 10);
         if (!(n >= 1 && n <= 366)) throw err(400, "Los días deben estar entre 1 y 366.");
@@ -79,7 +82,7 @@ function validarParametros(consulta, p = {}) {
         if (!CAMPOS_FECHA[v]) throw err(400, "Campo de fecha no válido.");
         out.campoFecha = v; break;
       case "preset": {
-        const presets = def.fuente === "proveedores" ? PRESETS_PROVEEDORES : PRESETS_COMPRAS;
+        const presets = def.fuente === "proveedores" ? PRESETS_PROVEEDORES : def.fuente === "tesoreria" ? PRESETS_TESORERIA : PRESETS_COMPRAS;
         if (!presets[v]) throw err(400, `Situación no válida: ${v}`);
         out.preset = v; break;
       }
@@ -99,7 +102,9 @@ function validarParametros(consulta, p = {}) {
   }
   if (consulta === "lista_compras" && !out.preset) throw err(400, "Indica qué compras quieres ver.");
   if (consulta === "proveedores_ciclo" && !out.preset) out.preset = "desactualizados";
-  if (out.periodo === "ultimos_n_dias" && !out.dias) out.dias = 7;
+  if (consulta === "pagos_tesoreria") { out.preset ||= "por_pagar"; if (out.preset !== "vencidos") out.periodo ||= "esta_semana"; }
+  if (consulta === "movimientos_tesoreria") out.periodo ||= "ayer";
+  if ((out.periodo === "ultimos_n_dias" || out.periodo === "proximos_n_dias") && !out.dias) out.dias = 7;
   return out;
 }
 
@@ -126,6 +131,9 @@ function validarFiltrosEvento(ev, p = {}) {
       out[k] = v;
     } else if (k === "soloExcedido") {
       if (v === true || v === "true") out[k] = true;
+    } else if (k === "sentido") {
+      if (!SENTIDOS_TESORERIA[v]) throw err(400, "Indica si es lo que sale o lo que entra.");
+      out[k] = v;
     } else if (k === "estadoCiclo") {
       if (!ESTADOS_CICLO[v]) throw err(400, "Estado del ciclo no válido.");
       out[k] = v;

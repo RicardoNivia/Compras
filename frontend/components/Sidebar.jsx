@@ -66,25 +66,36 @@ const GRUPOS = {
       ],
     },
   ],
-  // Tesorería: acceso NOMINAL (user.tesoreria, de /api/auth/me), no por rol ni por la Matriz.
+  // Tesorería: el acceso viene de la Matriz (user.tesoreria, de /api/auth/me: verTesoreria / registrarTesoreria / firmarTesoreria).
   tesoreria: [
     {
-      titulo: "Tesorería",
+      titulo: "Día a día",
       items: [
-        { key: "tesoreria", href: "/tesoreria", label: "Resumen", Icon: IconDashboard, permite: (u) => !!u.tesoreria },
-        { key: "tesoreria-movimientos", href: "/tesoreria/movimientos", label: "Movimientos", Icon: IconTable, permite: (u) => !!u.tesoreria },
-        { key: "tesoreria-recurrentes", href: "/tesoreria/recurrentes", label: "Recurrentes", Icon: IconClock, permite: (u) => !!u.tesoreria },
-        { key: "tesoreria-conciliacion", href: "/tesoreria/conciliacion", label: "Conciliación", Icon: IconCheck, permite: (u) => !!u.tesoreria },
-        // El cierre de mes (/tesoreria/cierre) sigue existiendo pero no está en el menú: lo reemplazan los reportes.
-        { key: "tesoreria-reportes", href: "/tesoreria/reportes", label: "Reportes", Icon: IconLayers, permite: (u) => !!u.tesoreria },
+        { key: "tesoreria", href: "/tesoreria", label: "Dashboard", buscar: "Dashboard · Resumen · Tesorería", Icon: IconDashboard, permite: (u) => !!u.tesoreria },
+        { key: "tesoreria-movimientos", href: "/tesoreria/movimientos", label: "Movimientos", buscar: "Movimientos del banco · Tesorería", Icon: IconTable, permite: (u) => !!u.tesoreria },
+        { key: "tesoreria-pagos", href: "/tesoreria/pagos", label: "Pagos programados", buscar: "Pagos programados · Tesorería", Icon: IconCalendar, permite: (u) => !!u.tesoreria },
+        { key: "tesoreria-periodicos", href: "/tesoreria/periodicos", label: "Gastos periódicos", buscar: "Gastos periódicos · Tesorería", Icon: IconHistory, permite: (u) => !!u.tesoreria },
+      ],
+    },
+    {
+      titulo: "Herramientas",
+      items: [
+        { key: "tesoreria-importar", href: "/tesoreria/importar", label: "Importar plantilla", buscar: "Importar plantilla de Excel · Tesorería", Icon: IconLayers, permite: (u) => !!u.tesoreria?.puedeRegistrar },
+        { key: "tesoreria-agentes", href: "/tesoreria/agentes", label: "Agentes", buscar: "Agente de asociación · Tesorería", Icon: IconSpark, permite: (u) => !!u.tesoreria },
+        { key: "tesoreria-conciliacion", href: "/tesoreria/conciliacion", label: "Conciliación", buscar: "Conciliación y cierre de mes · Tesorería", Icon: IconCheck, permite: (u) => !!u.tesoreria },
+      ],
+    },
+    {
+      titulo: "Consultas",
+      items: [
+        { key: "tesoreria-saldos", href: "/tesoreria/saldos", label: "Saldos de bancos", buscar: "Saldos de bancos · Tesorería", Icon: IconBuilding, permite: (u) => !!u.tesoreria },
+        { key: "tesoreria-reportes", href: "/tesoreria/reportes", label: "Reportes", buscar: "Reportes · Tesorería", Icon: IconList, permite: (u) => !!u.tesoreria },
       ],
     },
     {
       titulo: "Configuración",
       items: [
-        { key: "tesoreria-maestros", href: "/tesoreria/maestros", label: "Maestros", Icon: IconLayers, permite: (u) => !!u.tesoreria },
-        // Accesos: ya no se dan aquí sino en Usuarios y roles (Matriz de permisos, pestaña Tesorería).
-        // { key: "tesoreria-accesos", href: "/tesoreria/accesos", label: "Accesos", Icon: IconKey, permite: (u) => !!u.tesoreria?.puedeFirmar || !!u.tesoreriaArranque },
+        { key: "tesoreria-maestros", href: "/tesoreria/maestros", label: "Maestros", buscar: "Maestros de Tesorería", Icon: IconMoney, permite: (u) => !!u.tesoreria },
       ],
     },
   ],

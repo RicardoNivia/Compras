@@ -1,5 +1,6 @@
 "use client";
 
+import BotonExcel from "@/components/BotonExcel";
 import { useMemo, useState } from "react";
 import UserModal from "@/components/UserModal";
 import PermissionsMatrix from "@/components/PermissionsMatrix";
@@ -143,6 +144,10 @@ export default function UsuariosView({ initialUsers, initialPermissionsMatrix, i
           </select>
         </div>
         <div className="spacer" />
+        <BotonExcel nombre="usuarios" hoja="Usuarios" filas={filtered.filter(cumpleModulo)} deshabilitado={!filtered.filter(cumpleModulo).length} columnas={[
+          { t: "Nombre", v: (u) => u.nombre }, { t: "Correo", v: (u) => u.email }, { t: "Rol", v: (u) => nombreRol(u.role) },
+          { t: "Módulos", v: (u) => modulosDeRol(u.role).join(", ") }, { t: "Activo", v: (u) => (u.activo ? "Sí" : "No") },
+        ]} />
         <button type="button" className="btn btn-primary" onClick={() => setModalUser(null)}>
           + Agregar usuario
         </button>

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { itemsAlertasImportacion, itemsPagosVencidos } from "@/lib/tesoreria/alertas";
 import { solicitudesPendientes } from "@/lib/solicitudesCompra";
 import { listRecords } from "@/lib/records";
 import { getSolicitudesPendientes, getRiesgoPresupuesto, getRiesgoTiempos } from "@/lib/alerts";
@@ -294,6 +295,9 @@ const SECCIONES = [
   // Bienestar ("*": cualquier rol, incluidos los creados en Usuarios › Roles, que pueda editar alguna línea)
   { clave: "bienVencidas", titulo: "Actividades que ya pasaron y siguen programadas", descripcion: "Su fecha ya pasó: márcalas como ejecutadas y carga la asistencia, o cámbiales la fecha si se movieron.", roles: ["*"], fuente: "bienestar", permisosAlguno: ["editBienestar", "editFundacion"] },
   { clave: "bienSinCerrar", titulo: "Actividades ejecutadas sin cerrar", descripcion: `Se ejecutaron hace más de ${SIN_CERRAR_DIAS} días y no se han cerrado con su calificación.`, roles: ["*"], fuente: "bienestar", permisosAlguno: ["editBienestar", "editFundacion"] },
+  // Tesorería ("*" + permiso: también roles creados que tengan verTesoreria)
+  { clave: "tesVencidos", titulo: "Pagos de Tesorería vencidos", descripcion: "Su fecha de vencimiento ya pasó y siguen en P: asóciales el movimiento del banco o márcalos pagados.", roles: ["*"], fuente: "tesoreria", permiso: "verTesoreria" },
+  { clave: "tesAlertas", titulo: "Tesorería: lo que no cuadró al importar", descripcion: "Pagos que vinieron en 0, fechas dañadas, saldos del Excel por registrar y filas sin datos. Corrígelos con «Ir» y márcalos como revisados aquí mismo.", roles: ["*"], fuente: "tesoreria", permiso: "verTesoreria" },
   // Compras
   { clave: "atrasadas", titulo: "Solicitudes atrasadas", descripcion: "Compras sin fecha de entrega. Pasados 8 días hábiles incumplen el plazo; desde 5 ya conviene moverlas.", roles: ["admin", "registro"], fuente: "records" },
   { clave: "porLegalizar", titulo: "Compras por legalizar", descripcion: "Ya fueron entregadas o ejecutadas pero su legalización no se ha hecho. Los días cuentan desde la entrega.", roles: ["admin", "legalizar"], fuente: "records" },
@@ -339,6 +343,8 @@ async function prepararConstructores(user, usa) {
     solicitudesCompra: () => solicitudesCompraPendientes(),
     bienVencidas: () => actividadesVencidas(user),
     bienSinCerrar: () => actividadesSinCerrar(user),
+    tesVencidos: () => itemsPagosVencidos(),
+    tesAlertas: () => itemsAlertasImportacion(user),
   };
   return { constructores, ctxProv };
 }
@@ -376,7 +382,7 @@ export async function getPendientes(user) {
       clave: s.clave,
       titulo: s.titulo,
       descripcion: s.descripcion,
-      dominio: s.fuente === "proveedores" ? "proveedores" : s.fuente === "presupuesto" ? "presupuesto" : s.fuente === "informes" ? "informes" : s.fuente === "bienestar" ? "bienestar" : "compras",
+      dominio: s.fuente === "proveedores" ? "proveedores" : s.fuente === "presupuesto" ? "presupuesto" : s.fuente === "informes" ? "informes" : s.fuente === "bienestar" ? "bienestar" : s.fuente === "tesoreria" ? "tesoreria" : "compras",
       total: items.length,
       criticos: items.filter((i) => i.nivel === "critico").length,
       nivel: items.length ? peorNivel(items) : "ok",

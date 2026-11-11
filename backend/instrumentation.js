@@ -47,9 +47,6 @@ export async function register() {
     const { startAgenteCorreo } = await import("@/lib/agenteCorreoProveedores");
     startAgenteCorreo();
 
-    // Tesorería: mantiene generados los proyectados de los pagos recurrentes (ver lib/tesoreria/recurrentes.js).
-    const { startRecurrentesTesoreria } = await import("@/lib/tesoreria/recurrentes");
-    startRecurrentesTesoreria();
 
     // Una vez por despliegue: manito de todos los comentarios y recalificación de todas las actividades (ver lib/agenteDespliegue.js).
     const { startAgenteAlDesplegar } = await import("@/lib/agenteDespliegue");

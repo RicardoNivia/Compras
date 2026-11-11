@@ -1,5 +1,6 @@
 "use client";
 
+import BotonExcel from "@/components/BotonExcel";
 import { useEffect, useMemo, useState } from "react";
 import MaestroModal from "@/components/MaestroModal";
 import ConfigCicloProveedores from "@/components/proveedores/ConfigCicloProveedores";
@@ -357,6 +358,12 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
               </div>
               <span className="count-note">Página {currentPage} de {totalPages}</span>
               <div className="spacer" />
+              <BotonExcel nombre={`maestros-${tab}`} hoja={TIPO_LABELS[tab] || "Maestro"} filas={rows} deshabilitado={!rows.length} columnas={[
+                { t: COLUMN_LABELS[tab] || "Valor", v: (m) => m.valor },
+                ...(conLider ? [{ t: "Líder", v: (m) => m.lider }] : []),
+                ...(conEstrellas ? [{ t: "Estrellas", v: (m) => m.aplicaEstrellas }] : []),
+                { t: "En uso", v: (m) => (m.enUso ? m.usadoEn?.join(" · ") || "Sí" : "Libre") }, { t: "Activo", v: (m) => (m.activo ? "Sí" : "No") },
+              ]} />
               <span className="count-note">{rows.length} registro(s)</span>
             </div>
           </>

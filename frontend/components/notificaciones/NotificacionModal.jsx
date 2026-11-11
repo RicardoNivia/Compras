@@ -6,7 +6,7 @@ import {
   interpretarConNova, crearNotificacion, actualizarNotificacion, probarNotificacion, destinatariosElegibles, previsualizarProgramacion,
 } from "@/lib/notificacionesApi";
 import {
-  LIMITES, FUENTES, CONSULTAS, PERIODOS, CAMPOS_FECHA, PRESETS_COMPRAS, PRESETS_PROVEEDORES, CONDICIONES, SI_FESTIVO, VARIABLES,
+  LIMITES, FUENTES, CONSULTAS, PERIODOS, CAMPOS_FECHA, PRESETS_COMPRAS, PRESETS_PROVEEDORES, PERIODOS_TESORERIA, PRESETS_TESORERIA, SENTIDOS_TESORERIA, CONDICIONES, SI_FESTIVO, VARIABLES,
   EVENTOS, AGRUPACIONES, ESTADOS_CICLO, VARIABLES_EVENTO, NIVELES_PRESUPUESTO,
 } from "@/lib/notificacionesCatalogo";
 import { IconSpark, IconAlert, IconArrowRight, IconEdit } from "@/components/icons";
@@ -182,7 +182,8 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
   const teamsDisponible = canales?.teams && canales.teams !== "desactivado";
   const elegiblesLibres = useMemo(() => elegibles.filter((u) => !destinatarios.includes(u.id)), [elegibles, destinatarios]);
   const nombreDe = (id) => (id === user.id ? "Yo" : elegibles.find((u) => u.id === id)?.nombre || notificacion?.destinatarios?.find((d) => d.userId === id)?.userNombre || id);
-  const presets = fuente === "proveedores" ? PRESETS_PROVEEDORES : PRESETS_COMPRAS;
+  const presets = fuente === "proveedores" ? PRESETS_PROVEEDORES : fuente === "tesoreria" ? PRESETS_TESORERIA : PRESETS_COMPRAS;
+  const periodos = fuente === "tesoreria" ? PERIODOS_TESORERIA : PERIODOS;
   // Mismas reglas que backend/lib/notificacionesPermisos.js (el servidor vuelve a validar al guardar).
   const permiso = (f, def) => user.permissions?.[f] ?? def;
   const fuentesVisibles = [
@@ -190,6 +191,7 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
     permiso("viewAlertas", canViewAlertas(user.role)) && "mi_dia",
     permiso("viewProveedores", canViewProveedores(user.role)) && "proveedores",
     permiso("viewPresupuesto", canViewPresupuesto(user.role)) && "presupuesto",
+    !!user.tesoreria && "tesoreria",
   ].filter(Boolean);
 
   // "¿A quién le llega?": lista visual de personas con acceso a la fuente (crear, editar y confirmar).
@@ -432,6 +434,12 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
                       {def?.parametros.includes("area") && (
                         <div className="field"><label htmlFor="n-ev-area">Área (opcional)</label><input id="n-ev-area" value={regla.parametros?.area || ""} maxLength={100} onChange={(e) => setP("area", e.target.value)} placeholder="Todas" /></div>
                       )}
+                      {["item", "texto", "banco"].filter((p) => def?.parametros.includes(p)).map((p) => (
+                        <div className="field" key={p}><label htmlFor={`n-ev-${p}`}>{{ item: "Ítem o propiedad", texto: "Concepto o palabras", banco: "Banco" }[p]} (opcional)</label><input id={`n-ev-${p}`} value={regla.parametros?.[p] || ""} maxLength={100} onChange={(e) => setP(p, e.target.value)} placeholder="Todos" /></div>
+                      ))}
+                      {def?.parametros.includes("sentido") && (
+                        <div className="field"><label htmlFor="n-ev-sentido">Qué movimientos</label><select id="n-ev-sentido" value={regla.parametros?.sentido || ""} onChange={(e) => setP("sentido", e.target.value)}><option value="">Lo que sale y lo que entra</option>{Object.entries(SENTIDOS_TESORERIA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+                      )}
                       {def?.parametros.includes("proveedor") && (
                         <div className="field"><label htmlFor="n-ev-prov">Solo de un proveedor (NIT o nombre, opcional)</label><input id="n-ev-prov" value={regla.parametros?.proveedor || ""} maxLength={100} onChange={(e) => setP("proveedor", e.target.value)} placeholder="Todos" /></div>
                       )}
@@ -516,11 +524,11 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
                       <label htmlFor="n-periodo">Período</label>
                       <select id="n-periodo" value={regla.parametros?.periodo || ""} onChange={(e) => setP("periodo", e.target.value)}>
                         <option value="">Por defecto</option>
-                        {Object.entries(PERIODOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                        {Object.entries(periodos).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                       </select>
                     </div>
                   )}
-                  {regla.parametros?.periodo === "ultimos_n_dias" && (
+                  {["ultimos_n_dias", "proximos_n_dias"].includes(regla.parametros?.periodo) && (
                     <div className="field"><label htmlFor="n-dias">Días</label><input id="n-dias" type="number" min={1} max={366} value={regla.parametros?.dias || 7} onChange={(e) => setP("dias", Number(e.target.value))} /></div>
                   )}
                   {def?.parametros.includes("campoFecha") && (def.usaCampoFecha || regla.parametros?.preset === "registradas") && (
@@ -532,9 +540,18 @@ export default function NotificacionModal({ user, notificacion, pedidoInicial = 
                       </select>
                     </div>
                   )}
-                  {["area", "categoria", "estado"].filter((p) => def?.parametros.includes(p)).map((p) => (
+                  {def?.parametros.includes("sentido") && (
+                    <div className="field">
+                      <label htmlFor="n-sentido">Qué movimientos</label>
+                      <select id="n-sentido" value={regla.parametros?.sentido || ""} onChange={(e) => setP("sentido", e.target.value)}>
+                        <option value="">Lo que sale y lo que entra</option>
+                        {Object.entries(SENTIDOS_TESORERIA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {["area", "categoria", "estado", "item", "texto", "banco"].filter((p) => def?.parametros.includes(p)).map((p) => (
                     <div className="field" key={p}>
-                      <label htmlFor={`n-${p}`}>{p === "area" ? "Área" : p === "categoria" ? "Categoría" : "Estado"} (opcional)</label>
+                      <label htmlFor={`n-${p}`}>{{ area: "Área", categoria: "Categoría", estado: "Estado", item: "Ítem o propiedad", texto: "Concepto o palabras", banco: "Banco" }[p]} (opcional)</label>
                       <input id={`n-${p}`} value={regla.parametros?.[p] || ""} maxLength={100} onChange={(e) => setP(p, e.target.value)} placeholder="Todas" />
                     </div>
                   ))}

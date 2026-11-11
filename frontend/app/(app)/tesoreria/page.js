@@ -5,13 +5,13 @@ import ResumenTesoreria from "@/components/tesoreria/ResumenTesoreria";
 
 export const dynamic = "force-dynamic";
 
-// Tesorería: acceso NOMINAL (user.tesoreria viene de /api/auth/me), no por rol. Ver backend/lib/tesoreria/comun.js.
+// Tesorería: el acceso viene de la Matriz de permisos (user.tesoreria de /api/auth/me). Ver backend/lib/tesoreria/comun.js.
 export default async function Pagina() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (!user.tesoreria) redirect("/");
   return (
-    <AppShell user={user} title="Flujo de caja" subtitle="Ingresos y egresos ejecutados y proyectados de todas las cuentas">
+    <AppShell user={user} title="Dashboard de Tesorería" subtitle="Flujo de caja, saldos de los bancos y cumplimiento de los pagos">
       <ResumenTesoreria acceso={user.tesoreria} />
     </AppShell>
   );

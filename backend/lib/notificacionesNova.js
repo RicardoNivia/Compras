@@ -1,7 +1,7 @@
 import { generateStructuredJson } from "@/lib/aiStructured";
 import { FRECUENCIAS, ymd } from "@/lib/reportSchedule";
 import {
-  LIMITES, FUENTES, CONSULTAS, PERIODOS, CAMPOS_FECHA, PRESETS_COMPRAS, PRESETS_PROVEEDORES, CONDICIONES, SI_FESTIVO,
+  LIMITES, FUENTES, CONSULTAS, PERIODOS, CAMPOS_FECHA, PRESETS_COMPRAS, PRESETS_PROVEEDORES, CONDICIONES, SI_FESTIVO, PERIODOS_TESORERIA, PRESETS_TESORERIA, SENTIDOS_TESORERIA,
   VARIABLES, EVENTOS, AGRUPACIONES, ESTADOS_CICLO, VARIABLES_EVENTO, preguntasFaltantes,
 } from "@/lib/notificacionesCatalogo";
 import { fuentesPermitidas, mensajeSinPermiso, destinatariosElegibles } from "@/lib/notificacionesPermisos";
@@ -113,6 +113,7 @@ Valores válidos:
 - campoFecha: fechaSolicitud (fecha de solicitud de la compra) | fechaRegistro (día en que se creó en el sistema).
 - preset de lista_compras: ${Object.entries(PRESETS_COMPRAS).map(([k, v]) => `${k} = ${v}`).join("; ")}.
 - preset de proveedores_ciclo: ${Object.entries(PRESETS_PROVEEDORES).map(([k, v]) => `${k} = ${v}`).join("; ")}.
+- TESORERÍA (fuente tesoreria; solo si está en la lista de esta persona): consulta pagos_tesoreria con preset ${Object.entries(PRESETS_TESORERIA).map(([k, v]) => `${k} = ${v}`).join("; ")}; consulta movimientos_tesoreria (movimientos del banco). Su "periodo" usa OTROS valores: ${Object.entries(PERIODOS_TESORERIA).map(([k, v]) => `${k} = ${v}`).join("; ")} (con proximos_n_dias / ultimos_n_dias usa "dias"). Filtros de texto opcionales: item (propiedad, p. ej. Bahía), texto (concepto, p. ej. «gas»), banco; sentido: ${Object.entries(SENTIDOS_TESORERIA).map(([k, v]) => `${k} = ${v}`).join("; ")}. Ejemplos: «los lunes a las 8 dime qué se pagó y qué hay que pagar esta semana» = programado, pagos_tesoreria, preset pagados_y_por_pagar, periodo esta_semana, frecuencia semanal, diaSemana 1, hora 08:00; «todos los días a las 7 lo que vence hoy» = pagos_tesoreria preset por_pagar periodo hoy, frecuencia diaria; «el 1 de cada mes lo que hay que pagar en el mes» = periodo este_mes, frecuencia mensual diaMes 1; «avísame apenas se pague algo» = evento tesoreria.pago_pagado, agrupacion inmediato; «cuando se registre un movimiento» = evento tesoreria.movimiento_registrado. "Pagado" en Tesorería = el pago pasó a E (no son compras).
 - alcance: general (todos reciben lo mismo) | personal (cada quien recibe lo suyo, p. ej. solo las compras de las que es responsable).
 - condicion: ${Object.keys(CONDICIONES).join(", ")} (umbral necesita "umbral" = mínimo de resultados).
 - frecuencia: ${FRECUENCIAS.join(", ")}. diaria = cada día hábil. semanal usa diaSemana (0=domingo … 6=sábado). mensual usa diaMes (31 = fin de mes). mensual_semana usa ordinal (1..4, -1 = último) + diaSemana. unica usa fechaUnica YYYY-MM-DD.
@@ -120,6 +121,7 @@ Valores válidos:
 - Variables del mensaje: ${Object.entries(VARIABLES).map(([k, v]) => `{${k}} = ${v}`).join("; ")}.
 
 REGLAS:
+0. NUNCA preguntes por el canal (correo, WhatsApp, Teams, SMS): se elige en el formulario y siempre llega en la app. Tampoco preguntes filtros opcionales (banco, ítem, concepto, área) si la persona no los mencionó: déjalos vacíos (= todos).
 1. Una notificación usa UNA sola consulta. Si el pedido necesita gráficas, el dashboard, un PDF, análisis o redacción larga, o varias fuentes a la vez: estado "es_informe" y explica en "mensaje" que eso se arma en Estudio de informes.
 2. Si el pedido usa datos de una fuente que NO está en la lista (${noPermitidas.length ? noPermitidas.join(", ") : "ninguna"}): estado "no_permitido" y "fuenteNoPermitida" con su clave (${Object.keys(FUENTES).join(", ")}). No ofrezcas alternativas con esos datos.
 3. Si no hay ninguna consulta que lo cubra: estado "no_soportado" y en "mensaje" qué sí se puede, con 2 o 3 ideas.
@@ -213,6 +215,8 @@ const PLANTILLAS = {
   mis_pendientes: { titulo: "Tu día: {total} pendientes", plantilla: "Hola {nombre}, tienes {total} pendientes, {urgentes} urgentes." },
   proveedores_ciclo: { titulo: "Proveedores ({total})", plantilla: "Hay {total} proveedores en esta situación." },
   presupuesto_ejecucion: { titulo: "Presupuesto: {total} áreas sobre {umbral}", plantilla: "{total} áreas superan el {umbral} de su presupuesto." },
+  pagos_tesoreria: { titulo: "Pagos de Tesorería: {periodo}", plantilla: "Hola {nombre}: {periodo}. Por pagar: {por_pagar}. Pagado: {pagado}. El detalle va abajo." },
+  movimientos_tesoreria: { titulo: "Movimientos del banco: {periodo}", plantilla: "{total} movimiento(s) en {periodo}: salió {salio} y entró {entro}." },
 };
 
 // Mensaje por defecto de una notificación por evento (al instante: un evento; agrupada: varios).
@@ -235,6 +239,8 @@ function plantillaEvento(evento, agrupacion) {
     "proveedor.ciclo_cambio": ["Ciclo de proveedor: {proveedor}", "{proveedor}: {detalle}."],
     "presupuesto.umbral": ["Alerta de presupuesto: {descripcion}", "{descripcion}: {detalle}."],
     "presupuesto.actualizado": ["Cambio en el presupuesto: {descripcion}", "{descripcion}: {detalle}."],
+    "tesoreria.pago_pagado": ["Pagado: {concepto}", "{concepto} por {valor}. {detalle}."],
+    "tesoreria.movimiento_registrado": ["Movimiento en {banco}: {valor}", "{descripcion} ({banco}) por {valor}: {detalle}."],
   }[evento] || ["{evento}", "{evento}: {total}."];
   return lote ? { titulo: "{evento}: {total}", plantilla: "En este período: {total}. El detalle va abajo." } : { titulo: base[0], plantilla: base[1] };
 }

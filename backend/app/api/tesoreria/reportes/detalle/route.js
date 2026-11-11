@@ -6,7 +6,7 @@ import { detallePivote } from "@/lib/tesoreria/pivote";
  * /api/tesoreria/reportes/detalle:
  *   get:
  *     tags: [Tesorería]
- *     summary: "Movimientos de una celda de Reportes (como el doble clic de Excel): los mismos filtros de la tabla + moneda, ruta (JSON con los nombres de los grupos; vacío = total general) y mes (0-11; sin mes = columna Total). Paginado (page, size)."
+ *     summary: "Pagos de una celda de Reportes (como el doble clic de Excel): los mismos filtros de la tabla + moneda, ruta (JSON con los nombres de los grupos; vacío = total general) y mes (0-11; sin mes = columna Total). Paginado (page, size)."
  */
 export const GET = conTesoreria("consulta", ({ query }) => {
   let ruta = [];

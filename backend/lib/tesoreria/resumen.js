@@ -1,106 +1,129 @@
 import { prisma } from "@/lib/prisma";
 import { hoyColombia } from "@/lib/hoyColombia";
-import { fmtMoneda, rangoMes } from "@/lib/tesoreria/comun";
-import { mapasCatalogos } from "@/lib/tesoreria/movimientos";
-import { signoEnCuenta } from "@/lib/tesoreria/conciliacion";
+import { mapasCatalogos } from "@/lib/tesoreria/maestros";
+import { reporteSaldos } from "@/lib/tesoreria/saldos";
+import { fmtMoneda, redondear, sumarDias, TIPOS_PAGO, esIngreso, esEgreso } from "@/lib/tesoreria/comun";
 
-// Cifras del flujo de caja, siempre calculadas aquí (Nova y la pantalla solo las muestran). Nunca se suman monedas
-// distintas: todo va agrupado por código ISO 4217. Los traslados entre cuentas propias no cuentan como ingreso ni egreso.
+// Cifras del Resumen de Tesorería, siempre calculadas aquí (la pantalla y Nova solo las muestran): lo del mes
+// (pendientes y pagados), lo vencido, los movimientos sin asociar, las propuestas del agente, las alertas, el saldo de
+// cada banco y los próximos pagos. Suman I, E y J (jornal, según su signo).
 
 const num = (d) => (d == null ? 0 : Number(d));
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-export async function saldosPorCuenta(hasta = hoyColombia()) {
-  const [cuentas, movs] = await Promise.all([
-    prisma.cuentaTesoreria.findMany({ where: { activo: true }, orderBy: { nombre: "asc" } }),
-    prisma.movimientoTesoreria.findMany({ where: { estado: "ejecutado", fecha: { lte: hasta } }, select: { tipo: true, valor: true, cuentaId: true, cuentaDestinoId: true, fecha: true } }),
-  ]);
-  return cuentas.map((c) => {
-    const desde = c.saldoInicialFecha || "0000-00-00";
-    const saldo = num(c.saldoInicial) + movs.filter((m) => m.fecha >= desde && (m.cuentaId === c.id || m.cuentaDestinoId === c.id)).reduce((a, m) => a + signoEnCuenta(m, c.id), 0);
-    return { id: c.id, nombre: c.nombre, tipo: c.tipo, moneda: c.moneda, saldo, saldoTexto: fmtMoneda(saldo, c.moneda), desde: c.saldoInicialFecha };
-  });
-}
-
-// anio + mes opcional. Devuelve todo por moneda (normalmente solo COP).
-export async function resumenTesoreria({ anio, mes } = {}) {
+// vista "anual": las cifras del tablero (dashboard) son de todo el año; si no, del mes.
+export async function resumenTesoreria({ anio, mes, vista } = {}) {
   const hoy = hoyColombia();
   anio = Number(anio) || Number(hoy.slice(0, 4));
-  mes = mes ? Number(mes) : null;
-  const [movs, mapas, saldos, cierres] = await Promise.all([
-    prisma.movimientoTesoreria.findMany({ where: { fecha: { gte: `${anio}-01-01`, lte: `${anio}-12-31` } }, select: { id: true, fecha: true, tipo: true, estado: true, valor: true, moneda: true, itemId: true, conceptoId: true, concepto: true, cuentaId: true, pagadorId: true, _count: { select: { lineas: true } } } }),
+  mes = Number(mes) || (anio === Number(hoy.slice(0, 4)) ? Number(hoy.slice(5, 7)) : 12);
+  const [pagosAnio, vencidos, movs, propuestas, alertas, saldos, mapas] = await Promise.all([
+    prisma.pagoProgramado.findMany({ where: { anio }, select: { id: true, mes: true, fecha: true, tipo: true, estado: true, valor: true, moneda: true, itemId: true, medioPagoId: true, pagadorId: true, conceptoId: true, concepto: true, _count: { select: { asociaciones: true } } } }),
+    prisma.pagoProgramado.findMany({ where: { estado: "P", fecha: { lt: hoy }, tipo: { in: ["E", "I", "J"] } }, select: { id: true, fecha: true, valor: true, moneda: true, tipo: true, conceptoId: true, concepto: true, itemId: true }, orderBy: { fecha: "asc" } }),
+    prisma.movimientoBanco.findMany({ where: { fecha: { gte: `${anio}-01-01`, lte: `${anio}-12-31` } }, select: { fecha: true, valor: true, verificadoAt: true, asociaciones: { select: { valor: true } } } }),
+    prisma.propuestaPagoTesoreria.groupBy({ by: ["confianza"], where: { estado: "pendiente" }, _count: { _all: true } }),
+    prisma.alertaTesoreria.count({ where: { resuelta: false } }),
+    reporteSaldos(anio),
     mapasCatalogos(),
-    saldosPorCuenta(),
-    prisma.cierreMes.findMany({ where: { anio }, select: { mes: true, firmadoPorNombre: true, createdAt: true } }),
   ]);
-  const monedas = [...new Set(movs.map((m) => m.moneda))].sort((a, b) => (a === "COP" ? -1 : b === "COP" ? 1 : a.localeCompare(b)));
-  const porMoneda = monedas.map((moneda) => {
-    const ms = movs.filter((m) => m.moneda === moneda && m.tipo !== "traslado");
-    const fm = (v) => fmtMoneda(v, moneda);
-    const porMes = MESES.map((nombre, i) => {
-      const delMes = ms.filter((m) => Number(m.fecha.slice(5, 7)) === i + 1);
-      const suma = (tipo, estado) => delMes.filter((m) => m.tipo === tipo && m.estado === estado).reduce((a, m) => a + num(m.valor), 0);
-      return { mes: i + 1, nombre, ingresos: suma("ingreso", "ejecutado"), egresos: suma("egreso", "ejecutado"), ingresosProyectados: suma("ingreso", "proyectado"), egresosProyectados: suma("egreso", "proyectado") };
-    });
-    const periodo = mes ? ms.filter((m) => Number(m.fecha.slice(5, 7)) === mes) : ms;
-    const ej = periodo.filter((m) => m.estado === "ejecutado");
-    const ingresos = ej.filter((m) => m.tipo === "ingreso").reduce((a, m) => a + num(m.valor), 0);
-    const egresos = ej.filter((m) => m.tipo === "egreso").reduce((a, m) => a + num(m.valor), 0);
-    const proy = periodo.filter((m) => m.estado === "proyectado");
-    const agrupar = (lista, clave, nombreDe) => {
-      const g = new Map();
-      for (const m of lista) { const k = m[clave] ?? 0; g.set(k, (g.get(k) || 0) + num(m.valor)); }
-      return [...g.entries()].map(([id, valor]) => ({ id, nombre: nombreDe(id), valor, valorTexto: fm(valor) })).sort((a, b) => b.valor - a.valor);
-    };
-    const nombreItem = (id) => mapas.items.get(id)?.nombre || "Sin ítem";
-    // Mes anterior para comparar (solo en vista mensual).
-    let comparacion = null;
-    if (mes && mes > 1) {
-      const ant = porMes[mes - 2];
-      const pct = (a, b) => (b ? Math.round(((a - b) / b) * 1000) / 10 : null);
-      comparacion = { ingresosPct: pct(ingresos, ant.ingresos), egresosPct: pct(egresos, ant.egresos) };
-    }
+  const delMes = pagosAnio.filter((p) => p.mes === mes);
+  const suma = (lista) => redondear(lista.reduce((s, p) => s + num(p.valor), 0));
+  const mesActual = {
+    anio, mes, nombre: MESES[mes - 1],
+    pendientes: delMes.filter((p) => p.estado === "P").length,
+    pagados: delMes.filter((p) => p.estado === "E").length,
+    egresosPendientes: suma(delMes.filter((p) => p.estado === "P" && esEgreso(p))),
+    ingresosPendientes: suma(delMes.filter((p) => p.estado === "P" && esIngreso(p))),
+    egresosPagados: suma(delMes.filter((p) => p.estado === "E" && esEgreso(p))),
+    ingresosPagados: suma(delMes.filter((p) => p.estado === "E" && esIngreso(p))),
+  };
+  for (const k of ["egresosPendientes", "ingresosPendientes", "egresosPagados", "ingresosPagados"]) mesActual[`${k}Texto`] = fmtMoneda(mesActual[k]);
+  const porMes = MESES.map((nombre, i) => {
+    const l = pagosAnio.filter((p) => p.mes === i + 1);
     return {
-      moneda,
-      kpis: {
-        ingresos, ingresosTexto: fm(ingresos), egresos, egresosTexto: fm(egresos), neto: ingresos - egresos, netoTexto: fm(ingresos - egresos),
-        ingresosProyectados: proy.filter((m) => m.tipo === "ingreso").reduce((a, m) => a + num(m.valor), 0),
-        egresosProyectados: proy.filter((m) => m.tipo === "egreso").reduce((a, m) => a + num(m.valor), 0),
-        movimientos: periodo.length, sinConciliar: ej.filter((m) => !m._count.lineas).length,
-      },
-      comparacion,
-      porMes,
-      egresosPorItem: agrupar(ej.filter((m) => m.tipo === "egreso"), "itemId", nombreItem),
-      ingresosPorItem: agrupar(ej.filter((m) => m.tipo === "ingreso"), "itemId", nombreItem),
+      mes: i + 1, nombre,
+      egresosPagados: Math.abs(suma(l.filter((p) => esEgreso(p) && p.estado === "E"))), egresosPendientes: Math.abs(suma(l.filter((p) => esEgreso(p) && p.estado === "P"))),
+      ingresosPagados: suma(l.filter((p) => esIngreso(p) && p.estado === "E")), ingresosPendientes: suma(l.filter((p) => esIngreso(p) && p.estado === "P")),
+      pagos: l.length,
     };
   });
-  const enUnMes = new Date(Date.parse(`${hoy}T00:00:00Z`) + 31 * 86400000).toISOString().slice(0, 10);
-  const proximos = await prisma.movimientoTesoreria.findMany({ where: { estado: "proyectado", fecha: { gte: hoy, lte: enUnMes } }, orderBy: { fecha: "asc" }, take: 8 });
-  const vencidos = await prisma.movimientoTesoreria.count({ where: { estado: "proyectado", fecha: { lt: hoy } } });
+  const sinAsociar = movs.filter((m) => num(m.valor) - m.asociaciones.reduce((s, a) => s + num(a.valor), 0) > 0.5).length;
+  const prop = Object.fromEntries(propuestas.map((p) => [p.confianza, p._count._all]));
+  const tablero = armarTablero({ anio, mes, vista, hoy, pagosAnio, vencidos, movs, saldos, mapas, porMes, suma });
+  const proximosRaw = await prisma.pagoProgramado.findMany({ where: { estado: "P", fecha: { gte: hoy, lte: sumarDias(hoy, 7) } }, orderBy: [{ fecha: "asc" }, { id: "asc" }], take: 8 });
   return {
-    anio, mes, hoy,
-    porMoneda,
-    saldos,
-    cierres: cierres.map((c) => ({ mes: c.mes, por: c.firmadoPorNombre, at: c.createdAt })),
-    proyectadosVencidos: vencidos,
-    proximos: proximos.map((m) => ({ id: m.id, fecha: m.fecha, tipo: m.tipo, concepto: m.concepto, item: m.itemId ? mapas.items.get(m.itemId)?.nombre : null, cuenta: mapas.cuentas.get(m.cuentaId)?.nombre, valorTexto: fmtMoneda(m.valor, m.moneda) })),
+    anio, mes, hoy, mesActual, porMes, tablero,
+    vencidos: { cantidad: vencidos.length, valor: suma(vencidos), valorTexto: fmtMoneda(suma(vencidos)), masViejo: vencidos[0]?.fecha || null, diasMasViejo: vencidos[0] ? Math.floor((Date.parse(hoy) - Date.parse(vencidos[0].fecha)) / 86400000) : 0 },
+    movimientosSinAsociar: sinAsociar,
+    propuestas: { total: (prop.alta || 0) + (prop.media || 0) + (prop.baja || 0), alta: prop.alta || 0, media: prop.media || 0, baja: prop.baja || 0 },
+    alertasAbiertas: alertas,
+    saldos: saldos.items.filter((b) => b.activo).map((b) => ({ bancoId: b.bancoId, banco: b.banco, moneda: b.moneda, saldoInicial: b.saldoInicial, saldoHoy: b.saldoHoy, saldoFinal: b.saldoFinal, texto: b.saldoHoy != null ? fmtMoneda(b.saldoHoy, b.moneda) : b.saldoFinal != null ? fmtMoneda(b.saldoFinal, b.moneda) : null })),
+    proximos: proximosRaw.map((p) => ({
+      id: p.id, fecha: p.fecha, tipo: p.tipo, tipoTexto: TIPOS_PAGO[p.tipo], concepto: mapas.conceptos.get(p.conceptoId)?.nombre || p.concepto,
+      item: p.itemId ? mapas.items.get(p.itemId)?.nombre : null, medioPago: p.medioPagoId ? mapas.medios.get(p.medioPagoId)?.nombre : null,
+      valor: num(p.valor), valorTexto: fmtMoneda(p.valor, p.moneda),
+    })),
   };
 }
 
-// Reporte «Ejecutado» (como la hoja del Excel): tipo → ítem → concepto, mes a mes, por moneda. Sin traslados.
-export async function reporteEjecutado({ anio, porCuenta = false }) {
-  const mapas = await mapasCatalogos();
-  const movs = await prisma.movimientoTesoreria.findMany({ where: { estado: "ejecutado", tipo: { not: "traslado" }, fecha: { gte: `${anio}-01-01`, lte: `${anio}-12-31` } } });
-  const filas = new Map();
-  for (const m of movs) {
-    const grupo = porCuenta ? mapas.cuentas.get(m.cuentaId)?.nombre || "—" : m.tipo === "ingreso" ? "Ingresos" : "Egresos";
-    const item = mapas.items.get(m.itemId)?.nombre || "Sin ítem";
-    const concepto = (m.conceptoId && mapas.conceptos.get(m.conceptoId)?.nombre) || m.concepto;
-    const k = `${m.moneda}|${grupo}|${item}|${concepto}`;
-    if (!filas.has(k)) filas.set(k, { moneda: m.moneda, grupo, item, concepto, meses: Array(12).fill(0) });
-    filas.get(k).meses[Number(m.fecha.slice(5, 7)) - 1] += m.tipo === "egreso" ? -num(m.valor) : num(m.valor);
-  }
-  return [...filas.values()].sort((a, b) => a.moneda.localeCompare(b.moneda) || a.grupo.localeCompare(b.grupo) || a.item.localeCompare(b.item) || a.concepto.localeCompare(b.concepto));
+// Cifras del tablero (dashboard) de Tesorería: KPIs del período con su serie mensual, flujo de caja, saldos por banco mes
+// a mes, egresos por ítem y por medio de pago, cumplimiento de los pagos y movimientos asociados. Todo calculado aquí.
+function armarTablero({ anio, mes, vista, hoy, pagosAnio, vencidos, movs, saldos, mapas, porMes, suma }) {
+  const anual = vista === "anual";
+  const delPeriodo = pagosAnio.filter((p) => (anual || p.mes === mes) && ["I", "E", "J"].includes(p.tipo));
+  const egr = delPeriodo.filter((p) => esEgreso(p));
+  const ing = delPeriodo.filter((p) => esIngreso(p));
+  const abs = (v) => Math.abs(redondear(v));
+  const ingresos = suma(ing);
+  const egresos = abs(suma(egr));
+  const serieIng = porMes.map((m) => redondear(m.ingresosPagados + m.ingresosPendientes));
+  const serieEgr = porMes.map((m) => redondear(m.egresosPagados + m.egresosPendientes));
+  // Saldo total en bancos al cierre de cada mes (bancos activos con saldo calculable).
+  const activos = saldos.items.filter((b) => b.activo);
+  const serieSaldo = Array.from({ length: 12 }, (_, i) => {
+    const vals = activos.map((b) => b.meses[i].saldoFinal).filter((v) => v != null);
+    return vals.length ? redondear(vals.reduce((x, v) => x + v, 0)) : null;
+  });
+  const conSaldo = activos.filter((b) => (b.saldoHoy ?? b.saldoFinal) != null);
+  const saldoTotal = conSaldo.length ? redondear(conSaldo.reduce((x, b) => x + (b.saldoHoy ?? b.saldoFinal), 0)) : null;
+  // Cumplimiento: de lo que ya debía estar pagado (vence hasta hoy) en el período, cuánto está en E.
+  const debian = delPeriodo.filter((p) => p.fecha <= hoy);
+  const pagadosATiempo = debian.filter((p) => p.estado === "E").length;
+  const agrupar = (lista, campo, mapa, sinNombre) => {
+    const m = new Map();
+    for (const p of lista) { const id = p[campo] || 0; m.set(id, (m.get(id) || 0) + Math.abs(Number(p.valor) || 0)); }
+    return [...m.entries()].map(([id, valor]) => ({ id: id || null, nombre: id ? mapa.get(id)?.nombre || "—" : sinNombre, valor: redondear(valor) })).sort((a, b) => b.valor - a.valor);
+  };
+  const porItem = agrupar(egr, "itemId", mapas.items, "Sin ítem");
+  const porMedio = agrupar(egr, "medioPagoId", mapas.medios, "Sin medio de pago");
+  const topMedios = porMedio.slice(0, 5);
+  if (porMedio.length > 5) topMedios.push({ id: null, nombre: "Otros", valor: redondear(porMedio.slice(5).reduce((x, y) => x + y.valor, 0)) });
+  const movsPeriodo = movs.filter((m) => anual || Number(m.fecha.slice(5, 7)) === mes);
+  const asociados = movsPeriodo.filter((m) => Number(m.valor) - m.asociaciones.reduce((x, a) => x + Number(a.valor), 0) <= 0.5).length;
+  const nombreConcepto = (p) => mapas.conceptos.get(p.conceptoId)?.nombre || p.concepto;
+  const prefijo = anual ? `${anio}-` : `${anio}-${String(mes).padStart(2, "0")}-`;
+  const vencidosPeriodo = vencidos.filter((p) => p.fecha.startsWith(prefijo));
+  const fila = (p) => ({ id: p.id, fecha: p.fecha, concepto: nombreConcepto(p), item: p.itemId ? mapas.items.get(p.itemId)?.nombre || null : null, tipo: p.tipo, estado: p.estado || "P", valor: Number(p.valor), valorTexto: fmtMoneda(p.valor, p.moneda) });
+  return {
+    vista: anual ? "anual" : "mensual", anio, mes,
+    kpis: {
+      saldo: { valor: saldoTotal, serie: serieSaldo, bancos: activos.length, conSaldo: conSaldo.length },
+      ingresos: { valor: ingresos, pendiente: suma(ing.filter((p) => p.estado === "P")), recibido: suma(ing.filter((p) => p.estado === "E")), serie: serieIng },
+      egresos: { valor: egresos, pendiente: abs(suma(egr.filter((p) => p.estado === "P"))), pagado: abs(suma(egr.filter((p) => p.estado === "E"))), serie: serieEgr },
+      neto: { valor: redondear(ingresos - egresos), serie: serieIng.map((v, i) => redondear(v - serieEgr[i])) },
+      cumplimiento: { debian: debian.length, pagados: pagadosATiempo, pct: debian.length ? Math.round((pagadosATiempo / debian.length) * 1000) / 10 : null, vencidos: vencidosPeriodo.length, valorVencido: abs(suma(vencidosPeriodo)) },
+    },
+    flujo: porMes.map((m, i) => ({ mes: m.mes, nombre: m.nombre, ingresos: serieIng[i], egresos: serieEgr[i], neto: redondear(serieIng[i] - serieEgr[i]) })),
+    serieSaldo,
+    bancos: activos.map((b) => ({
+      bancoId: b.bancoId, banco: b.banco, moneda: b.moneda, saldo: b.saldoHoy ?? b.saldoFinal, serie: b.meses.map((m) => m.saldoFinal),
+      ultimoSaldoBanco: b.ultimoSaldoBanco,
+      cuadran: b.meses.filter((m) => m.diferencia != null && Math.abs(m.diferencia) <= 0.5).length,
+      diferencias: b.meses.filter((m) => m.diferencia != null && Math.abs(m.diferencia) > 0.5).length,
+    })),
+    porItem: porItem.slice(0, 8), porItemTotal: porItem.length, porMedio: topMedios,
+    movimientos: { total: movsPeriodo.length, asociados, verificados: movsPeriodo.filter((m) => m.verificadoAt).length, sinAsociar: movsPeriodo.length - asociados },
+    pagos: { total: delPeriodo.length, pagados: delPeriodo.filter((p) => p.estado === "E").length, pendientes: delPeriodo.filter((p) => p.estado === "P").length, conMovimiento: delPeriodo.filter((p) => p._count.asociaciones > 0).length },
+    vencidos: vencidos.slice(0, 6).map((p) => ({ ...fila(p), dias: Math.floor((Date.parse(hoy) - Date.parse(p.fecha)) / 86400000) })),
+    grandes: [...egr].sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor)).slice(0, 5).map(fila),
+  };
 }
-
-export { rangoMes };

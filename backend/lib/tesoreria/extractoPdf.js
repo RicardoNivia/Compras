@@ -193,5 +193,5 @@ export async function leerExtractoPdf(buffer, nombre, cuenta) {
     else avisos.push(`Cuadra con el extracto: saldo inicial ${fmt(leido.saldoInicial)} → final ${fmt(leido.saldoFinal)}.`);
   }
   if (leidoPor === "nova") avisos.unshift("El PDF no traía texto y lo leyó Nova.");
-  return { formato: "pdf", lineas, leidoPor, aviso: avisos.join(" ") || null };
+  return { formato: "pdf", lineas, leidoPor, aviso: avisos.join(" ") || null, saldoInicial: leido.saldoInicial ?? null, saldoFinal: leido.saldoFinal ?? null };
 }

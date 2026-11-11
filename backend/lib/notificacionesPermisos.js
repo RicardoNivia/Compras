@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { isRoleAllowed } from "@/lib/permissions";
 import { canViewRegistros, ROLES } from "@/lib/roles";
 import { FUENTES } from "@/lib/notificacionesCatalogo";
+import { accesoDe } from "@/lib/tesoreria/comun";
 
 // Único punto de decisión de "¿esta persona puede ver los datos de esta fuente?" para las notificaciones.
 // Se evalúa al crear, al editar, al elegir destinatarios y en CADA ejecución (ver lib/notificacionesMotor.js):
@@ -17,6 +18,9 @@ export async function puedeVerFuente(user, fuente) {
       return isRoleAllowed(user.role, "viewProveedores");
     case "presupuesto":
       return isRoleAllowed(user.role, "viewPresupuesto");
+    case "tesoreria":
+      // Tesorería es confidencial: solo quien tiene verTesoreria (Matriz de permisos) crea o recibe estas notificaciones.
+      return !!(await accesoDe(user));
     default:
       return false;
   }

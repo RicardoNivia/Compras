@@ -2,23 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { tesCrearMaestro, tesEditarMaestro, tesBorrarMaestro } from "@/lib/tesoreriaApi";
-import { fmtMoneda } from "@/lib/moneda";
 import { crossfade } from "@/lib/crossfade";
 import { Portal } from "@/components/notificaciones/ui";
-import { IconSearch, IconPlus, IconEdit, IconTrash, IconMoney, IconLayers, IconList, IconUsers } from "@/components/icons";
-import { useCatalogos, Aviso } from "@/components/tesoreria/comun";
-import MoneyInput from "@/components/MoneyInput";
+import { IconSearch, IconPlus, IconEdit, IconTrash, IconMoney, IconLayers, IconList, IconUsers, IconBuilding } from "@/components/icons";
+import { useCatalogos, Aviso, BotonExcel } from "@/components/tesoreria/comun";
 
 // Maestros de Tesorería con el mismo diseño que los de Compras y Bienestar (components/MaestrosView.jsx): menú a la
 // izquierda, buscador, «Crear nuevo», tabla con En uso / Activo / acciones y paginación.
 const PAGE_SIZES = [25, 50, 100];
 const TIPOS = [
-  { k: "cuenta", lista: "cuentas", label: "Cuentas", col: "Cuenta", Icon: IconMoney },
+  { k: "banco", lista: "bancos", label: "Bancos", col: "Banco", Icon: IconBuilding },
+  { k: "medio", lista: "medios", label: "Medios de pago", col: "Medio de pago", Icon: IconMoney },
   { k: "item", lista: "items", label: "Ítems", col: "Ítem", Icon: IconLayers },
   { k: "concepto", lista: "conceptos", label: "Conceptos", col: "Concepto", Icon: IconList },
   { k: "pagador", lista: "pagadores", label: "Quién paga", col: "Pagador", Icon: IconUsers },
 ];
-const TIPO_CUENTA = { ahorros: "Ahorros", inversion: "Inversión", tarjeta: "Tarjeta de crédito", efectivo: "Efectivo", otro: "Otro" };
 const FORMATO = { avvillas: "Tipo AV Villas", credicorp: "Tipo Credicorp", generico: "Genérico (fecha, descripción, valor)" };
 const sin = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
@@ -33,14 +31,14 @@ function ToggleSwitch({ checked, onChange, disabled, title }) {
 
 function EditorModal({ tipo, fila, cat, onClose, onSaved }) {
   const def = TIPOS.find((t) => t.k === tipo);
-  const [v, set] = useState(() => fila ? { ...fila } : { nombre: "", tipo: "ahorros", moneda: "COP", activo: true });
+  const [v, set] = useState(() => fila ? { ...fila } : { nombre: "", moneda: "COP", activo: true });
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
   async function guardar(e) {
     e.preventDefault();
     setGuardando(true); setError("");
     const datos = { nombre: v.nombre, activo: v.activo };
-    if (tipo === "cuenta") Object.assign(datos, { tipo: v.tipo, moneda: v.moneda, formatoExtracto: v.formatoExtracto || null, saldoInicial: v.saldoInicial || 0, saldoInicialFecha: v.saldoInicialFecha || null });
+    if (tipo === "banco") Object.assign(datos, { moneda: v.moneda, numeroCuenta: v.numeroCuenta || null, formatoExtracto: v.formatoExtracto || null });
     if (tipo === "concepto") datos.itemId = Number(v.itemId) || null;
     try {
       if (fila) await tesEditarMaestro(tipo, fila.id, datos); else await tesCrearMaestro(tipo, datos);
@@ -54,13 +52,12 @@ function EditorModal({ tipo, fila, cat, onClose, onSaved }) {
           <div className="modal-head"><h3>{fila ? `Editar ${def.col.toLowerCase()}` : `Nuevo: ${def.col.toLowerCase()}`}</h3><button type="button" className="btn-ghost icon-btn" onClick={onClose} aria-label="Cerrar">✕</button></div>
           <div className="modal-body">
             <div className="field full"><label htmlFor="tmm-nombre">{def.col}</label><input id="tmm-nombre" value={v.nombre} maxLength={120} autoFocus onChange={(e) => set({ ...v, nombre: e.target.value })} /></div>
-            {tipo === "cuenta" && (
+            {tipo === "banco" && (
               <>
-                <div className="field"><label htmlFor="tmm-tipo">Tipo</label><select id="tmm-tipo" value={v.tipo} onChange={(e) => set({ ...v, tipo: e.target.value })}>{Object.entries(TIPO_CUENTA).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></div>
                 <div className="field"><label htmlFor="tmm-moneda">Moneda (código ISO 4217)</label><input id="tmm-moneda" value={v.moneda} maxLength={3} onChange={(e) => set({ ...v, moneda: e.target.value.toUpperCase() })} placeholder="COP" /></div>
+                <div className="field"><label htmlFor="tmm-num">Número de cuenta (opcional)</label><input id="tmm-num" value={v.numeroCuenta || ""} maxLength={40} onChange={(e) => set({ ...v, numeroCuenta: e.target.value })} /></div>
                 <div className="field full"><label htmlFor="tmm-formato">Formato del extracto</label><select id="tmm-formato" value={v.formatoExtracto || ""} onChange={(e) => set({ ...v, formatoExtracto: e.target.value })}><option value="">Detectar solo</option>{Object.entries(FORMATO).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></div>
-                <div className="field"><label htmlFor="tmm-saldo">Saldo inicial ({v.moneda || "COP"})</label><MoneyInput id="tmm-saldo" value={v.saldoInicial ?? ""} onChange={(x) => set({ ...v, saldoInicial: x })} prefix={v.moneda || "COP"} decimales={v.moneda && v.moneda !== "COP" ? 2 : 0} permitirNegativo /></div>
-                <div className="field"><label htmlFor="tmm-saldo-f">Fecha del saldo inicial</label><input id="tmm-saldo-f" type="date" value={v.saldoInicialFecha || ""} onChange={(e) => set({ ...v, saldoInicialFecha: e.target.value })} /></div>
+                <p className="card-sub full" style={{ gridColumn: "1 / -1", margin: 0 }}>El saldo inicial de cada año se registra en Tesorería › Saldos de bancos.</p>
               </>
             )}
             {tipo === "concepto" && (
@@ -77,7 +74,7 @@ function EditorModal({ tipo, fila, cat, onClose, onSaved }) {
 
 export default function MaestrosTesoreria({ acceso }) {
   const { cat, error: errorCat, recargar } = useCatalogos();
-  const [tab, setTab] = useState("cuenta");
+  const [tab, setTab] = useState("banco");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
@@ -96,7 +93,7 @@ export default function MaestrosTesoreria({ acceso }) {
   const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const usos = cat?.usos?.[tab] || {};
   const itemNombre = (id) => cat?.items.find((i) => i.id === id)?.nombre;
-  const extras = tab === "cuenta" ? 4 : tab === "concepto" ? 1 : 0;
+  const extras = tab === "banco" ? 3 : tab === "concepto" ? 1 : 0;
 
   async function toggleActivo(f) {
     setOcupadoId(f.id); setError("");
@@ -122,7 +119,7 @@ export default function MaestrosTesoreria({ acceso }) {
           </nav>
         </div>
         <p className="maestros-nav-nota">
-          {puede ? "Un valor en uso no se borra: se desactiva y deja de ofrecerse, pero los movimientos que lo usan lo conservan. Las cuentas llevan su moneda con el código ISO 4217." : "Solo quien tiene acceso de firma en Tesorería edita los maestros."}
+          {puede ? "Un valor en uso no se borra: se desactiva y deja de ofrecerse, pero lo que ya lo usa lo conserva. Los bancos son las pestañas de movimientos; los medios de pago son otra lista, independiente." : "Solo quien puede administrar los maestros de Tesorería los edita."}
         </p>
       </aside>
 
@@ -133,6 +130,12 @@ export default function MaestrosTesoreria({ acceso }) {
             <span className="ic"><IconSearch size={14} /></span>
           </div>
           <div className="spacer" />
+          <BotonExcel nombre={`tesoreria-maestros-${def.lista}`} hoja={def.label} filas={rows} deshabilitado={!rows.length} columnas={[
+            { t: def.col, v: (f) => f.nombre },
+            ...(tab === "banco" ? [{ t: "Moneda", v: (f) => f.moneda }, { t: "Número de cuenta", v: (f) => f.numeroCuenta }, { t: "Formato del extracto", v: (f) => f.formatoExtracto }] : []),
+            ...(tab === "concepto" ? [{ t: "Ítem por defecto", v: (f) => itemNombre(f.itemId) }] : []),
+            { t: "En uso", v: (f) => usos[f.id] || 0 }, { t: "Activo", v: (f) => (f.activo ? "Sí" : "No") }, { t: "Creado por", v: (f) => f.creadoPorNombre },
+          ]} />
           {puede && <button type="button" className="btn btn-primary" onClick={() => setEditor({ fila: null })} disabled={!cat}><IconPlus size={13} /> Crear nuevo</button>}
         </div>
         {(error || errorCat) && <div className="modal-error" style={{ marginBottom: 10 }}>{error || errorCat}</div>}
@@ -141,7 +144,7 @@ export default function MaestrosTesoreria({ acceso }) {
           <thead>
             <tr>
               <th>{def.col}</th>
-              {tab === "cuenta" && <><th>Tipo</th><th>Moneda</th><th>Extracto</th><th style={{ textAlign: "right" }}>Saldo inicial</th></>}
+              {tab === "banco" && <><th>Moneda</th><th>Cuenta</th><th>Extracto</th></>}
               {tab === "concepto" && <th>Ítem por defecto</th>}
               <th className="col-uso">En uso</th>
               <th className="col-activo">Activo</th>
@@ -159,9 +162,9 @@ export default function MaestrosTesoreria({ acceso }) {
               return (
                 <tr key={f.id}>
                   <td className="truncate"><span className="desc-tooltip-wrap"><span className="desc-text">{f.nombre}</span><span className="desc-tooltip-bubble">{f.nombre}{f.creadoPorNombre ? ` · creado por ${f.creadoPorNombre}` : ""}</span></span></td>
-                  {tab === "cuenta" && <><td>{TIPO_CUENTA[f.tipo] || f.tipo}</td><td>{f.moneda}</td><td>{FORMATO[f.formatoExtracto] || <span className="muted">Detectar</span>}</td><td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmtMoneda(f.saldoInicial, f.moneda)}</td></>}
+                  {tab === "banco" && <><td>{f.moneda}</td><td>{f.numeroCuenta || <span className="muted">—</span>}</td><td>{FORMATO[f.formatoExtracto] || <span className="muted">Detectar</span>}</td></>}
                   {tab === "concepto" && <td className="truncate">{itemNombre(f.itemId) || <span className="muted">—</span>}</td>}
-                  <td>{n ? <span className="pill accent" title={`${n} movimiento(s) lo usan: no se puede eliminar, solo desactivar.`}>{n.toLocaleString("es-CO")} mov.</span> : <span className="pill good" title="Sin uso: se puede eliminar">Libre</span>}</td>
+                  <td>{n ? <span className="pill accent" title={`${n} registro(s) lo usan: no se puede eliminar, solo desactivar.`}>{n.toLocaleString("es-CO")} {tab === "banco" ? "mov." : "en uso"}</span> : <span className="pill good" title="Sin uso: se puede eliminar">Libre</span>}</td>
                   <td><ToggleSwitch checked={f.activo} onChange={() => toggleActivo(f)} disabled={!puede || ocupadoId === f.id} title={f.activo ? "Inactivar" : "Activar"} /></td>
                   <td className="acciones">
                     {puede && (confirming ? (

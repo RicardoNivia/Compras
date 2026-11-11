@@ -1,24 +1,24 @@
 "use client";
 
+import EstadoVacio from "@/components/EstadoVacio";
 import { useCallback, useEffect, useState } from "react";
 import { crossfade } from "@/lib/crossfade";
 import { urlReporteExcel } from "@/lib/tesoreriaApi";
-import { IconChevronDown, IconDownload, IconSpark, IconAlert } from "@/components/icons";
-import { useCatalogos, anios, anioActual } from "@/components/tesoreria/comun";
+import { IconChevronDown, IconDownload } from "@/components/icons";
+import { useCatalogos, anioActual, useAniosTesoreria } from "@/components/tesoreria/comun";
 import { FilasEsqueleto } from "@/components/tesoreria/Esqueletos";
 import { Portal, Paginacion } from "@/components/notificaciones/ui";
-import { DetalleMovimientoModal } from "@/components/tesoreria/MovimientoModales";
-import { Celda, EstadoPill, tipoTexto, fechaCorta } from "@/components/tesoreria/comun";
+import { DetallePagoModal } from "@/components/tesoreria/PagoModales";
+import { Celda, EstadoPago, TipoPago, Dinero, fechaCorta } from "@/components/tesoreria/comun";
 
-// Las hojas «Ejecutado» y «Por medio de pago» del Excel, como tablas dinámicas: grupos que se abren y cierran (+/−),
-// meses en columnas, subtotal por grupo y total general. Cifras calculadas en el backend (lib/tesoreria/pivote.js),
-// una tabla por moneda ISO 4217; egresos en negativo, como en el Excel.
+// Las hojas «Ejecutado» y «Por medio de pago» del Excel, como tablas dinámicas sobre los pagos programados: grupos que
+// se abren y cierran (+/−), meses en columnas, subtotal por grupo y total general. Cifras calculadas en el backend
+// (lib/tesoreria/pivote.js), una tabla por moneda ISO 4217; egresos en negativo, como en el Excel.
 const PAGE_SIZES = [25, 50, 100];
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const VISTAS = [["ejecutado", "Ejecutado"], ["medio", "Por medio de pago"]];
 const MESES_LARGOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-const filtrosIniciales = () => ({ anio: anioActual(), estado: "", tipo: "", pagadorId: "", cuentaId: "", itemId: "", mesDesde: 1, mesHasta: 12, traslados: false });
-const SIN_NOVA = { estado: "", resumen: [], motivo: "" };
+const filtrosIniciales = () => ({ anio: anioActual(), estado: "E", tipo: "", pagadorId: "", medioPagoId: "", itemId: "", mesDesde: 1, mesHasta: 12, todosLosTipos: false });
 const fmt = (v) => (v ? Math.round(v).toLocaleString("es-CO") : "");
 
 // Aplana el árbol en filas visibles según lo que esté abierto.
@@ -43,18 +43,16 @@ function todasLasClaves(nodo, ruta = [], out = []) {
 export function consultaDe(f, vista) {
   return new URLSearchParams({
     anio: f.anio, vista, mesDesde: f.mesDesde, mesHasta: f.mesHasta,
-    ...(f.estado ? { estado: f.estado } : {}), ...(f.tipo ? { tipo: f.tipo } : {}), ...(f.pagadorId ? { pagadorId: f.pagadorId } : {}),
-    ...(f.cuentaId ? { cuentaId: f.cuentaId } : {}), ...(f.itemId ? { itemId: f.itemId } : {}), ...(f.traslados && !f.itemId && !f.tipo ? { traslados: "1" } : {}),
+    estado: f.estado || "todos", ...(f.tipo ? { tipo: f.tipo } : {}), ...(f.pagadorId ? { pagadorId: f.pagadorId } : {}),
+    ...(f.medioPagoId ? { medioPagoId: f.medioPagoId } : {}), ...(f.itemId ? { itemId: f.itemId } : {}), ...(f.todosLosTipos && !f.tipo ? { todosLosTipos: "1" } : {}),
   });
 }
 
 export default function ReportesTesoreria({ acceso }) {
+  const aniosTes = useAniosTesoreria(); // años anteriores solo si tienen pagos
   const { cat } = useCatalogos();
   const [vista, setVista] = useState("ejecutado");
   const [f, setF] = useState(filtrosIniciales);
-  // «Filtrar con Nova»: el pedido, si está consultando, lo que aplicó (chips) o por qué no pudo.
-  const [pedido, setPedido] = useState("");
-  const [nova, setNova] = useState(SIN_NOVA);
   // Celda en la que se hizo clic: { moneda, ruta, mes, titulo } → ventana con sus movimientos.
   const [celda, setCelda] = useState(null);
   const [datos, setDatos] = useState(null);
@@ -82,37 +80,13 @@ export default function ReportesTesoreria({ acceso }) {
   }, [vista, f]);
   useEffect(() => { setPage(1); }, [vista, f, size]);
 
-  // Cambiar un filtro a mano deja de mostrar lo que había aplicado Nova (ya no es lo mismo).
   const set = (k) => (e) => {
-    setNova(SIN_NOVA);
     const v = e.target.type === "checkbox" ? e.target.checked : ["mesDesde", "mesHasta"].includes(k) ? Number(e.target.value) : e.target.value;
     setF((x) => ({ ...x, [k]: v }));
   };
   const hayFiltros = vista !== "ejecutado" || JSON.stringify(f) !== JSON.stringify(filtrosIniciales());
-  const limpiar = () => { setVista("ejecutado"); setF(filtrosIniciales()); setPedido(""); setNova(SIN_NOVA); };
+  const limpiar = () => { setVista("ejecutado"); setF(filtrosIniciales()); };
 
-  async function filtrarConNova(e) {
-    e.preventDefault();
-    if (!pedido.trim()) return;
-    setNova({ ...SIN_NOVA, estado: "pensando" });
-    try {
-      const res = await fetch("/api/tesoreria/reportes/nova", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texto: pedido, anioActual: f.anio }) });
-      const b = await res.json();
-      if (!res.ok) throw new Error(b.error || `Error ${res.status}`);
-      if (!b.aplicable) { setNova({ ...SIN_NOVA, estado: "no", motivo: b.motivo }); return; }
-      // Nova arma el filtro completo: lo que no menciona vuelve a «(Todos)».
-      const x = b.filtros;
-      setF({
-        ...filtrosIniciales(), anio: x.anio || f.anio, estado: x.estado || "", tipo: x.tipo || "",
-        pagadorId: x.pagadorId ? String(x.pagadorId) : "", cuentaId: x.cuentaId ? String(x.cuentaId) : "", itemId: x.itemId ? String(x.itemId) : "",
-        mesDesde: x.mesDesde || 1, mesHasta: x.mesHasta || 12, traslados: !!x.traslados,
-      });
-      if (x.vista) setVista(x.vista);
-      setNova({ estado: "ok", resumen: b.resumen, motivo: "" });
-    } catch (err) {
-      setNova({ ...SIN_NOVA, estado: "no", motivo: `No pude consultar a Nova (${err.message}).` });
-    }
-  }
   const alternar = (clave) => setAbiertos((s) => { const n = new Set(s); n.has(clave) ? n.delete(clave) : n.add(clave); return n; });
   const expandir = () => datos && setAbiertos(new Set(datos.porMoneda.flatMap((m) => todasLasClaves(m, [m.moneda]))));
   // Contraer deja ver solo el primer nivel (Tipo o Cuenta), como «Collapse entire field» del Excel.
@@ -120,35 +94,21 @@ export default function ReportesTesoreria({ acceso }) {
 
   return (
     <div className="tes-vista">
-      <form className="tes-nova-filtro" onSubmit={filtrarConNova}>
-        <span className="tes-nova-filtro-ic" aria-hidden="true"><IconSpark size={16} /></span>
-        <input aria-label="Filtrar con Nova" value={pedido} onChange={(e) => setPedido(e.target.value)} maxLength={400} placeholder="Filtra con Nova: «egresos de EL RECREO pagados por SNC en el segundo semestre»" />
-        <button type="submit" className="btn btn-primary" disabled={!pedido.trim() || nova.estado === "pensando"}>{nova.estado === "pensando" ? <span className="spinner" /> : <IconSpark size={13} />} Filtrar</button>
-      </form>
-      {nova.estado === "ok" && (
-        <div className="tes-nova-aplicado" role="status">
-          <span>Nova aplicó:</span>
-          {nova.resumen.map((t) => <span key={t} className="tes-chip">{t}</span>)}
-        </div>
-      )}
-      {nova.estado === "no" && (
-        <div className="tes-nova-no" role="alert"><IconAlert size={16} /><span><strong>No puedo aplicar ese filtro.</strong> {String(nova.motivo || "").replace(/^No puedo aplicar ese filtro:?\s*/i, "")}</span></div>
-      )}
       <div className="card tes-filtros tes-piv-filtros">
         <div className="dash-tabs" role="tablist" aria-label="Hoja">
           {VISTAS.map(([k, t]) => <button key={k} type="button" role="tab" className="dash-tab" aria-selected={vista === k} onClick={() => crossfade(() => setVista(k))}>{t}</button>)}
         </div>
         <div className="field" style={{ width: 100 }}>
           <label htmlFor="tp-anio">Año</label>
-          <select id="tp-anio" value={f.anio} onChange={set("anio")}>{anios().map((a) => <option key={a}>{a}</option>)}</select>
+          <select id="tp-anio" value={f.anio} onChange={set("anio")}>{[...new Set([...(aniosTes || []), Number(f.anio) || anioActual()])].sort((x, y) => x - y).map((a) => <option key={a}>{a}</option>)}</select>
         </div>
         <div className="field" style={{ width: 140 }}>
           <label htmlFor="tp-estado">Estado</label>
-          <select id="tp-estado" value={f.estado} onChange={set("estado")}><option value="">(Todos)</option><option value="ejecutado">Ejecutado</option><option value="proyectado">Proyectado</option></select>
+          <select id="tp-estado" value={f.estado} onChange={set("estado")}><option value="E">Pagados (E)</option><option value="P">Pendientes (P)</option><option value="">Todos</option></select>
         </div>
         <div className="field" style={{ width: 130 }}>
           <label htmlFor="tp-tipo">Tipo</label>
-          <select id="tp-tipo" value={f.tipo} onChange={set("tipo")}><option value="">(Todos)</option><option value="egreso">Egresos</option><option value="ingreso">Ingresos</option></select>
+          <select id="tp-tipo" value={f.tipo} onChange={set("tipo")}><option value="">I, E y J</option><option value="E">Egresos</option><option value="I">Ingresos</option><option value="J">Jornal</option><option value="S">Saldos</option><option value="T">Traslados</option></select>
         </div>
         <div className="field" style={{ width: 160 }}>
           <label htmlFor="tp-item">Ítem</label>
@@ -167,21 +127,21 @@ export default function ReportesTesoreria({ acceso }) {
           <select id="tp-paga" value={f.pagadorId} onChange={set("pagadorId")}><option value="">(Todos)</option>{cat?.pagadores.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}</select>
         </div>
         <div className="field" style={{ width: 170 }}>
-          <label htmlFor="tp-cuenta">Medio de pago</label>
-          <select id="tp-cuenta" value={f.cuentaId} onChange={set("cuentaId")}><option value="">(Todos)</option>{cat?.cuentas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
+          <label htmlFor="tp-medio">Medio de pago</label>
+          <select id="tp-medio" value={f.medioPagoId} onChange={set("medioPagoId")}><option value="">(Todos)</option>{cat?.medios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
         </div>
-        <label className="tes-check tes-piv-check" title={f.itemId || f.tipo ? "Los traslados no tienen ítem ni son ingreso o egreso" : undefined}><span>Incluir traslados entre cuentas propias</span><input type="checkbox" checked={f.traslados && !f.itemId && !f.tipo} disabled={!!f.itemId || !!f.tipo} onChange={set("traslados")} /></label>
+        <label className="tes-check tes-piv-check" title={f.tipo ? "Con un tipo elegido solo sale ese tipo" : undefined}><span>Incluir saldos y traslados (S y T no suman)</span><input type="checkbox" checked={f.todosLosTipos && !f.tipo} disabled={!!f.tipo} onChange={set("todosLosTipos")} /></label>
         <div className="tes-filtros-acciones">
           <button type="button" className="btn small" onClick={limpiar} disabled={!hayFiltros}>Limpiar filtros</button>
           <button type="button" className="btn small" onClick={expandir} disabled={!datos}>Expandir todo</button>
           <button type="button" className="btn small" onClick={contraer} disabled={!datos}>Contraer todo</button>
-          <a className="btn small btn-primary" href={urlReporteExcel(f.anio)}><IconDownload size={13} /> Excel {f.anio}</a>
+          <a className="btn small btn-primary" href={urlReporteExcel(f.anio, f.estado || "todos")}><IconDownload size={13} /> Excel {f.anio}</a>
         </div>
       </div>
 
       {error && <p className="modal-error">{error}</p>}
       {cargando && !datos && <div className="table-card"><FilasEsqueleto filas={12} columnas={8} /></div>}
-      {datos && !datos.porMoneda.length && <div className="card"><p className="muted" style={{ margin: 0 }}>No hay movimientos con estos filtros.</p></div>}
+      {datos && !datos.porMoneda.length && <div className="card"><EstadoVacio titulo="No hay pagos con estos filtros">Cambia el año, los tipos o las filas del reporte.</EstadoVacio></div>}
 
       {datos?.porMoneda.map((m) => {
         const todas = filas(m, abiertos, [m.moneda]);
@@ -192,7 +152,7 @@ export default function ReportesTesoreria({ acceso }) {
           <div key={m.moneda} className={`table-card tes-piv${cargando ? " cargando" : ""}`}>
             <div className="tes-piv-cab">
               <strong>{VISTAS.find((v) => v[0] === vista)[1]} · {datos.anio}</strong>
-              <span>Suma de valor en {m.moneda} (ISO 4217) · {datos.niveles.join(" → ")} · {datos.movimientos.toLocaleString("es-CO")} movimiento(s)</span>
+              <span>Suma de valor en {m.moneda} (ISO 4217) · {datos.niveles.join(" → ")} · {datos.pagos.toLocaleString("es-CO")} pago(s)</span>
             </div>
             <div className="table-scroll">
               <table className="tes-piv-tabla">
@@ -254,7 +214,7 @@ function CeldaValor({ v, total = false, onAbrir }) {
   const cls = `${total ? "tes-piv-total " : ""}${v < 0 ? "neg " : ""}${v ? "clic" : ""}`.trim();
   if (!v) return <td className={cls} />;
   return (
-    <td className={cls} onClick={onAbrir} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onAbrir(); } }} tabIndex={0} title="Ver los movimientos de esta cifra">
+    <td className={cls} onClick={onAbrir} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onAbrir(); } }} tabIndex={0} title="Ver los pagos de esta cifra">
       {fmt(v)}
     </td>
   );
@@ -262,7 +222,7 @@ function CeldaValor({ v, total = false, onAbrir }) {
 
 const PAGE_SIZES_MODAL = [10, 25, 50, 100];
 
-// Movimientos de una celda (como el doble clic de Excel en una tabla dinámica). Cada uno abre su detalle.
+// Pagos de una celda (como el doble clic de Excel en una tabla dinámica). Cada uno abre su detalle.
 function DetalleCelda({ celda, consulta, acceso, onClose }) {
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(PAGE_SIZES_MODAL[0]);
@@ -290,12 +250,12 @@ function DetalleCelda({ celda, consulta, acceso, onClose }) {
 
   return (
     <Portal>
-      <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-overlay tes-tema" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         <div className="modal tes-celda-modal" role="dialog" aria-modal="true" aria-label={celda.titulo} style={{ maxWidth: 1000, width: "100%" }}>
           <div className="modal-head">
             <div style={{ minWidth: 0 }}>
               <h3 style={{ margin: 0 }}>{celda.titulo}</h3>
-              {d && <span className="card-sub">{d.cantidad.toLocaleString("es-CO")} movimiento(s) · suman <strong className={d.total < 0 ? "tes-neg" : "tes-pos"}>{d.totalTexto}</strong></span>}
+              {d && <span className="card-sub">{d.cantidad.toLocaleString("es-CO")} pago(s) · suman <strong className={d.total < 0 ? "tes-neg" : "tes-pos"}>{d.totalTexto}</strong></span>}
             </div>
             <button type="button" className="btn-ghost icon-btn" onClick={onClose} aria-label="Cerrar">✕</button>
           </div>
@@ -303,31 +263,31 @@ function DetalleCelda({ celda, consulta, acceso, onClose }) {
             {error && <p className="modal-error">{error}</p>}
             <div className="table-scroll">
               <table className="records tes-tabla">
-                <thead><tr><th>Fecha</th><th>Tipo</th><th>Ítem</th><th>Concepto</th><th>Cuenta</th><th>Paga</th><th>Tercero</th><th style={{ textAlign: "right" }}>Valor</th><th>Estado</th></tr></thead>
+                <thead><tr><th>Vence</th><th>Tipo</th><th>Ítem</th><th>Concepto</th><th>Medio de pago</th><th>Paga</th><th style={{ textAlign: "right" }}>Valor</th><th>Movimientos</th><th>Estado</th></tr></thead>
                 <tbody>
                   {!d && !error && Array.from({ length: 5 }).map((_, i) => <tr key={i} aria-hidden="true"><td colSpan={9}><div className="skeleton-bar" style={{ height: 18, borderRadius: 6 }} /></td></tr>)}
                   {d?.items.map((x) => (
-                    <tr key={`${x.id}-${x.valorConSigno}`} className="clickable" onClick={() => setAbierto(x.id)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setAbierto(x.id)}>
+                    <tr key={x.id} className="clickable" onClick={() => setAbierto(x.id)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setAbierto(x.id)}>
                       <td>{fechaCorta(x.fecha)}{x.fechaAproximada ? " *" : ""}</td>
-                      <td>{tipoTexto(x.tipo)}</td>
+                      <td><TipoPago tipo={x.tipo} /></td>
                       <td><Celda v={x.item} /></td>
                       <td><Celda v={x.concepto} ancha /></td>
-                      <td><Celda v={x.cuentaDestino ? `${x.cuenta} → ${x.cuentaDestino}` : x.cuenta} /></td>
+                      <td>{x.medioPago || <span className="muted">—</span>}</td>
                       <td>{x.pagador || <span className="muted">—</span>}</td>
-                      <td><Celda v={x.tercero} /></td>
-                      <td style={{ textAlign: "right" }} className={x.valorConSigno < 0 ? "tes-neg" : "tes-pos"}><strong>{x.valorConSignoTexto}</strong></td>
-                      <td><EstadoPill mov={x} /></td>
+                      <td style={{ textAlign: "right" }}><Dinero valor={x.valor} texto={x.valorTexto} fuerte /></td>
+                      <td>{x.movimientos ? `${x.movimientos} mov.` : <span className="muted">—</span>}</td>
+                      <td><EstadoPago estado={x.estado} /></td>
                     </tr>
                   ))}
-                  {d && !d.items.length && <tr><td colSpan={9} className="muted" style={{ textAlign: "center", padding: 18 }}>No hay movimientos en esta cifra.</td></tr>}
+                  {d && !d.items.length && <tr><td colSpan={9}><div className="empty compacta">No hay pagos en esta cifra.</div></td></tr>}
                 </tbody>
               </table>
             </div>
-            {d && <Paginacion id="tes-celda-pagesize" page={d.page} size={size} total={d.cantidad} sizes={PAGE_SIZES_MODAL} onPage={setPage} onSize={setSize} etiqueta="movimiento(s)" />}
+            {d && <Paginacion id="tes-celda-pagesize" page={d.page} size={size} total={d.cantidad} sizes={PAGE_SIZES_MODAL} onPage={setPage} onSize={setSize} etiqueta="pago(s)" />}
           </div>
         </div>
       </div>
-      {abierto && cat && <DetalleMovimientoModal id={abierto} cat={cat} puedeRegistrar={!!acceso?.puedeRegistrar} onClose={() => setAbierto(null)} onCambio={() => cargar()} onEditar={() => { window.location.href = "/tesoreria/movimientos"; }} />}
+      {abierto && cat && <DetallePagoModal id={abierto} cat={cat} puedeRegistrar={!!acceso?.puedeRegistrar} onClose={() => setAbierto(null)} onCambio={() => cargar()} />}
     </Portal>
   );
 }

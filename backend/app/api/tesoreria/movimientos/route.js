@@ -6,10 +6,13 @@ import { listMovimientos, crearMovimiento, getMovimiento } from "@/lib/tesoreria
  * /api/tesoreria/movimientos:
  *   get:
  *     tags: [Tesorería]
- *     summary: "Libro de movimientos paginado (q, anio, mes, desde, hasta, cuentaId, itemId, conceptoId, pagadorId, tipo, estado: proyectado|ejecutado|conciliado|porConciliar|sinSoporte, page, size) con totales por moneda ISO 4217."
+ *     summary: "Movimientos de los bancos paginados (q, anio, mes, bancoId, tipo debito|credito, asociacion sin|con|parcial|porAsignar, origen, ids, page, size) con totales."
  *   post:
  *     tags: [Tesorería]
- *     summary: "Registra un movimiento a mano (nivel registro). Valor positivo; el tipo da el signo."
+ *     summary: "Registra un movimiento (nivel registro). Valor positivo; el tipo da el signo. asociaciones opcional: [{ pagoId, valor }]."
  */
 export const GET = conTesoreria("consulta", ({ query }) => listMovimientos(query));
-export const POST = conTesoreria("registro", async ({ user, body }) => getMovimiento((await crearMovimiento(user, body || {})).id));
+export const POST = conTesoreria("registro", async ({ user, body }) => {
+  const m = await crearMovimiento(user, body || {});
+  return { ...(await getMovimiento(m.id)), avisoAsociacion: m.avisoAsociacion || null };
+});

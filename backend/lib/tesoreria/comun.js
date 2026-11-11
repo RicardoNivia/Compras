@@ -82,3 +82,30 @@ export async function exigirMesAbierto(fecha) {
   const c = await prisma.cierreMes.findUnique({ where: { anio_mes: { anio, mes } }, select: { firmadoPorNombre: true } });
   if (c) throw badRequest(`El cierre de ${String(mes).padStart(2, "0")}/${anio} ya está firmado${c.firmadoPorNombre ? ` por ${c.firmadoPorNombre}` : ""}: ese mes es de solo lectura. Registra el ajuste en un mes abierto.`);
 }
+
+// ---------- Pagos programados (los códigos de la columna INGRESO/EGRESO del Excel) ----------
+// Códigos de la columna INGRESO/EGRESO: I ingreso, E egreso, J jornal, S saldo, T traslado entre cuentas.
+// I, E y J suman en ingresos y egresos (J según su signo: positivo entra, negativo sale); S y T se registran pero no suman.
+export const TIPOS_PAGO = { I: "Ingreso", E: "Egreso", J: "Jornal", S: "Saldo", T: "Traslado" };
+export const TIPOS_QUE_SUMAN = ["I", "E", "J"];
+// Un pago cuenta como ingreso o egreso por su tipo; el jornal (J) por su signo.
+export const esIngreso = (p) => p.tipo === "I" || (p.tipo === "J" && Number(p.valor) > 0);
+export const esEgreso = (p) => p.tipo === "E" || (p.tipo === "J" && Number(p.valor) < 0);
+export const ESTADOS_PAGO = { P: "Pendiente", E: "Pagado" };
+export const PERIODICIDADES = { quincenal: "Quincenal", mensual: "Mensual", bimestral: "Bimestral", trimestral: "Trimestral", semestral: "Semestral", anual: "Anual" };
+export const PASO_MESES = { quincenal: 1, mensual: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
+
+// Valor con el signo del Excel: egreso negativo; I, J y S positivos; T conserva el signo que trae (sale − / entra +).
+export function valorConSigno(tipo, valor, signoTraslado = null) {
+  const v = Math.abs(Number(valor) || 0);
+  if (tipo === "E") return -v;
+  if (tipo === "T") return (signoTraslado ?? (Number(valor) < 0 ? -1 : 1)) < 0 ? -v : v;
+  return v;
+}
+
+export const redondear = (n) => Math.round((Number(n) || 0) * 100) / 100;
+export const ultimoDia = (anio, mes) => new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+export const fechaDe = (anio, mes, dia) => `${anio}-${String(mes).padStart(2, "0")}-${String(Math.min(Math.max(1, dia), ultimoDia(anio, mes))).padStart(2, "0")}`;
+export function sumarDias(fecha, dias) {
+  return new Date(Date.parse(`${fecha}T00:00:00Z`) + dias * 86400000).toISOString().slice(0, 10);
+}

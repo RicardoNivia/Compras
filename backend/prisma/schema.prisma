@@ -339,7 +339,7 @@ model Maestro {
   valor           String
   userId          String? // solo para tipo="responsable": id del User al que está atado este valor (sin FK, igual que el resto de este modelo — ver lib/maestros.js). null para los demás tipos.
   aplicaEstrellas Int? // solo para tipo="causaCalificacion": a qué cantidad de estrellas (1..4) aplica esta causa — null para los demás tipos.
-  lider           String?  // solo para tipo="areaParticipante" (Bienestar): nombre del líder del área, opcional; se muestra en la participación por área.
+  lider           String? // solo para tipo="areaParticipante" (Bienestar): nombre del líder del área, opcional; se muestra en la participación por área.
   activo          Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1053,40 +1053,82 @@ model SolicitudProveedorCorreo {
   @@map("solicitudes_proveedor_correo")
 }
 
-// ===================== Tesorería (flujo de caja, soportes, conciliación y cierre) =====================
-// Módulo aparte de Compras y Bienestar (ver lib/tesoreria/*). Tiene finanzas personales y patrimoniales, así que el
-// acceso es NOMINAL (AccesoTesoreria), no por rol: ser admin del panel no da acceso. Valores siempre positivos: el tipo
-// da el signo (ingreso suma, egreso resta, traslado mueve entre cuentas propias sin afectar el flujo).
+// ===================== Tesorería (bancos, movimientos, gastos periódicos y pagos programados) =====================
+// Reemplaza el Excel «Flujo de Caja»: cada pestaña de banco es un BancoTesoreria con sus movimientos (MovimientoBanco),
+// «Detalle 2026» son los pagos programados del año (PagoProgramado, estado P pendiente / E pagado) y los que se repiten
+// nacen de un GastoPeriodico. Un movimiento se asocia a uno o varios pagos indicando cuánto va a cada uno
+// (AsociacionPago); al asociarlo, el pago pasa a E y muestra la diferencia si los valores no coinciden.
+// Acceso por rol en la Matriz (verTesoreria / registrarTesoreria / firmarTesoreria), ver lib/tesoreria/comun.js.
 
-model AccesoTesoreria {
+// Banco (una pestaña de movimientos del Excel: «Mvto Banco Andino», «Mvto Pacificorp»…).
+model BancoTesoreria {
   id              Int      @id @default(autoincrement())
-  userId          String   @unique
-  userNombre      String
-  nivel           String // "consulta" | "registro" | "firma" (firma = además concilia, firma el cierre y administra accesos y maestros)
+  nombre          String   @unique
+  numeroCuenta    String?
+  moneda          String   @default("COP") // ISO 4217
+  formatoExtracto String? // "avvillas" | "credicorp" | "generico" | null (detectar)
+  activo          Boolean  @default(true)
   createdAt       DateTime @default(now())
   creadoPorUserId String?
   creadoPorNombre String?
   updatedAt       DateTime @updatedAt
 
-  @@map("tesoreria_accesos")
+  movimientos      MovimientoBanco[]
+  saldosIniciales  SaldoInicialBanco[]
+  saldosReportados SaldoReportadoBanco[]
+
+  @@map("tesoreria_bancos")
 }
 
-// Catálogos del módulo: cuenta (medio de pago), ítem (inmueble, oficinas, impuestos…), concepto y pagador.
-model CuentaTesoreria {
-  id                Int      @id @default(autoincrement())
-  nombre            String   @unique
-  tipo              String   @default("ahorros") // ahorros | inversion | tarjeta | efectivo | otro
-  moneda            String   @default("COP") // código ISO 4217 (COP, USD, EUR…)
-  formatoExtracto   String? // "avvillas" | "credicorp" | null (sin importador)
-  saldoInicial      Decimal  @default(0) @db.Decimal(18, 2)
-  saldoInicialFecha String? // AAAA-MM-DD desde el que cuenta el saldo inicial
-  activo            Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  creadoPorUserId   String?
-  creadoPorNombre   String?
-  updatedAt         DateTime @updatedAt
+// Saldo inicial de enero de cada banco y año (lo digita la persona; con él se calcula el saldo de cada mes).
+model SaldoInicialBanco {
+  id              Int            @id @default(autoincrement())
+  bancoId         Int
+  banco           BancoTesoreria @relation(fields: [bancoId], references: [id], onDelete: Cascade)
+  anio            Int
+  valor           Decimal        @db.Decimal(18, 2)
+  createdAt       DateTime       @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime       @updatedAt
 
-  @@map("tesoreria_cuentas")
+  @@unique([bancoId, anio])
+  @@map("tesoreria_saldos_iniciales")
+}
+
+// Saldo que el propio banco reporta (filas SALDO INICIAL / SALDO FINAL de la pestaña del banco): sirve para cuadrar el
+// saldo calculado. No es un movimiento.
+model SaldoReportadoBanco {
+  id              Int            @id @default(autoincrement())
+  bancoId         Int
+  banco           BancoTesoreria @relation(fields: [bancoId], references: [id], onDelete: Cascade)
+  anio            Int
+  mes             Int
+  tipo            String // "inicial" | "final"
+  valor           Decimal        @db.Decimal(18, 2)
+  texto           String? // lo que decía la fila («SALDO FINAL ENERO»)
+  fecha           String? // AAAA-MM-DD del saldo (extracto parcial: el día hasta el que llega); null = fin del mes
+  clave           String         @unique
+  createdAt       DateTime       @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@index([bancoId, anio, mes])
+  @@map("tesoreria_saldos_reportados")
+}
+
+// Medio de pago de un pago programado (AV Alamos, Distrimax, Pacificorp, Tarjeta crédito, Efectivo…). Independiente
+// de los bancos.
+model MedioPagoTesoreria {
+  id              Int      @id @default(autoincrement())
+  nombre          String   @unique
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("tesoreria_medios_pago")
 }
 
 model ItemTesoreria {
@@ -1116,7 +1158,7 @@ model ConceptoTesoreria {
 
 model PagadorTesoreria {
   id              Int      @id @default(autoincrement())
-  nombre          String   @unique // JPA, SNC, Binoma, POINT, CRM, BNM
+  nombre          String   @unique // RVM, SNC, Distrimax, POINT, CRM, BNM (columna «Paga»)
   activo          Boolean  @default(true)
   createdAt       DateTime @default(now())
   creadoPorUserId String?
@@ -1126,53 +1168,55 @@ model PagadorTesoreria {
   @@map("tesoreria_pagadores")
 }
 
-model MovimientoTesoreria {
-  id                 Int                   @id @default(autoincrement())
-  fecha              String // AAAA-MM-DD
-  fechaAproximada    Boolean               @default(false) // migrado del Excel solo con el mes (día 1)
-  tipo               String // "ingreso" | "egreso" | "traslado"
-  estado             String // "proyectado" | "ejecutado" (conciliado = tiene líneas del extracto enlazadas)
-  valor              Decimal               @db.Decimal(18, 2) // siempre positivo
-  moneda             String                @default("COP") // código ISO 4217: el de la cuenta
-  cuentaId           Int // cuenta (origen si es traslado)
-  cuentaDestinoId    Int? // solo traslados
-  itemId             Int?
-  conceptoId         Int?
-  concepto           String // snapshot del nombre del concepto
-  pagadorId          Int?
-  tercero            String?
-  referencia         String? // CUS, número de aprobación, factura…
-  observacion        String?
-  origen             String                @default("manual") // manual | soporte | extracto | importacion | recurrente
-  recurrenciaId      Int? // el pago recurrente que generó este proyectado
-  recurrencia        RecurrenciaTesoreria? @relation(fields: [recurrenciaId], references: [id], onDelete: SetNull)
-  periodoRecurrencia String? // AAAA-MM del periodo que cubre (uno por recurrente y periodo)
-  claveImportacion   String?               @unique // huella de la fila del Excel importado: volver a importar no duplica (lib/tesoreria/importadorExcel.js)
-  createdAt          DateTime              @default(now())
-  creadoPorUserId    String?
-  creadoPorNombre    String?
-  updatedAt          DateTime              @updatedAt
-  soportes           SoporteMovimiento[]
-  lineas             LineaExtracto[]
+// Movimiento real del banco. Formulario único que junta las columnas de todas las pestañas de banco: las comunes
+// (tipo débito/crédito, fecha, descripción, valor, concepto libre, tercero, observación) y las propias de algunos
+// bancos (tipo de carga, tipo de solicitud, preparador, formato). Valor siempre positivo: el tipo da el signo.
+model MovimientoBanco {
+  id                  Int                      @id @default(autoincrement())
+  bancoId             Int
+  banco               BancoTesoreria           @relation(fields: [bancoId], references: [id], onDelete: Restrict)
+  tipo                String // "debito" (sale) | "credito" (entra)
+  fecha               String // AAAA-MM-DD
+  fechaAproximada     Boolean                  @default(false) // la fila del Excel tenía la fecha dañada: se tomó el mes
+  descripcion         String
+  valor               Decimal                  @db.Decimal(18, 2)
+  moneda              String                   @default("COP")
+  concepto            String? // texto libre (lo que la persona escribía en la columna Concepto)
+  tercero             String? // «Nombre» en Pacificorp
+  observacion         String?
+  referencia          String?
+  tipoCarga           String?
+  tipoSolicitud       String?
+  preparador          String?
+  formato             String?
+  origen              String                   @default("manual") // manual | importacion | extracto
+  claveImportacion    String?                  @unique // huella: volver a subir la plantilla o el extracto no duplica
+  extractoId          Int? // el extracto que lo trajo o que lo confirmó
+  verificadoAt        DateTime? // el banco lo confirmó (vino del extracto o de la plantilla, o se confirmó a mano en Conciliación)
+  verificadoPorNombre String?
+  createdAt           DateTime                 @default(now())
+  creadoPorUserId     String?
+  creadoPorNombre     String?
+  updatedAt           DateTime                 @updatedAt
+  soportes            SoporteMovimiento[]
+  asociaciones        AsociacionPago[]
+  propuestas          PropuestaPagoTesoreria[]
 
-  @@unique([recurrenciaId, periodoRecurrencia])
+  @@index([bancoId, fecha])
   @@index([fecha])
-  @@index([cuentaId, fecha])
-  @@index([estado])
-  @@map("tesoreria_movimientos")
+  @@map("tesoreria_movimientos_banco")
 }
 
 model SoporteMovimiento {
-  id              Int                 @id @default(autoincrement())
+  id              Int             @id @default(autoincrement())
   movimientoId    Int
-  movimiento      MovimientoTesoreria @relation(fields: [movimientoId], references: [id], onDelete: Cascade)
+  movimiento      MovimientoBanco @relation(fields: [movimientoId], references: [id], onDelete: Cascade)
   nombre          String
   tipoMime        String
   tamano          Int
   sha1            String
   contenido       Bytes
-  datosLeidos     String? // JSON: lo que leyó Nova
-  createdAt       DateTime            @default(now())
+  createdAt       DateTime        @default(now())
   creadoPorUserId String?
   creadoPorNombre String?
 
@@ -1180,15 +1224,142 @@ model SoporteMovimiento {
   @@map("tesoreria_soportes")
 }
 
-// Una importación del extracto de una cuenta y sus líneas.
+// Gasto (o ingreso) que se repite: genera sus pagos programados en P desde el mes en curso hasta su fecha fin o hasta
+// diciembre del año actual («Replicar pagos» llena el año siguiente). Desactivado deja de generar.
+model GastoPeriodico {
+  id              Int              @id @default(autoincrement())
+  tipo            String // I ingreso | E egreso | J | S saldo | T traslado (los códigos del Excel)
+  itemId          Int?
+  conceptoId      Int
+  medioPagoId     Int?
+  pagadorId       Int?
+  valor           Decimal          @db.Decimal(18, 2) // con el signo del Excel (egreso negativo)
+  moneda          String           @default("COP")
+  periodicidad    String // quincenal | mensual | bimestral | trimestral | semestral | anual
+  diaCorte        Int // 1-31 (en meses más cortos, el último día); quincenal: y 15 días después
+  fechaInicio     String // AAAA-MM-DD
+  fechaFin        String? // AAAA-MM-DD; null = hasta diciembre del año en curso (y lo que se replique)
+  activo          Boolean          @default(true)
+  observacion     String?
+  createdAt       DateTime         @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime         @updatedAt
+  pagos           PagoProgramado[]
+
+  @@map("tesoreria_gastos_periodicos")
+}
+
+// Pago programado (una fila de «Detalle 2026»). Nace en P; pasa a E al asociarle movimientos o a mano (sin soporte).
+model PagoProgramado {
+  id               Int                      @id @default(autoincrement())
+  anio             Int
+  mes              Int
+  fecha            String // AAAA-MM-DD de vencimiento
+  fechaAproximada  Boolean                  @default(false) // del Excel solo se sabía el mes
+  tipo             String // I | E | J | S | T
+  estado           String                   @default("P") // P pendiente | E pagado
+  estadoPor        String? // "asociacion" | "manual" | "importacion"
+  itemId           Int?
+  conceptoId       Int
+  concepto         String // snapshot del nombre
+  medioPagoId      Int?
+  pagadorId        Int?
+  valor            Decimal                  @db.Decimal(18, 2) // con signo (egreso negativo, como en el Excel)
+  moneda           String                   @default("COP")
+  observacion      String?
+  gastoPeriodicoId Int?
+  gastoPeriodico   GastoPeriodico?          @relation(fields: [gastoPeriodicoId], references: [id], onDelete: SetNull)
+  periodo          String? // AAAA-MM (o AAAA-MM-Q2 la segunda quincena): uno por gasto y periodo
+  origen           String                   @default("manual") // manual | periodico | importacion | ia
+  claveImportacion String?                  @unique
+  createdAt        DateTime                 @default(now())
+  creadoPorUserId  String?
+  creadoPorNombre  String?
+  updatedAt        DateTime                 @updatedAt
+  asociaciones     AsociacionPago[]
+  propuestas       PropuestaPagoTesoreria[]
+
+  @@unique([gastoPeriodicoId, periodo])
+  @@index([anio, mes])
+  @@index([estado])
+  @@map("tesoreria_pagos_programados")
+}
+
+// Movimiento ↔ pago (varios a varios): cuánto del movimiento va a ese pago.
+model AsociacionPago {
+  id              Int             @id @default(autoincrement())
+  movimientoId    Int
+  movimiento      MovimientoBanco @relation(fields: [movimientoId], references: [id], onDelete: Cascade)
+  pagoId          Int
+  pago            PagoProgramado  @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+  valor           Decimal         @db.Decimal(18, 2) // positivo
+  origen          String          @default("manual") // manual | agente
+  createdAt       DateTime        @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@unique([movimientoId, pagoId])
+  @@index([pagoId])
+  @@map("tesoreria_asociaciones")
+}
+
+// Propuesta del agente de asociación (lib/tesoreria/agenteAsociacion.js): nunca asocia solo, la persona acepta.
+model PropuestaPagoTesoreria {
+  id                Int             @id @default(autoincrement())
+  movimientoId      Int
+  movimiento        MovimientoBanco @relation(fields: [movimientoId], references: [id], onDelete: Cascade)
+  pagoId            Int
+  pago              PagoProgramado  @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+  valor             Decimal         @db.Decimal(18, 2)
+  confianza         String // alta | media | baja
+  motivo            String
+  estado            String          @default("pendiente") // pendiente | aceptada | descartada
+  agente            String          @default("movimientos") // movimientos (movimiento → pago) | pagos (pago → movimiento)
+  resueltoPorNombre String?
+  resueltoAt        DateTime?
+  createdAt         DateTime        @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+
+  @@unique([movimientoId, pagoId])
+  @@index([estado])
+  @@map("tesoreria_propuestas_pago")
+}
+
+// Lo que no cuadró al importar (valores en 0, fechas dañadas, saldos del Excel por registrar…). Sale en Mi día hasta
+// que alguien lo marca como revisado.
+model AlertaTesoreria {
+  id                Int       @id @default(autoincrement())
+  tipo              String // valorCero | fechaDanada | saldoInicial | otro
+  mensaje           String
+  refTipo           String? // pago | movimiento | banco
+  refId             Int?
+  resuelta          Boolean   @default(false)
+  resueltaPorNombre String?
+  resueltaAt        DateTime?
+  clave             String?   @unique // no repetir la misma alerta al volver a importar
+  createdAt         DateTime  @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+
+  @@index([resuelta])
+  @@map("tesoreria_alertas")
+}
+
+// Extracto subido para registrar movimientos (registro de la carga).
 model ExtractoBancario {
   id              Int      @id @default(autoincrement())
-  cuentaId        Int
+  bancoId         Int
   archivo         String
+  formato         String?
   desde           String?
   hasta           String?
-  lineasNuevas    Int      @default(0)
-  lineasRepetidas Int      @default(0)
+  saldoInicial    Decimal? @db.Decimal(18, 2) // lo que dice el extracto
+  saldoFinal      Decimal? @db.Decimal(18, 2)
+  nuevos          Int      @default(0)
+  repetidos       Int      @default(0)
+  pendientes      String? // JSON: líneas que no se aprobaron al subirlo (la conciliación las ofrece)
   createdAt       DateTime @default(now())
   creadoPorUserId String?
   creadoPorNombre String?
@@ -1196,46 +1367,16 @@ model ExtractoBancario {
   @@map("tesoreria_extractos")
 }
 
-model LineaExtracto {
-  id                Int                  @id @default(autoincrement())
-  cuentaId          Int
-  extractoId        Int?
-  fecha             String // AAAA-MM-DD
-  descripcion       String
-  tercero           String?
-  valor             Decimal              @db.Decimal(18, 2) // con signo: + entra, − sale
-  clave             String // huella para no importar dos veces la misma línea
-  etiqueta          String? // concepto que alguien le puso a mano en el Excel
-  movimientoId      Int?
-  movimiento        MovimientoTesoreria? @relation(fields: [movimientoId], references: [id], onDelete: SetNull)
-  comoSeEnlazo      String? // "exacto" | "manual" | "creado"
-  enlazadoAt        DateTime?
-  enlazadoPorNombre String?
-  ignorada          Boolean              @default(false) // saldos u otras filas que no son movimientos
-  createdAt         DateTime             @default(now())
-  creadoPorUserId   String?
-  creadoPorNombre   String?
-
-  @@unique([cuentaId, clave])
-  @@index([cuentaId, fecha])
-  @@index([movimientoId])
-  @@map("tesoreria_lineas_extracto")
-}
-
-// "La descripción del banco contiene X → concepto Y": aprendida del Excel y de cada movimiento creado desde el extracto.
-model ReglaClasificacion {
+// Años de Tesorería creados a mano («Crear otro año» en Gastos periódicos). Los años con datos y los de por defecto
+// (hasta 2028) no necesitan fila: esta tabla solo guarda los que la persona agregó, aunque los deje en blanco.
+model AnioTesoreria {
   id              Int      @id @default(autoincrement())
-  patron          String   @unique // texto normalizado que debe contener la descripción
-  conceptoId      Int
-  itemId          Int?
-  pagadorId       Int?
-  usos            Int      @default(0)
+  anio            Int      @unique
   createdAt       DateTime @default(now())
   creadoPorUserId String?
   creadoPorNombre String?
-  updatedAt       DateTime @updatedAt
 
-  @@map("tesoreria_reglas")
+  @@map("tesoreria_anios")
 }
 
 model CierreMes {
@@ -1251,36 +1392,6 @@ model CierreMes {
 
   @@unique([anio, mes])
   @@map("tesoreria_cierres")
-}
-
-// Pago recurrente de Tesorería (arriendo, administración, servicios, nómina, tarjeta…): genera solo el proyectado de cada
-// periodo (lib/tesoreria/recurrentes.js). Cuando llega el soporte o la línea del extracto, ese proyectado pasa a
-// ejecutado. Si el valor es variable (servicios), el proyectado lleva el estimado y se corrige con el valor real.
-model RecurrenciaTesoreria {
-  id              Int                   @id @default(autoincrement())
-  nombre          String
-  tipo            String // "ingreso" | "egreso" | "traslado"
-  valor           Decimal               @db.Decimal(18, 2) // positivo; estimado si valorVariable
-  valorVariable   Boolean               @default(false)
-  moneda          String                @default("COP") // ISO 4217: la de la cuenta
-  cuentaId        Int
-  cuentaDestinoId Int?
-  itemId          Int?
-  conceptoId      Int
-  pagadorId       Int?
-  tercero         String?
-  frecuencia      String                @default("mensual") // mensual | bimestral | trimestral | semestral | anual
-  diaDelMes       Int // 1-31 (en meses más cortos, el último día)
-  desde           String // AAAA-MM-DD: primer periodo
-  hasta           String? // AAAA-MM-DD: último periodo (null = sin fin)
-  activo          Boolean               @default(true)
-  createdAt       DateTime              @default(now())
-  creadoPorUserId String?
-  creadoPorNombre String?
-  updatedAt       DateTime              @updatedAt
-  movimientos     MovimientoTesoreria[]
-
-  @@map("tesoreria_recurrencias")
 }
 
 // Inventario (bodega) de Bienestar: los artículos que hay en bodega para las actividades. Cada fila es un lote (el

@@ -1,5 +1,6 @@
 "use client";
 
+import BotonExcel from "@/components/BotonExcel";
 import { useEffect, useState } from "react";
 
 export const PAGE_SIZES = [25, 50, 100];
@@ -16,7 +17,8 @@ export function usePagina(filas, clave = "", inicial = PAGE_SIZES[0]) {
   return { pageSize, setPageSize, setPage, totalPages, currentPage, pagina: filas.slice((currentPage - 1) * pageSize, currentPage * pageSize) };
 }
 
-export default function PiePagina({ id, p, total, etiqueta, tamanos = PAGE_SIZES }) {
+// excel (opcional): { nombre, hoja, columnas, filas } para «Exportar a Excel» con todas las filas del filtro.
+export default function PiePagina({ id, p, total, etiqueta, tamanos = PAGE_SIZES, excel = null }) {
   return (
     <div className="table-footer">
       <div className="field" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -31,6 +33,7 @@ export default function PiePagina({ id, p, total, etiqueta, tamanos = PAGE_SIZES
       </div>
       <span className="count-note">Página {p.currentPage} de {p.totalPages}</span>
       <div className="spacer" />
+      {excel && <BotonExcel {...excel} deshabilitado={!excel.filas?.length} />}
       <span className="count-note">{total} {etiqueta}</span>
     </div>
   );

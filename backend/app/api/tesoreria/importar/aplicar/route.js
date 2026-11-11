@@ -1,11 +1,18 @@
-import { conTesoreria } from "@/lib/tesoreria/ruta";
-import { aplicarExcel } from "@/lib/tesoreria/importarExcelApp";
+import { conTesoreria, archivoDe } from "@/lib/tesoreria/ruta";
+import { aplicarPlantilla } from "@/lib/tesoreria/importarPlantilla";
 
 /**
  * @openapi
  * /api/tesoreria/importar/aplicar:
  *   post:
  *     tags: [Tesorería]
- *     summary: "Carga la plantilla analizada ({ token, modo: agregar | reemplazar }). Agregar: crea lo nuevo y pasa a ejecutado lo que cambió (no duplica). Reemplazar: borra antes todo lo de Tesorería (solo firma)."
+ *     summary: "Carga la plantilla con lo que la persona confirmó (multipart: archivo + decisiones JSON { bancos, pagos, periodicos, diaCorteDefecto }). Idempotente (nivel registro)."
  */
-export const POST = conTesoreria("registro", ({ user, acceso, body }) => aplicarExcel(user, acceso, body || {}));
+export const POST = conTesoreria("registro", async ({ request, user }) => {
+  const form = await request.formData();
+  const archivo = await archivoDe(form);
+  if (!archivo) throw Object.assign(new Error("Adjunta la plantilla de Excel."), { status: 400 });
+  let decisiones = {};
+  try { decisiones = JSON.parse(String(form.get("decisiones") || "{}")); } catch { throw Object.assign(new Error("Las decisiones no son válidas."), { status: 400 }); }
+  return aplicarPlantilla(user, archivo.buffer, archivo.nombre, decisiones);
+});

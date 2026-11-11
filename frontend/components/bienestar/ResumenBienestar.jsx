@@ -141,7 +141,7 @@ export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bi
               color="var(--secondary)"
               onSelect={(d) => onAbrirActividad(d.id)}
             />
-          ) : <p className="count-note">Ninguna actividad del período tiene presupuesto ni compras asociadas.</p>}
+          ) : <div className="empty compacta">Ninguna actividad del período tiene presupuesto ni compras asociadas.</div>}
         </section>
         <section className="resumen-card" aria-labelledby="res-area">
           <h2 id="res-area">Participación por área</h2>
@@ -151,7 +151,7 @@ export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bi
               data={participacion.porArea.slice(0, 10).map((a) => ({ key: a.area, label: a.area, value: a.inscritos, detalle: `${a.asistieron} asistieron (${pct(a.inscritos ? a.asistieron / a.inscritos : null)}) · ${a.noAsistieron} no asistieron` }))}
               formatValue={entero} color="var(--accent)"
             />
-          ) : <p className="count-note">Aún no hay participantes registrados en el período.</p>}
+          ) : <div className="empty compacta">Aún no hay participantes registrados en el período.</div>}
         </section>
       </div>
 
@@ -167,7 +167,7 @@ export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bi
           <h2 id="res-costo">Costo por asistente</h2>
           <p className="card-sub">Actividades con compras asociadas: valor de sus compras ÷ asistentes.</p>
           {costoPorActividad.length === 0 ? (
-            <p className="count-note">Ninguna actividad tiene todavía compras asociadas y asistentes registrados.</p>
+            <div className="empty compacta">Ninguna actividad tiene todavía compras asociadas y asistentes registrados.</div>
           ) : (
             <HBarChartSvg
               data={costoPorActividad.slice(0, 8).map((a) => ({ key: String(a.id), id: a.id, label: a.nombre, value: Math.round(a.costoPorAsistente), detalle: `${fmtCOP(a.gastado)} en ${a.compras} compra(s) · ${a.asistentes} asistentes` }))}
@@ -199,7 +199,7 @@ export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bi
             <button type="button" className="btn small" onClick={onVerActividades}>Ver todas</button>
           </div>
           {proximas.length === 0 ? (
-            <p className="count-note">No hay actividades programadas desde hoy en {periodo}.</p>
+            <div className="empty compacta">No hay actividades programadas desde hoy en {periodo}.</div>
           ) : (
             <div className="table-scroll">
               <table className="plain-table resumen-proximas">
