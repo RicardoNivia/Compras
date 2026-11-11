@@ -140,8 +140,8 @@ button{ font-family: inherit; }
 
 /* ---------- Menú (components/Sidebar.jsx): riel oscuro con los módulos + panel fijo con el menú del módulo ----------
    Los dos son hijos reales de .app-shell con alto 100vh: nunca se desplazan con el contenido (solo .app-main hace
-   scroll). Plegado (.plegado, lo normal), el panel sale del flujo: se abre sobre el contenido al hacer clic en un módulo del
-   riel (.abierto) y se oculta cuando el mouse sale del menú. */
+   scroll). Plegado (.plegado, lo normal), el panel sale del flujo: se descubre sobre el contenido al acercar el mouse al
+   menú (o con clic en un módulo, .abierto) y se oculta cuando el mouse sale. */
 .nav2{ flex:none; display:flex; height:100vh; position:relative; z-index:50; }
 .nav2-rail{ flex:none; width:72px; display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 0; position:relative; z-index:2;
   background:linear-gradient(180deg, var(--rail) 40%, color-mix(in srgb, var(--marca) 32%, var(--rail))); box-shadow:inset -1px 0 0 rgba(255,255,255,0.06); transition:background .4s ease; }
@@ -164,8 +164,25 @@ button{ font-family: inherit; }
 .nav2-panel{ width:248px; display:flex; flex-direction:column; gap:12px; padding:16px 12px 12px; overflow:hidden; white-space:nowrap;
   background:linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--surface) 93%, var(--accent))); border-right:1px solid var(--border);
   box-shadow:10px 0 30px -24px rgba(13,18,40,0.5); transition:opacity .18s ease, transform .18s ease; }
-.nav2.plegado .nav2-panel{ position:absolute; left:72px; top:0; bottom:0; opacity:0; transform:translateX(-14px); pointer-events:none; box-shadow:var(--elev-2); }
-.nav2.plegado.abierto .nav2-panel{ opacity:1; transform:none; pointer-events:auto; }
+/* Plegado: la mecánica del menú de Selvana. El panel conserva su diseño de 248 px y se DESCUBRE encima de la página al
+   acercar el mouse al menú (o con clic en un módulo, o al navegar con el teclado): nada se reacomoda ni se mueve el
+   contenido. Se descubre en 200 ms, con 70 ms de espera para que no se abra al pasar de largo, y las opciones entran
+   escalonadas de arriba abajo; al salir el mouse se recoge de una vez. */
+.nav2.plegado .nav2-panel{ position:absolute; left:72px; top:0; bottom:0; pointer-events:none; clip-path:inset(0 100% 0 0); box-shadow:var(--elev-2);
+  transition:clip-path 200ms cubic-bezier(.2,.8,.2,1); }
+.nav2.plegado:is(:hover, .abierto, :has(:focus-visible)) .nav2-panel{ clip-path:inset(0 -60px 0 0); pointer-events:auto; transition-delay:70ms; }
+.nav2.plegado :is(.nav2-head, .nav2-buscar, .nav2-grupo-titulo, .nav2-link, .nav2-user){ opacity:0; transform:translateX(-12px); animation:none;
+  transition:opacity 140ms ease, transform 220ms cubic-bezier(.2,.8,.2,1), background .15s ease, color .15s ease, box-shadow .15s ease; }
+.nav2.plegado:is(:hover, .abierto, :has(:focus-visible)) :is(.nav2-head, .nav2-buscar, .nav2-grupo-titulo, .nav2-link, .nav2-user){ opacity:1; transform:none;
+  transition-delay:calc(70ms + var(--g, 0ms) + var(--d, 0ms)), calc(70ms + var(--g, 0ms) + var(--d, 0ms)), 0s, 0s, 0s; }
+.nav2-buscar{ --d:25ms; }
+.nav2-grupo > :nth-child(1){ --d:50ms; } .nav2-grupo > :nth-child(2){ --d:75ms; } .nav2-grupo > :nth-child(3){ --d:100ms; } .nav2-grupo > :nth-child(4){ --d:125ms; }
+.nav2-grupo > :nth-child(5){ --d:150ms; } .nav2-grupo > :nth-child(6){ --d:175ms; } .nav2-grupo > :nth-child(n+7){ --d:200ms; }
+.nav2-grupo:nth-child(2){ --g:70ms; } .nav2-grupo:nth-child(n+3){ --g:130ms; }
+.nav2-user{ --d:230ms; }
+@media (prefers-reduced-motion: reduce){
+  .nav2.plegado .nav2-panel, .nav2.plegado :is(.nav2-head, .nav2-buscar, .nav2-grupo-titulo, .nav2-link, .nav2-user){ transition:none; transform:none; }
+}
 .nav2-head{ display:flex; align-items:center; gap:10px; padding:0 4px; flex:none; }
 .nav2-chip{ flex:none; width:36px; height:36px; border-radius:var(--r-s); display:grid; place-items:center; color:#fff;
   background:linear-gradient(135deg, var(--marca), color-mix(in srgb, var(--marca) 55%, var(--marca-2))); box-shadow:0 10px 18px -10px var(--marca), inset 0 1px 0 rgba(255,255,255,0.3); }
@@ -5337,3 +5354,5 @@ table tbody tr:nth-child(5){ animation-delay:.12s; } table tbody tr:nth-child(6)
 
 /* Opciones de los desplegables: color y fondo explícitos (no heredados), para que la lista nunca salga en blanco. */
 select option, select optgroup{ color:var(--ink); background-color:var(--surface); font-family:"Inter", system-ui, "Segoe UI", sans-serif; }
+
+.importar-nova-lectura{ display:flex; flex-direction:column; gap:8px; }
