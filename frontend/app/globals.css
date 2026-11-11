@@ -6063,3 +6063,8 @@ tr.tes-ex-no td{ opacity:.45; text-decoration:line-through; }
 .pg-resumen span{ font-size:12px; color:var(--ink-2); }
 .pg-resumen-v{ font-size:18px !important; font-weight:700; flex:none; }
 @media (max-width: 760px){ .pg-tipos{ grid-template-columns:1fr 1fr; } .pg-grid{ grid-template-columns:1fr; } }
+/* Inventario: pestañas a la izquierda; buscador y filtros en una sola fila a la derecha, misma altura. */
+.inv-barra .inv-filtros{ flex-wrap:nowrap; flex:none; }
+.inv-barra .inv-filtros select{ width:auto; min-width:170px; max-width:220px; min-height:36px; height:36px; padding-top:0; padding-bottom:0; flex:none; }
+.inv-barra .inv-buscar{ height:36px; }
+@media (max-width: 1100px){ .inv-barra .inv-buscar{ flex:1 1 280px; margin-left:0; } .inv-barra .inv-filtros{ flex-wrap:wrap; } }
