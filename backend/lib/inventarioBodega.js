@@ -208,12 +208,40 @@ export async function salidaParaActividad(actividadId, body, actor) {
     if (!art.activo) throw badRequest("Ese artículo está inactivo en la bodega.");
     const existente = await tx.inventarioActividad.findFirst({ where: { actividadId: act.id, articuloId: art.id } });
     const fila = existente
-      ? await tx.inventarioActividad.update({ where: { id: existente.id }, data: { cantidad: existente.cantidad + cantidad, ...(costo != null ? { costoUnitario: costo } : {}) } })
-      : await tx.inventarioActividad.create({ data: { actividadId: act.id, articuloId: art.id, item: art.producto, unidad: art.unidad, cantidad, costoUnitario: costo, observacion: "Salió de la bodega de Bienestar", creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null } });
-    const m = await mover(tx, art.id, { tipo: "salida", delta: -cantidad, actividadId: act.id, inventarioActividadId: fila.id, motivo: `Para la actividad «${act.nombre}»` }, actor);
+      ? await tx.inventarioActividad.update({ where: { id: existente.id }, data: { cantidad: existente.cantidad + cantidad, usado: existente.cantidad + cantidad, ...(costo != null ? { costoUnitario: costo } : {}) } })
+      : await tx.inventarioActividad.create({ data: { actividadId: act.id, articuloId: art.id, item: art.producto, unidad: art.unidad, cantidad, usado: cantidad, costoUnitario: costo, observacion: "Usado de la bodega de Bienestar", creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null } });
+    const m = await mover(tx, art.id, { tipo: "salida", delta: -cantidad, actividadId: act.id, inventarioActividadId: fila.id, motivo: `Usado en la actividad «${act.nombre}»` }, actor);
     return { ...m, fila };
   });
   logInventarioBodega(actor, r.articulo, "salida", resumenMov(r.movimiento, r.articulo)).catch(() => {});
+  return { articulo: toClientArticulo(r.articulo), item: r.fila };
+}
+
+// Corrige cuánto se usó de un artículo de la bodega («Editar cantidad usada» de la ficha). Lo que sale de la bodega es lo
+// usado (cantidad = usado, no se estima antes): si sube, la diferencia sale de la bodega (nunca más de lo que hay, 409);
+// si baja, la diferencia vuelve a la bodega.
+export async function ajustarCantidadDeBodega(actividadId, body, actor) {
+  const act = await actividadEditable(actividadId);
+  const nueva = entero(body?.cantidad, "La cantidad", { min: 1 });
+  const r = await prisma.$transaction(async (tx) => {
+    const fila = await tx.inventarioActividad.findFirst({ where: { id: Number(body?.itemId) || 0, actividadId: act.id } });
+    if (!fila) throw badRequest("Ese ítem no es de esta actividad.", 404);
+    if (!fila.articuloId) throw badRequest("Ese ítem no salió de la bodega.");
+    const delta = nueva - fila.cantidad;
+    if (delta === 0 && fila.usado === nueva) return { sinCambio: true, fila };
+    const actualizada = await tx.inventarioActividad.update({ where: { id: fila.id }, data: { cantidad: nueva, usado: nueva } });
+    if (delta === 0) return { sinCambio: true, fila: actualizada };
+    if (delta > 0) {
+      const art = await tx.articuloInventario.findUnique({ where: { id: fila.articuloId }, select: { producto: true, stock: true } });
+      if (art && delta > art.stock) throw Object.assign(new Error(`No hay suficiente ${art.producto.toLowerCase()}: en la bodega quedan ${art.stock}, así que lo usado puede subir hasta ${fila.cantidad + art.stock}.`), { status: 409 });
+    }
+    const m = delta > 0
+      ? await mover(tx, fila.articuloId, { tipo: "salida", delta: -delta, actividadId: act.id, inventarioActividadId: fila.id, motivo: `Se usó más en la actividad «${act.nombre}» (${fila.cantidad} → ${nueva})` }, actor)
+      : await mover(tx, fila.articuloId, { tipo: "devolucion", delta: -delta, actividadId: act.id, inventarioActividadId: fila.id, motivo: `Se usó menos en la actividad «${act.nombre}» (${fila.cantidad} → ${nueva})` }, actor);
+    return { ...m, fila: actualizada };
+  });
+  if (r.sinCambio) return { item: r.fila, articulo: null };
+  logInventarioBodega(actor, r.articulo, r.movimiento.tipo, resumenMov(r.movimiento, r.articulo)).catch(() => {});
   return { articulo: toClientArticulo(r.articulo), item: r.fila };
 }
 

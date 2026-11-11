@@ -51,7 +51,7 @@ async function idPorNombre(modelo, texto) {
 }
 
 export async function ejecutarTesoreria(name, args, user) {
-  if (!user || !(await accesoDe(user.id))) return { error: "Esta persona no tiene acceso a Tesorería." };
+  if (!user || !(await accesoDe(user))) return { error: "Esta persona no tiene acceso a Tesorería." };
   switch (name) {
     case "resumen_tesoreria": {
       const r = await resumenTesoreria({ anio: args.anio, mes: args.mes });

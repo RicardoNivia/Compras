@@ -13,18 +13,21 @@ function badRequest(message, status = 400) {
   return err;
 }
 
+// El inventario de una actividad registra UN número: lo que se usó (cantidad = usado). Las filas antiguas que traían
+// cantidad y usado distintos se muestran por lo usado.
 export function toClientItem(i) {
   const sobrante = i.usado == null ? null : Math.max(0, i.cantidad - i.usado);
+  const usado = i.usado ?? i.cantidad;
   return {
     id: i.id,
     actividadId: i.actividadId,
     item: i.item,
     unidad: i.unidad,
     cantidad: i.cantidad,
-    usado: i.usado,
+    usado,
     sobrante,
     costoUnitario: i.costoUnitario,
-    costoTotal: i.costoUnitario != null ? i.costoUnitario * i.cantidad : null,
+    costoTotal: i.costoUnitario != null ? i.costoUnitario * usado : null,
     costoSobrante: i.costoUnitario != null && sobrante != null ? i.costoUnitario * sobrante : null,
     recordId: i.recordId,
     articuloId: i.articuloId ?? null, // salió de la bodega de Bienestar (se puede devolver lo que sobre)
@@ -65,8 +68,12 @@ function leerItem(body, { parcial = false } = {}) {
     if (!data.item) throw badRequest("Escribe qué es el ítem.");
   }
   if (viene("unidad")) data.unidad = String(body.unidad ?? "").trim().slice(0, 40) || null;
-  if (viene("cantidad")) data.cantidad = num(body.cantidad, "La cantidad", { obligatorio: true });
-  if (viene("usado")) data.usado = num(body.usado, "Lo usado");
+  // Un solo número: lo usado (llega como usado o como cantidad) y se guarda en los dos campos.
+  if (!parcial || "usado" in body || "cantidad" in body) {
+    const n = num(body.usado ?? body.cantidad, "La cantidad usada", { obligatorio: true });
+    data.cantidad = n;
+    data.usado = n;
+  }
   if (viene("costoUnitario")) data.costoUnitario = num(body.costoUnitario, "El costo unitario");
   if (viene("recordId")) data.recordId = body.recordId ? String(body.recordId) : null;
   if (viene("observacion")) data.observacion = String(body.observacion ?? "").trim().slice(0, 500) || null;
@@ -83,7 +90,6 @@ export async function crearItem(actividadId, body, actor) {
   const a = await actividadEditable(actividadId);
   const data = leerItem(body || {});
   Object.assign(data, await unidadDelCatalogo(data.unidad));
-  if (data.usado != null && data.usado > data.cantidad) throw badRequest("Lo usado no puede ser más que la cantidad.");
   const row = await prisma.inventarioActividad.create({ data: { ...data, actividadId: a.id, creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null } });
   logInventario(actor, a, "crear", `${row.item}: ${row.cantidad}${row.unidad ? ` ${row.unidad}` : ""}`).catch(() => {});
   return toClientItem(row);
@@ -94,14 +100,11 @@ export async function actualizarItem(actividadId, id, body, actor) {
   const before = await prisma.inventarioActividad.findFirst({ where: { id: Number(id), actividadId: a.id } });
   if (!before) throw badRequest("Ítem no encontrado.", 404);
   const data = leerItem(body || {}, { parcial: true });
-  // Lo que salió de la bodega solo cambia su cantidad con «Sacar de bodega» o «Devolver»: si no, la bodega se descuadra.
-  if (before.articuloId && "cantidad" in data && data.cantidad !== before.cantidad) throw badRequest("Este ítem salió de la bodega: para cambiar la cantidad, saca más de la bodega o devuelve lo que sobró.");
+  // Lo que salió de la bodega cambia su cantidad con «Editar cantidad» (ajustarCantidadDeBodega, que mueve la bodega): si no, se descuadra.
+  if (before.articuloId && "cantidad" in data && data.cantidad !== before.cantidad) throw badRequest("Este ítem salió de la bodega: cambia su cantidad con «Editar cantidad», así la bodega queda cuadrada.");
   if ("unidad" in data) Object.assign(data, await unidadDelCatalogo(data.unidad));
-  const cantidad = data.cantidad ?? before.cantidad;
-  const usado = "usado" in data ? data.usado : before.usado;
-  if (usado != null && usado > cantidad) throw badRequest("Lo usado no puede ser más que la cantidad.");
   const row = await prisma.inventarioActividad.update({ where: { id: before.id }, data });
-  logInventario(actor, a, "editar", `${row.item}: usado ${row.usado ?? "—"} de ${row.cantidad}`).catch(() => {});
+  logInventario(actor, a, "editar", `${row.item}: se usaron ${row.usado ?? row.cantidad}`).catch(() => {});
   return toClientItem(row);
 }
 
@@ -109,9 +112,10 @@ export async function eliminarItem(actividadId, id, actor) {
   const a = await actividadEditable(actividadId);
   const row = await prisma.inventarioActividad.findFirst({ where: { id: Number(id), actividadId: a.id } });
   if (!row) throw badRequest("Ítem no encontrado.", 404);
-  // Si salió de la bodega, lo que no se usó vuelve a la bodega al quitarlo de la actividad.
-  const vuelve = row.articuloId ? Math.max(0, Math.floor(row.cantidad - (row.usado ?? 0))) : 0;
+  // Si salió de la bodega, quitarlo de la actividad es decir que no se usó: toda su cantidad vuelve a la bodega.
+  const vuelve = row.articuloId ? Math.max(0, Math.floor(row.cantidad)) : 0;
   if (vuelve > 0) {
+    await prisma.inventarioActividad.update({ where: { id: row.id }, data: { usado: null } });
     await devolverABodega(a.id, { itemId: row.id, cantidad: vuelve }, actor);
   }
   await prisma.inventarioActividad.delete({ where: { id: row.id } });
@@ -130,13 +134,13 @@ export async function importarInventario(actividadId, buffer, actor) {
   let creados = 0, actualizados = 0;
   for (const f of filas) {
     if (f.unidad) Object.assign(f, await cat.unidad(f.unidad));
-    const usado = f.usado != null ? Math.min(f.usado, f.cantidad) : null;
+    const usado = f.usado != null ? f.usado : f.cantidad; // un solo número: lo usado (si no trae, la cantidad)
     const actual = porItem.get(f.item.toLowerCase());
     if (actual) {
-      await prisma.inventarioActividad.update({ where: { id: actual.id }, data: { cantidad: f.cantidad, unidad: f.unidad ?? actual.unidad, unidadId: f.unidadId ?? actual.unidadId, costoUnitario: f.costoUnitario ?? actual.costoUnitario, usado: usado ?? actual.usado } });
+      await prisma.inventarioActividad.update({ where: { id: actual.id }, data: { cantidad: usado, unidad: f.unidad ?? actual.unidad, unidadId: f.unidadId ?? actual.unidadId, costoUnitario: f.costoUnitario ?? actual.costoUnitario, usado } });
       actualizados++;
     } else {
-      await prisma.inventarioActividad.create({ data: { actividadId: a.id, item: f.item, cantidad: f.cantidad, unidad: f.unidad, unidadId: f.unidadId || null, costoUnitario: f.costoUnitario, usado, creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null } });
+      await prisma.inventarioActividad.create({ data: { actividadId: a.id, item: f.item, cantidad: usado, unidad: f.unidad, unidadId: f.unidadId || null, costoUnitario: f.costoUnitario, usado, creadoPorUserId: actor?.id || null, creadoPorNombre: actor?.nombre || null } });
       creados++;
     }
   }

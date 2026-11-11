@@ -10,6 +10,7 @@ import { EsqueletoTabla } from "@/components/bienestar/Esqueletos";
 import { IconPlus, IconEdit, IconHistory } from "@/components/icons";
 
 const BODEGAS = [["bodega", "Bodega"], ["sst", "SST"], ["aseo", "Desechables y aseo"]];
+const NOMBRE_BODEGA = Object.fromEntries(BODEGAS);
 const num = (n) => Number(n || 0).toLocaleString("es-CO");
 const fecha = (iso) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" }) : "—");
 
@@ -39,6 +40,11 @@ const FILTROS = {
 // Inventario (bodega) de Bienestar: artículos por bodega con su stock, mínimo y vencimiento. Cada cambio del stock es
 // un movimiento (entrada, salida, ajuste por conteo) y queda en el historial del artículo; las compras de Compras lo
 // alimentan y las actividades lo consumen desde su ficha.
+const sinTildes = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+const IconoLupa = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+);
+
 export default function InventarioBodegaView({ puedeEditar }) {
   const [articulos, setArticulos] = useState(null);
   const [error, setError] = useState("");
@@ -57,10 +63,14 @@ export default function InventarioBodegaView({ puedeEditar }) {
   useEffect(() => { if (!aviso) return undefined; const t = setTimeout(() => setAviso(""), 3500); return () => clearTimeout(t); }, [aviso]);
 
   const deBodega = useMemo(() => (articulos || []).filter((a) => a.bodega === bodega), [articulos, bodega]);
+  // Buscador: con texto busca en las TRES bodegas (sin tildes ni mayúsculas, cada palabra por separado) y cada fila dice
+  // de qué bodega es; sin texto se ve solo la bodega de la pestaña.
+  const terminos = useMemo(() => sinTildes(q).split(/\s+/).filter(Boolean), [q]);
+  const buscando = terminos.length > 0;
   const filtradas = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    return deBodega.filter((a) => FILTROS[filtro](a) && (!t || `${a.producto} ${a.referencia || ""}`.toLowerCase().includes(t)));
-  }, [deBodega, filtro, q]);
+    const base = buscando ? articulos || [] : deBodega;
+    return base.filter((a) => FILTROS[filtro](a) && (!buscando || terminos.every((t) => sinTildes(`${a.producto} ${a.referencia || ""} ${a.unidad || ""} ${NOMBRE_BODEGA[a.bodega] || ""}`).includes(t))));
+  }, [articulos, deBodega, filtro, terminos, buscando]);
   const pag = usePagina(filtradas, `${bodega}|${filtro}|${q}`);
   const maxStock = Math.max(1, ...deBodega.map((a) => Math.max(a.stock, a.minimo || 0)));
   const lotes = useMemo(() => {
@@ -104,7 +114,11 @@ export default function InventarioBodegaView({ puedeEditar }) {
               </button>
             ))}
           </div>
-          <input className="inv-buscar" type="search" aria-label="Buscar artículo" placeholder="Buscar artículo o referencia" value={q} onChange={(e) => setQ(e.target.value)} />
+          <label className="inv-buscar">
+            <IconoLupa />
+            <input type="search" aria-label="Buscar artículo en todas las bodegas" placeholder="Buscar artículo, referencia o unidad…" value={q} onChange={(e) => setQ(e.target.value)} />
+            {buscando && <span className="inv-buscar-n">{filtradas.length} en todas las bodegas</span>}
+          </label>
         </div>
         <div className="table-scroll">
           <table className="records inv-tabla">
@@ -112,7 +126,7 @@ export default function InventarioBodegaView({ puedeEditar }) {
               <tr><th>Artículo</th><th className="num">Inicial</th><th className="num">Entradas</th><th className="num">Salidas</th><th>Stock actual</th><th className="num">Mínimo</th><th>Estado</th><th>Vencimiento</th><th className="actions-col">Acciones</th></tr>
             </thead>
             <tbody>
-              {pag.pagina.length === 0 && <tr><td colSpan={9}><div className="empty">{deBodega.length ? "Ningún artículo coincide. Prueba con otra palabra o quita el filtro." : "Esta bodega aún no tiene artículos."}</div></td></tr>}
+              {pag.pagina.length === 0 && <tr><td colSpan={9}><div className="empty">{buscando ? `Ningún artículo de ninguna bodega coincide con «${q.trim()}». Prueba con otra palabra${filtro !== "todos" ? " o quita el filtro" : ""}.` : deBodega.length ? "Ningún artículo coincide con el filtro." : "Esta bodega aún no tiene artículos."}</div></td></tr>}
               {pag.pagina.map((a) => {
                 const l = lotes.get(`${a.bodega}|${a.producto}`) || [];
                 return (
@@ -120,7 +134,7 @@ export default function InventarioBodegaView({ puedeEditar }) {
                     <td>
                       <span className="inv-prod">
                         <span className="desc-tooltip-wrap"><span className="desc-text">{a.producto}</span><span className="desc-tooltip-bubble">{a.producto}</span></span>
-                        <small>{[a.referencia ? `Ref. ${a.referencia}` : null, a.unidad, l.length > 1 ? `lote ${l.indexOf(a.id) + 1} de ${l.length}` : null].filter(Boolean).join(" · ")}</small>
+                        <small>{[buscando ? NOMBRE_BODEGA[a.bodega] : null, a.referencia ? `Ref. ${a.referencia}` : null, a.unidad, l.length > 1 ? `lote ${l.indexOf(a.id) + 1} de ${l.length}` : null].filter(Boolean).join(" · ")}</small>
                       </span>
                     </td>
                     <td className="num">{num(a.inicial)}</td>

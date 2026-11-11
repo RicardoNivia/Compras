@@ -6,9 +6,9 @@ import { NIVELES, accesoDe, badRequest, forbidden, notFound } from "@/lib/tesore
 // vacía, un administrador del panel puede dar el PRIMER acceso (arranque del módulo).
 
 export async function puedeAdministrarAccesos(user) {
-  const a = await accesoDe(user.id);
-  if (a?.puedeFirmar) return true;
-  return user.role === "admin" && (await prisma.accesoTesoreria.count()) === 0;
+  // Los accesos ahora se dan en Usuarios y roles; esta lista antigua ya no se administra.
+  void user;
+  return false;
 }
 
 export async function listAccesos() {

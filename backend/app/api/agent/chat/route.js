@@ -196,7 +196,7 @@ export async function POST(request) {
   const canSeeProveedoresGestion = await isRoleAllowed(user.role, "viewProveedores");
   const canSeeBienestar = (await Promise.all(["viewBienestar", "viewFundacion", "viewDashboardBienestar", "viewDashboardFundacion"].map((f) => isRoleAllowed(user.role, f)))).some(Boolean);
   // Tesorería: acceso nominal (no por rol). Sus herramientas nunca van al servidor MCP.
-  const canSeeTesoreria = !!(await accesoDe(user.id));
+  const canSeeTesoreria = !!(await accesoDe(user));
 
   const body = await request.json().catch(() => ({}));
   const message = (body.message || "").toString().trim();

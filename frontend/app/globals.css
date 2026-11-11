@@ -3562,6 +3562,7 @@ button.ficha-cierre:hover, button.ficha-cierre:focus-visible{ border-color: var(
 .user-card-modulos{ display:flex; flex-wrap:wrap; justify-content:center; gap:4px; margin-top:6px; min-height:20px; }
 .user-modulo{ padding:1px 8px; border-radius:99px; font-size:10px; font-weight:700; background: #e3eefa; color:#1a5a96; }
 .user-modulo.bienestar{ background:#dff3e8; color:#1f7a4d; }
+.user-modulo.tesorería{ background:#efe7fb; color:#6a3fb5; }
 .maestros-nav-nota{ margin:10px 12px; font-size:10.5px; line-height:1.45; color: var(--muted); }
 
 /* ===== Formulario de actividad (ActividadFormulario.jsx) ===== */
@@ -5630,7 +5631,11 @@ select option, select optgroup{ color:var(--ink); background-color:var(--surface
 .inv-kpi small{ font-size:11.5px; color:var(--ink-2); }
 .inv-barra{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:10px 14px; border-bottom:1px solid var(--border); }
 .inv-cuenta{ font:600 10.5px "IBM Plex Mono", monospace; padding:0 6px; border-radius:99px; background:var(--surface-2); }
-.inv-buscar{ flex:0 1 300px; margin-left:auto; min-height:32px; padding:4px 10px; font-size:12.5px; }
+.inv-buscar{ flex:0 1 360px; margin-left:auto; display:flex; align-items:center; gap:8px; min-height:36px; padding:0 12px; border:1px solid var(--border-strong, var(--border)); border-radius:var(--r-s, 10px); background:var(--surface); color:var(--muted); cursor:text; transition:border-color .15s ease, box-shadow .15s ease; }
+.inv-buscar:focus-within{ border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); color:var(--accent); }
+.inv-buscar input{ flex:1; min-width:0; border:0 !important; background:transparent !important; box-shadow:none !important; outline:none; padding:6px 0 !important; font-size:13px; color:var(--ink, inherit); }
+.inv-buscar-n{ flex:none; font-size:11px; font-weight:600; color:var(--muted); white-space:nowrap; }
+@media (max-width:700px){ .inv-buscar{ flex:1 1 100%; margin-left:0; } }
 table.inv-tabla{ min-width:980px; }
 table.inv-tabla tbody td{ padding:8px 12px; vertical-align:middle; }
 .inv-prod{ display:flex; flex-direction:column; line-height:1.25; max-width:280px; }
@@ -5709,3 +5714,11 @@ table.inv-tabla tbody td{ padding:8px 12px; vertical-align:middle; }
 /* Desplegables nativos: sin el estilo de barras de desplazamiento de la página. En Chrome de Windows, scrollbar-color /
    scrollbar-width heredados por un <select> pueden dejar su lista en blanco (las opciones no se pintan). */
 select, select option, select optgroup{ scrollbar-color:auto; scrollbar-width:auto; }
+
+/* Accesos directos de lo general en el riel (Alertas, Nova, Usuarios, Auditoría, Claude): llevan a su página sin abrir
+   menú, así que pasar el mouse por ellos no descubre el panel del módulo. */
+.nav2-rail-div{ flex:none; width:34px; height:1px; margin:4px 0; background:rgba(255,255,255,0.14); }
+.nav2-directo{ text-decoration:none; --m:var(--marca); }
+.nav2-directo .nav2-mod-chip{ position:relative; width:36px; height:36px; }
+.nav2-directo .notif-dot{ position:absolute; top:3px; right:3px; }
+.nav2.plegado:has(.nav2-directo:hover):not(.abierto) .nav2-panel{ clip-path:inset(0 100% 0 0); pointer-events:none; }

@@ -312,10 +312,9 @@ function TabResumen({ act }) {
         </section>
         <section className="resumen-card" aria-labelledby="f-inv">
           <h2 id="f-inv">Inventario</h2>
-          <p className="card-sub">{inv.items} ítem(s){inv.sinRegistrarUso ? ` · ${inv.sinRegistrarUso} sin registrar cuánto se usó` : ""}.</p>
+          <p className="card-sub">{inv.items} ítem(s) usados.</p>
           <div className="actividad-cifras">
-            <div><span>Costo del inventario</span><strong>{fmtCOP(inv.costoTotal)}</strong></div>
-            <div><span>Costo de lo que sobró</span><strong className={inv.costoSobrante ? "actividad-warning-color" : ""}>{fmtCOP(inv.costoSobrante)}</strong></div>
+            <div><span>Costo de lo usado</span><strong>{fmtCOP(inv.costoTotal)}</strong></div>
           </div>
         </section>
       </div>
@@ -574,19 +573,35 @@ function TabInventario({ act, puedeEditar, onCambio }) {
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
   const archivo = useRef(null);
-  const [devolver, setDevolver] = useState(null); // ítem que salió de la bodega y se va a devolver
-  const [cantDevolver, setCantDevolver] = useState("");
+  // «Editar cantidad»: en un ítem de la bodega la diferencia sale o vuelve a la bodega (el servidor no deja sacar más de
+  // lo que hay ni bajar de lo ya usado); en uno propio de la actividad solo cambia su cantidad.
+  const [editarCant, setEditarCant] = useState(null);
+  const [cantNueva, setCantNueva] = useState("");
+  const [errorCant, setErrorCant] = useState("");
+  const [guardandoCant, setGuardandoCant] = useState(false);
 
-  async function confirmarDevolucion(e) {
+  async function confirmarCantidad(e) {
     e.preventDefault();
-    setError("");
+    setErrorCant("");
+    const it = editarCant;
+    const n = Number(cantNueva);
+    if (!(n > 0)) { setErrorCant("Escribe una cantidad mayor que cero."); return; }
+    setGuardandoCant(true);
     try {
-      const r = await salidaBodegaApi(act.id, { accion: "devolver", itemId: devolver.id, cantidad: Math.floor(Number(cantDevolver) || 0) });
-      setAviso(`Volvieron ${cantDevolver} a la bodega: ahora hay ${r.articulo.stock}.`);
-      setDevolver(null);
+      if (it.articuloId) {
+        const r = await salidaBodegaApi(act.id, { accion: "cantidad", itemId: it.id, cantidad: Math.floor(n) });
+        const d = Math.floor(n) - it.cantidad; // lo que hoy está fuera de la bodega
+        setAviso(r.articulo ? `${it.item}: se usaron ${Math.floor(n)}. ${d > 0 ? `Se descontaron ${d} más de la bodega` : `Volvieron ${-d} a la bodega`}; allá quedan ${r.articulo.stock}.` : "La cantidad no cambió.");
+      } else {
+        await actualizarItemApi(act.id, it.id, { usado: n });
+        setAviso(`${it.item}: se usaron ${n}.`);
+      }
+      setEditarCant(null);
       await recargar();
     } catch (err) {
-      setError(err.message);
+      setErrorCant(err.message);
+    } finally {
+      setGuardandoCant(false);
     }
   }
 
@@ -612,15 +627,6 @@ function TabInventario({ act, puedeEditar, onCambio }) {
     }
   }
 
-  async function guardarUsado(it, valor) {
-    setError("");
-    try {
-      await actualizarItemApi(act.id, it.id, { usado: valor === "" ? null : Number(valor) });
-      await recargar();
-    } catch (err) {
-      setError(err.message);
-    }
-  }
 
   async function importar(e) {
     const f = e.target.files?.[0];
@@ -640,16 +646,14 @@ function TabInventario({ act, puedeEditar, onCambio }) {
     <div className="ficha-seccion">
       <div className="actividad-cifras">
         <div><span>Ítems</span><strong>{resumen.items}</strong></div>
-        <div><span>Costo del inventario</span><strong>{fmtCOP(resumen.costoTotal)}</strong></div>
-        <div><span>Costo de lo que sobró</span><strong className={resumen.costoSobrante ? "actividad-warning-color" : ""}>{fmtCOP(resumen.costoSobrante)}</strong></div>
-        <div><span>Sin registrar cuánto se usó</span><strong>{resumen.sinRegistrarUso}</strong></div>
+        <div><span>Costo de lo usado</span><strong>{fmtCOP(resumen.costoTotal)}</strong></div>
       </div>
       {puedeEditar && <SacarDeBodega actividadId={act.id} onListo={async (txt) => { setAviso(txt); await recargar(); }} />}
       {puedeEditar && (
         <form className="ficha-import" onSubmit={agregar}>
           <span className="ficha-import-titulo">Agregar ítem que no está en la bodega</span>
           <input aria-label="Ítem" placeholder="Ítem (ej. Refrigerios)" value={nuevo.item} onChange={(e) => setNuevo({ ...nuevo, item: e.target.value })} />
-          <input aria-label="Cantidad" type="number" min="0" step="any" placeholder="Cantidad" value={nuevo.cantidad} onChange={(e) => setNuevo({ ...nuevo, cantidad: e.target.value })} style={{ width: 110 }} />
+          <input aria-label="Cantidad usada" type="number" min="0" step="any" placeholder="Cantidad usada" value={nuevo.cantidad} onChange={(e) => setNuevo({ ...nuevo, cantidad: e.target.value })} style={{ width: 110 }} />
           <select aria-label="Unidad" value={nuevo.unidad} onChange={(e) => setNuevo({ ...nuevo, unidad: e.target.value })} style={{ width: 120 }}><option value="">Unidad</option>{unidades.map((u) => <option key={u} value={u}>{u}</option>)}</select>
           <MoneyInput prefix={null} ariaLabel="Costo unitario" placeholder="Costo unitario" value={nuevo.costoUnitario} onChange={(x) => setNuevo({ ...nuevo, costoUnitario: x })} decimales={2} style={{ width: 140 }} />
           <button type="submit" className="btn btn-primary"><IconPlus size={13} /> Agregar</button>
@@ -660,7 +664,7 @@ function TabInventario({ act, puedeEditar, onCambio }) {
           <label className="importar-tarjeta">
             <input ref={archivo} type="file" accept=".xlsx,.xls" className="importar-input" onChange={importar} />
             <IconDownload size={15} style={{ transform: "rotate(180deg)" }} />
-            <span><strong>Importar inventario</strong><span className="count-note">Un Excel con Ítem, Cantidad, Unidad, Costo unitario y Usado. Los ítems que ya existen se actualizan.</span></span>
+            <span><strong>Importar inventario</strong><span className="count-note">Un Excel con Ítem, Cantidad usada, Unidad y Costo unitario. Los ítems que ya existen se actualizan.</span></span>
           </label>
         </div>
       )}
@@ -669,26 +673,19 @@ function TabInventario({ act, puedeEditar, onCambio }) {
       <div className="table-card">
         <div className="table-scroll">
           <table className="records ficha-tabla">
-            <thead><tr><th>Ítem</th><th>Unidad</th><th className="num">Cantidad</th><th className="num">Usado</th><th className="num">Sobró</th><th className="num">Costo unit.</th><th className="num">Costo total</th><th className="num">Costo sobrante</th><th className="actions-col">Acciones</th></tr></thead>
+            <thead><tr><th>Ítem</th><th>Unidad</th><th className="num">Usado</th><th className="num">Costo unit.</th><th className="num">Costo total</th><th className="actions-col">Acciones</th></tr></thead>
             <tbody>
-              {pageRows.length === 0 && <tr><td colSpan={9}><div className="empty">Sin inventario. Agrega ítems o sube un Excel con Ítem, Cantidad, Unidad, Costo unitario y Usado.</div></td></tr>}
+              {pageRows.length === 0 && <tr><td colSpan={6}><div className="empty">Sin inventario. Registra lo usado de la bodega, agrega un ítem o sube un Excel con Ítem, Cantidad usada, Unidad y Costo unitario.</div></td></tr>}
               {pageRows.map((it) => (
                 <tr key={it.id}>
                   <td><span className="desc-tooltip-wrap"><span className="desc-text">{it.item}</span><span className="desc-tooltip-bubble">{it.item}</span></span>{it.articuloId && <span className="pill accent inv-de-bodega" title="Salió de la bodega de Bienestar">Bodega</span>}</td>
                   <td>{it.unidad || "—"}</td>
-                  <td className="num">{it.cantidad}</td>
-                  <td className="num">
-                    {puedeEditar ? (
-                      <input aria-label={`Usado de ${it.item}`} type="number" min="0" max={it.cantidad} step="any" defaultValue={it.usado ?? ""} className="ficha-input-num" onBlur={(e) => { if (String(it.usado ?? "") !== e.target.value) guardarUsado(it, e.target.value); }} />
-                    ) : it.usado ?? "—"}
-                  </td>
-                  <td className="num">{it.sobrante ?? "—"}</td>
+                  <td className="num">{it.usado}</td>
                   <td className="num">{it.costoUnitario != null ? fmtCOP(it.costoUnitario) : "—"}</td>
                   <td className="num">{it.costoTotal != null ? fmtCOP(it.costoTotal) : "—"}</td>
-                  <td className="num">{it.costoSobrante != null ? fmtCOP(it.costoSobrante) : "—"}</td>
                   <td className="actions-cell"><div className="row-actions">
-                    {puedeEditar && it.articuloId && it.cantidad - (it.usado ?? 0) > 0 && <button type="button" className="btn small" title="Devolver a la bodega lo que sobró" onClick={() => { setDevolver(it); setCantDevolver(String(Math.floor(it.cantidad - (it.usado ?? 0)))); }}>Devolver</button>}
-                    {puedeEditar && <button type="button" className="icon-action-btn delete" aria-label={`Quitar ${it.item}`} onClick={async () => { if (window.confirm(it.articuloId ? `¿Quitar "${it.item}" de la actividad? Lo que no se usó vuelve a la bodega.` : `¿Quitar "${it.item}" del inventario?`)) { await eliminarItemApi(act.id, it.id).catch((e) => setError(e.message)); recargar(); } }}><IconTrash size={13} /></button>}
+                    {puedeEditar && <button type="button" className="icon-action-btn" aria-label={`Editar la cantidad de ${it.item}`} title="Editar la cantidad usada" onClick={() => { setEditarCant(it); setCantNueva(String(it.usado)); setErrorCant(""); }}><IconEdit size={13} /></button>}
+                    {puedeEditar && <button type="button" className="icon-action-btn delete" aria-label={`Quitar ${it.item}`} onClick={async () => { if (window.confirm(it.articuloId ? `¿Quitar "${it.item}" de la actividad? Las ${it.usado} usadas vuelven a la bodega.` : `¿Quitar "${it.item}" del inventario?`)) { await eliminarItemApi(act.id, it.id).catch((e) => setError(e.message)); recargar(); } }}><IconTrash size={13} /></button>}
                   </div></td>
                 </tr>
               ))}
@@ -708,17 +705,23 @@ function TabInventario({ act, puedeEditar, onCambio }) {
           <div className="spacer" />
           <span className="count-note">{items.length} ítem(s)</span>
         </div>
-        {devolver && (
-          <div className="modal-overlay inv-fondo" onMouseDown={(e) => { if (e.target === e.currentTarget) setDevolver(null); }}>
-            <form className="modal inv-modal" role="dialog" aria-modal="true" aria-labelledby="dev-t" onSubmit={confirmarDevolucion}>
-              <div className="modal-head"><div><h3 id="dev-t">Devolver a la bodega</h3><span className="count-note">{devolver.item}: se sacaron {devolver.cantidad}{devolver.usado != null ? ` y se usaron ${devolver.usado}` : ""}.</span></div><button type="button" className="btn-ghost icon-btn" onClick={() => setDevolver(null)} aria-label="Cerrar">✕</button></div>
-              <div className="inv-modal-cuerpo">
-                <div className="field"><label htmlFor="dev-cant">¿Cuántas vuelven a la bodega? (máx. {Math.floor(devolver.cantidad - (devolver.usado ?? 0))})</label><input id="dev-cant" type="number" min="1" max={Math.floor(devolver.cantidad - (devolver.usado ?? 0))} step="1" className="inv-num" value={cantDevolver} onChange={(e) => setCantDevolver(e.target.value)} autoFocus /></div>
-              </div>
-              <div className="modal-foot"><button type="submit" className="btn btn-primary">Devolver</button><button type="button" className="btn" onClick={() => setDevolver(null)}>Cancelar</button></div>
-            </form>
-          </div>
-        )}
+        {editarCant && (() => {
+          const n = Math.floor(Number(cantNueva) || 0);
+          const d = n - editarCant.cantidad;
+          return (
+            <div className="modal-overlay inv-fondo" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditarCant(null); }}>
+              <form className="modal inv-modal" role="dialog" aria-modal="true" aria-labelledby="cant-t" onSubmit={confirmarCantidad} noValidate>
+                <div className="modal-head"><div><h3 id="cant-t">Editar la cantidad usada</h3><span className="count-note">{editarCant.item}: hoy se usaron {editarCant.usado}{editarCant.articuloId ? " de la bodega" : ""}.</span></div><button type="button" className="btn-ghost icon-btn" onClick={() => setEditarCant(null)} aria-label="Cerrar">✕</button></div>
+                <div className="inv-modal-cuerpo">
+                  <div className="field"><label htmlFor="cant-n">Cantidad usada</label><input id="cant-n" type="number" min="1" step={editarCant.articuloId ? "1" : "any"} inputMode="numeric" className="inv-num" value={cantNueva} onChange={(e) => { setCantNueva(e.target.value); setErrorCant(""); }} autoFocus /></div>
+                  {editarCant.articuloId && n > 0 && d !== 0 && <span className="count-note">{d > 0 ? `Se descontarán ${d} más de la bodega.` : `Volverán ${-d} a la bodega.`}</span>}
+                  {errorCant && <div className="modal-error" role="alert">{errorCant}</div>}
+                </div>
+                <div className="modal-foot"><button type="submit" className="btn btn-primary" disabled={guardandoCant}>{guardandoCant && <span className="spinner" />} Guardar</button><button type="button" className="btn" onClick={() => setEditarCant(null)}>Cancelar</button></div>
+              </form>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

@@ -83,21 +83,21 @@ const GRUPOS = {
       titulo: "Configuración",
       items: [
         { key: "tesoreria-maestros", href: "/tesoreria/maestros", label: "Maestros", Icon: IconLayers, permite: (u) => !!u.tesoreria },
-        // Arranque: mientras nadie tiene acceso, un admin del panel solo ve esto, para dar el primer acceso.
-        { key: "tesoreria-accesos", href: "/tesoreria/accesos", label: "Accesos", Icon: IconKey, permite: (u) => !!u.tesoreria?.puedeFirmar || !!u.tesoreriaArranque },
+        // Accesos: ya no se dan aquí sino en Usuarios y roles (Matriz de permisos, pestaña Tesorería).
+        // { key: "tesoreria-accesos", href: "/tesoreria/accesos", label: "Accesos", Icon: IconKey, permite: (u) => !!u.tesoreria?.puedeFirmar || !!u.tesoreriaArranque },
       ],
     },
   ],
 };
 
 const GENERALES = [
-  { key: "alertas", href: "/alertas", label: "Alertas y notificaciones", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas, alt: { feature: "viewNotificaciones", show: canViewNotificaciones } },
+  { key: "alertas", href: "/alertas", label: "Alertas y notificaciones", corto: "Alertas", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas, alt: { feature: "viewNotificaciones", show: canViewNotificaciones } },
   { key: "agente-ia", href: "/agente-ia", label: "Nova", Icon: IconSpark, feature: "viewAgenteIA", show: canViewAgenteIA },
   // "Mi correo" está oculto del menú y del buscador (noviembre 2026); la página /mi-correo y el agente siguen existiendo.
-  { key: "usuarios", href: "/usuarios", label: "Usuarios y roles", Icon: IconUsers, feature: "viewUsuarios", show: canViewUsuarios },
+  { key: "usuarios", href: "/usuarios", label: "Usuarios y roles", corto: "Usuarios", Icon: IconUsers, feature: "viewUsuarios", show: canViewUsuarios },
   { key: "auditoria", href: "/auditoria", label: "Auditoría", Icon: IconHistory, feature: "viewAuditoria", show: canViewAuditoria },
   // Solo para administradores (no es un permiso de la Matriz: se valida el rol).
-  { key: "conectar-claude", href: "/conectar-claude", label: "Conectar con Claude", Icon: IconKey, feature: null, show: (role) => role === "admin" },
+  { key: "conectar-claude", href: "/conectar-claude", label: "Conectar con Claude", corto: "Claude", Icon: IconKey, feature: null, show: (role) => role === "admin" },
 ];
 
 // Todos los destinos (los usa la paleta de comandos y el chat flotante para saber en qué página está la persona).
@@ -167,6 +167,8 @@ export default function Sidebar({ user, plegadoInicial = true }) {
     }
     return out;
   }, [user, hayCompartidos]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Lo general (Alertas, Nova, Usuarios y roles, Auditoría, Conectar con Claude) va en el riel como accesos directos:
+  // cada uno lleva a su página, sin abrir un menú (antes se repetía al final del menú de cada módulo).
   const generales = GENERALES.filter(permite);
   const modulosVisibles = Object.keys(menu);
   const modulosPropios = Object.entries(modulosDelUsuario(user));
@@ -290,6 +292,20 @@ export default function Sidebar({ user, plegadoInicial = true }) {
             </button>
           );
         })}
+        {generales.length > 0 && <span className="nav2-rail-div" aria-hidden="true" />}
+        {generales.map(({ key, href, label, corto, Icon }) => {
+          const activo = pathname === href || pathname.startsWith(`${href}/`);
+          return (
+            <Link key={key} href={href} className={`nav2-mod nav2-directo${activo ? " activo" : ""}`} aria-current={activo ? "page" : undefined} title={label}
+              onClick={() => setAbierto(false)}>
+              <span className="nav2-mod-chip">
+                <Icon size={18} />
+                {key === "alertas" && noLeidas > 0 && <span className="notif-dot" aria-label={`${noLeidas} sin leer`} />}
+              </span>
+              <span>{corto || label}</span>
+            </Link>
+          );
+        })}
         <span className="nav2-rail-sep" />
         <button type="button" className="nav2-rail-btn" onClick={() => setPaletteOpen(true)} title="Buscar (Ctrl+K)" aria-label="Buscar">
           <IconSearch size={17} />
@@ -327,12 +343,6 @@ export default function Sidebar({ user, plegadoInicial = true }) {
               {g.items.map(enlace)}
             </div>
           ))}
-          {generales.length > 0 && (
-            <div className="nav2-grupo">
-              <span className="nav2-grupo-titulo">General</span>
-              {generales.map(enlace)}
-            </div>
-          )}
         </nav>
 
         <div className="nav2-user">
