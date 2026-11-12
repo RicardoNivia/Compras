@@ -6205,3 +6205,6 @@ tr.tes-ex-no td{ opacity:.45; text-decoration:line-through; }
 /* Estrella parcial del puntaje de Nova con decimales (Estrellas en CalificacionActividad.jsx). */
 .ficha-estrella{ position:relative; }
 .ficha-estrella-parcial{ position:absolute; inset:0; display:inline-flex; padding:inherit; color:#f5a524; clip-path:inset(0 calc((1 - var(--fr)) * 100%) 0 0); }
+
+/* Errores de varias líneas (p. ej. el detalle de por qué una importación no encontró personas). */
+.modal-error{ white-space:pre-line; }

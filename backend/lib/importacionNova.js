@@ -231,6 +231,37 @@ function leerCalificacion(v, escala) {
   return Math.max(1, Math.min(5, Math.round((n / escala) * 5)));
 }
 
+// Cuando no queda ninguna persona: explica por qué con detalle (qué columna se tomó como nombre y cuántas filas trae
+// vacías, cuántas filas se descartaron y por qué, qué columnas sí tienen datos) y qué hacer.
+function explicarSinPersonas({ m, tipo, encabezados, motivos, filas, explicacion }) {
+  const letra = (i) => XLSX.utils.encode_col(i);
+  const nombreCol = (i) => `«${encabezados[i] || `Columna ${letra(i)}`}» (columna ${letra(i)})`;
+  const datos = filas.slice(m.filaEncabezado + 1).filter((r) => r.some((v) => String(v ?? "").trim()));
+  const llenas = (i) => datos.filter((r) => String(r[i] ?? "").trim()).length;
+  const falta = tipo === "calificaciones" ? "personas con calificación" : tipo === "asistentes" ? "personas con su asistencia" : "personas";
+  const lineas = [`No encontré ${falta} en la hoja «${m.hoja}».`];
+  if (!motivos.conDatos) {
+    lineas.push(m.filaEncabezado >= 0 ? `Debajo del encabezado (fila ${m.filaEncabezado + 1}) no hay filas con datos.` : "La hoja no tiene filas con datos.");
+  } else {
+    lineas.push(`Revisé ${motivos.conDatos} fila(s) con datos${m.filaEncabezado >= 0 ? ` debajo del encabezado (fila ${m.filaEncabezado + 1})` : ""}.`);
+    const cn = m.columnas;
+    if (cn.nombre >= 0) lineas.push(`• Tomé como nombre la columna ${nombreCol(cn.nombre)}: está vacía en ${motivos.conDatos - llenas(cn.nombre)} de ${motivos.conDatos} fila(s).`);
+    else if (cn.nombres >= 0 || cn.apellidos >= 0) lineas.push(`• Armé el nombre con ${[cn.nombres, cn.apellidos].filter((i) => i >= 0).map(nombreCol).join(" y ")}.`);
+    else lineas.push("• No identifiqué ninguna columna con los nombres de las personas.");
+    if (motivos.sinNombre) lineas.push(`• ${motivos.sinNombre} fila(s) sin nombre.`);
+    if (motivos.nombreCorto) lineas.push(`• ${motivos.nombreCorto} fila(s) con un nombre de menos de 3 letras.`);
+    if (motivos.filaTotal) lineas.push(`• ${motivos.filaTotal} fila(s) de totales.`);
+    if (motivos.sinCalificacion) lineas.push(`• ${motivos.sinCalificacion} fila(s) sin una calificación válida${cn.calificacion >= 0 ? ` en ${nombreCol(cn.calificacion)} (escala de 1 a ${m.escalaMaxima})` : ": no identifiqué la columna de la calificación"}.`);
+    if (tipo === "calificaciones" && cn.calificacion < 0 && !motivos.sinCalificacion) lineas.push("• No identifiqué la columna de la calificación (un número de 1 a 5, de 1 a 10 o estrellas).");
+    if (motivos.sinAsistencia) lineas.push(`• ${motivos.sinAsistencia} fila(s) sin decir si la persona asistió${cn.asistencia >= 0 ? ` en ${nombreCol(cn.asistencia)}` : ": no identifiqué la columna de asistencia"}.`);
+    const conDatos = encabezados.map((h, i) => ({ i, n: llenas(i) })).filter((x) => x.n > 0).slice(0, 10);
+    if (conDatos.length) lineas.push(`Columnas con datos en el archivo: ${conDatos.map((x) => `${nombreCol(x.i)} ${x.n}/${motivos.conDatos}`).join(", ")}.`);
+  }
+  lineas.push(`Qué hacer: revisa que la columna con los nombres completos tenga datos (o llámala «Nombre completo»)${tipo === "calificaciones" ? " y que la calificación sea un número o estrellas" : ""}, y vuelve a subir el archivo.`);
+  if (explicacion) lineas.push(`Nova leyó: ${explicacion}`);
+  return lineas.join("\n");
+}
+
 // Lee TODAS las filas con el mapeo, sin IA.
 function leerFilas(wb, m, tipo) {
   const filas = filasDe(wb, m.hoja);
@@ -238,11 +269,18 @@ function leerFilas(wb, m, tipo) {
   const usadas = new Set(Object.values(m.columnas).filter((i) => i >= 0));
   const participantes = [];
   let descartadas = 0;
+  // Por qué se descartó cada fila: para explicar con detalle cuando no queda nadie (explicarSinPersonas).
+  const motivos = { conDatos: 0, sinNombre: 0, nombreCorto: 0, filaTotal: 0, sinCalificacion: 0, sinAsistencia: 0 };
   for (const fila of filas.slice(m.filaEncabezado + 1, m.filaEncabezado + 1 + MAX_FILAS)) {
     if (!fila.some((c) => String(c ?? "").trim())) continue;
+    motivos.conDatos++;
     const col = (k) => (m.columnas[k] >= 0 ? String(fila[m.columnas[k]] ?? "").trim() : "");
     const nombre = (col("nombre") || `${col("nombres")} ${col("apellidos")}`).replace(/\s+/g, " ").trim();
-    if (nombre.length < 3 || /^total/i.test(nombre)) { descartadas++; continue; }
+    if (nombre.length < 3 || /^total/i.test(nombre)) {
+      descartadas++;
+      if (!nombre) motivos.sinNombre++; else if (/^total/i.test(nombre)) motivos.filaTotal++; else motivos.nombreCorto++;
+      continue;
+    }
     const p = {
       nombre,
       documento: normalizarDocumento(col("documento")),
@@ -285,11 +323,11 @@ function leerFilas(wb, m, tipo) {
       });
     }
     // Una fila de la encuesta sin puntaje no aporta nada; una de la planilla de asistencia que no diga nada, tampoco.
-    if (tipo === "calificaciones" && !p.calificacion) { descartadas++; continue; }
-    if (tipo === "asistentes" && p.asistio === null) { descartadas++; continue; }
+    if (tipo === "calificaciones" && !p.calificacion) { descartadas++; motivos.sinCalificacion++; continue; }
+    if (tipo === "asistentes" && p.asistio === null) { descartadas++; motivos.sinAsistencia++; continue; }
     participantes.push(p);
   }
-  return { encabezados, participantes, descartadas };
+  return { encabezados, participantes, descartadas, motivos, filas };
 }
 
 // Sin mapeo: Nova lo arma. Sin confirmar: vista previa, no escribe nada.
@@ -309,11 +347,8 @@ export async function importarConNova(actividadId, buffer, { tipo, mapeo, confir
     // la actividad: las personas quedan programadas y, si el archivo lo dice, con su asistencia y su motivo.
     modo = m.columnas.asistencia < 0 && m.columnas.motivo < 0 && m.todasAsistieron ? "asistentes" : "inscripcion";
   }
-  const { encabezados, participantes, descartadas } = leerFilas(wb, m, tipo);
-  if (!participantes.length) {
-    const falta = tipo === "calificaciones" ? "personas con calificación" : tipo === "asistentes" ? "personas con su asistencia" : "personas";
-    throw badRequest(`No encontré ${falta} en la hoja "${m.hoja}".${crudo.explicacion ? ` Nova leyó: ${crudo.explicacion}` : ""}`);
-  }
+  const { encabezados, participantes, descartadas, motivos, filas } = leerFilas(wb, m, tipo);
+  if (!participantes.length) throw badRequest(explicarSinPersonas({ m, tipo, encabezados, motivos, filas, explicacion: crudo.explicacion }));
   // Antes de la actividad, no tener asistencia es lo normal (aún no se hace): la pregunta solo aplica si ya pasó.
   const yaPaso = !!actividad.fecha && actividad.fecha <= new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
   const resultado = await aplicarParticipantes(actividad, participantes, { modo, noMarcadosNoAsistieron: modo === "asistentes" && noMarcadosNoAsistieron, sinDatoComoAsistio: yaPaso && sinDatoComo !== "sin_asignar", actor, origen: "importacion", simular: !confirmar });
