@@ -168,7 +168,7 @@ export function PagoFormModal({ cat, onClose, onSaved }) {
               <small className="pg-ayuda">{periodicidad === "quincenal" ? `El día ${Number(v.fecha.slice(8, 10))} de cada mes y 15 días después.` : `El día ${Number(v.fecha.slice(8, 10))} (el de la fecha de vencimiento); en meses más cortos, el último día.`}</small>
             </div>
             <div className="pg-grid">
-              <div className="field"><label htmlFor="pg-hasta">Hasta (opcional)</label><input id="pg-hasta" type="date" min={v.fecha} max={`${anioPago}-12-31`} value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} /><small className="pg-ayuda">Vacío = hasta diciembre de {anioPago}. Para el año siguiente usa «Llenar un año» en Gastos periódicos.</small></div>
+              <div className="field"><label htmlFor="pg-hasta">Hasta (opcional)</label><input id="pg-hasta" type="date" min={v.fecha} max={`${anioPago}-12-31`} value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} /><small className="pg-ayuda">Vacío = hasta diciembre de {anioPago}. Para el año siguiente usa «Llenar un año» en Pagos programados.</small></div>
             </div>
             <div className="pg-repite-res" aria-live="polite">
               <strong>{fechas.length ? `Se van a crear ${fechas.length} pago(s) hasta ${fechaFin && fechaFin < `${anioPago}-12-31` ? fechaCorta(fechaFin) : `diciembre de ${anioPago}`}` : "Con esa fecha no queda ningún pago este año"}</strong>

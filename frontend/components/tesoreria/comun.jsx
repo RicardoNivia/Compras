@@ -120,7 +120,7 @@ export function useAniosTesoreria(fuente = "pagos") {
 }
 
 // Selector de año: los años de Tesorería (del actual hasta 2028, los anteriores con datos y los creados a mano). Un año nuevo
-// solo se crea en Gastos periódicos («Crear otro año»). value "" = todos (solo con conTodos).
+// solo se crea en Pagos programados («Crear otro año»). value "" = todos (solo con conTodos).
 export function SelectorAnio({ id, label = "Año", value, onChange, anios = [], conTodos = false, ancho = 170, fuente = "pagos" }) {
   const actual = anioActual();
   const delServidor = useAniosTesoreria(fuente);

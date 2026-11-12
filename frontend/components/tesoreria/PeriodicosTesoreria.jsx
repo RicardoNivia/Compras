@@ -282,8 +282,6 @@ export default function PeriodicosTesoreria({ acceso }) {
         <div className="dash-tabs" role="tablist" aria-label="Estado">{[["todos", `Todos${items ? ` · ${items.length}` : ""}`], ["activos", `Activos${items ? ` · ${items.filter((g) => g.activo).length}` : ""}`], ["inactivos", `Inactivos${items ? ` · ${items.filter((g) => !g.activo).length}` : ""}`]].map(([k, t]) => <button key={k} type="button" role="tab" className="dash-tab" aria-selected={estado === k} onClick={() => setEstado(k)}>{t}</button>)}</div>
         <div className="tes-filtros-acciones"><BotonExcel nombre={`tesoreria-gastos-periodicos${anio ? `-${anio}` : ""}`} hoja="Gastos periódicos" columnas={COLS_EXCEL} filas={filas} deshabilitado={!filas.length} /></div>
         {puede && <div className="tes-filtros-acciones">
-          <button type="button" className="btn" onClick={() => setModal({ tipo: "crearAnio" })}>+ Crear otro año</button>
-          <button type="button" className="btn" onClick={() => setModal({ tipo: "replicar" })}>Llenar un año (replicar o proponer)</button>
           <button type="button" className="btn btn-primary" onClick={() => setModal({ tipo: "form" })} disabled={!cat}>+ Nuevo gasto periódico</button>
         </div>}
       </div>
@@ -335,8 +333,6 @@ export default function PeriodicosTesoreria({ acceso }) {
         </div>
       </div>
       {modal?.tipo === "form" && cat && <PeriodicoFormModal cat={cat} gasto={modal.gasto} onClose={() => setModal(null)} onSaved={(msg) => { setModal(null); setAviso(msg); cargar(); }} />}
-      {modal?.tipo === "replicar" && <LlenarAnioModal anio={modal.anio || anio || anioActual()} modoInicial={modal.modo} aniosOrigen={aniosOrigen} onClose={() => setModal(null)} onListo={(msg) => { setModal(null); setAviso(msg); cargar(); }} />}
-      {modal?.tipo === "crearAnio" && <CrearAnioModal onClose={() => setModal(null)} onCreado={(nuevo, modo) => { setAnio(nuevo); if (modo === "blanco") { setModal(null); setAviso(`Año ${nuevo} creado en blanco. Ya aparece en todos los selectores de año.`); } else setModal({ tipo: "replicar", anio: nuevo, modo }); }} />}
       {modal?.tipo === "apagar" && <ApagarModal gasto={modal.gasto} onClose={() => setModal(null)} onListo={(msg) => { setModal(null); setAviso(msg); cargar(); }} />}
       <Aviso texto={aviso} onCerrar={() => setAviso("")} />
     </div>

@@ -3,14 +3,14 @@
 import EstadoVacio from "@/components/EstadoVacio";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { tesPagos, tesResumen } from "@/lib/tesoreriaApi";
+import { tesPagos, tesResumen, tesPeriodicos } from "@/lib/tesoreriaApi";
 import { fmtMoneda } from "@/lib/moneda";
 import { crossfade } from "@/lib/crossfade";
 import { Paginacion } from "@/components/notificaciones/ui";
 import { IconSpark } from "@/components/icons";
 import { SelectorAnio, BotonExcel, todasLasPaginas, Celda, useCatalogos, Aviso, MESES, MESES_CORTOS, anioActual, mesActual, hoyCO, fechaSinAnio, EstadoPago, TipoPago, Dinero } from "@/components/tesoreria/comun";
 import { DetallePagoModal, PagoFormModal, ProponerModal } from "@/components/tesoreria/PagoModales";
-import { ReplicarModal } from "@/components/tesoreria/PeriodicosTesoreria";
+import { LlenarAnioModal, CrearAnioModal } from "@/components/tesoreria/PeriodicosTesoreria";
 
 const PAGE_SIZES = [25, 50, 100];
 // Pestañas de estado: [clave, texto, filtros que manda al backend]
@@ -55,6 +55,10 @@ export default function PagosTesoreria({ acceso }) {
   const [modal, setModal] = useState(params.get("id") ? { tipo: "detalle", id: Number(params.get("id")) } : null);
   const [aviso, setAviso] = useState("");
   const puedeRegistrar = !!acceso?.puedeRegistrar;
+  // Años con pagos de gastos periódicos: son los que «Llenar un año» ofrece como origen para replicar.
+  const [aniosOrigen, setAniosOrigen] = useState([]);
+  const cargarAniosOrigen = useCallback(() => tesPeriodicos("").then((r) => setAniosOrigen(r.aniosConPagos.map((x) => x.anio))).catch(() => {}), []);
+  useEffect(() => { if (puedeRegistrar) cargarAniosOrigen(); }, [puedeRegistrar, cargarAniosOrigen]);
 
   useEffect(() => { const t = setTimeout(() => setF((x) => (x.q === q ? x : { ...x, q, ids: "" })), 350); return () => clearTimeout(t); }, [q]);
   useEffect(() => { setPage(1); }, [anio, mes, tab, f, size]);
@@ -73,7 +77,7 @@ export default function PagosTesoreria({ acceso }) {
   }, [f, anio, mes, tab, page, size]);
   useEffect(() => { cargar(); }, [cargar]);
 
-  const cambio = (msg) => { if (msg) setAviso(msg); cargar(); cargarConteos(); };
+  const cambio = (msg) => { if (msg) setAviso(msg); cargar(); cargarConteos(); cargarAniosOrigen(); };
   // Tocar una tarjeta filtra la tabla con los pagos que forman esa cifra; tocarla otra vez quita el filtro.
   const filtrarKpi = (sentido, nuevaTab) => crossfade(() => {
     const igual = f.sentido === sentido && tab === nuevaTab;
@@ -94,6 +98,8 @@ export default function PagosTesoreria({ acceso }) {
           <SelectorAnio id="pg-anio" value={anio} onChange={(a) => a && setAnio(a)} ancho={160} />
           <span className="card-sub" style={{ margin: 0 }}>Toca un mes; el número es cuántos pagos tiene.</span>
           <div className="spacer" />
+          {puedeRegistrar && <button type="button" className="btn" onClick={() => setModal({ tipo: "crearAnio" })}>+ Crear otro año</button>}
+          {puedeRegistrar && <button type="button" className="btn" onClick={() => setModal({ tipo: "replicar" })}>Llenar un año (replicar o proponer)</button>}
           {puedeRegistrar && <button type="button" className="btn" onClick={() => setModal({ tipo: "proponer" })}><IconSpark size={13} /> Proponer pagos con IA</button>}
           {puedeRegistrar && <button type="button" className="btn btn-primary" onClick={() => setModal({ tipo: "nuevo" })} disabled={!cat}>+ Pago extraordinario</button>}
         </div>
@@ -127,11 +133,12 @@ export default function PagosTesoreria({ acceso }) {
               <span className="label">Ingresos ({nombreMes})</span><span className="value"><Dinero valor={t.ingresos || 0} texto={fmtMoneda(t.ingresos || 0, "COP")} /></span>
               <span className={`foot tes-kpi-sub${f.sentido === "ingreso" && tab === "P" ? " on" : ""}`} role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); filtrarKpi("ingreso", "P"); }} onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); filtrarKpi("ingreso", "P"); } }}>pendiente {fmtMoneda(t.pendienteIngresos || 0, "COP")}</span>
             </TarjetaFiltro>
-            <div className={`kpi tes-kpi-filtro${!f.sentido && (tab === "P" || tab === "E") ? " on" : ""}`}>
+            {/* Toda la tarjeta filtra (los pendientes, o quita el filtro si ya está puesto); cada número filtra lo suyo. */}
+            <TarjetaFiltro on={!f.sentido && (tab === "P" || tab === "E")} onClick={() => filtrarKpi("", tab === "E" && !f.sentido ? "E" : "P")} titulo="Ver los pendientes (o toca un número)">
               <span className="label">Pendientes · Pagados</span>
-              <span className="value"><button type="button" className={`tes-kpi-num${!f.sentido && tab === "P" ? " on" : ""}`} onClick={() => filtrarKpi("", "P")} title="Ver los pendientes">{t.pendientes ?? 0}</button> · <button type="button" className={`tes-kpi-num${!f.sentido && tab === "E" ? " on" : ""}`} onClick={() => filtrarKpi("", "E")} title="Ver los pagados">{t.pagados ?? 0}</button></span>
-              <span className="foot">toca un número para verlos</span>
-            </div>
+              <span className="value"><button type="button" className={`tes-kpi-num${!f.sentido && tab === "P" ? " on" : ""}`} onClick={(e) => { e.stopPropagation(); filtrarKpi("", "P"); }} title="Ver los pendientes">{t.pendientes ?? 0}</button> · <button type="button" className={`tes-kpi-num${!f.sentido && tab === "E" ? " on" : ""}`} onClick={(e) => { e.stopPropagation(); filtrarKpi("", "E"); }} title="Ver los pagados">{t.pagados ?? 0}</button></span>
+              <span className="foot">{!f.sentido && tab === "P" ? "viendo los pendientes · toca otra vez para ver todos" : !f.sentido && tab === "E" ? "viendo los pagados · toca otra vez para ver todos" : "toca la tarjeta o un número para verlos"}</span>
+            </TarjetaFiltro>
             <TarjetaFiltro on={!f.sentido && tab === "dif"} onClick={() => filtrarKpi("", "dif")} titulo="Ver los pagos con diferencia"><span className="label">Con diferencia</span><span className="value">{t.conDiferencia ?? 0}</span><span className="foot">lo asociado no da igual a lo programado</span></TarjetaFiltro>
           </div>
 
@@ -184,7 +191,8 @@ export default function PagosTesoreria({ acceso }) {
       {modal?.tipo === "detalle" && cat && <DetallePagoModal id={modal.id} cat={cat} puedeRegistrar={puedeRegistrar} onClose={() => setModal(null)} onCambio={cambio} />}
       {modal?.tipo === "nuevo" && cat && <PagoFormModal cat={cat} onClose={() => setModal(null)} onSaved={(_p, msg) => { setModal(null); cambio(msg); }} />}
       {modal?.tipo === "proponer" && <ProponerModal anio={anio} mes={mes || null} onClose={() => setModal(null)} onListo={(msg) => { setModal(null); cambio(msg); }} />}
-      {modal?.tipo === "replicar" && <ReplicarModal anio={anio} onClose={() => setModal(null)} onListo={(msg) => { setModal(null); cambio(msg); }} />}
+      {modal?.tipo === "replicar" && <LlenarAnioModal anio={modal.anio || anio} modoInicial={modal.modo} aniosOrigen={aniosOrigen} onClose={() => setModal(null)} onListo={(msg) => { setModal(null); cambio(msg); }} />}
+      {modal?.tipo === "crearAnio" && <CrearAnioModal onClose={() => setModal(null)} onCreado={(nuevo, modo) => { setAnio(nuevo); if (modo === "blanco") { setModal(null); setAviso(`Año ${nuevo} creado en blanco. Ya aparece en todos los selectores de año.`); } else setModal({ tipo: "replicar", anio: nuevo, modo }); }} />}
       <Aviso texto={aviso} onCerrar={() => setAviso("")} />
     </div>
   );
