@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   tesCrearMovimiento, tesEditarMovimiento, tesMovimiento, tesBorrarMovimiento, tesAsociarMovimiento, tesLeerSoporte,
-  tesAgregarSoporte, tesBorrarSoporte, urlSoporte, tesPagos, tesAnalizarExtracto, tesAplicarExtracto,
+  tesAgregarSoporte, tesBorrarSoporte, urlSoporte, tesPagos, tesAnalizarExtracto, tesAplicarExtracto, tesBuscarPropuestas,
 } from "@/lib/tesoreriaApi";
 import { fmtMoneda } from "@/lib/moneda";
 import { IconSpark, IconTrash, IconSearch } from "@/components/icons";
@@ -358,6 +358,8 @@ export function ExtractoModal({ cat, bancoId: bancoInicial, onClose, onListo }) 
   const [error, setError] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [ver, setVer] = useState("nuevos");
+  const [hecho, setHecho] = useState(null);
+  const [agente, setAgente] = useState(null);
   const fileRef = useRef(null);
   const COP = (v) => fmtMoneda(v, a?.moneda || "COP");
   async function analizar() {
@@ -372,10 +374,45 @@ export function ExtractoModal({ cat, bancoId: bancoInicial, onClose, onListo }) 
     setOcupado(true); setError("");
     try {
       const r = await tesAplicarExtracto(a.token, [...aprobados], guardarSaldos);
-      onListo(`Extracto de ${r.banco}: ${r.creados} movimiento(s) registrados${r.noAprobados ? `, ${r.noAprobados} no aprobados` : ""}${r.verificados ? `, ${r.verificados} verificados` : ""}${r.saldosGuardados ? " y saldos del banco guardados" : ""}.`);
+      setHecho({ ...r, mensaje: `Extracto de ${r.banco}: ${r.creados} movimiento(s) registrados${r.noAprobados ? `, ${r.noAprobados} no aprobados` : ""}${r.verificados ? `, ${r.verificados} verificados` : ""}${r.saldosGuardados ? " y saldos del banco guardados" : ""}.` });
+      setOcupado(false);
     } catch (e) { setError(e.message); setOcupado(false); }
   }
   const alternar = (clave) => setAprobados((s) => { const n = new Set(s); if (n.has(clave)) n.delete(clave); else n.add(clave); return n; });
+  async function correrAgentes() {
+    setAgente({ estado: "corriendo" });
+    try {
+      const [mov, pag] = await Promise.all([tesBuscarPropuestas({}), tesBuscarPropuestas({ agente: "pagos", alcance: "todos", anio: Number(a.hasta.slice(0, 4)), mes: Number(a.hasta.slice(5, 7)) })]);
+      setAgente({ estado: "listo", propuestas: (mov.propuestas || 0) + (pag.propuestas || 0), alta: (mov.porConfianza?.alta || 0) + (pag.porConfianza?.alta || 0) });
+    } catch (e) { setAgente({ estado: "error", error: e.message }); }
+  }
+  // Paso siguiente a aprobar: el flujo del mes (extracto → asociar con el agente → conciliar).
+  if (hecho) {
+    const anioEx = Number(a.hasta.slice(0, 4));
+    const mesEx = Number(a.hasta.slice(5, 7));
+    return (
+      <Modal titulo="Extracto registrado" sub={hecho.mensaje} onClose={() => onListo(hecho.mensaje)} ancho={720}
+        pie={<><div className="spacer" /><button type="button" className="btn" onClick={() => onListo(hecho.mensaje)}>Listo, lo hago después</button></>}>
+        <div className="tes-flujo">
+          <div className="tes-flujo-paso ok"><span>1</span><div><strong>Extracto subido</strong><small>{hecho.creados} nuevo(s) · {hecho.verificados} confirmado(s) por el banco{hecho.noAprobados ? ` · ${hecho.noAprobados} sin aprobar (quedan en Por resolver)` : ""}</small></div></div>
+          <div className={`tes-flujo-paso${agente?.estado === "listo" ? " ok" : ""}`}><span>2</span>
+            <div><strong>Asociar cada movimiento con su pago</strong>
+              <small>{!agente ? "Los agentes buscan el pago de los movimientos nuevos y el movimiento de los pagos que ya debían estar pagados. Solo proponen: tú apruebas." : agente.estado === "corriendo" ? "Buscando…" : agente.estado === "error" ? agente.error : `${agente.propuestas} propuesta(s), ${agente.alta} de confianza alta.`}</small>
+            </div>
+            {!agente || agente.estado === "error" ? <button type="button" className="btn btn-primary small" onClick={correrAgentes}><IconSpark size={12} /> Buscar ahora</button>
+              : agente.estado === "corriendo" ? <span className="spinner" />
+                : <a className="btn small btn-primary" href="/tesoreria/agentes">Revisar propuestas</a>}
+          </div>
+          <div className="tes-flujo-paso"><span>3</span><div><strong>Conciliar {MESES[mesEx - 1].toLowerCase()}</strong><small>Ver si lo registrado da el saldo del banco y resolver lo que falte.</small></div>
+            <a className="btn small" href={`/tesoreria/conciliacion?anio=${anioEx}&mes=${mesEx}&bancoId=${a.bancoId}`}>Ir a conciliar</a>
+          </div>
+          <div className="tes-flujo-paso"><span>4</span><div><strong>Subir los soportes</strong><small>Los comprobantes de los pagos del mes, varios a la vez.</small></div>
+            <a className="btn small" href="/tesoreria/por-resolver">Ir a Por resolver</a>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
   // Cómo queda el saldo final con lo que está marcado.
   const netoMarcado = a ? a.nuevos.filter((m) => aprobados.has(m.clave)).reduce((x, m) => x + (m.tipo === "credito" ? m.valor : -m.valor), 0) : 0;
   const finalMarcado = a?.saldos.sistemaFinal != null ? a.saldos.sistemaFinal + netoMarcado : null;
@@ -468,6 +505,82 @@ export function ExtractoModal({ cat, bancoId: bancoInicial, onClose, onListo }) 
           <label className="tes-check"><span>Guardar los saldos del extracto como saldo del banco (el mes siguiente arranca con el saldo final de este)</span><input type="checkbox" checked={guardarSaldos} onChange={(e) => setGuardarSaldos(e.target.checked)} /></label>
         )}
       </>}
+      {error && <p className="modal-error">{error}</p>}
+    </Modal>
+  );
+}
+
+// «Subir varios soportes»: se eligen varios comprobantes (PDF o fotos) y Nova lee cada uno; para cada recibo se propone
+// el movimiento del banco que corresponde (mismo valor, ±3 días, mismo sentido). La persona revisa y adjunta los que
+// quiera de una vez; los que no tienen movimiento se registran después con «Registrar con soporte».
+export function SoportesLoteModal({ onClose, onListo }) {
+  const [filas, setFilas] = useState([]); // { archivo, estado, leido, opciones, elegido, duplicado, error }
+  const [leyendo, setLeyendo] = useState(false);
+  const [adjuntando, setAdjuntando] = useState(false);
+  const [error, setError] = useState("");
+  const fileRef = useRef(null);
+  async function elegir(lista) {
+    const nuevos = [...lista].filter((f) => /pdf|image/.test(f.type) || /\.(pdf|jpe?g|png|webp|heic)$/i.test(f.name)).slice(0, 25);
+    if (!nuevos.length) { setError("Elige comprobantes en PDF o fotos (JPG, PNG)."); return; }
+    setError("");
+    const base = filas.length;
+    setFilas((x) => [...x, ...nuevos.map((archivo) => ({ archivo, estado: "pendiente" }))]);
+    setLeyendo(true);
+    for (let i = 0; i < nuevos.length; i++) {
+      setFilas((x) => x.map((r, k) => (k === base + i ? { ...r, estado: "leyendo" } : r)));
+      try {
+        const r = await tesLeerSoporte(nuevos[i]);
+        const opciones = (r.coincidencias || []).filter((c) => !c.soportes);
+        setFilas((x) => x.map((f, k) => (k === base + i ? { ...f, estado: "leido", leido: r.leido, opciones, todas: r.coincidencias || [], elegido: !r.duplicado && opciones.length === 1 ? opciones[0].id : "", duplicado: r.duplicado } : f)));
+      } catch (e) {
+        setFilas((x) => x.map((f, k) => (k === base + i ? { ...f, estado: "error", error: e.message } : f)));
+      }
+    }
+    setLeyendo(false);
+  }
+  const listos = filas.filter((f) => f.estado === "leido" && f.elegido && !f.duplicado);
+  async function adjuntar() {
+    setAdjuntando(true); setError("");
+    let ok = 0;
+    for (const f of listos) {
+      try { await tesAgregarSoporte(Number(f.elegido), f.archivo); ok++; setFilas((x) => x.map((r) => (r === f ? { ...r, estado: "adjuntado" } : r))); }
+      catch (e) { setFilas((x) => x.map((r) => (r === f ? { ...r, estado: "error", error: e.message } : r))); }
+    }
+    setAdjuntando(false);
+    if (ok === listos.length) onListo(`${ok} soporte(s) adjuntados a su movimiento.`);
+  }
+  return (
+    <Modal titulo="Subir varios soportes" sub="Elige los comprobantes (PDF o fotos, hasta 25). Nova lee cada uno y te propone su movimiento del banco; nada se adjunta hasta que confirmes." onClose={onClose} ancho={980}
+      pie={<><button type="button" className="btn" onClick={onClose}>Cerrar</button><div className="spacer" /><button type="button" className="btn btn-primary" onClick={adjuntar} disabled={!listos.length || leyendo || adjuntando}>{adjuntando ? <span className="spinner" /> : null} Adjuntar {listos.length} soporte(s)</button></>}>
+      <div className="tes-lote-drop" role="button" tabIndex={0} onClick={() => fileRef.current?.click()} onKeyDown={(e) => { if (e.key === "Enter") fileRef.current?.click(); }}
+        onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); elegir(e.dataTransfer.files); }}>
+        <strong>Arrastra aquí los comprobantes o haz clic para elegirlos</strong>
+        <small>Recibos PSE, transferencias, pagos de facturas, consignaciones. Se revisa cada archivo antes de leerlo.</small>
+        <input ref={fileRef} type="file" multiple accept=".pdf,image/*" hidden onChange={(e) => { elegir(e.target.files || []); e.target.value = ""; }} />
+      </div>
+      {filas.length > 0 && (
+        <div className="tes-lote-lista">
+          {filas.map((f, i) => (
+            <div key={i} className={`tes-lote-fila ${f.estado}${f.duplicado ? " dup" : ""}`}>
+              <div className="tes-lote-arch"><strong>{f.archivo.name}</strong>
+                <small>{f.estado === "pendiente" ? "En cola…" : f.estado === "leyendo" ? "Nova está leyendo…" : f.estado === "error" ? f.error : f.estado === "adjuntado" ? "Adjuntado ✓" : f.leido ? [f.leido.fecha, f.leido.valor ? fmtMoneda(f.leido.valor, "COP") : null, f.leido.tercero].filter(Boolean).join(" · ") || "No se pudo leer el valor" : ""}</small>
+              </div>
+              <div className="tes-lote-mov">
+                {f.estado === "leyendo" && <span className="spinner" />}
+                {f.duplicado && <span className="pill muted">{f.duplicado}</span>}
+                {f.estado === "leido" && !f.duplicado && (f.opciones.length ? (
+                  <select value={f.elegido} onChange={(e) => setFilas((x) => x.map((r, k) => (k === i ? { ...r, elegido: e.target.value } : r)))} aria-label={`Movimiento para ${f.archivo.name}`}>
+                    <option value="">No adjuntar</option>
+                    {f.opciones.map((c) => <option key={c.id} value={c.id}>{c.fecha} · {c.banco} · {c.descripcion} · {c.valorTexto}</option>)}
+                  </select>
+                ) : <span className="pill warning">{f.todas?.length ? "Su movimiento ya tiene soporte" : "No hay movimiento con ese valor y fecha: regístralo con «Registrar con soporte»"}</span>)}
+                {f.estado === "leido" && !f.duplicado && f.opciones.length === 1 && <span className="pill good">Coincide</span>}
+                {f.estado === "leido" && !f.duplicado && f.opciones.length > 1 && <span className="pill accent">{f.opciones.length} posibles: elige</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {error && <p className="modal-error">{error}</p>}
     </Modal>
   );

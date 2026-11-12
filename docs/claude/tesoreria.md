@@ -70,3 +70,17 @@ Conciliación starts each month from `saldoInicialPrevio`, so it also follows th
 - **Account × month map:** colored by `meses[].estado`, one of confirmado / diferencia / parcial / estimado / futuro / sinDatos (`reporteSaldos`).
 - **Selected month in words:** «empezó con X», where X comes from `inicioFuente`: extracto / digitado / estimado. Then it came in, it went out, it ended at Y, and what the bank says.
 - **Saldo inicial del año:** collapsible. It is only needed when the December extract is missing.
+
+**Operator and manager (after the two-week simulation).**
+- **Por resolver** (`/tesoreria/por-resolver`, `lib/tesoreria/porResolver.js#porResolver`): the operator's inbox, in the order of the month's flow.
+  1. Closed months without an extract, and unapproved extract lines.
+  2. Movements without a pago, and the agents' proposals.
+  3. Pagos with a difference.
+  4. Pagos with a movement but no receipt.
+- **Vencidos heredados:** `vistaVencidosHeredados` / `marcarPagadosEnBloque`, at `GET/POST /api/tesoreria/pagos/vencidos-heredados`. The person unticks the ones still unpaid. It writes one audit entry and sends no notice per pago, and it does not touch closed months.
+- **Extract approved:** the modal shows the next steps — run both agents, conciliate the month, upload receipts.
+- **Subir varios soportes** (`SoportesLoteModal`): Nova reads each receipt (`/api/tesoreria/soporte/leer`) and proposes its movement (same value, ±3 days). Nothing is attached until confirmed.
+- **Proyección de caja** (`proyeccionCaja`, `GET /api/tesoreria/proyeccion`, Nova tool `proyeccion_caja_tesoreria`, «¿Alcanza la plata?» card on the dashboard): today's balance of each account (by bank-name match against the medio de pago), minus what falls due in the period, plus what comes in. Overdue items and medios without an account are shown separately.
+- **Notifications:**
+  - New event `tesoreria.pago_con_diferencia`, published by `eventos.js#publicarPagoPagado` when the associated amount differs from the scheduled one.
+  - For Tesorería events the daily summary is listed first, as recommended.

@@ -9,7 +9,7 @@ import { MODULOS } from "@/lib/modulos";
 import { useModulo } from "@/components/ModuloShell";
 import {
   IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail,
-  IconBell, IconBuilding, IconEye, IconCalendar, IconBag, IconHeart, IconList, IconCheck, IconClock, IconSearch, IconPanel, IconSun, IconMoon, IconBox } from "@/components/icons";
+  IconBell, IconBuilding, IconEye, IconCalendar, IconBag, IconHeart, IconList, IconCheck, IconClock, IconSearch, IconPanel, IconSun, IconMoon, IconBox, IconInbox } from "@/components/icons";
 import { fetchCompartidosApi } from "@/lib/api";
 import { crossfade } from "@/lib/crossfade";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
@@ -71,6 +71,7 @@ const GRUPOS = {
       titulo: "Día a día",
       items: [
         { key: "tesoreria", href: "/tesoreria", label: "Dashboard", buscar: "Dashboard · Resumen · Tesorería", Icon: IconDashboard, permite: (u) => !!u.tesoreria },
+        { key: "tesoreria-por-resolver", href: "/tesoreria/por-resolver", label: "Por resolver", buscar: "Por resolver · extractos, asociar, diferencias, soportes · Tesorería", Icon: IconInbox, permite: (u) => !!u.tesoreria },
         { key: "tesoreria-movimientos", href: "/tesoreria/movimientos", label: "Movimientos", buscar: "Movimientos del banco · Tesorería", Icon: IconTable, permite: (u) => !!u.tesoreria },
         { key: "tesoreria-pagos", href: "/tesoreria/pagos", label: "Pagos programados", buscar: "Pagos programados · Tesorería", Icon: IconCalendar, permite: (u) => !!u.tesoreria },
         { key: "tesoreria-periodicos", href: "/tesoreria/periodicos", label: "Gastos periódicos", buscar: "Gastos periódicos · Tesorería", Icon: IconHistory, permite: (u) => !!u.tesoreria },

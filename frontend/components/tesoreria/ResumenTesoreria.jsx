@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { tesResumen } from "@/lib/tesoreriaApi";
+import { tesResumen, tesProyeccion } from "@/lib/tesoreriaApi";
 import { fmtMoneda, fmtMonedaCorta } from "@/lib/moneda";
 import { crossfade } from "@/lib/crossfade";
 import KpiExplain from "@/components/KpiExplain";
@@ -145,6 +145,8 @@ export default function ResumenTesoreria() {
         <Link className="kpi tes-dash-kpi" href="/tesoreria/agentes"><div className="label">Movimientos sin asociar</div><div className="value">{t.movimientos.sinAsociar.toLocaleString("es-CO")}</div><div className="foot">de {t.movimientos.total} · {d.propuestas.total} propuesta(s) del agente</div></Link>
       </div>
 
+      <ProyeccionCaja />
+
       {/* Flujo de caja / Resumen ejecutivo */}
       <div className="grid-2">
         <div className="card">
@@ -251,6 +253,44 @@ function Barra({ nombre, n, total, color, detalle = null }) {
       <div className="name">{nombre}</div>
       <div className="track"><div className="fill" style={{ width: `${pct}%`, background: color }} /></div>
       <div className="figs"><span className="n">{n.toLocaleString("es-CO")} · {Math.round(pct)}%</span>{detalle && <span className="c">{detalle}</span>}</div>
+    </div>
+  );
+}
+
+// ¿Alcanza la plata? Por cada cuenta: saldo de hoy (real o estimado) − lo que vence en el período con esa cuenta + lo que
+// entra = saldo proyectado. Lo atrasado y los pagos con medios que no son una cuenta (tarjeta, efectivo, otra empresa)
+// van aparte. Cifras de /api/tesoreria/proyeccion (lib/tesoreria/porResolver.js#proyeccionCaja).
+function ProyeccionCaja() {
+  const [periodo, setPeriodo] = useState("esta_semana");
+  const [p, setP] = useState(null);
+  useEffect(() => { setP(null); tesProyeccion(periodo).then(setP).catch(() => setP({ error: true })); }, [periodo]);
+  return (
+    <div className="card tes-proy" style={{ marginBottom: 14 }}>
+      <div className="card-head">
+        <div><h3>¿Alcanza la plata?</h3><p className="card-sub" style={{ margin: 0 }}>Saldo de hoy de cada cuenta frente a lo que vence {p?.periodo ? `(${p.periodo})` : ""} con esa cuenta.</p></div>
+        <div className="dash-tabs" role="tablist" aria-label="Período">{[["esta_semana", "Esta semana"], ["proxima_semana", "Próxima"], ["este_mes", "Este mes"]].map(([k, t]) => <button key={k} type="button" role="tab" className="dash-tab" aria-selected={periodo === k} onClick={() => setPeriodo(k)}>{t}</button>)}</div>
+      </div>
+      {!p && <span className="spinner" />}
+      {p?.error && <div className="empty compacta">No se pudo calcular la proyección.</div>}
+      {p && !p.error && (
+        <>
+          <div className="tes-proy-grid">
+            {p.cuentas.map((c) => (
+              <div key={c.bancoId} className={`tes-proy-cta ${c.alcanza == null ? "nd" : c.alcanza ? (c.alcanzaConVencidos ? "ok" : "justo") : "mal"}`}>
+                <div className="tes-proy-top"><strong>{c.banco}</strong>{c.alcanza == null ? <span className="pill muted">Sin saldo</span> : c.alcanza ? (c.alcanzaConVencidos ? <span className="pill good">Alcanza</span> : <span className="pill warning">Alcanza, sin lo atrasado</span>) : <span className="pill critical">No alcanza</span>}</div>
+                <div className="tes-proy-eq">
+                  <span>Hoy <b className="tes-num">{c.textos.saldoHoy}</b>{c.saldoHoy != null && !c.confirmado && <i> (estimado)</i>}</span>
+                  <span>− vence <b className="tes-num tes-neg">{c.textos.sale}</b></span>
+                  {c.entra > 0 && <span>+ entra <b className="tes-num tes-pos">{c.textos.entra}</b></span>}
+                  <span className="tes-proy-res">= queda <b className="tes-num">{c.textos.proyectado}</b></span>
+                </div>
+                {c.vencido > 0 && <small>Además hay {c.textos.vencido} atrasados que se pagan con esta cuenta.</small>}
+              </div>
+            ))}
+          </div>
+          {p.otrosMedios.length > 0 && <p className="card-sub" style={{ margin: "10px 0 0" }}>Con otros medios (sin cuenta registrada): {p.otrosMedios.map((o) => `${o.medio}: vence ${o.textos.sale}${o.vencido ? ` + ${o.textos.vencido} atrasado` : ""}`).join(" · ")}.</p>}
+        </>
+      )}
     </div>
   );
 }

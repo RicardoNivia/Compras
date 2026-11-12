@@ -6138,3 +6138,44 @@ tr.tes-ex-no td{ opacity:.45; text-decoration:line-through; }
 .pg-repite-fechas{ display:flex; flex-wrap:wrap; gap:6px; }
 .pg-repite-t > span{ display:block; }
 .pg-repite-t > span small{ display:block; margin-top:4px; }
+
+/* Por resolver (PorResolverTesoreria.jsx): flujo del mes y secciones. */
+.pr-flujo{ display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; }
+.pr-paso{ display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:var(--r); border:1px solid var(--border); background:var(--surface); text-decoration:none; color:inherit; box-shadow:var(--elev); border-top:3px solid var(--warning); transition:transform .15s ease; }
+.pr-paso:hover{ transform:translateY(-1px); }
+.pr-paso.ok{ border-top-color:var(--good); }
+.pr-paso-n{ width:28px; height:28px; flex:none; display:grid; place-items:center; border-radius:50%; font-weight:800; color:#fff; background:linear-gradient(135deg, var(--marca), var(--marca-2)); }
+.pr-paso.ok .pr-paso-n{ background:var(--good); }
+.pr-paso-txt{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.pr-paso-txt small{ font-size:11.5px; color:var(--muted); }
+.pr-sec{ display:flex; flex-direction:column; gap:8px; scroll-margin-top:80px; }
+.pr-sub{ margin:10px 0 2px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+@media (max-width: 900px){ .pr-flujo{ grid-template-columns:1fr 1fr; } }
+/* Extracto aprobado: siguientes pasos. */
+.tes-flujo{ display:flex; flex-direction:column; gap:10px; }
+.tes-flujo-paso{ display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:var(--r); border:1px solid var(--border); background:var(--surface); }
+.tes-flujo-paso > span{ width:28px; height:28px; flex:none; display:grid; place-items:center; border-radius:50%; font-weight:800; color:#fff; background:linear-gradient(135deg, var(--marca), var(--marca-2)); }
+.tes-flujo-paso.ok > span{ background:var(--good); }
+.tes-flujo-paso > div{ flex:1; display:flex; flex-direction:column; gap:2px; min-width:0; }
+.tes-flujo-paso small{ font-size:11.5px; color:var(--ink-2); }
+/* Subir varios soportes. */
+.tes-lote-drop{ display:flex; flex-direction:column; align-items:center; gap:4px; padding:22px; border:2px dashed color-mix(in srgb, var(--marca) 40%, var(--border)); border-radius:var(--r); background:color-mix(in srgb, var(--marca) 4%, var(--surface)); cursor:pointer; text-align:center; }
+.tes-lote-drop small{ color:var(--muted); font-size:11.5px; }
+.tes-lote-lista{ display:flex; flex-direction:column; gap:6px; max-height:420px; overflow:auto; }
+.tes-lote-fila{ display:grid; grid-template-columns:minmax(200px, 1fr) minmax(260px, 1.4fr); gap:10px; align-items:center; padding:10px 12px; border:1px solid var(--border); border-radius:var(--r); background:var(--surface); }
+.tes-lote-fila.adjuntado{ border-color:var(--good); background:color-mix(in srgb, var(--good) 6%, var(--surface)); }
+.tes-lote-fila.error{ border-color:var(--critical); }
+.tes-lote-arch{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.tes-lote-arch strong{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tes-lote-arch small{ font-size:11.5px; color:var(--ink-2); }
+.tes-lote-mov{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.tes-lote-mov select{ flex:1; min-width:220px; }
+/* ¿Alcanza la plata? (Dashboard de Tesorería). */
+.tes-proy-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; }
+.tes-proy-cta{ display:flex; flex-direction:column; gap:8px; padding:12px 14px; border-radius:var(--r); border:1px solid var(--border); border-left:4px solid var(--border); background:var(--surface); }
+.tes-proy-cta.ok{ border-left-color:var(--good); } .tes-proy-cta.justo{ border-left-color:var(--warning); } .tes-proy-cta.mal{ border-left-color:var(--critical); background:color-mix(in srgb, var(--critical) 5%, var(--surface)); }
+.tes-proy-top{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.tes-proy-eq{ display:flex; flex-wrap:wrap; gap:4px 12px; font-size:12px; color:var(--ink-2); }
+.tes-proy-eq i{ color:var(--warning); font-style:normal; font-size:11px; }
+.tes-proy-res b{ font-size:14px; color:var(--ink); }
+.tes-proy-cta small{ font-size:11.5px; color:var(--warning); }

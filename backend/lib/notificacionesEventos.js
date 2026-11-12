@@ -287,6 +287,8 @@ export function itemDeEvento(ev) {
     }
     case "tesoreria.pago_pagado":
       return { ref: "Pagado", titulo: d.concepto || "(sin concepto)", contexto: [d.item, d.medio, d.paga].filter(Boolean).join(" · "), detalle: `${d.via || "Pasó a E"}${d.pagadoEl ? ` · el ${d.pagadoEl}` : ""}${d.banco ? ` · ${d.banco}` : ""}${d.actualizadoPor ? ` · por ${d.actualizadoPor}` : ""}`, dato: d.valorTexto || null, href: `/tesoreria/pagos?id=${d.pagoId}` };
+    case "tesoreria.pago_con_diferencia":
+      return { ref: "Diferencia", titulo: d.concepto || "(sin concepto)", contexto: [d.item, d.banco].filter(Boolean).join(" · "), detalle: `Programado ${d.programadoTexto} · se pagó ${d.valorTexto} (diferencia ${d.diferenciaTexto})${d.pagadoEl ? ` · el ${d.pagadoEl}` : ""}`, dato: d.diferenciaTexto || null, href: `/tesoreria/pagos?id=${d.pagoId}` };
     case "tesoreria.movimiento_registrado":
       return { ref: d.fecha || "", titulo: d.descripcion || "(sin descripción)", contexto: [d.banco, d.concepto, d.tercero].filter(Boolean).join(" · "), detalle: `${d.sentido === "sale" ? "Salió" : "Entró"} · ${d.via || "registrado"}${d.registradoPor ? ` por ${d.registradoPor}` : ""}`, dato: d.valorTexto || null, href: `/tesoreria/movimientos?id=${d.movimientoId}` };
     case "presupuesto.umbral": {

@@ -92,3 +92,9 @@ export const tesResolverPendiente = (extractoId, clave, accion) => fetch("/api/t
 export const tesVerificarMovimiento = (movimientoId, verificado = true) => fetch("/api/tesoreria/conciliacion/verificar", json("POST", { movimientoId, verificado })).then(handle);
 export const tesFirmarCierre = (anio, mes) => fetch("/api/tesoreria/cierre/firmar", json("POST", { anio, mes })).then(handle);
 export const tesReabrirCierre = (anio, mes) => fetch("/api/tesoreria/cierre/reabrir", json("POST", { anio, mes })).then(handle);
+
+// Por resolver (operador), limpieza de vencidos heredados y proyección de caja por cuenta.
+export const tesPorResolver = () => get("/api/tesoreria/por-resolver");
+export const tesVencidosHeredados = (hasta) => get(`/api/tesoreria/pagos/vencidos-heredados?${qs({ hasta })}`);
+export const tesMarcarPagadosLote = (ids, motivo) => fetch("/api/tesoreria/pagos/vencidos-heredados", json("POST", { ids, motivo })).then(handle);
+export const tesProyeccion = (periodo) => get(`/api/tesoreria/proyeccion?${qs({ periodo })}`);

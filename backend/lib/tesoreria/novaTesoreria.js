@@ -6,6 +6,7 @@ import { listMovimientos } from "@/lib/tesoreria/movimientos";
 import { reporteSaldos } from "@/lib/tesoreria/saldos";
 import { agendaPagos, estadoDePago, reporteBanco, saldosConEstado, soportesDePago } from "@/lib/tesoreria/consultas";
 import { rangoTesoreria, PERIODOS_TESORERIA } from "@/lib/tesoreria/periodos";
+import { proyeccionCaja } from "@/lib/tesoreria/porResolver";
 
 // Herramientas de Nova para Tesorería. Solo se le ofrecen a quien tiene acceso al módulo (el chat lo decide con
 // accesoDe) y cada llamada lo vuelve a comprobar. NO se publican en el servidor MCP de Claude. Son de solo lectura y
@@ -31,6 +32,11 @@ export const TOOLS_TESORERIA = [
     name: "saldos_hoy_tesoreria",
     description: "Saldo de hoy de cada banco y el total en bancos, diciendo de cada uno si está confirmado con el extracto del último mes o si es solo una estimación (saldo inicial ± movimientos registrados) porque falta el extracto. Úsala para «¿cuánta plata tengo?», «¿cuál es el saldo de X?».",
     input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "proyeccion_caja_tesoreria",
+    description: "«¿Me alcanza la plata esta semana?», «¿cuánto necesito en cada cuenta?»: por cada cuenta, el saldo de hoy frente a lo que vence en el período (por defecto esta semana) con esa cuenta como medio de pago, el saldo proyectado y si alcanza; aparte lo atrasado y los pagos con medios que no son una cuenta (tarjeta, efectivo, otra empresa). Recuerda decir si el saldo de hoy es real (confirmado con extracto) o estimado.",
+    input_schema: { type: "object", properties: { periodo: { type: "string", enum: ["esta_semana", "proxima_semana", "este_mes", "proximos_n_dias", "mes_siguiente"] } } },
   },
   {
     name: "soporte_pago_tesoreria",
@@ -105,6 +111,8 @@ export async function ejecutarTesoreria(name, args, user) {
     }
     case "saldos_hoy_tesoreria":
       return saldosConEstado();
+    case "proyeccion_caja_tesoreria":
+      return proyeccionCaja({ periodo: args.periodo || "esta_semana" });
     case "soporte_pago_tesoreria":
       return soportesDePago({ pagoId: args.pagoId, texto: args.texto });
     case "resumen_tesoreria": {

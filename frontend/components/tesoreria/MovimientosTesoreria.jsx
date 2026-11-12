@@ -8,7 +8,7 @@ import { fmtMoneda } from "@/lib/moneda";
 import { crossfade } from "@/lib/crossfade";
 import { Paginacion } from "@/components/notificaciones/ui";
 import { BotonExcel, todasLasPaginas, Celda, fechaCorta, useCatalogos, Aviso, MESES, anioActual, useAniosTesoreria } from "@/components/tesoreria/comun";
-import { FormMovimientoModal, DetalleMovimientoModal, ExtractoModal } from "@/components/tesoreria/MovimientoModales";
+import { FormMovimientoModal, DetalleMovimientoModal, ExtractoModal, SoportesLoteModal } from "@/components/tesoreria/MovimientoModales";
 
 const PAGE_SIZES = [25, 50, 100];
 // Columnas del Excel (las de la tabla y los demás campos del formulario único).
@@ -83,6 +83,7 @@ export default function MovimientosTesoreria({ acceso }) {
           <div className="tes-filtros-acciones">
             <button type="button" className="btn" onClick={() => setModal({ tipo: "extracto" })} disabled={!cat?.bancos.length}>Subir extracto o movimientos</button>
             <button type="button" className="btn" onClick={() => setModal({ tipo: "form", conSoporte: true })} disabled={!cat?.bancos.length}>Registrar con soporte</button>
+            <button type="button" className="btn" onClick={() => setModal({ tipo: "lote" })}>Subir varios soportes</button>
             <button type="button" className="btn btn-primary" onClick={() => setModal({ tipo: "form" })} disabled={!cat?.bancos.length}>+ Registrar movimiento</button>
           </div>
         )}
@@ -135,6 +136,7 @@ export default function MovimientosTesoreria({ acceso }) {
       {modal?.tipo === "form" && cat && <FormMovimientoModal cat={cat} movimiento={modal.mov} conSoporte={!!modal.conSoporte} onClose={() => setModal(null)} onSaved={(_m, msg, seguir) => { if (seguir) cargar(); else { setModal(null); cambio(msg); } }} />}
       {modal?.tipo === "detalle" && cat && <DetalleMovimientoModal id={modal.id} cat={cat} puedeRegistrar={puedeRegistrar} onClose={() => setModal(null)} onCambio={cambio} onEditar={(mov) => setModal({ tipo: "form", mov })} />}
       {modal?.tipo === "extracto" && cat && <ExtractoModal cat={cat} onClose={() => setModal(null)} onListo={(msg) => { setModal(null); cambio(msg); }} />}
+      {modal?.tipo === "lote" && <SoportesLoteModal onClose={() => setModal(null)} onListo={(msg) => { setModal(null); cambio(msg); }} />}
       <Aviso texto={aviso} onCerrar={() => setAviso("")} />
     </div>
   );

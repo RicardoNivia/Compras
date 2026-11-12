@@ -182,6 +182,7 @@ export const EVENTOS = {
   "proveedor.ciclo_cambio": { fuente: "proveedores", label: "Cambia el estado del ciclo de un proveedor", accion: "cambia el estado del ciclo de un proveedor", filtros: ["estadoCiclo", "proveedor"] },
   "presupuesto.actualizado": { fuente: "presupuesto", label: "Se configura, modifica o elimina un presupuesto", accion: "se configura o modifica un presupuesto", filtros: ["area"] },
   "tesoreria.pago_pagado": { fuente: "tesoreria", label: "Un pago programado pasa a pagado (E)", accion: "se paga un pago programado", filtros: ["item", "texto"] },
+  "tesoreria.pago_con_diferencia": { fuente: "tesoreria", label: "Un pago se paga por un valor distinto al programado", accion: "se paga algo por un valor distinto al programado", filtros: ["item", "texto"] },
   "tesoreria.movimiento_registrado": { fuente: "tesoreria", label: "Se registra un movimiento del banco", accion: "se registra un movimiento del banco", filtros: ["banco", "sentido", "texto"] },
   "presupuesto.umbral": { fuente: "presupuesto", label: "Se supera el 80 % o el 100 % del presupuesto (general, por área o por categoría)", accion: "se supera el 80 % o el 100 % de un presupuesto", filtros: ["nivel", "area", "soloExcedido"] },
 };
@@ -308,7 +309,9 @@ function preguntasEvento(regla) {
     return faltan;
   }
   if (!regla.agrupacion) {
-    faltan.push({ id: "agrupacion", texto: "¿Te aviso apenas pase cada una o prefieres agruparlas?", opciones: Object.entries(AGRUPACIONES).map(([valor, etiqueta]) => ({ valor, etiqueta })) });
+    // Tesorería genera muchos eventos (cada pago y cada movimiento): el resumen diario va primero, como recomendado.
+    const orden = ev.fuente === "tesoreria" ? ["resumen_diario", "inmediato", "cada_15_min"] : Object.keys(AGRUPACIONES);
+    faltan.push({ id: "agrupacion", texto: "¿Te aviso apenas pase cada una o prefieres agruparlas?", opciones: orden.map((valor) => ({ valor, etiqueta: ev.fuente === "tesoreria" && valor === "resumen_diario" ? `${AGRUPACIONES[valor]} (recomendado)` : AGRUPACIONES[valor] })) });
   }
   if (regla.agrupacion === "resumen_diario" && !regla.hora) {
     faltan.push({ id: "hora", texto: "¿A qué hora te envío el resumen del día?", opciones: [["08:00", "8:00 a. m."], ["12:00", "12:00 p. m."], ["17:00", "5:00 p. m."], ["18:00", "6:00 p. m."]].map(([valor, etiqueta]) => ({ valor, etiqueta })), permiteTexto: true });

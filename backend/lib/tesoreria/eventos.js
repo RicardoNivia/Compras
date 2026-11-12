@@ -13,7 +13,7 @@ const despues = (fn) => setTimeout(() => { fn().catch(() => {}); }, 1200);
 // via: cómo pasó a E («asociado al movimiento del banco», «marcado a mano», «aprobado desde el agente»…).
 export function publicarPagoPagado(pagoId, actor, via) {
   despues(async () => {
-    const p = await prisma.pagoProgramado.findUnique({ where: { id: Number(pagoId) }, include: { asociaciones: { include: { movimiento: { select: { fecha: true, bancoId: true } } } } } });
+    const p = await prisma.pagoProgramado.findUnique({ where: { id: Number(pagoId) }, include: { asociaciones: { select: { valor: true, movimiento: { select: { fecha: true, bancoId: true } } } } } });
     if (!p || p.estado !== "E") return;
     const m = await mapasCatalogos();
     const mov = p.asociaciones.map((a) => a.movimiento).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
@@ -29,6 +29,15 @@ export function publicarPagoPagado(pagoId, actor, via) {
         sentido: Number(p.valor) < 0 ? "sale" : "entra", actualizadoPor: actor?.nombre || null,
       },
     });
+    // Pagado por un valor distinto al programado (lo asociado no da lo que se esperaba).
+    const asociado = p.asociaciones.reduce((s, a) => s + Number(a.valor), 0);
+    const programado = Math.abs(Number(p.valor));
+    if (p.asociaciones.length && Math.abs(asociado - programado) > 0.5) {
+      await publicarEvento("tesoreria.pago_con_diferencia", {
+        entidadId: p.id, clave: `tesoreria.pago_con_diferencia|${p.id}|${p.updatedAt.toISOString()}`, actor,
+        datos: { pagoId: p.id, concepto: m.conceptos.get(p.conceptoId)?.nombre || p.concepto, item: p.itemId ? m.items.get(p.itemId)?.nombre : null, medio: p.medioPagoId ? m.medios.get(p.medioPagoId)?.nombre : null, valor: asociado, valorTexto: fmtMoneda(asociado, p.moneda), programadoTexto: fmtMoneda(programado, p.moneda), diferenciaTexto: fmtMoneda(asociado - programado, p.moneda), pagadoEl: mov?.fecha || null, banco: mov ? m.bancos.get(mov.bancoId)?.nombre : null, actualizadoPor: actor?.nombre || null },
+      });
+    }
   });
 }
 
