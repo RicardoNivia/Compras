@@ -181,6 +181,25 @@ function limpiarValores(v) {
 }
 
 // El mapeo vuelve del navegador al confirmar: se valida como cualquier otra entrada.
+// Las exportaciones de Microsoft Forms traen una columna «Nombre» vacía (la del usuario del formulario anónimo) junto a
+// «Nombre completo» con los datos. Si la columna de nombre elegida está vacía en la mayoría de las filas, se usa la
+// columna cuyo encabezado habla de nombre (de preferencia «completo») que sí tiene datos. Sin IA: corrige el mapeo.
+function corregirColumnaNombre(columnas, ws, filaEncabezado) {
+  if (!ws) return;
+  const filas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+  const encabezados = filaEncabezado >= 0 ? filas[filaEncabezado] || [] : [];
+  const datos = filas.slice(filaEncabezado + 1).filter((r) => r.some((v) => String(v).trim()));
+  if (!datos.length) return;
+  const llenas = (c) => datos.filter((r) => String(r[c] ?? "").trim()).length / datos.length;
+  if (columnas.nombre >= 0 && llenas(columnas.nombre) >= 0.5) return;
+  const sinT = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const candidatas = encabezados
+    .map((h, c) => ({ c, h: sinT(h), llenas: llenas(c) }))
+    .filter((x) => /nombre|name|participante|colaborador|asistente/.test(x.h) && !/usuario|correo|email|area|cargo|empresa/.test(x.h) && x.llenas >= 0.5)
+    .sort((a, b) => (/complet/.test(b.h) - /complet/.test(a.h)) || b.llenas - a.llenas);
+  if (candidatas.length) columnas.nombre = candidatas[0].c;
+}
+
 function validarMapeo(m, wb) {
   if (!m || typeof m !== "object" || !wb.SheetNames.includes(m.hoja)) throw badRequest("Nova no pudo identificar la hoja con los datos. Revisa el archivo.");
   const columnas = {};
@@ -190,9 +209,11 @@ function validarMapeo(m, wb) {
   }
   const f = Number(m.filaEncabezado);
   const escala = Number(m.escalaMaxima);
+  const filaEncabezado = Number.isInteger(f) && f >= -1 ? f : -1;
+  corregirColumnaNombre(columnas, wb.Sheets[m.hoja], filaEncabezado);
   return {
     hoja: m.hoja,
-    filaEncabezado: Number.isInteger(f) && f >= -1 ? f : -1,
+    filaEncabezado,
     columnas,
     todasAsistieron: m.todasAsistieron === true,
     escalaMaxima: Number.isFinite(escala) && escala > 0 ? escala : 5,
@@ -294,7 +315,7 @@ export async function importarConNova(actividadId, buffer, { tipo, mapeo, confir
     throw badRequest(`No encontré ${falta} en la hoja "${m.hoja}".${crudo.explicacion ? ` Nova leyó: ${crudo.explicacion}` : ""}`);
   }
   // Antes de la actividad, no tener asistencia es lo normal (aún no se hace): la pregunta solo aplica si ya pasó.
-  const yaPaso = !actividad.fecha || actividad.fecha <= new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
+  const yaPaso = !!actividad.fecha && actividad.fecha <= new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
   const resultado = await aplicarParticipantes(actividad, participantes, { modo, noMarcadosNoAsistieron: modo === "asistentes" && noMarcadosNoAsistieron, sinDatoComoAsistio: yaPaso && sinDatoComo !== "sin_asignar", actor, origen: "importacion", simular: !confirmar });
   if (confirmar) {
     logParticipantes(actor, actividad, "importar", `Importó ${def.etiqueta} con Nova (hoja "${m.hoja}"): ${resultado.creados} nuevos, ${resultado.actualizados} actualizados${resultado.marcadosNo ? `, ${resultado.marcadosNo} marcados como no asistieron` : ""}${resultado.marcadosSi ? `, ${resultado.marcadosSi} sin asistencia registrada marcados como asistieron` : ""}`).catch(() => {});

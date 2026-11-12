@@ -618,6 +618,8 @@ const jsonPost = (url, method, data) => fetch(url, { method, headers: { "Content
 export const fetchParticipantesApi = (actividadId) => fetch(`/api/actividades/${actividadId}/participantes`, { cache: "no-store" }).then(handle);
 export const crearParticipanteApi = (actividadId, data) => jsonPost(`/api/actividades/${actividadId}/participantes`, "POST", data);
 export const actualizarParticipanteApi = (actividadId, id, data) => jsonPost(`/api/actividades/${actividadId}/participantes/${id}`, "PUT", data);
+// Borra la lista completa de participantes (con su asistencia) de la actividad.
+export const eliminarTodosLosParticipantesApi = (actividadId) => fetch(`/api/actividades/${actividadId}/participantes`, { method: "DELETE" }).then(handle);
 export const eliminarParticipanteApi = (actividadId, id) => fetch(`/api/actividades/${actividadId}/participantes/${id}`, { method: "DELETE" }).then(handle);
 
 export function importarParticipantesApi(actividadId, archivo, { modo = "inscripcion", noMarcadosNoAsistieron = false } = {}) {

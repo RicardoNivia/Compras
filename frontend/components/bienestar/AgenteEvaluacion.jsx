@@ -131,7 +131,7 @@ function ModalAgente({ onClose }) {
                         <td><span className="desc-tooltip-wrap"><span className="desc-text">{a.nombre}</span><span className="desc-tooltip-bubble">{a.nombre}</span></span></td>
                         <td>{a.linea}</td>
                         <td><span className="desc-tooltip-wrap"><span className="desc-text">{a.motivos.join(" · ")}</span><span className="desc-tooltip-bubble">{a.motivos.join(" · ")}</span></span></td>
-                        <td className="num">{a.puntajeActual != null ? `★ ${a.puntajeActual}` : "—"}</td>
+                        <td className="num">{a.puntajeActual != null ? `★ ${String(a.puntajeActual).replace(".", ",")}` : "—"}</td>
                       </tr>
                     ))}
                   </tbody>

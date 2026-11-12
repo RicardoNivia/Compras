@@ -171,7 +171,7 @@ export default function CronogramaTrayectoria({ anio, linea, actividades, onEleg
                     <span className={`tray-tallo ${y < 0 ? "arriba" : "abajo"}`} aria-hidden="true" />
                     <i aria-hidden="true">{a.asistentes ? <em>{entero(a.asistentes)}</em> : null}</i>
                     <span className="tray-etiqueta">
-                      {a.puntajeNova != null && <span className="nova-puntaje" title={`Nova la calificó con ${a.puntajeNova} de 5`}>★ {a.puntajeNova}</span>}
+                      {a.puntajeNova != null && <span className="nova-puntaje" title={`Nova la calificó con ${String(a.puntajeNova).replace(".", ",")} de 5`}>★ {String(a.puntajeNova).replace(".", ",")}</span>}
                       <small>{Number(a.fecha.slice(8, 10))} {MES_CORTO[Number(a.fecha.slice(5, 7)) - 1]}{a.fechaFin ? ` · ${diasDeActividad(a)} días` : ""}</small>
                       <b>{a.nombre}</b>
                     </span>

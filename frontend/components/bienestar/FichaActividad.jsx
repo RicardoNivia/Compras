@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { fmtCOP, fmtDateTime } from "@/lib/format";
 import {
-  fetchActividadApi, updateActividadApi, fetchParticipantesApi, actualizarParticipanteApi, eliminarParticipanteApi,
+  fetchActividadApi, updateActividadApi, fetchParticipantesApi, actualizarParticipanteApi, eliminarParticipanteApi, eliminarTodosLosParticipantesApi,
   crearParticipanteApi, fetchInventarioApi, generarAnalisisActividadApi, fetchMaestroTipoApi, crearItemApi,
   actualizarItemApi, eliminarItemApi, importarInventarioApi, fetchPlantillasFormularioApi, configurarFormularioApi,
   asociarCompraApi, desasociarCompraApi, salidaBodegaApi,
@@ -426,6 +426,15 @@ function TabParticipantes({ act, puedeEditar, onCambio }) {
         </div>
         <div className="filter-actions">
           <button type="button" className="btn" onClick={exportarCsv}><IconDownload size={13} /> CSV</button>
+          {puedeEditar && lista?.length > 0 && (
+            <button type="button" className="btn btn-danger-outline" onClick={async () => {
+              const conOpinion = lista.filter((x) => x.calificacion != null || x.observacion).length;
+              if (!(await confirmar({ titulo: "Eliminar toda la asistencia", mensaje: `¿Borrar la lista completa de «${act.nombre}»? Se eliminan las ${lista.length} persona(s) con su asistencia${conOpinion ? `, y ${conOpinion} calificación(es) o comentario(s)` : ""}.`, detalle: "Solo se borran las calificaciones y comentarios de esas personas. La calificación y el comentario de cierre, las notas del equipo y las observaciones de la actividad no se tocan. No se puede deshacer; puedes volver a importar la lista. Queda en Auditoría.", boton: "Sí, borrar todo", peligro: true }))) return;
+              setError("");
+              try { await eliminarTodosLosParticipantesApi(act.id); } catch (e) { setError(e.message); }
+              cargar(); onCambio();
+            }}><IconTrash size={13} /> Eliminar toda la asistencia</button>
+          )}
           {puedeEditar && <button type="button" className="btn btn-primary" onClick={() => setNuevo(true)}><IconPlus size={13} /> Agregar persona</button>}
         </div>
       </div>

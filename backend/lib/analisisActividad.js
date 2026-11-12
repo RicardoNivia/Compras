@@ -19,7 +19,7 @@ const badRequest = (msg, status = 400) => Object.assign(new Error(msg), { status
 const SCHEMA = {
   type: "object",
   properties: {
-    puntaje: { type: "integer", description: "Puntaje de la actividad de 1 (muy mal) a 5 (excelente), según la rúbrica." },
+    puntaje: { type: "number", description: "Puntaje de la actividad de 1.0 (muy mal) a 5.0 (excelente) con UN decimal (p. ej. 4.6), según la rúbrica." },
     titulo: { type: "string", description: "Una frase corta que resuma cómo salió (máx. 90 caracteres)." },
     resumen: { type: "string", description: "Dos o tres frases que expliquen el puntaje con las cifras recibidas." },
     puntos: {
@@ -46,6 +46,9 @@ const SISTEMA = `Eres Nova, la analista del módulo de Bienestar de Sinco. Escri
 Recibes los datos YA CALCULADOS de una actividad que ya se realizó y la evalúas de 1 a 5 con esta rúbrica:
 asistencia frente a inscritos, gasto frente a presupuesto, satisfacción de quienes asistieron y aprovechamiento del
 inventario. 5 = cumplió muy bien en todo lo medible; 3 = resultado aceptable con desvíos claros; 1 = desvíos graves.
+El puntaje lleva UN decimal (4,6; 3,8…): un detalle menor resta décimas, nunca un punto entero.
+Asistencia de 90 % o más de los inscritos es excelente: una o pocas ausencias aisladas no son una alerta ni restan; si
+falta el motivo de quien no fue, eso es una idea («registrar el motivo de quien no asistió»), no una alerta.
 Si los datos dicen que la actividad no maneja participantes, no evalúes asistencia ni participación, no bajes el puntaje
 por eso ni lo menciones como falla: califica solo con presupuesto, gasto, inventario y la calificación de cierre.
 Reglas: usa solo los datos recibidos, nunca inventes ni recalcules cifras; un dato que falta (presupuesto sin configurar,
@@ -92,6 +95,30 @@ const SIN_ENCUESTA = `
 
 ENCUESTA: esta actividad no tiene encuesta de satisfacción (nadie la calificó). La satisfacción no es criterio: no restes puntos,
 no la cuentes como falla ni como alerta; a lo sumo, una idea para recogerla la próxima vez.`;
+const SOBRE_AUSENCIA = /asisti|asisten|inasist|particip|ausen|falt|motivo/i;
+
+// ¿Merece 5 sin discusión? Asistencia ≥ 90 % de los inscritos (solo si la actividad maneja participantes), sin quejas
+// repetidas (el patrón de la rúbrica: ≥ 3 comentarios negativos y ≥ 25 % de los que opinan, o promedio < 3,5 con ≥ 5
+// calificaciones) y sin sobrecosto (gasto > presupuesto configurado).
+async function reglaDelCinco(a) {
+  const p = a.participacion || {};
+  const inscritos = p.total ? p.inscritos : a.inscritos;
+  const asistieron = p.total ? p.asistieron : a.asistentes;
+  const ratio = a.aplicaParticipantes && inscritos > 0 ? (asistieron || 0) / inscritos : null;
+  const asistenciaAlta = ratio != null && ratio >= 0.9;
+  if (!asistenciaAlta) return { cumple: false, asistenciaAlta };
+  const [porTono, notas] = await Promise.all([
+    prisma.participanteActividad.groupBy({ by: ["sentimiento"], where: { actividadId: a.id, observacion: { not: null }, sentimiento: { in: ["positivo", "neutro", "negativo"] } }, _count: { _all: true } }),
+    prisma.observacionActividad.groupBy({ by: ["sentimiento"], where: { actividadId: a.id, sentimiento: { in: ["positivo", "neutro", "negativo"] } }, _count: { _all: true } }),
+  ]);
+  const cuenta = (t) => [...porTono, ...notas].filter((g) => g.sentimiento === t).reduce((s, g) => s + g._count._all, 0);
+  const negativos = cuenta("negativo");
+  const opinan = negativos + cuenta("positivo") + cuenta("neutro");
+  const quejasRepetidas = (negativos >= 3 && negativos >= opinan * 0.25) || (p.calificaciones >= 5 && p.calificacionPromedio < 3.5);
+  const sobrecosto = a.presupuestoConfigurado && a.gastado > a.presupuesto;
+  return { cumple: !quejasRepetidas && !sobrecosto, asistenciaAlta };
+}
+
 const SOBRE_ASISTENCIA = /asisten|inscrit|convocad|participaci|lista de asistencia|participantes/i;
 
 async function datosParaNova(a) {
@@ -166,12 +193,17 @@ export async function generarAnalisisActividad(id, { actor = null, origen = "man
     schema: SCHEMA,
     cache: false,
   });
-  const puntaje = Math.round(Number(ia?.puntaje));
+  let puntaje = Math.round(Number(ia?.puntaje) * 10) / 10;
+  const regla = await reglaDelCinco(a);
+  // Regla fija (no depende de Nova): asistencia ≥ 90 %, sin quejas repetidas y sin sobrecosto = 5.
+  if (regla.cumple && puntaje >= 1) puntaje = 5;
   const titulo = String(ia?.titulo || "").trim().slice(0, 160);
   const resumen = String(ia?.resumen || "").trim().slice(0, 1500);
   if (!(puntaje >= 1 && puntaje <= 5) || !titulo || !resumen) throw badRequest("Nova no devolvió un análisis válido. Intenta de nuevo.", 502);
   const puntos = (Array.isArray(ia.puntos) ? ia.puntos : [])
     .filter((x) => TIPOS.includes(x?.tipo) && String(x?.texto || "").trim())
+    // Con asistencia ≥ 90 %, una ausencia aislada (o su motivo sin registrar) es una idea, no una alerta.
+    .map((x) => (regla.asistenciaAlta && x.tipo === "alerta" && SOBRE_AUSENCIA.test(x.texto) ? { ...x, tipo: "idea" } : x))
     // Sin participantes, una alerta sobre asistencia o inscritos no aplica (no se llevó ese control a propósito).
     .filter((x) => a.aplicaParticipantes || !(x.tipo === "alerta" && SOBRE_ASISTENCIA.test(x.texto)))
     // Sin presupuesto configurado, tampoco hay alertas sobre presupuesto (no se evalúa).
@@ -185,7 +217,7 @@ export async function generarAnalisisActividad(id, { actor = null, origen = "man
   const data = { puntaje, titulo, resumen, puntos, origen, creadoPorUserId: actor?.id || null, creadoPorNombre: quien.nombre };
   const antes = await prisma.analisisActividad.findUnique({ where: { actividadId: a.id }, select: { id: true } });
   const row = await prisma.analisisActividad.upsert({ where: { actividadId: a.id }, create: { actividadId: a.id, ...data }, update: data });
-  logAnalisisActividad(quien, a, antes ? "editar" : "crear", `${antes ? "Regeneró" : "Generó"} el análisis de Nova (${origen}): ${puntaje} de 5`).catch(() => {});
+  logAnalisisActividad(quien, a, antes ? "editar" : "crear", `${antes ? "Regeneró" : "Generó"} el análisis de Nova (${origen}): ${String(puntaje).replace(".", ",")} de 5`).catch(() => {});
   return toClientAnalisisActividad(row);
 }
 

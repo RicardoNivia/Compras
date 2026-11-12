@@ -1,15 +1,20 @@
 -- Regla de Bienestar (2026-11-11): no debe quedar gente sin asistencia registrada. Toda persona de una actividad con
 -- asistencia en NULL ("sin registrar") pasa a "asistió". Se recalculan los conteos de cada actividad tocada (como
 -- lib/participantesBienestar.js#sincronizarConteos) y queda una entrada de Auditoría por actividad.
+-- Solo actividades que YA pasaron (fecha de hoy o anterior, hora de Colombia): en las futuras o sin fecha, no tener
+-- asistencia es lo normal (aún no se hacen) y no se tocan.
 DO $$
 DECLARE
   r RECORD;
 BEGIN
   FOR r IN
-    SELECT "actividadId" AS id, COUNT(*) AS n
-    FROM participantes_actividad
-    WHERE asistio IS NULL
-    GROUP BY "actividadId"
+    SELECT p."actividadId" AS id, COUNT(*) AS n
+    FROM participantes_actividad p
+    JOIN actividades_bienestar a ON a.id = p."actividadId"
+    WHERE p.asistio IS NULL
+      AND a.fecha IS NOT NULL
+      AND a.fecha <= to_char(now() AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD')
+    GROUP BY p."actividadId"
   LOOP
     UPDATE participantes_actividad
        SET asistio = TRUE, "motivoInasistencia" = NULL, "motivoInasistenciaId" = NULL

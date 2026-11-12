@@ -6201,3 +6201,7 @@ tr.tes-ex-no td{ opacity:.45; text-decoration:line-through; }
 
 /* Modal de confirmación global (components/Confirmar.jsx): reemplaza window.confirm / alert. */
 .confirmar-modal .confirmar-mensaje{ margin:0; font-size:14px; line-height:1.5; color:var(--ink); }
+
+/* Estrella parcial del puntaje de Nova con decimales (Estrellas en CalificacionActividad.jsx). */
+.ficha-estrella{ position:relative; }
+.ficha-estrella-parcial{ position:absolute; inset:0; display:inline-flex; padding:inherit; color:#f5a524; clip-path:inset(0 calc((1 - var(--fr)) * 100%) 0 0); }

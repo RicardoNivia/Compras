@@ -130,7 +130,7 @@ function ItemActividad({ a, onAbrir, conDia = false, mes }) {
         {conDia && <span className="cronograma-dia">{diaEnMes(a, mes)}</span>}
         <i className={`cronograma-dot ${a.estado}`} aria-hidden="true" />
         <span className="cronograma-nombre">{a.nombre}</span>
-        {a.puntajeNova != null && <span className="nova-puntaje" title={`Nova la calificó con ${a.puntajeNova} de 5`}>★ {a.puntajeNova}</span>}
+        {a.puntajeNova != null && <span className="nova-puntaje" title={`Nova la calificó con ${String(a.puntajeNova).replace(".", ",")} de 5`}>★ {String(a.puntajeNova).replace(".", ",")}</span>}
         {a.presupuestoConfigurado ? <span className={`cronograma-pct ${pctClase(a.pctPresupuesto)}`}>{Math.round((a.pctPresupuesto || 0) * 100)} %</span> : null}
       </button>
     </li>

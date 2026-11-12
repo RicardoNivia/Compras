@@ -9,15 +9,22 @@ import { EsqueletoAnalisis } from "@/components/bienestar/Esqueletos";
 
 const TIPOS = { logro: "Lo que funcionó", alerta: "Para revisar", idea: "Para la próxima" };
 
+// Puntaje con un decimal en formato es-CO (4,6). Nova califica con decimales; la persona, con estrellas enteras.
+export const fmtPuntaje = (v) => (v == null ? "" : Number(v).toLocaleString("es-CO", { maximumFractionDigits: 1 }));
+
 export function Estrellas({ valor, onElegir }) {
   return (
-    <span className="ficha-estrellas" role={onElegir ? "radiogroup" : "img"} aria-label={`${valor || 0} de 5`}>
+    <span className="ficha-estrellas" role={onElegir ? "radiogroup" : "img"} aria-label={`${fmtPuntaje(valor || 0)} de 5`}>
       {[1, 2, 3, 4, 5].map((n) => (onElegir ? (
         <button key={n} type="button" role="radio" aria-checked={valor === n} aria-label={`${n} de 5`} className={`ficha-estrella${n <= (valor || 0) ? " on" : ""}`} onClick={() => onElegir(n)}>
           <IconStar size={26} filled={n <= (valor || 0)} />
         </button>
       ) : (
-        <span key={n} className={`ficha-estrella${n <= (valor || 0) ? " on" : ""}`}><IconStar size={14} filled={n <= (valor || 0)} /></span>
+        // Solo lectura: la estrella de la fracción se llena en parte (4,6 → la quinta al 60 %).
+        <span key={n} className={`ficha-estrella${n <= (valor || 0) ? " on" : ""}`}>
+          <IconStar size={14} filled={n <= (valor || 0)} />
+          {(valor || 0) > n - 1 && (valor || 0) < n && <span className="ficha-estrella-parcial" style={{ "--fr": (valor || 0) - (n - 1) }} aria-hidden="true"><IconStar size={14} filled /></span>}
+        </span>
       )))}
     </span>
   );
@@ -58,7 +65,7 @@ export function AnalisisDeActividad({ act, puedeEditar, onCambio, soloNova = fal
         <>
           <div className="ficha-puntajes">
             {a.puntaje != null
-              ? <div><span>Puntaje de Nova</span><Estrellas valor={a.puntaje} /><strong>{a.puntaje} de 5</strong></div>
+              ? <div><span>Puntaje de Nova</span><Estrellas valor={a.puntaje} /><strong>{fmtPuntaje(a.puntaje)} de 5</strong></div>
               : <div><span>Puntaje de Nova</span><strong>Sin datos para calificar</strong></div>}
             {!soloNova && act.calificacion != null && <div><span>Calificación de {act.cerradaPorNombre || "quien la cerró"}</span><Estrellas valor={act.calificacion} /><strong>{act.calificacion} de 5</strong></div>}
           </div>

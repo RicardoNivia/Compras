@@ -859,7 +859,7 @@ model AnalisisActividad {
   id                Int                @id @default(autoincrement())
   actividadId       Int                @unique
   actividad         ActividadBienestar @relation(fields: [actividadId], references: [id], onUpdate: Cascade, onDelete: Cascade)
-  puntaje           Int? // null = sin datos para calificar (no se inventa un puntaje)
+  puntaje           Float? // 1.0 a 5.0 con un decimal; null = sin datos para calificar (no se inventa un puntaje)
   titulo            String
   resumen           String
   puntos            Json

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePermisoActividad, apiError } from "@/lib/apiGuard";
-import { listParticipantes, crearParticipante } from "@/lib/participantesBienestar";
+import { listParticipantes, crearParticipante, eliminarTodosLosParticipantes } from "@/lib/participantesBienestar";
 import { motivosActivos, valoresActivos } from "@/lib/catalogosBienestar";
 
 /**
@@ -23,6 +23,17 @@ export async function GET(_request, { params }) {
   if (denied) return denied;
   try {
     return NextResponse.json({ participantes: await listParticipantes(params.id, user), motivos: await motivosActivos(), areas: await valoresActivos("areaParticipante") });
+  } catch (err) {
+    return apiError(err);
+  }
+}
+
+// Borra la lista completa de participantes (y su asistencia) de la actividad. Requiere editar la línea; queda en Auditoría.
+export async function DELETE(_request, { params }) {
+  const { user, denied } = await requirePermisoActividad(params.id, "editar");
+  if (denied) return denied;
+  try {
+    return NextResponse.json(await eliminarTodosLosParticipantes(params.id, user));
   } catch (err) {
     return apiError(err);
   }

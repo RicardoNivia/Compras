@@ -364,9 +364,9 @@ function DiapoCierre({ j, siguiente, onSiguiente }) {
       <div className="hd-cierre-centro">
         <span className="hd-chip suave">Lo que vio Nova</span>
         {p != null ? (
-          <div className="hd-estrellas" role="img" aria-label={`${p} de 5 estrellas`}>
+          <div className="hd-estrellas" role="img" aria-label={`${String(p).replace(".", ",")} de 5 estrellas`}>
             {[0, 1, 2, 3, 4].map((i) => (
-              <span key={i} className={i < p ? "llena" : ""} style={{ animationDelay: `${0.6 + i * 0.22}s` }}>
+              <span key={i} className={i < Math.round(p) ? "llena" : ""} style={{ animationDelay: `${0.6 + i * 0.22}s` }}>
                 <svg width="58" height="58" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 3 6.6 7.2.7-5.4 4.9 1.6 7.1L12 17.6 5.6 21.3l1.6-7.1L1.8 9.3 9 8.6z" fill="currentColor" /></svg>
               </span>
             ))}

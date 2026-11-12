@@ -151,7 +151,7 @@ export default function HistoriasFundacion() {
                       <span>{j.tonos.aFavor + j.tonos.neutros ? `${j.tonos.aFavor + j.tonos.neutros} comentario(s)` : "Sin comentarios"}</span>
                       {j.calificaciones.total > 0 && <span>{j.calificaciones.promedio.toLocaleString("es-CO", { maximumFractionDigits: 1 })} de 5 ({j.calificaciones.total})</span>}
                       {j.fotos.length > 0 && <span>{j.fotos.length} foto(s)</span>}
-                      {j.nova?.puntaje != null && <span className="hist-estrella">★ {j.nova.puntaje}</span>}
+                      {j.nova?.puntaje != null && <span className="hist-estrella">★ {String(j.nova.puntaje).replace(".", ",")}</span>}
                     </span>
                   </span>
                 </button>

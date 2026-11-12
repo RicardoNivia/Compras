@@ -250,6 +250,25 @@ export async function actualizarParticipante(actividadId, id, body, actor) {
   return toClientParticipante(row, { verSensibles: await isRoleAllowed(actor.role, actividad.linea === "Fundación" ? "editFundacion" : "editBienestar") });
 }
 
+// Borra la lista completa de la actividad (todas las personas, con su asistencia, calificación y comentario) para
+// volver a cargarla desde cero. Solo lo ligado a una persona: la calificación/comentario de cierre, las notas del equipo
+// (ObservacionActividad) y las observaciones de la actividad no se tocan. No en una actividad cerrada. Los conteos manuales quedan vacíos. Queda en Auditoría.
+export async function eliminarTodosLosParticipantes(actividadId, actor) {
+  const actividad = await actividadEditable(actividadId);
+  const where = { actividadId: actividad.id };
+  const [total, conOpinion] = await Promise.all([
+    prisma.participanteActividad.count({ where }),
+    prisma.participanteActividad.count({ where: { ...where, OR: [{ calificacion: { not: null } }, { observacion: { not: null } }] } }),
+  ]);
+  if (!total) throw badRequest("La actividad no tiene personas registradas.");
+  await prisma.$transaction([
+    prisma.participanteActividad.deleteMany({ where }),
+    prisma.actividadBienestar.update({ where: { id: actividad.id }, data: { inscritos: null, asistentes: null } }),
+  ]);
+  logParticipantes(actor, actividad, "eliminar", `Borró la lista completa: ${total} persona(s)${conOpinion ? `, ${conOpinion} con calificación o comentario` : ""}`).catch(() => {});
+  return { eliminados: total, conOpinion };
+}
+
 // Asistencia en bloque: "asistió" o "no asistió" (con motivo) para varios a la vez.
 export async function eliminarParticipante(actividadId, id, actor) {
   const actividad = await actividadEditable(actividadId);
