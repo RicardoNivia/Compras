@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import BotonExcel from "@/components/BotonExcel";
 import { useMemo, useState } from "react";
 import UserModal from "@/components/UserModal";
@@ -62,10 +63,10 @@ export default function UsuariosView({ initialUsers, initialPermissionsMatrix, i
   }, [users, roles]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalizar(search);
     return users.filter((u) => {
       if (roleFilter && u.role !== roleFilter) return false;
-      if (q && !`${u.nombre} ${u.email}`.toLowerCase().includes(q)) return false;
+      if (q && !normalizar(`${u.nombre} ${u.email}`).includes(q)) return false;
       return true;
     });
   }, [users, search, roleFilter]);

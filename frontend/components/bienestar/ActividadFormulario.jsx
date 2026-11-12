@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -142,8 +143,8 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
   const asistentes = form.asistentes === "" || form.asistentes === null ? null : Number(form.asistentes);
   const pctAsistencia = inscritos && asistentes != null ? asistentes / inscritos : null;
   const comprasVisibles = lista.filter((c) => {
-    const q = buscarCompra.trim().toLowerCase();
-    return !q || [c.localSeq, c.descripcion, c.proveedor, c.estadoLegalizacion, c.fechaSolicitud].some((v) => String(v ?? "").toLowerCase().includes(q));
+    const q = normalizar(buscarCompra);
+    return !q || [c.localSeq, c.descripcion, c.proveedor, c.estadoLegalizacion, c.fechaSolicitud].some((v) => normalizar(v).includes(q));
   });
   const pagCompras = usePagina(comprasVisibles, buscarCompra, PAGE_SIZES_MODAL[0]);
   const est = estadoActividad(form.estado);

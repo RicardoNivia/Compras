@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { normalizar } from "@/lib/buscarTexto";
 import { valoracionGeneralPorProveedor } from "@/lib/valoraciones";
 import { publicarEvento, publicarCambiosDeProveedor } from "@/lib/notificacionesEventos";
 import {
@@ -215,7 +216,7 @@ export async function listMaestroProveedores(filtros = {}) {
     valoracionIA: valoraciones.get(p.nit) || null,
   }));
 
-  const q = String(filtros.q || "").trim().toLowerCase();
+  const q = normalizar(filtros.q);
   const clasif = filtros.clasificacion ? [].concat(filtros.clasificacion) : [];
   const estados = filtros.estado ? [].concat(filtros.estado) : [];
   const checklist = filtros.checklist || "";
@@ -251,7 +252,7 @@ export async function listMaestroProveedores(filtros = {}) {
       if (registradoDesde && diaRegistro < registradoDesde) return false;
       if (registradoHasta && diaRegistro > registradoHasta) return false;
     }
-    if (q && !`${r.nombre} ${r.nit}`.toLowerCase().includes(q)) return false;
+    if (q && !normalizar(`${r.nombre} ${r.nit}`).includes(q)) return false;
     return true;
   });
 

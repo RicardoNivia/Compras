@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import BotonExcel from "@/components/BotonExcel";
 import { useEffect, useMemo, useState } from "react";
 import MaestroModal from "@/components/MaestroModal";
@@ -112,10 +113,10 @@ export default function MaestrosView({ initialMaestros, modulos = { Compras: tru
   }, [tab, search, pageSize]);
 
   const rows = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalizar(search);
     return maestros
       .filter((m) => m.tipo === tab)
-      .filter((m) => !q || m.valor.toLowerCase().includes(q))
+      .filter((m) => !q || normalizar(m.valor).includes(q))
       .sort((a, b) => (tab === "escalaCalificacion" ? a.aplicaEstrellas - b.aplicaEstrellas : a.valor.localeCompare(b.valor, "es")));
   }, [maestros, tab, search]);
 

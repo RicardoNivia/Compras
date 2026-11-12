@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { idsQueCoinciden } from "@/lib/buscarTexto";
 import { logCreate, logUpdate, logDelete } from "@/lib/audit";
 import { publicarCambiosDeCompra, revisarUmbralPresupuesto, publicarEvento, datosCompra } from "@/lib/notificacionesEventos";
 
@@ -459,9 +460,7 @@ export async function comprasSinActividad({ q = "", limite = 20 } = {}) {
   const where = { actividadId: null };
   if (texto) {
     where.OR = [
-      { descripcion: { contains: texto, mode: "insensitive" } },
-      { proveedor: { contains: texto, mode: "insensitive" } },
-      { area: { contains: texto, mode: "insensitive" } },
+      { id: { in: await idsQueCoinciden("records", ["descripcion", "proveedor", "area"], texto) } },
       ...(Number.isInteger(numero) && numero > 0 ? [{ localSeq: numero }] : []),
     ];
   }

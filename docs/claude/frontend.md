@@ -26,3 +26,4 @@ Detalle movido desde `CLAUDE.md` (sin cambios de contenido).
   - Inside a table, `td > .empty` centers on the visible part of `.table-scroll`.
   - The agents' `ag-vacio` uses the same illustration.
   - **Never leave a gray loose «No hay…» text: use one of the two.**
+- **Búsquedas por texto** (`lib/buscar.js`): every search box filters with `normalizar(q)` / `coincide(q, ...campos)` — case, accents and extra spaces don't matter («dia del padre» finds «Día del padre»). Server-side searches use `backend/lib/buscarTexto.js` (`idsQueCoinciden` uses Postgres `translate()` to drop accents, no extension). Never `.toLowerCase().includes(...)`.

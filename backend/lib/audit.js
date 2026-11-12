@@ -143,6 +143,13 @@ export async function logActividadUpdate(actor, before, after) {
   await writeLog({ action: "editar", entityType: "actividad", recordId: String(after.id), recordInfo: actividadSummary(after), actor, changes });
 }
 
+// Reabrir una actividad cerrada: el cambio de estado y de «Cerrada por», más el motivo como Detalle.
+export async function logActividadReabrir(actor, before, after, detalle) {
+  const changes = diffFields(before, after, ACTIVIDAD_FIELD_LABELS);
+  changes.push({ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle });
+  await writeLog({ action: "reabrir", entityType: "actividad", recordId: String(after.id), recordInfo: actividadSummary(after), actor, changes });
+}
+
 export async function logActividadDelete(actor, a, detalle) {
   const changes = diffFields(a, null, ACTIVIDAD_FIELD_LABELS);
   if (detalle) changes.push({ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle });

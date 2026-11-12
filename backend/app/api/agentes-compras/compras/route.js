@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAlgunPermiso, apiError } from "@/lib/apiGuard";
 import { listRecords } from "@/lib/records";
+import { normalizar } from "@/lib/buscarTexto";
 
 /**
  * @openapi
@@ -15,8 +16,8 @@ export async function GET(request) {
   const { denied } = await requireAlgunPermiso(["viewAgentesCompras"]);
   if (denied) return denied;
   try {
-    const q = (new URL(request.url).searchParams.get("q") || "").trim().toLowerCase().replace(/^#/, "");
-    const n = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+    const q = normalizar(new URL(request.url).searchParams.get("q")).replace(/^#/, "");
+    const n = normalizar;
     const todas = (await listRecords()).sort((a, b) => (b.localSeq || 0) - (a.localSeq || 0));
     const hit = !q ? todas : todas.filter((r) => String(r.localSeq) === q || n(`${r.descripcion} ${r.proveedor} ${r.fe}`).includes(n(q)));
     return NextResponse.json({ compras: hit.slice(0, 30).map((r) => ({ id: r.id, numero: r.localSeq, fecha: r.fechaSolicitud, descripcion: r.descripcion, proveedor: r.proveedor, valor: r.valorConIva, fe: r.fe, estadoLegalizacion: r.estadoLegalizacion })) });

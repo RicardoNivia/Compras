@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import { useEffect, useMemo, useState } from "react";
 import { fetchUsuariosInformesApi } from "@/lib/api";
 import { ROLE_LABELS } from "@/lib/roles";
@@ -20,8 +21,8 @@ export default function AccesoPanel({ informe, onCambio }) {
   }, []);
 
   const filtrados = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    return (usuarios || []).filter((u) => u.id !== informe.createdBy && (!t || `${u.nombre} ${u.email}`.toLowerCase().includes(t)));
+    const t = normalizar(q);
+    return (usuarios || []).filter((u) => u.id !== informe.createdBy && (!t || normalizar(`${u.nombre} ${u.email}`).includes(t)));
   }, [usuarios, q, informe.createdBy]);
 
   function alternar(u) {

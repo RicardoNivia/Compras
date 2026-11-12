@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import { useEffect, useMemo, useState } from "react";
 import { fmtCOP } from "@/lib/format";
 import { savePresupuestoApi, deletePresupuestoApi, setModoAnioApi, fetchPresupuestos } from "@/lib/api";
@@ -446,9 +447,9 @@ export default function PresupuestoView({ records, areas, categorias, initialPre
 
   const [busqueda, setBusqueda] = useState("");
   const areasFiltradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
+    const q = normalizar(busqueda);
     if (!q) return areasOrdenadas;
-    return areasOrdenadas.filter((a) => a.valor.toLowerCase().includes(q));
+    return areasOrdenadas.filter((a) => normalizar(a.valor).includes(q));
   }, [areasOrdenadas, busqueda]);
 
   async function handleElegirModo(target, confirm = false) {

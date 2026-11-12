@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { tesPropuestas, tesBuscarPropuestas, tesResolverPropuesta, tesAceptarAltas, tesResumen } from "@/lib/tesoreriaApi";
@@ -92,7 +93,7 @@ function AgenteAsociacion({ acceso, agente = "movimientos" }) {
   const [aviso, setAviso] = useState("");
   const puede = !!acceso?.puedeRegistrar;
 
-  useEffect(() => { const t = setTimeout(() => setQ(buscar.trim().toLowerCase()), 300); return () => clearTimeout(t); }, [buscar]);
+  useEffect(() => { const t = setTimeout(() => setQ(normalizar(buscar)), 300); return () => clearTimeout(t); }, [buscar]);
   const cargar = useCallback(() => tesPropuestas({ agente, confianza: conf, page: q ? 1 : page, size: q ? 100 : size }).then((r) => { setD(r); if (!q && r.page !== page) setPage(r.page); setError(""); }).catch((e) => setError(e.message)), [agente, conf, page, size, q]);
   useEffect(() => { cargar(); }, [cargar]);
   useEffect(() => { setPage(1); }, [conf, size, q]);
@@ -118,7 +119,7 @@ function AgenteAsociacion({ acceso, agente = "movimientos" }) {
 
   const pc = d?.porConfianza || {};
   const total = (pc.alta || 0) + (pc.media || 0) + (pc.baja || 0);
-  const items = (d?.items || []).filter((p) => !q || `${p.movimiento.descripcion} ${p.movimiento.concepto || ""} ${p.movimiento.tercero || ""} ${p.pago.concepto} ${p.pago.item || ""}`.toLowerCase().includes(q));
+  const items = (d?.items || []).filter((p) => !q || normalizar(`${p.movimiento.descripcion} ${p.movimiento.concepto || ""} ${p.movimiento.tercero || ""} ${p.pago.concepto} ${p.pago.item || ""}`).includes(q));
   const cuenta = (k) => (k ? pc[k] || 0 : total);
   return (
     <div className="agente-panel">

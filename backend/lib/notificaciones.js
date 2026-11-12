@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { idsQueCoinciden } from "@/lib/buscarTexto";
 import { FRECUENCIAS, esFechaDeEnvio, esHabil, describirProgramacion, formatoHora, ymd } from "@/lib/reportSchedule";
 import {
   LIMITES, FUENTES, CONSULTAS, PERIODOS, CAMPOS_FECHA, PRESETS_COMPRAS, PRESETS_PROVEEDORES, PERIODOS_TESORERIA, PRESETS_TESORERIA, SENTIDOS_TESORERIA,
@@ -384,7 +385,7 @@ export async function listNotificaciones(user, { ver = "mias", estado, q, page =
     where.propietarioUserId = user.id;
   }
   if (estado && ESTADOS[estado]) where.estado = estado;
-  if (q) where.OR = [{ nombre: { contains: String(q).slice(0, 100), mode: "insensitive" } }, { propietarioNombre: { contains: String(q).slice(0, 100), mode: "insensitive" } }];
+  if (q) where.id = { in: await idsQueCoinciden("notificaciones", ["nombre", "propietarioNombre"], String(q).slice(0, 100)) };
   const take = Math.min(Math.max(parseInt(size, 10) || 25, 1), 100);
   const total = await prisma.notificacion.count({ where });
   const paginas = Math.max(1, Math.ceil(total / take));

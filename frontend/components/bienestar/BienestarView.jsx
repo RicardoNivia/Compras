@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import BotonExcel from "@/components/BotonExcel";
 import { fetchParticipacionPorAreaApi } from "@/lib/api";
 import NuevaActividadModal from "@/components/bienestar/NuevaActividadModal";
@@ -67,10 +68,10 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
   }, [actividades, anio, areaActiva, porArea]);
 
   const filtradas = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalizar(search);
     return delAnio
       .filter((a) => !estado || a.estado === estado)
-      .filter((a) => !q || [a.nombre, a.descripcion, a.responsableNombre, a.observaciones].some((v) => v && v.toLowerCase().includes(q)))
+      .filter((a) => !q || [a.nombre, a.descripcion, a.responsableNombre, a.observaciones].some((v) => v && normalizar(v).includes(q)))
       .sort((a, b) => (a.fecha || "9999").localeCompare(b.fecha || "9999") || a.nombre.localeCompare(b.nombre));
   }, [delAnio, estado, search]);
 

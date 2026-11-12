@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { idsQueCoinciden } from "@/lib/buscarTexto";
 import { publicarPagoPagado, publicarMovimientosRegistrados } from "@/lib/tesoreria/eventos";
 import { logTesoreria } from "@/lib/audit";
 import { hoyColombia } from "@/lib/hoyColombia";
@@ -59,7 +60,7 @@ export function toClientPago(p, mapas) {
   };
 }
 
-function whereDe(f) {
+async function whereDe(f) {
   const and = [];
   if (f.anio) and.push({ anio: Number(f.anio) });
   if (f.mes) and.push({ mes: Number(f.mes) });
@@ -72,7 +73,7 @@ function whereDe(f) {
   if (f.ids) and.push({ id: { in: String(f.ids).split(",").map(Number).filter(Boolean) } });
   if (f.q) {
     const t = String(f.q).trim();
-    and.push({ OR: [{ concepto: { contains: t, mode: "insensitive" } }, { observacion: { contains: t, mode: "insensitive" } }] });
+    and.push({ id: { in: await idsQueCoinciden("tesoreria_pagos_programados", ["concepto", "observacion"], t) } });
   }
   return and.length ? { AND: and } : {};
 }
@@ -90,7 +91,7 @@ export async function listPagos(filtros = {}) {
   const size = TAMANOS.includes(Number(filtros.size)) ? Number(filtros.size) : 25;
   const [filas, mapas] = await Promise.all([
     prisma.pagoProgramado.findMany({
-      where: whereDe(filtros),
+      where: await whereDe(filtros),
       include: { asociaciones: { select: { valor: true } }, gastoPeriodico: { select: { periodicidad: true } } },
       orderBy: [{ fecha: "asc" }, { id: "asc" }],
     }),

@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteReportApi, fetchPorEnviarApi, updateReportApi } from "@/lib/api";
@@ -151,9 +152,9 @@ export default function EstudioInicio({ initialReports, plantillas, initialPorEn
   }), [reports]);
   const deLista = vistaLista === "consulta";
   const filtrados = useMemo(() => {
-    const t = q.trim().toLowerCase();
+    const t = normalizar(q);
     const base = reports.filter((r) => esConsulta(r) === deLista);
-    return t ? base.filter((r) => `${r.nombre} ${r.programacionTexto || ""}`.toLowerCase().includes(t)) : base;
+    return t ? base.filter((r) => normalizar(`${r.nombre} ${r.programacionTexto || ""}`).includes(t)) : base;
   }, [reports, q, deLista]);
   const totalPages = Math.max(1, Math.ceil(filtrados.length / pageSize));
   const current = Math.min(page, totalPages);

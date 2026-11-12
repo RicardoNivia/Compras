@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import BotonExcel from "@/components/BotonExcel";
 import { useEffect, useMemo, useState } from "react";
 import { ROLES, ROLE_COLOR_VARS } from "@/lib/roles";
@@ -20,8 +21,8 @@ export default function RolesView({ roles, features, onCambio }) {
   const [page, setPage] = useState(1);
 
   const filtrados = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return roles.filter((r) => !q || `${r.nombre} ${r.descripcion || ""}`.toLowerCase().includes(q));
+    const q = normalizar(search);
+    return roles.filter((r) => !q || normalizar(`${r.nombre} ${r.descripcion || ""}`).includes(q));
   }, [roles, search]);
   useEffect(() => { setPage(1); }, [search, pageSize]);
   const totalPages = Math.max(1, Math.ceil(filtrados.length / pageSize));

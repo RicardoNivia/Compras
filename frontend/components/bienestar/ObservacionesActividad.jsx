@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { crearObservacionApi, eliminarObservacionApi, fetchObservacionesApi } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
@@ -43,9 +44,9 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
   }, [datos, porClasificar, cargar]);
 
   const filtradas = useMemo(() => {
-    const q = buscar.trim().toLowerCase();
+    const q = normalizar(buscar);
     return (datos?.observaciones || []).filter((o) => (!filtro || (filtro === "comentario" ? !!o.texto : filtro.startsWith("s:") ? o.sentimiento === filtro.slice(2) : o.tipo === filtro))
-      && (!q || `${o.quien} ${o.area || ""} ${o.texto || ""}`.toLowerCase().includes(q)));
+      && (!q || normalizar(`${o.quien} ${o.area || ""} ${o.texto || ""}`).includes(q)));
   }, [datos, buscar, filtro]);
   const pag = usePagina(filtradas, `${buscar}|${filtro}`, enModal ? PAGE_SIZES_MODAL[0] : PAGE_SIZES[0]);
 

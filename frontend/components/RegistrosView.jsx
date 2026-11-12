@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import RecordModal from "@/components/RecordModal";
@@ -151,7 +152,7 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
   const estadoLegalizacionOptions = useMemo(() => uniqueSorted(records, "estadoLegalizacion"), [records]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalizar(search);
     return records.filter((r) => {
       if (q) {
         const hay = [
@@ -175,9 +176,8 @@ export default function RegistrosView({ records, setRecords, onFilteredChange, c
           r.observaciones,
         ]
           .filter((v) => v !== null && v !== undefined && v !== "")
-          .join(" ")
-          .toLowerCase();
-        if (!hay.includes(q)) return false;
+          .join(" ");
+        if (!normalizar(hay).includes(q)) return false;
       }
       if (area && r.area !== area) return false;
       if (estado && r.estado !== estado) return false;

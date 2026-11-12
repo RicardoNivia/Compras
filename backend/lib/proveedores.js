@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { idsQueCoinciden } from "@/lib/buscarTexto";
 import { logProveedorCreate, logProveedorUpdate, logProveedorDelete } from "@/lib/audit";
 import { REVISIONES, normalizeNit, nitValido } from "@/lib/proveedoresCicloReglas";
 
@@ -155,7 +156,7 @@ export async function listProveedores({ onlyActive, search } = {}) {
     const q = String(search).trim();
     if (q) {
       where.OR = [
-        { nombre: { contains: q, mode: "insensitive" } },
+        { nit: { in: await idsQueCoinciden("proveedores", ["nombre"], q, { idColumn: "nit" }) } },
         { nit: { contains: normalizeNit(q) || q } },
       ];
     }

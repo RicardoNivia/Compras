@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconSearch } from "@/components/icons";
@@ -26,9 +27,9 @@ export default function CommandPalette({ items, onClose }) {
   }, [onClose]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizar(query);
     if (!q) return items;
-    return items.filter((i) => i.label.toLowerCase().includes(q));
+    return items.filter((i) => normalizar(i.label).includes(q));
   }, [items, query]);
 
   function go(href) {

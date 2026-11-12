@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 // Autocompletar de proveedor sobre el catálogo (maestro) de Proveedores:
@@ -44,11 +45,11 @@ export default function ProveedorAutocomplete({ id, nombre, nit, proveedorNit, p
   }, [nombre]);
 
   const matches = useMemo(() => {
-    const q = text.trim().toLowerCase();
+    const q = normalizar(text);
     const qDigits = q.replace(/[^0-9]/g, "");
     const list = !q
       ? proveedores
-      : proveedores.filter((p) => p.nombre.toLowerCase().includes(q) || (qDigits && p.nit.includes(qDigits)));
+      : proveedores.filter((p) => normalizar(p.nombre).includes(q) || (qDigits && p.nit.includes(qDigits)));
     return list.slice(0, 50);
   }, [proveedores, text]);
 

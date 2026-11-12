@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { fetchAsociadorApi, accionAsociadorApi, revisionDiariaAsociadorApi } from "@/lib/api";
@@ -112,11 +113,11 @@ export default function AgenteAsociador() {
   const propuestas = datos?.propuestas || [];
   const pendientes = propuestas.filter((p) => p.estado === "pendiente");
   const altas = pendientes.filter((p) => p.confianza === "alta");
-  const q = buscar.trim().toLowerCase();
+  const q = normalizar(buscar);
   const filas = useMemo(() => propuestas
     .filter((p) => (estado === "aceptada" ? p.estado === "aceptada" || p.estado === "resuelta" : p.estado === estado))
     .filter((p) => !confianza || p.confianza === confianza)
-    .filter((p) => !q || `${p.compra.numero} ${p.compra.descripcion} ${p.compra.proveedor} ${p.actividad?.nombre}`.toLowerCase().includes(q)), [propuestas, estado, confianza, q]);
+    .filter((p) => !q || normalizar(`${p.compra.numero} ${p.compra.descripcion} ${p.compra.proveedor} ${p.actividad?.nombre}`).includes(q)), [propuestas, estado, confianza, q]);
   const pag = usePagina(filas, `${estado}|${confianza}|${q}`);
   const corriendo = datos?.estado?.corriendo;
 

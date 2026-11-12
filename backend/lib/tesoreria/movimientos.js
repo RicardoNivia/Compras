@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { idsQueCoinciden } from "@/lib/buscarTexto";
 import { publicarPagoPagado, publicarMovimientosRegistrados } from "@/lib/tesoreria/eventos";
 import { logTesoreria } from "@/lib/audit";
 import { mapasCatalogos } from "@/lib/tesoreria/maestros";
@@ -48,7 +49,7 @@ export function toClientMovimiento(m, mapas) {
   };
 }
 
-function whereDe(f) {
+async function whereDe(f) {
   const and = [];
   if (f.anio && f.mes) { const r = rangoMes(Number(f.anio), Number(f.mes)); and.push({ fecha: { gte: r.desde, lte: r.hasta } }); }
   else if (f.anio) and.push({ fecha: { gte: `${f.anio}-01-01`, lte: `${f.anio}-12-31` } });
@@ -62,8 +63,7 @@ function whereDe(f) {
     const t = String(f.q).trim();
     const n = Number(t.replace(/[^\d]/g, ""));
     and.push({ OR: [
-      { descripcion: { contains: t, mode: "insensitive" } }, { concepto: { contains: t, mode: "insensitive" } }, { tercero: { contains: t, mode: "insensitive" } },
-      { observacion: { contains: t, mode: "insensitive" } }, { referencia: { contains: t, mode: "insensitive" } },
+      { id: { in: await idsQueCoinciden("tesoreria_movimientos_banco", ["descripcion", "concepto", "tercero", "observacion", "referencia"], t) } },
       ...(n && /^[\d.,\s$]+$/.test(t) ? [{ valor: n }] : []),
     ] });
   }
@@ -82,7 +82,7 @@ export async function listMovimientos(filtros = {}) {
   const size = TAMANOS.includes(Number(filtros.size)) ? Number(filtros.size) : 25;
   const [filas, mapas] = await Promise.all([
     prisma.movimientoBanco.findMany({
-      where: whereDe(filtros),
+      where: await whereDe(filtros),
       include: { asociaciones: { select: { valor: true } }, _count: { select: { soportes: true } } },
       orderBy: [{ fecha: filtros.orden === "antiguo" ? "asc" : "desc" }, { id: "desc" }],
     }),

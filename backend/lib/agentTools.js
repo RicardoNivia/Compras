@@ -5,6 +5,7 @@ import { listAuditLogs } from "@/lib/audit";
 import { buildAggregates } from "@/lib/reportContent";
 import { listMaestroProveedores, getProveedorDetalle, indicadoresCiclo } from "@/lib/proveedoresCiclo";
 import { prisma } from "@/lib/prisma";
+import { idsQueCoinciden, normalizar } from "@/lib/buscarTexto";
 import { getPendientesParaNova } from "@/lib/pendientes";
 import { CONSULTAR_REFERENCIA_TOOL, consultarReferencia } from "@/lib/referenciasNova";
 import { getActividad, listActividades, resumenBienestar } from "@/lib/actividadesBienestar";
@@ -605,7 +606,7 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
           const txt = String(args.proveedor).trim();
           const nitTxt = txt.toUpperCase().replace(/[^A-Z0-9]/g, "");
           const provs = await prisma.proveedor.findMany({
-            where: { OR: [{ nombre: { contains: txt, mode: "insensitive" } }, ...(nitTxt ? [{ nit: { contains: nitTxt } }] : [])] },
+            where: { OR: [{ nit: { in: await idsQueCoinciden("proveedores", ["nombre"], txt, { idColumn: "nit" }) } }, ...(nitTxt ? [{ nit: { contains: nitTxt } }] : [])] },
             select: { nit: true, nombre: true },
             take: 20,
           });
@@ -660,7 +661,7 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
         const busqueda = String(args.busqueda || "").trim();
         const qNit = busqueda.toUpperCase().replace(/[^A-Z0-9]/g, "");
         const candidatos = await prisma.proveedor.findMany({
-          where: { OR: [{ nombre: { contains: busqueda, mode: "insensitive" } }, ...(qNit ? [{ nit: { contains: qNit } }] : [])] },
+          where: { OR: [{ nit: { in: await idsQueCoinciden("proveedores", ["nombre"], busqueda, { idColumn: "nit" }) } }, ...(qNit ? [{ nit: { contains: qNit } }] : [])] },
           select: { nit: true, nombre: true },
           take: 10,
         });
@@ -786,13 +787,13 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
         for (const l of args.linea ? [args.linea] : ["Bienestar", "Fundación"]) if (await puedeLinea(user, l)) lineas.push(l);
         if (!lineas.length) return { error: "No autorizado para consultar esas actividades." };
         const limite = Math.max(1, Math.min(60, Number(args.limite) || 30));
-        const q = String(args.texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const q = normalizar(args.texto);
         const hoy = hoyColombia();
         const hasta = args.realizadas ? [args.hasta, hoy].filter(Boolean).sort()[0] : args.hasta;
         const todas = (await listActividades({ anio: args.anio || undefined })).filter((a) => lineas.includes(a.linea) && (!args.estado || a.estado === args.estado)
           && (!args.realizadas || a.estado === "ejecutada" || a.estado === "cerrada")
           && (!args.desde || (a.fecha && (a.fechaFin || a.fecha) >= args.desde)) && (!hasta || (a.fecha && a.fecha <= hasta))
-          && (!q || a.nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(q)));
+          && (!q || normalizar(a.nombre).includes(q)));
         todas.sort((x, y) => String(y.fecha || "").localeCompare(String(x.fecha || "")));
         const porLinea = {}, porEstado = {};
         for (const a of todas) { porLinea[a.linea] = (porLinea[a.linea] || 0) + 1; porEstado[a.estado] = (porEstado[a.estado] || 0) + 1; }
@@ -804,8 +805,8 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
         if (!lineas.length) return { error: "No autorizado para consultar esas actividades." };
         const anio = Number(args.anio) || Number(hoyColombia().slice(0, 4));
         const mes = Number(args.mes) || null;
-        const sinT = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-        const q = sinT(args.actividad).trim();
+        const sinT = normalizar;
+        const q = normalizar(args.actividad);
         const delPeriodo = (await listActividades({ anio })).filter((a) => lineas.includes(a.linea)
           && (!mes || String(a.fecha || "").slice(5, 7) === String(mes).padStart(2, "0"))
           && (!q || sinT(a.nombre).includes(q)));

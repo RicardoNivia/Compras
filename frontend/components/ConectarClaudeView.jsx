@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import { useEffect, useMemo, useState } from "react";
 import {
   IconKey, IconPlus, IconCopy, IconCheck, IconBell, IconTable, IconBuilding, IconMoney,
@@ -390,10 +391,10 @@ export default function ConectarClaudeView({ initialTokens, user }) {
   }
 
   const filtrados = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    const needle = normalizar(q);
     return tokens.filter((t) => {
       if (filtro === "activo" && t.estado !== "activo") return false;
-      if (needle && !`${t.nombre} ${t.dueno?.nombre || ""} ${t.prefijo}`.toLowerCase().includes(needle)) return false;
+      if (needle && !normalizar(`${t.nombre} ${t.dueno?.nombre || ""} ${t.prefijo}`).includes(needle)) return false;
       return true;
     });
   }, [tokens, filtro, q]);

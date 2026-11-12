@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizar } from "@/lib/buscar";
 import BotonExcel from "@/components/BotonExcel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -354,10 +355,10 @@ function TabParticipantes({ act, puedeEditar, onCambio }) {
 
   const areas = useMemo(() => [...new Set((lista || []).map((p) => p.area).filter(Boolean))].sort(), [lista]);
   const filtrados = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalizar(search);
     return (lista || []).filter((p) => (!filtro || (filtro === "si" ? p.asistio === true : filtro === "no" ? p.asistio === false : p.asistio === null))
       && (!area || p.area === area)
-      && (!q || `${p.nombre} ${p.documento || ""} ${p.observacion || ""}`.toLowerCase().includes(q)));
+      && (!q || normalizar(`${p.nombre} ${p.documento || ""} ${p.observacion || ""}`).includes(q)));
   }, [lista, search, filtro, area]);
   useEffect(() => { setPage(1); }, [search, filtro, area, pageSize]);
   const totalPages = Math.max(1, Math.ceil(filtrados.length / pageSize));
@@ -751,8 +752,8 @@ function TabCompras({ act, puedeEditar, cerrada, onCambio }) {
     try { await desasociarCompraApi(act.id, c.id); onCambio(); } catch (e) { setError(e.message || "No se pudo quitar la compra."); }
   }
   const filtradas = useMemo(() => {
-    const q = buscar.trim().toLowerCase();
-    return act.detalleCompras.filter((c) => !q || [c.localSeq, c.descripcion, c.proveedor, c.estadoLegalizacion, c.fechaSolicitud].some((v) => String(v ?? "").toLowerCase().includes(q)));
+    const q = normalizar(buscar);
+    return act.detalleCompras.filter((c) => !q || [c.localSeq, c.descripcion, c.proveedor, c.estadoLegalizacion, c.fechaSolicitud].some((v) => normalizar(v).includes(q)));
   }, [act.detalleCompras, buscar]);
   const pag = usePagina(filtradas, buscar);
   return (
