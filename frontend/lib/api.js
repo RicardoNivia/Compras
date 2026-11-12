@@ -540,6 +540,12 @@ export async function updateActividadApi(id, data) {
   return handle(res);
 }
 
+// Qué se borra con la actividad y si se puede eliminar (para el modal de confirmación).
+export async function fetchEliminacionActividadApi(id) {
+  const res = await fetch(`/api/actividades/${id}/eliminacion`, { cache: "no-store" });
+  return handle(res);
+}
+
 export async function deleteActividadApi(id) {
   const res = await fetch(`/api/actividades/${id}`, { method: "DELETE" });
   return handle(res);

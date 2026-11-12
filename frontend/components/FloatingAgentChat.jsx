@@ -261,7 +261,7 @@ export default function FloatingAgentChat({ user }) {
               <textarea
                 ref={textareaRef}
                 rows={1}
-                placeholder={section ? `Pregunta algo sobre ${section}…` : "Pregunta algo…"}
+                placeholder="Escribe tu pregunta…"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}

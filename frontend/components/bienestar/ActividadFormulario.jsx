@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fmtCOP, fmtDateTime } from "@/lib/format";
 import {
-  createActividadApi, updateActividadApi, deleteActividadApi, fetchActividadApi,
+  createActividadApi, updateActividadApi, fetchActividadApi,
   fetchComprasDisponiblesApi, asociarCompraApi, desasociarCompraApi,
 } from "@/lib/api";
 import MoneyInput from "@/components/MoneyInput";
 import { EsqueletoLista } from "@/components/bienestar/Esqueletos";
 import CerrarActividadModal, { razonParaNoCerrar } from "@/components/bienestar/CerrarActividadModal";
+import EliminarActividadModal from "@/components/bienestar/EliminarActividadModal";
 import PiePagina, { usePagina, PAGE_SIZES_MODAL } from "@/components/bienestar/PiePagina";
 import { ModalSolicitar } from "@/components/bienestar/SolicitudesActividad";
 import { IconTrash, IconSearch, IconPlus, IconCheck, IconHeart, IconUsers, IconAlert } from "@/components/icons";
@@ -213,20 +214,11 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
     }
   }
 
-  async function handleDelete() {
-    setSaving(true);
-    setError("");
-    try {
-      await deleteActividadApi(actividad.id);
-      guardado.current = true;
-      router.push(`${basePath}/actividades`);
-      router.refresh();
-    } catch (err) {
-      setError(err.message || "No se pudo eliminar la actividad.");
-      setConfirmDelete(false);
-    } finally {
-      setSaving(false);
-    }
+  function trasEliminar() {
+    guardado.current = true;
+    setConfirmDelete(false);
+    router.push(`${basePath}/actividades`);
+    router.refresh();
   }
 
   async function asociar(c) {
@@ -479,17 +471,12 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
                   <IconCheck size={13} /> Cerrar actividad
                 </button>
               )}
-              {isEdit && !ro && (!embebido || secciones.includes("actividad")) && (confirmDelete ? (
-                <span className="confirm-del">
-                  <span>¿Eliminar?</span>
-                  <button type="button" className="btn btn-danger-solid small" onClick={handleDelete} disabled={saving}>Sí</button>
-                  <button type="button" className="btn small" onClick={() => setConfirmDelete(false)} disabled={saving}>No</button>
-                </span>
-              ) : (
+              {isEdit && !ro && (!embebido || secciones.includes("actividad")) && (
                 <button type="button" className="btn btn-danger-outline" onClick={() => setConfirmDelete(true)} disabled={saving}>
-                  <IconTrash size={13} /> Eliminar
+                  <IconTrash size={13} /> Eliminar actividad
                 </button>
-              ))}
+              )}
+              {confirmDelete && <EliminarActividadModal act={actividad} onClose={() => setConfirmDelete(false)} onEliminada={trasEliminar} />}
             </div>}
           </div>
 

@@ -257,7 +257,7 @@ export async function devolverABodega(actividadId, body, actor) {
     const puede = fila.cantidad - usado;
     if (cantidad > puede) throw badRequest(`Solo se pueden devolver ${puede}: se sacaron ${fila.cantidad} y se usaron ${usado}.`);
     const actualizada = await tx.inventarioActividad.update({ where: { id: fila.id }, data: { cantidad: fila.cantidad - cantidad } });
-    const m = await mover(tx, fila.articuloId, { tipo: "devolucion", delta: cantidad, actividadId: act.id, inventarioActividadId: fila.id, motivo: `Sobró en la actividad «${act.nombre}»` }, actor);
+    const m = await mover(tx, fila.articuloId, { tipo: "devolucion", delta: cantidad, actividadId: act.id, inventarioActividadId: fila.id, motivo: body?.motivo || `Sobró en la actividad «${act.nombre}»` }, actor);
     return { ...m, fila: actualizada };
   });
   logInventarioBodega(actor, r.articulo, "devolucion", resumenMov(r.movimiento, r.articulo)).catch(() => {});

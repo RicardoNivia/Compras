@@ -7,7 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fmtCOP } from "@/lib/format";
-import { IconPlus } from "@/components/icons";
+import { IconPlus, IconTrash } from "@/components/icons";
+import EliminarActividadModal from "@/components/bienestar/EliminarActividadModal";
 import CronogramaView from "@/components/bienestar/CronogramaView";
 import ResumenBienestar from "@/components/bienestar/ResumenBienestar";
 import ResumenFundacion from "@/components/bienestar/ResumenFundacion";
@@ -30,6 +31,7 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
   const router = useRouter();
   const actividades = initialActividades;
   const [verCalificacion, setVerCalificacion] = useState(null); // id de la actividad
+  const [eliminar, setEliminar] = useState(null); // actividad a eliminar (modal de confirmación)
   const [comentarioDe, setComentarioDe] = useState(null); // actividad de un comentario destacado del Resumen
 
   const anios = useMemo(() => {
@@ -283,6 +285,11 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
                           <div className="row-actions">
                             {/* Un solo botón: la actividad se ve y se edita en la misma página. */}
                             <Link href={fichaDe(a.id)} className="btn small" title={puedeEditar && a.estado !== "cerrada" ? "Ver y gestionar la actividad" : "Ver la actividad"}>Abrir</Link>
+                            {puedeEditar && a.estado !== "cerrada" && (
+                              <button type="button" className="btn small btn-danger-outline icon-btn" title="Eliminar la actividad" aria-label={`Eliminar ${a.nombre}`} onClick={() => setEliminar(a)}>
+                                <IconTrash size={13} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -317,6 +324,7 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
         </>
       )}
       {nueva && <NuevaActividadModal linea={linea} fecha={nueva.fecha} basePath={basePath} onClose={() => setNueva(null)} />}
+      {eliminar && <EliminarActividadModal act={eliminar} onClose={() => setEliminar(null)} onEliminada={() => { setEliminar(null); router.refresh(); }} />}
       {verCalificacion != null && <CalificacionModal actividadId={verCalificacion} puedeEditar={puedeEditar} onClose={() => setVerCalificacion(null)} onCambio={() => router.refresh()} />}
     </div>
   );

@@ -143,8 +143,9 @@ export async function logActividadUpdate(actor, before, after) {
   await writeLog({ action: "editar", entityType: "actividad", recordId: String(after.id), recordInfo: actividadSummary(after), actor, changes });
 }
 
-export async function logActividadDelete(actor, a) {
+export async function logActividadDelete(actor, a, detalle) {
   const changes = diffFields(a, null, ACTIVIDAD_FIELD_LABELS);
+  if (detalle) changes.push({ field: "detalle", label: DETALLE_FIELD_LABELS.detalle, before: null, after: detalle });
   await writeLog({ action: "eliminar", entityType: "actividad", recordId: String(a.id), recordInfo: actividadSummary(a), actor, changes });
 }
 

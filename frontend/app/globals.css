@@ -6179,3 +6179,12 @@ tr.tes-ex-no td{ opacity:.45; text-decoration:line-through; }
 .tes-proy-eq i{ color:var(--warning); font-style:normal; font-size:11px; }
 .tes-proy-res b{ font-size:14px; color:var(--ink); }
 .tes-proy-cta small{ font-size:11.5px; color:var(--warning); }
+
+/* Eliminar actividad (EliminarActividadModal.jsx). */
+.eliminar-aviso{ margin-bottom:12px; padding:10px 14px; border-radius:10px; background:color-mix(in srgb, var(--critical) 10%, var(--surface)); border:1px solid color-mix(in srgb, var(--critical) 35%, var(--border)); }
+.eliminar-aviso strong{ font-size:13px; color:var(--critical); }
+.eliminar-aviso p{ margin:3px 0 0; font-size:12px; line-height:1.45; color:var(--ink-2); }
+.eliminar-sub{ margin:10px 0 4px; font-size:12.5px; color:var(--ink-2); }
+.eliminar-lista{ margin:0; padding-left:18px; display:flex; flex-direction:column; gap:3px; font-size:13px; }
+/* Placeholder del chat flotante: una sola línea. */
+.floating-agent-input textarea::placeholder{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

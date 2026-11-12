@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { logActividadCreate, logActividadUpdate, logActividadDelete, logCompraDeActividad } from "@/lib/audit";
 import { resumenParticipacion } from "@/lib/participantesBienestar";
 import { listInventario, resumenInventario } from "@/lib/inventarioBienestar";
+import { devolverABodega } from "@/lib/inventarioBodega";
 import { clasificarEnSegundoPlano } from "@/lib/sentimientoComentarios";
 import { hoyColombia } from "@/lib/hoyColombia";
 
@@ -298,16 +299,61 @@ export async function updateActividad(id, body, actor) {
   return after;
 }
 
+// Lo que vuelve a la bodega de un ítem que salió de ella: si la actividad no se ejecutó, todo (como quitar el ítem,
+// lib/inventarioBienestar.js#eliminarItem); si ya se ejecutó, solo lo que no se usó.
+const cantidadQueVuelve = (a, i) => Math.max(0, Math.floor(a.estado === "ejecutada" ? i.cantidad - (i.usado ?? 0) : i.cantidad));
+
+// Qué se va a borrar con la actividad (para el modal de confirmación) y si se puede: no se elimina una actividad
+// cerrada ni una con compras asociadas (Record.actividadId es ON DELETE RESTRICT: hay que desasociarlas primero).
+export async function resumenEliminacion(id) {
+  const a = await prisma.actividadBienestar.findUnique({ where: { id: Number(id) || 0 } });
+  if (!a) throw badRequest("Actividad no encontrada.", 404);
+  const where = { actividadId: a.id };
+  const [compras, participantes, fotos, observaciones, solicitudes, inventario] = await Promise.all([
+    prisma.record.count({ where }),
+    prisma.participanteActividad.count({ where }),
+    prisma.fotoActividad.count({ where }),
+    prisma.observacionActividad.count({ where }),
+    prisma.solicitudCompra.count({ where: { ...where, estado: "pendiente" } }),
+    prisma.inventarioActividad.findMany({ where, select: { item: true, cantidad: true, usado: true, articuloId: true } }),
+  ]);
+  const vuelven = inventario
+    .filter((i) => i.articuloId)
+    .map((i) => ({ item: i.item, cantidad: cantidadQueVuelve(a, i) }))
+    .filter((i) => i.cantidad > 0);
+  const motivo = a.estado === "cerrada"
+    ? "La actividad está cerrada: ya no se puede eliminar."
+    : compras ? `Tiene ${compras} compra(s) asociada(s). Desasócialas desde Registros (o desde la actividad) antes de eliminarla.` : null;
+  return {
+    actividad: { id: a.id, nombre: a.nombre, linea: a.linea, estado: a.estado, fechaInicio: a.fechaInicio },
+    sePuede: !motivo, motivo, compras, participantes, fotos, observaciones, solicitudesPendientes: solicitudes,
+    inventario: inventario.length, vuelvenABodega: vuelven,
+  };
+}
+
+// Elimina la actividad con todo lo suyo (participantes, fotos, inventario, observaciones, formulario, solicitudes: ON
+// DELETE CASCADE). Lo que salió de la bodega y no se usó vuelve antes a la bodega, con su movimiento. Queda en Auditoría
+// con la foto de la actividad y el detalle de lo que se borró.
 export async function deleteActividad(id, actor) {
-  const before = await prisma.actividadBienestar.findUnique({ where: { id: Number(id) } });
-  if (!before) throw badRequest("Actividad no encontrada.", 404);
-  if (before.estado === "cerrada") throw badRequest("La actividad está cerrada: ya no se puede eliminar.", 409);
-  const compras = await prisma.record.count({ where: { actividadId: before.id } });
-  if (compras) {
-    throw badRequest(`La actividad tiene ${compras} compra(s) asociada(s). Desasócialas desde Registros antes de eliminarla, o ciérrala.`, 409);
+  const r = await resumenEliminacion(id);
+  if (!r.sePuede) throw badRequest(r.motivo, 409);
+  const before = await prisma.actividadBienestar.findUnique({ where: { id: r.actividad.id } });
+  const filas = await prisma.inventarioActividad.findMany({ where: { actividadId: before.id, articuloId: { not: null } } });
+  for (const f of filas) {
+    const vuelve = cantidadQueVuelve(before, f);
+    if (vuelve > 0 && before.estado !== "ejecutada") await prisma.inventarioActividad.update({ where: { id: f.id }, data: { usado: null } });
+    if (vuelve > 0) await devolverABodega(before.id, { itemId: f.id, cantidad: vuelve, motivo: `Se eliminó la actividad «${before.nombre}»` }, actor);
   }
+  // Las propuestas del agente asociador que apuntaban a esta actividad ya no tienen a dónde ir.
+  await prisma.propuestaAsociacion.updateMany({ where: { actividadId: before.id, estado: "pendiente" }, data: { estado: "descartada", resueltaAt: new Date(), resueltaPorUserId: actor?.id || null, resueltaPorNombre: actor?.nombre || null } });
   await prisma.actividadBienestar.delete({ where: { id: before.id } });
-  logActividadDelete(actor, toClientActividad(before)).catch(() => {});
+  const partes = [
+    r.participantes && `${r.participantes} participante(s)`, r.fotos && `${r.fotos} foto(s)`, r.inventario && `${r.inventario} ítem(s) de inventario`,
+    r.observaciones && `${r.observaciones} observación(es)`, r.solicitudesPendientes && `${r.solicitudesPendientes} solicitud(es) de compra pendiente(s)`,
+  ].filter(Boolean);
+  const devueltos = r.vuelvenABodega.map((v) => `${v.cantidad} ${v.item}`);
+  const detalle = [partes.length ? `Se borró con: ${partes.join(", ")}` : "No tenía participantes, fotos ni inventario", devueltos.length && `Volvieron a la bodega: ${devueltos.join(", ")}`].filter(Boolean).join(". ");
+  logActividadDelete(actor, toClientActividad(before), detalle).catch(() => {});
 }
 
 // ---------- Resumen (dashboard) ----------
