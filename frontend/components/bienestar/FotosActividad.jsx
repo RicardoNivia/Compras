@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirmar } from "@/components/Confirmar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchFotosApi, subirFotoApi, actualizarFotoApi, eliminarFotoApi, urlFoto } from "@/lib/api";
 import { IconPlus, IconTrash } from "@/components/icons";
@@ -30,6 +31,7 @@ export async function reducir(file) {
 // Material fotográfico de una actividad: galería, subir varias a la vez (o arrastrarlas), verlas en grande,
 // describirlas y quitarlas.
 export default function FotosActividad({ actividadId, puedeEditar, onCambio }) {
+  const { confirmar } = useConfirmar();
   const [fotos, setFotos] = useState(null);
   const [error, setError] = useState("");
   const [progreso, setProgreso] = useState(null); // { hechas, total }
@@ -140,7 +142,7 @@ export default function FotosActividad({ actividadId, puedeEditar, onCambio }) {
                 <a className="btn small" href={urlFoto(actividadId, actual.id)} download={actual.nombre}>Descargar</a>
                 {puedeEditar && (
                   <button type="button" className="btn small btn-danger-outline" onClick={async () => {
-                    if (!window.confirm("¿Quitar esta foto de la actividad?")) return;
+                    if (!(await confirmar({ titulo: "Quitar foto", mensaje: "¿Quitar esta foto de la actividad?", boton: "Sí, quitar", peligro: true }))) return;
                     await eliminarFotoApi(actividadId, actual.id).catch((er) => setError(er.message));
                     setAbierta(null);
                     cargar();

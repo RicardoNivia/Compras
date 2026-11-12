@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirmar } from "@/components/Confirmar";
 import BotonExcel from "@/components/BotonExcel";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -38,6 +39,7 @@ function Texto({ v, ancho = false }) {
 
 // «Revisada» de una alerta de Tesorería (lo que no cuadró al importar): la marca y vuelve a calcular Mi día.
 function RevisarAlertaTesoreria({ id }) {
+  const { avisar } = useConfirmar();
   const router = useRouter();
   const [estado, setEstado] = useState("");
   async function revisar() {
@@ -49,7 +51,7 @@ function RevisarAlertaTesoreria({ id }) {
       router.refresh();
     } catch (e) {
       setEstado("");
-      window.alert(e.message);
+      avisar({ titulo: "No se pudo marcar como revisada", mensaje: e.message });
     }
   }
   if (estado === "lista") return <span className="pill good"><IconCheck size={11} /> Revisada</span>;

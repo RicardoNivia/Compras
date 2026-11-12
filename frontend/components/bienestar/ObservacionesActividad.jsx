@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirmar } from "@/components/Confirmar";
 import { normalizar } from "@/lib/buscar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { crearObservacionApi, eliminarObservacionApi, fetchObservacionesApi } from "@/lib/api";
@@ -17,6 +18,7 @@ const entero = (v) => Math.round(v).toLocaleString("es-CO");
 // Pestaña de la ficha: la encuesta de satisfacción (se importa aquí) y todas las observaciones de la actividad en una
 // sola tabla, con las que agrega el equipo. enModal: solo la tabla, para leerla desde el detalle del cronograma.
 export default function ObservacionesActividad({ act, puedeEditar = false, onCambio, enModal = false }) {
+  const { confirmar } = useConfirmar();
   const [datos, setDatos] = useState(null);
   const [buscar, setBuscar] = useState("");
   const [filtro, setFiltro] = useState(enModal ? "comentario" : "");
@@ -70,7 +72,7 @@ export default function ObservacionesActividad({ act, puedeEditar = false, onCam
   }
 
   async function quitar(o) {
-    if (!window.confirm("¿Quitar esta observación?")) return;
+    if (!(await confirmar({ titulo: "Quitar observación", mensaje: "¿Quitar esta observación?", boton: "Sí, quitar", peligro: true }))) return;
     setError("");
     setAviso("");
     try {

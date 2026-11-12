@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirmar } from "@/components/Confirmar";
 import { useState } from "react";
 import { IconDownload } from "@/components/icons";
 
@@ -7,6 +8,7 @@ import { IconDownload } from "@/components/icons";
 // columnas de la pantalla. columnas: [{ t: "Título", v: (fila) => valor, ancho? }]; los montos van como número con su
 // signo (se pueden sumar en Excel). filas = arreglo ya cargado, u obtener = función async que trae todo.
 export default function BotonExcel({ nombre, hoja = "Datos", columnas, filas, obtener, etiqueta = "Exportar a Excel", deshabilitado = false }) {
+  const { avisar } = useConfirmar();
   const [ocupado, setOcupado] = useState(false);
   async function exportar() {
     setOcupado(true);
@@ -21,7 +23,7 @@ export default function BotonExcel({ nombre, hoja = "Datos", columnas, filas, ob
       XLSX.utils.book_append_sheet(wb, ws, hoja.slice(0, 31));
       XLSX.writeFile(wb, `${nombre}-${new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" })}.xlsx`);
     } catch (e) {
-      window.alert(`No se pudo exportar: ${e.message}`);
+      avisar({ titulo: "No se pudo exportar", mensaje: e.message });
     } finally { setOcupado(false); }
   }
   return (

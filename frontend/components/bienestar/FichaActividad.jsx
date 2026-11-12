@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirmar } from "@/components/Confirmar";
 import { normalizar } from "@/lib/buscar";
 import BotonExcel from "@/components/BotonExcel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -52,6 +53,7 @@ const pct = (v) => (v == null ? "—" : `${(Math.round(v * 1000) / 10).toString(
 // aplica, los totales o la lista con su importación). Las partes editables son el mismo ActividadFormulario, incrustado.
 const TABS_VALIDAS = ["resumen", "datos", "presupuesto", "compras", "participantes", "observaciones", "inventario", "fotos", "calificaciones", "agente"];
 export default function FichaActividad({ actividadId, puedeEditar, puedeUsarBodega = false, basePath, responsables = [], lineasPermitidas }) {
+  const { confirmar } = useConfirmar();
   const [act, setAct] = useState(null);
   const [error, setError] = useState("");
   // ?tab= abre directo en una pestaña (los enlaces viejos a /editar llegan con tab=datos; al cerrar, calificaciones).
@@ -65,9 +67,9 @@ export default function FichaActividad({ actividadId, puedeEditar, puedeUsarBode
     const t = setTimeout(() => setGuardado(false), 3500);
     return () => clearTimeout(t);
   }, [guardado]);
-  function cambiarTab(k) {
+  async function cambiarTab(k) {
     if (k === tab) return;
-    if (sucio.current && !window.confirm("Tienes cambios sin guardar en esta sección. ¿Salir sin guardarlos?")) return;
+    if (sucio.current && !(await confirmar({ titulo: "Cambios sin guardar", mensaje: "Tienes cambios sin guardar en esta sección. ¿Salir sin guardarlos?", boton: "Salir sin guardar", peligro: true }))) return;
     sucio.current = false;
     crossfade(() => setTab(k));
   }
@@ -342,6 +344,7 @@ function TabResumen({ act }) {
 
 // ---------- Participantes ----------
 function TabParticipantes({ act, puedeEditar, onCambio }) {
+  const { confirmar } = useConfirmar();
   const [lista, setLista] = useState(null);
   const [motivos, setMotivos] = useState([]);
   const [areasMaestro, setAreasMaestro] = useState([]);
@@ -489,7 +492,7 @@ function TabParticipantes({ act, puedeEditar, onCambio }) {
                   <td className="actions-cell">
                     <div className="row-actions">
                       {(Object.keys(pp.datos).length > 0 || pp.datosOcultos > 0) && <button type="button" className="btn small" onClick={() => setVerDatos(pp)}>Datos</button>}
-                      {puedeEditar && <button type="button" className="icon-action-btn delete" title="Quitar de la actividad" aria-label={`Quitar a ${pp.nombre}`} onClick={async () => { if (window.confirm(`¿Quitar a ${pp.nombre} de la actividad?`)) { await eliminarParticipanteApi(act.id, pp.id).catch((e) => setError(e.message)); cargar(); onCambio(); } }}><IconTrash size={13} /></button>}
+                      {puedeEditar && <button type="button" className="icon-action-btn delete" title="Quitar de la actividad" aria-label={`Quitar a ${pp.nombre}`} onClick={async () => { if (await confirmar({ titulo: "Quitar participante", mensaje: `¿Quitar a ${pp.nombre} de la actividad?`, detalle: "Se borran su asistencia, calificación y comentario en esta actividad.", boton: "Sí, quitar", peligro: true })) { await eliminarParticipanteApi(act.id, pp.id).catch((e) => setError(e.message)); cargar(); onCambio(); } }}><IconTrash size={13} /></button>}
                     </div>
                   </td>
                 </tr>
@@ -578,6 +581,7 @@ function ModalNuevoParticipante({ act, motivos, areas, onClose, onCreado }) {
 
 // ---------- Inventario ----------
 function TabInventario({ act, puedeEditar, puedeUsarBodega, onCambio }) {
+  const { confirmar } = useConfirmar();
   const [items, setItems] = useState(act.inventario.items);
   const [resumen, setResumen] = useState(act.inventario.resumen);
   const [unidades, setUnidades] = useState([]);
@@ -700,7 +704,7 @@ function TabInventario({ act, puedeEditar, puedeUsarBodega, onCambio }) {
                   <td className="num">{it.costoTotal != null ? fmtCOP(it.costoTotal) : "—"}</td>
                   <td className="actions-cell"><div className="row-actions">
                     {puedeEditar && (!it.articuloId || puedeUsarBodega) && <button type="button" className="icon-action-btn" aria-label={`Editar la cantidad de ${it.item}`} title="Editar la cantidad usada" onClick={() => { setEditarCant(it); setCantNueva(String(it.usado)); setErrorCant(""); }}><IconEdit size={13} /></button>}
-                    {puedeEditar && (!it.articuloId || puedeUsarBodega) && <button type="button" className="icon-action-btn delete" aria-label={`Quitar ${it.item}`} onClick={async () => { if (window.confirm(it.articuloId ? `¿Quitar "${it.item}" de la actividad? Las ${it.usado} usadas vuelven a la bodega.` : `¿Quitar "${it.item}" del inventario?`)) { await eliminarItemApi(act.id, it.id).catch((e) => setError(e.message)); recargar(); } }}><IconTrash size={13} /></button>}
+                    {puedeEditar && (!it.articuloId || puedeUsarBodega) && <button type="button" className="icon-action-btn delete" aria-label={`Quitar ${it.item}`} onClick={async () => { if (await confirmar({ titulo: "Quitar del inventario", mensaje: it.articuloId ? `¿Quitar "${it.item}" de la actividad? Las ${it.usado} usadas vuelven a la bodega.` : `¿Quitar "${it.item}" del inventario?`, boton: "Sí, quitar", peligro: true })) { await eliminarItemApi(act.id, it.id).catch((e) => setError(e.message)); recargar(); } }}><IconTrash size={13} /></button>}
                   </div></td>
                 </tr>
               ))}
@@ -832,6 +836,7 @@ function TabCompras({ act, puedeEditar, cerrada, onCambio }) {
 
 // ---------- Formulario público ----------
 function TabFormulario({ act, puedeEditar, onCambio }) {
+  const { confirmar } = useConfirmar();
   const [plantillas, setPlantillas] = useState([]);
   const [plantilla, setPlantilla] = useState("");
   const [error, setError] = useState("");
@@ -863,7 +868,7 @@ function TabFormulario({ act, puedeEditar, onCambio }) {
             <input readOnly value={enlace} aria-label="Enlace del formulario" onFocus={(e) => e.target.select()} />
             <button type="button" className="btn" onClick={() => { navigator.clipboard?.writeText(enlace); setCopiado(true); setTimeout(() => setCopiado(false), 1800); }}>{copiado ? "Copiado" : "Copiar enlace"}</button>
             <a className="btn" href={enlace} target="_blank" rel="noreferrer">Abrir</a>
-            {puedeEditar && <button type="button" className="btn" onClick={() => window.confirm("El enlace actual dejará de funcionar. ¿Generar uno nuevo?") && guardar({ nuevoEnlace: true })}>Nuevo enlace</button>}
+            {puedeEditar && <button type="button" className="btn" onClick={async () => { if (await confirmar({ titulo: "Nuevo enlace", mensaje: "El enlace actual dejará de funcionar. ¿Generar uno nuevo?", boton: "Generar enlace nuevo" })) guardar({ nuevoEnlace: true }); }}>Nuevo enlace</button>}
           </div>
         )}
         {puedeEditar && (
