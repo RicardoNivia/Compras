@@ -18,6 +18,7 @@ import { AnimatedNumber } from "@/components/charts/chartKit";
 import HBarChartSvg from "@/components/charts/HBarChartSvg";
 import ImportarNovaModal from "@/components/bienestar/ImportarNovaModal";
 import CerrarActividadModal, { razonParaNoCerrar } from "@/components/bienestar/CerrarActividadModal";
+import ReabrirActividadModal from "@/components/bienestar/ReabrirActividadModal";
 import PiePagina, { usePagina } from "@/components/bienestar/PiePagina";
 import SolicitudesActividad from "@/components/bienestar/SolicitudesActividad";
 import { EsqueletoFicha, EsqueletoTabla } from "@/components/bienestar/Esqueletos";
@@ -71,6 +72,7 @@ export default function FichaActividad({ actividadId, puedeEditar, puedeUsarBode
     crossfade(() => setTab(k));
   }
   const [cerrar, setCerrar] = useState(false);
+  const [reabrir, setReabrir] = useState(false);
   const [verCalificacion, setVerCalificacion] = useState(false);
 
   const cargar = useCallback(() => {
@@ -173,6 +175,11 @@ export default function FichaActividad({ actividadId, puedeEditar, puedeUsarBode
                 {cerrada ? `Cerrada por ${act.cerradaPorNombre || "—"}${act.cerradaAt ? ` · ${fmtDateTime(act.cerradaAt)}` : ""}` : "Análisis de Nova"}
               </button>
             )}
+            {puedeEditar && cerrada && (
+              <button type="button" className="btn" onClick={() => setReabrir(true)} title="Vuelve a «Ejecutada» para modificarla o eliminarla; queda en Auditoría">
+                Reabrir actividad
+              </button>
+            )}
             {puedeEditar && !cerrada && (
               <button type="button" className="btn btn-primary" onClick={() => setCerrar(true)} disabled={!!razonParaNoCerrar(act)} title={razonParaNoCerrar(act) || "Calificar y cerrar la actividad"}>
                 <IconCheck size={13} /> Cerrar actividad
@@ -272,6 +279,7 @@ export default function FichaActividad({ actividadId, puedeEditar, puedeUsarBode
 
       {guardado && <div className="toast toast-good" role="status"><IconCheck size={13} /> Cambios guardados.</div>}
       {verCalificacion && <CalificacionModal actividadId={act.id} puedeEditar={puedeEditar} onClose={() => setVerCalificacion(false)} onCambio={cargar} />}
+      {reabrir && <ReabrirActividadModal act={act} onClose={() => setReabrir(false)} onReabierta={() => { setReabrir(false); setTab("datos"); cargar(); }} />}
       {cerrar && <CerrarActividadModal act={act} onClose={() => setCerrar(false)} onCerrada={() => { setCerrar(false); setTab("calificaciones"); cargar(); }} />}
     </div>
   );

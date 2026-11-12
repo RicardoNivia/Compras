@@ -286,8 +286,8 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
                           <div className="row-actions">
                             {/* Un solo botón: la actividad se ve y se edita en la misma página. */}
                             <Link href={fichaDe(a.id)} className="btn small" title={puedeEditar && a.estado !== "cerrada" ? "Ver y gestionar la actividad" : "Ver la actividad"}>Abrir</Link>
-                            {puedeEditar && a.estado !== "cerrada" && (
-                              <button type="button" className="btn small btn-danger-outline icon-btn" title="Eliminar la actividad" aria-label={`Eliminar ${a.nombre}`} onClick={() => setEliminar(a)}>
+                            {puedeEditar && (
+                              <button type="button" className="btn small btn-danger-outline icon-btn" disabled={a.estado === "cerrada"} title={a.estado === "cerrada" ? "Está cerrada: ábrela y usa «Reabrir actividad» para poder eliminarla" : "Eliminar la actividad"} aria-label={`Eliminar ${a.nombre}`} onClick={() => setEliminar(a)}>
                                 <IconTrash size={13} />
                               </button>
                             )}

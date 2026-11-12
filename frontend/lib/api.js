@@ -546,6 +546,12 @@ export async function fetchEliminacionActividadApi(id) {
   return handle(res);
 }
 
+// Reabre una actividad cerrada (vuelve a ejecutada); el motivo queda en Auditoría.
+export async function reabrirActividadApi(id, motivo) {
+  const res = await fetch(`/api/actividades/${id}/reabrir`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ motivo }) });
+  return handle(res);
+}
+
 export async function deleteActividadApi(id) {
   const res = await fetch(`/api/actividades/${id}`, { method: "DELETE" });
   return handle(res);
