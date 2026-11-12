@@ -69,6 +69,17 @@ motivo, dilo (área y motivo, sin nombres de personas) y propón una idea concre
 nombres de campos. Devuelve de 3 a 5 puntos: "logro" (lo que funcionó), "alerta" (lo que falló) e "idea" (qué hacer
 distinto la próxima vez), de una o dos frases cada uno.`;
 
+// Actividad sin el check «aplica participantes y listas de asistencia»: no se llevó control de asistencia a propósito,
+// así que ese criterio no existe para ella (ni resta puntos, ni es alerta, ni se sugiere llevarlo).
+const SIN_PARTICIPANTES = `
+
+REGLA PARA ESTA ACTIVIDAD (manda sobre la rúbrica): no maneja participantes ni listas de asistencia, por decisión de quien la
+configuró. La rúbrica queda SOLO en: gasto frente a presupuesto, aprovechamiento del inventario, la calificación y el comentario
+de cierre y las observaciones del equipo. No hables de asistencia, inscritos, convocatoria ni participación; no los cuentes como
+dato faltante, no bajes el puntaje por eso y no sugieras llevar listas de asistencia. Si con eso todo lo medible está bien, el
+puntaje es 4 o 5.`;
+const SOBRE_ASISTENCIA = /asisten|inscrit|convocad|participaci|lista de asistencia|participantes/i;
+
 async function datosParaNova(a) {
   const p = a.participacion;
   const comentarios = await prisma.participanteActividad.findMany({
@@ -86,7 +97,7 @@ async function datosParaNova(a) {
     linea: a.linea,
     fechas: a.fechaFin ? `${a.fecha} a ${a.fechaFin}` : a.fecha,
     descripcion: a.descripcion,
-    presupuesto: a.presupuesto,
+    presupuesto: a.presupuestoConfigurado ? a.presupuesto : "sin configurar (se toma lo acumulado en compras)",
     gastadoEnCompras: a.gastado,
     comprasAsociadas: a.detalleCompras.slice(0, 15).map((c) => ({ descripcion: String(c.descripcion || "").slice(0, 120), proveedor: c.proveedor, valor: c.valorConIva, legalizacion: c.estadoLegalizacion })),
     ...(a.aplicaParticipantes ? {
@@ -135,8 +146,8 @@ export async function generarAnalisisActividad(id, { actor = null, origen = "man
     return toClientAnalisisActividad(row);
   }
   const ia = await generateStructuredJson({
-    systemInstruction: SISTEMA,
-    prompt: `Datos de la actividad (JSON):\n${JSON.stringify(await datosParaNova(a))}`,
+    systemInstruction: a.aplicaParticipantes ? SISTEMA : SISTEMA + SIN_PARTICIPANTES,
+    prompt: `${a.aplicaParticipantes ? "" : "ESTA ACTIVIDAD NO MANEJA PARTICIPANTES NI LISTAS DE ASISTENCIA: la asistencia NO es un criterio aquí.\n"}Datos de la actividad (JSON):\n${JSON.stringify(await datosParaNova(a))}`,
     schema: SCHEMA,
     cache: false,
   });
@@ -146,6 +157,8 @@ export async function generarAnalisisActividad(id, { actor = null, origen = "man
   if (!(puntaje >= 1 && puntaje <= 5) || !titulo || !resumen) throw badRequest("Nova no devolvió un análisis válido. Intenta de nuevo.", 502);
   const puntos = (Array.isArray(ia.puntos) ? ia.puntos : [])
     .filter((x) => TIPOS.includes(x?.tipo) && String(x?.texto || "").trim())
+    // Sin participantes, una alerta sobre asistencia o inscritos no aplica (no se llevó ese control a propósito).
+    .filter((x) => a.aplicaParticipantes || !(x.tipo === "alerta" && SOBRE_ASISTENCIA.test(x.texto)))
     .slice(0, 5)
     .map((x) => ({ tipo: x.tipo, texto: String(x.texto).trim().slice(0, 600) }));
 

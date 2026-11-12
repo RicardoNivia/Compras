@@ -80,12 +80,12 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
   const pageRows = filtradas.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const resumen = useMemo(() => {
-    const presupuesto = delAnio.reduce((s, a) => s + (a.presupuesto || 0), 0);
+    const presupuesto = delAnio.reduce((s, a) => s + (a.presupuestoConfigurado ? a.presupuesto : 0), 0);
     const gastado = delAnio.reduce((s, a) => s + (a.gastado || 0), 0);
-    const gastadoConPresupuesto = delAnio.filter((a) => a.presupuesto).reduce((s, a) => s + (a.gastado || 0), 0);
+    const gastadoConPresupuesto = delAnio.filter((a) => a.presupuestoConfigurado).reduce((s, a) => s + (a.gastado || 0), 0);
     const asistentes = delAnio.reduce((s, a) => s + (a.asistentes || 0), 0);
     const porEstado = Object.fromEntries(ESTADOS_ACTIVIDAD.map((e) => [e.value, delAnio.filter((a) => a.estado === e.value).length]));
-    const sinPresupuesto = delAnio.filter((a) => a.estado !== "cerrada" && !a.presupuesto).length;
+    const sinPresupuesto = delAnio.filter((a) => a.estado !== "cerrada" && !a.presupuestoConfigurado).length;
     return { presupuesto, gastado, gastadoConPresupuesto, asistentes, porEstado, sinPresupuesto };
   }, [delAnio]);
 
@@ -113,7 +113,7 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
           <span className="bienestar-kpi-label">Gastado en compras asociadas</span>
           <span className="bienestar-kpi-value">{fmtCOP(resumen.gastado)}</span>
           <span className="count-note">
-            {resumen.gastado ? `${fmtCOP(resumen.gastadoConPresupuesto)} en actividades con presupuesto` : "Asocia las compras desde Registros"}
+            {resumen.gastado ? `${fmtCOP(resumen.gastadoConPresupuesto)} en actividades con presupuesto` : "Sin compras asociadas"}
           </span>
         </div>
         <div className="bienestar-kpi">
@@ -266,7 +266,7 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
                         <td className="truncate">{a.responsableNombre || "—"}</td>
                         <td className="num">{a.aplicaParticipantes ? a.inscritos ?? "—" : <span className="muted">No aplica</span>}</td>
                         <td className="num">{a.aplicaParticipantes ? a.asistentes ?? "—" : <span className="muted">No aplica</span>}</td>
-                        <td className="num">{a.presupuesto != null ? fmtCOP(a.presupuesto) : <span className="muted">Sin asignar</span>}</td>
+                        <td className="num">{fmtCOP(a.presupuesto || 0)}{!a.presupuestoConfigurado && <span className="pres-sin-config" title="El presupuesto no está configurado: se toma lo acumulado en compras asociadas">sin configurar</span>}</td>
                         <td className="num">{a.compras || "—"}</td>
                         <td className="num">
                           {a.gastado ? fmtCOP(a.gastado) : "—"}
@@ -315,7 +315,7 @@ export default function BienestarView({ vista = "resumen", linea = "Bienestar", 
                 { t: "Fecha", v: (a) => rangoFechas(a) }, { t: "Actividad", v: (a) => a.nombre }, { t: "Descripción", v: (a) => a.descripcion },
                 { t: "Estado", v: (a) => estadoActividad(a.estado).label }, { t: "Responsable", v: (a) => a.responsableNombre },
                 { t: "Inscritos", v: (a) => (a.aplicaParticipantes ? a.inscritos ?? null : "No aplica") }, { t: "Asistentes", v: (a) => (a.aplicaParticipantes ? a.asistentes ?? null : "No aplica") },
-                { t: "Presupuesto ($)", v: (a) => a.presupuesto }, { t: "Compras", v: (a) => a.compras || 0 }, { t: "Gastado ($)", v: (a) => a.gastado || 0 },
+                { t: "Presupuesto ($)", v: (a) => a.presupuesto }, { t: "Presupuesto configurado", v: (a) => (a.presupuestoConfigurado ? "Sí" : "No (= compras)") }, { t: "Compras", v: (a) => a.compras || 0 }, { t: "Gastado ($)", v: (a) => a.gastado || 0 },
                 { t: "% del presupuesto", v: (a) => (a.pctPresupuesto != null ? Math.round(a.pctPresupuesto * 100) : null) }, { t: "Calificación", v: (a) => a.calificacion ?? a.puntajeNova ?? null },
               ]} />
               <span className="count-note">{filtradas.length} actividad(es) (de {delAnio.length} en {anio})</span>

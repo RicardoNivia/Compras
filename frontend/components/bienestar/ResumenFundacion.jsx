@@ -9,7 +9,6 @@ import ComboChartSvg from "@/components/charts/ComboChartSvg";
 import HBarChartSvg from "@/components/charts/HBarChartSvg";
 import AnalisisNova from "@/components/bienestar/AnalisisNova";
 import ComentariosDestacados from "@/components/bienestar/ComentariosDestacados";
-import ComprasSinActividad from "@/components/bienestar/ComprasSinActividad";
 import ComparaPresupuesto from "@/components/bienestar/ComparaPresupuesto";
 import { EsqueletoResumen } from "@/components/bienestar/Esqueletos";
 import ResumenDelMes from "@/components/bienestar/ResumenDelMes";
@@ -112,8 +111,6 @@ export default function ResumenFundacion({ anio, anios = [], onAnio, puedeEditar
         <Cifra {...explica("Presupuesto y gasto")} etiqueta="Presupuesto y gasto"><ComparaPresupuesto presupuesto={kpis.presupuestoAsignado} gastado={kpis.gastoActividades} gastoSinPresupuesto={kpis.gastoSinPresupuesto} /></Cifra>
       </div>
 
-      <ComprasSinActividad datos={resumen.comprasSinActividad} anio={anio} mes={vista === "mensual" ? mes : null} linea="Fundación" periodo={periodo} puedeEditar={puedeEditar} onCambio={() => setRecarga((n) => n + 1)} />
-
       <AnalisisNova linea="Fundación" anio={anio} mes={vista === "mensual" ? mes : 0} puedeEditar={puedeEditar} />
 
       <div className="resumen-fila">
@@ -175,7 +172,7 @@ export default function ResumenFundacion({ anio, anios = [], onAnio, puedeEditar
           <h2 id="fund-presu">Lo invertido frente a lo presupuestado</h2>
           <p className="card-sub">Por jornada; al pasar el cursor, su presupuesto.</p>
           {presupuestoVsGasto.length ? (
-            <HBarChartSvg data={presupuestoVsGasto.slice(0, 8).map((a) => ({ key: String(a.id), id: a.id, label: a.nombre, value: a.gastado, detalle: a.presupuesto ? `Presupuesto ${fmtCOP(a.presupuesto)} · ${pct(a.gastado / a.presupuesto)} usado` : "Sin presupuesto asignado" }))} color="var(--secondary)" onSelect={(d) => onAbrirActividad(d.id)} />
+            <HBarChartSvg data={presupuestoVsGasto.slice(0, 8).map((a) => ({ key: String(a.id), id: a.id, label: a.nombre, value: a.gastado, detalle: a.presupuestoConfigurado ? `Presupuesto ${fmtCOP(a.presupuesto)} · ${pct(a.gastado / a.presupuesto)} usado` : "Presupuesto sin configurar (= compras)" }))} color="var(--secondary)" onSelect={(d) => onAbrirActividad(d.id)} />
           ) : <div className="empty compacta">Ninguna jornada del período tiene presupuesto ni compras asociadas.</div>}
         </section>
         <section className="resumen-card" aria-labelledby="fund-cat">

@@ -439,8 +439,8 @@ const puedeLinea = (user, linea, tipo = "lista") => {
 };
 const filaActividad = (a) => ({
   id: a.id, nombre: a.nombre, linea: a.linea, fecha: a.fecha, fechaFin: a.fechaFin, estado: a.estado, responsable: a.responsableNombre,
-  // Sin compras asociadas el gasto no es $0 sino que no hay dato (las compras pueden estar sin asociar).
-  presupuesto: a.presupuesto, gastadoEnComprasAsociadas: a.compras ? a.gastado : null, compras: a.compras, inscritos: a.inscritos, asistentes: a.asistentes,
+  // No toda compra va a una actividad: sin compras asociadas el gasto de la actividad es 0.
+  presupuesto: a.presupuesto, presupuestoConfigurado: a.presupuestoConfigurado, ...(a.presupuestoConfigurado ? {} : { notaPresupuesto: "Sin presupuesto configurado: se toma como presupuesto lo acumulado en sus compras asociadas." }), gastadoEnComprasAsociadas: a.gastado || 0, compras: a.compras, inscritos: a.inscritos, asistentes: a.asistentes,
   aplicaParticipantes: a.aplicaParticipantes, calificacionAlCerrar: a.calificacion, puntajeNova: a.puntajeNova,
 });
 
@@ -726,7 +726,6 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
           // Sin ninguna actividad con lista de asistencia el número de asistentes no existe (no es 0).
           asistentes: x.participacion.registrados || x.kpis.asistentes ? x.kpis.asistentes : null, inscritosConLista: x.participacion.inscritos, asistencia: x.kpis.asistencia,
           presupuestoDeActividades: x.kpis.presupuestoAsignado, gastoAsociadoAActividades: x.kpis.gastoArea, costoPorAsistente: x.kpis.costoPorAsistente,
-          comprasDelAreaSinActividad: x.comprasSinActividad,
         });
         let comparacion;
         if (args.compararCon && Number(args.compararCon) !== r.anio) {
@@ -736,7 +735,7 @@ export function buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeePr
           comparacion = { [r.anio]: actual, [otro.anio]: otro, diferencias: { asistentes: dif("asistentes"), gastoAsociadoAActividades: dif("gastoAsociadoAActividades"), presupuestoDeActividades: dif("presupuestoDeActividades"), actividades: dif("actividades") } };
         }
         return {
-          nota: "Todo gasto del módulo es de compras ASOCIADAS a una actividad, en el mes de la actividad. Las compras del área Bienestar sin actividad van aparte en comprasDelAreaSinActividad: menciónalas cuando hables de cuánto se gasta. presupuestoDeActividades es lo asignado a cada actividad (distinto del presupuesto de Compras por área). Usa las cifras tal cual vienen; si algo es null o falta, di 'sin dato'.",
+          nota: "Todo gasto del módulo es de compras ASOCIADAS a una actividad, en el mes de la actividad. No todas las compras van asociadas a una actividad y eso es normal: nunca avises ni sugieras asociar compras que no tienen actividad. presupuestoDeActividades es lo asignado a cada actividad (distinto del presupuesto de Compras por área). Usa las cifras tal cual vienen; si algo es null o falta, di 'sin dato'.",
           cifras: cifras(r),
           ...(comparacion ? { comparacion } : {}),
           linea, anio: r.anio, mes: r.mes, kpis: r.kpis,

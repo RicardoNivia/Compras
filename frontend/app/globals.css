@@ -6188,3 +6188,8 @@ tr.tes-ex-no td{ opacity:.45; text-decoration:line-through; }
 .eliminar-lista{ margin:0; padding-left:18px; display:flex; flex-direction:column; gap:3px; font-size:13px; }
 /* Placeholder del chat flotante: una sola línea. */
 .floating-agent-input textarea::placeholder{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* Presupuesto de actividad sin configurar (= lo acumulado en compras). */
+.pres-sin-config{ display:inline-block; margin-left:6px; padding:1px 6px; border-radius:999px; font-size:10.5px; font-weight:600; color:var(--warning); background:color-mix(in srgb, var(--warning) 12%, var(--surface)); vertical-align:1px; white-space:nowrap; }
+.pres-aviso{ display:flex; flex-direction:column; gap:2px; margin:8px 0 12px; padding:10px 14px; border-radius:10px; background:color-mix(in srgb, var(--warning) 12%, var(--surface)); border:1px solid color-mix(in srgb, var(--warning) 40%, var(--border)); font-size:12.5px; color:var(--ink-2); }
+.pres-aviso strong{ color:var(--ink); font-size:13px; }

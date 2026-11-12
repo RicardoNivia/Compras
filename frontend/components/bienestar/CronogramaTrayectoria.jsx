@@ -74,9 +74,9 @@ export default function CronogramaTrayectoria({ anio, linea, actividades, onEleg
   const conAsistencia = conFecha.filter((a) => a.inscritos && a.asistentes != null);
   const programados = conAsistencia.reduce((s, a) => s + a.inscritos, 0);
   const asistieron = conAsistencia.reduce((s, a) => s + a.asistentes, 0);
-  const presupuestado = conFecha.reduce((s, a) => s + (a.presupuesto || 0), 0);
+  const presupuestado = conFecha.reduce((s, a) => s + (a.presupuestoConfigurado ? a.presupuesto : 0), 0);
   const gastado = conFecha.reduce((s, a) => s + (a.gastado || 0), 0);
-  const gastoSinPresupuesto = conFecha.filter((a) => !a.presupuesto).reduce((s, a) => s + (a.gastado || 0), 0);
+  const gastoSinPresupuesto = conFecha.filter((a) => !a.presupuestoConfigurado).reduce((s, a) => s + (a.gastado || 0), 0);
   const conteo = Object.fromEntries(ESTADOS_ACTIVIDAD.map((e) => [e.value, conFecha.filter((a) => a.estado === e.value).length]));
   const R = 22;
   // La pista crece solo hasta el nivel más lejano que se usó, para que un año con pocas actividades no quede vacío.

@@ -150,7 +150,7 @@ export function CalificacionModal({ actividadId, puedeEditar, onClose, onCambio 
                 <div><span>Asistieron</span><strong>{asistieron != null ? `${asistieron}${inscritos ? ` de ${inscritos}` : ""}` : "—"}</strong></div>
                 <div><span>Asistentes que calificaron</span><strong>{p.calificaciones ? `${p.calificacionPromedio.toFixed(1).replace(".", ",")} / 5 (${p.calificaciones})` : "—"}</strong></div>
                 <div><span>Gastado</span><strong>{fmtCOP(act.gastado || 0)}</strong></div>
-                <div><span>Presupuesto</span><strong>{act.presupuesto != null ? fmtCOP(act.presupuesto) : "Sin asignar"}</strong></div>
+                <div><span>Presupuesto</span><strong>{fmtCOP(act.presupuesto || 0)}{act.presupuestoConfigurado === false && <span className="pres-sin-config" title="El presupuesto no está configurado: se toma lo acumulado en compras asociadas">sin configurar</span>}</strong></div>
               </div>
             </>
           )}

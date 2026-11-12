@@ -24,8 +24,12 @@ function badRequest(message, status = 400) {
   return err;
 }
 
+// Presupuesto sin configurar (vacío o en 0): la actividad toma como presupuesto lo acumulado en sus compras asociadas
+// (`presupuesto` = gastado) y lo dice con `presupuestoConfigurado: false`. `presupuestoAsignado` es lo que se digitó (el
+// formulario edita ese); los totales del tablero suman solo lo asignado, para no inflar el presupuesto del año.
 export function toClientActividad(a, gasto = null) {
   const gastado = gasto?.gastado ?? 0;
+  const configurado = Number(a.presupuesto) > 0;
   return {
     id: a.id,
     nombre: a.nombre,
@@ -37,7 +41,9 @@ export function toClientActividad(a, gasto = null) {
     descripcion: a.descripcion,
     responsableUserId: a.responsableUserId,
     responsableNombre: a.responsableNombre,
-    presupuesto: a.presupuesto,
+    presupuesto: configurado ? a.presupuesto : gastado,
+    presupuestoAsignado: a.presupuesto ?? null,
+    presupuestoConfigurado: configurado,
     inscritos: a.inscritos,
     asistentes: a.asistentes,
     enCronograma: a.enCronograma,
@@ -56,7 +62,7 @@ export function toClientActividad(a, gasto = null) {
     // Gasto de las compras asociadas (valor con IVA, en pesos) y cuánto del presupuesto consume.
     compras: gasto?.compras ?? 0,
     gastado,
-    pctPresupuesto: a.presupuesto ? gastado / a.presupuesto : null,
+    pctPresupuesto: configurado ? gastado / a.presupuesto : null,
   };
 }
 
@@ -494,15 +500,15 @@ export async function resumenBienestar(anio, linea = "Bienestar", mes = null) {
     mes: m,
     linea,
     // Vista Mensual: cada actividad del mes con su gasto y sus asistentes (la gráfica de barras + línea).
-    porActividad: conFecha.map((a) => ({ id: a.id, nombre: a.nombre, fecha: a.fecha, fechaFin: a.fechaFin, estado: a.estado, aplicaParticipantes: a.aplicaParticipantes, gastado: a.gastado || 0, asistentes: a.asistentes || 0, inscritos: a.inscritos || 0, presupuesto: a.presupuesto || 0 })),
+    porActividad: conFecha.map((a) => ({ id: a.id, nombre: a.nombre, fecha: a.fecha, fechaFin: a.fechaFin, estado: a.estado, aplicaParticipantes: a.aplicaParticipantes, gastado: a.gastado || 0, asistentes: a.asistentes || 0, inscritos: a.inscritos || 0, presupuesto: a.presupuesto || 0, presupuestoConfigurado: a.presupuestoConfigurado })),
     kpis: {
       actividades: actividades.length,
       porEstado: Object.fromEntries(ESTADOS.map((e) => [e, actividades.filter((a) => a.estado === e).length])),
       asistentes,
       asistencia: sum(conAsistencia, (a) => a.inscritos) ? sum(conAsistencia, (a) => a.asistentes) / sum(conAsistencia, (a) => a.inscritos) : null,
-      presupuestoAsignado: sum(actividades, (a) => a.presupuesto),
+      presupuestoAsignado: sum(actividades, (a) => (a.presupuestoConfigurado ? a.presupuesto : 0)),
       gastoActividades: sum(actividades, (a) => a.gastado),
-      gastoSinPresupuesto: sum(actividades.filter((a) => !a.presupuesto), (a) => a.gastado),
+      gastoSinPresupuesto: sum(actividades.filter((a) => !a.presupuestoConfigurado), (a) => a.gastado),
       gastoArea,
       comprasArea: comprasArea.length,
       // Solo con los asistentes de las actividades que tienen compras: los demás no tienen costo conocido.
@@ -521,7 +527,7 @@ export async function resumenBienestar(anio, linea = "Bienestar", mes = null) {
     },
     presupuestoVsGasto: actividades
       .filter((a) => a.presupuesto || a.gastado)
-      .map((a) => ({ id: a.id, nombre: a.nombre, fecha: a.fecha, presupuesto: a.presupuesto || 0, gastado: a.gastado || 0 }))
+      .map((a) => ({ id: a.id, nombre: a.nombre, fecha: a.fecha, presupuesto: a.presupuesto || 0, presupuestoConfigurado: a.presupuestoConfigurado, gastado: a.gastado || 0 }))
       .sort((a, b) => b.gastado + b.presupuesto - (a.gastado + a.presupuesto)),
     costoPorActividad: actividades
       .filter((a) => a.gastado > 0 && a.asistentes)
@@ -531,6 +537,5 @@ export async function resumenBienestar(anio, linea = "Bienestar", mes = null) {
       .filter((a) => (a.fechaFin || a.fecha) >= hoy && (a.estado === "creada" || a.estado === "programada"))
       .slice(0, 8),
     comentariosDestacados: await comentariosDestacados(actividades),
-    comprasSinActividad: await resumenComprasSinActividad(prefijoPeriodo),
   };
 }

@@ -113,7 +113,7 @@ export default function FichaActividad({ actividadId, puedeEditar, puedeUsarBode
   // Las secciones, agrupadas por tema (antes eran once pestañas en dos filas). [clave, nombre, ícono, contador, aviso]
   const grupos = [
     { titulo: "La actividad", items: [["resumen", "Resumen", IconDashboard], ["datos", "Datos de la actividad", IconEdit]] },
-    { titulo: "Dinero", items: [["presupuesto", "Presupuesto", IconMoney, act.presupuesto == null && !cerrada ? "Falta" : null, true], ["compras", "Compras", IconBag, cuenta(act.compras)]] },
+    { titulo: "Dinero", items: [["presupuesto", "Presupuesto", IconMoney, !act.presupuestoConfigurado && !cerrada ? "Falta" : null, true], ["compras", "Compras", IconBag, cuenta(act.compras)]] },
     {
       titulo: "Personas",
       items: [
@@ -194,8 +194,8 @@ export default function FichaActividad({ actividadId, puedeEditar, puedeUsarBode
         <div className="fx-medidores">
           {medidor(
             "presupuesto", "Presupuesto",
-            act.presupuesto != null ? <><AnimatedNumber value={act.gastado} format={fmtCOP} /> <em>de {fmtCOP(presupuesto)}</em></> : "Sin asignar",
-            act.presupuesto != null ? `${pct(act.pctPresupuesto)} gastado · disponible ${fmtCOP(disponible)}` : (cerrada ? "No se asignó presupuesto" : "Asígnalo aquí"),
+            act.presupuestoConfigurado ? <><AnimatedNumber value={act.gastado} format={fmtCOP} /> <em>de {fmtCOP(presupuesto)}</em></> : <AnimatedNumber value={act.gastado} format={fmtCOP} />,
+            act.presupuestoConfigurado ? `${pct(act.pctPresupuesto)} gastado · disponible ${fmtCOP(disponible)}` : "No configurado: se toma lo acumulado en compras",
             act.pctPresupuesto != null ? { pct: act.pctPresupuesto, clase: pctClase(act.pctPresupuesto) } : null,
           )}
           {medidor(

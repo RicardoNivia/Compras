@@ -80,10 +80,10 @@ export default function ResumenDelMes({ mes, anio, porMes, porActividad, kpis, o
                   ) : (
                     <div className="mes-medidor mes-medidor-pendiente"><span>Asistencia</span><strong>{a.inscritos ? `${entero(a.inscritos)} inscritos` : "Aún no se realiza"}</strong></div>
                   )}
-                  {a.presupuesto ? (
+                  {a.presupuestoConfigurado ? (
                     <Medidor etiqueta="Gasto" valor={a.gastado} total={a.presupuesto} texto={`${fmtCOP(a.gastado)} de ${fmtCOP(a.presupuesto)}`} clase={a.gastado > a.presupuesto ? "excedido" : "gasto"} />
                   ) : (
-                    <div className="mes-medidor mes-medidor-pendiente"><span>Gasto</span><strong>{a.gastado ? fmtCOP(a.gastado) : "Sin compras asociadas"}</strong></div>
+                    <div className="mes-medidor mes-medidor-pendiente"><span>Gasto</span><strong>{a.gastado ? fmtCOP(a.gastado) : "Sin compras asociadas"}{a.presupuestoConfigurado === false && <span className="pres-sin-config">presupuesto sin configurar</span>}</strong></div>
                   )}
                 </button>
               </li>

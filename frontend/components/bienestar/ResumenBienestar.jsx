@@ -9,7 +9,6 @@ import ComboChartSvg from "@/components/charts/ComboChartSvg";
 import HBarChartSvg from "@/components/charts/HBarChartSvg";
 import AnalisisNova from "@/components/bienestar/AnalisisNova";
 import ComentariosDestacados from "@/components/bienestar/ComentariosDestacados";
-import ComprasSinActividad from "@/components/bienestar/ComprasSinActividad";
 import ComparaPresupuesto from "@/components/bienestar/ComparaPresupuesto";
 import { EsqueletoResumen } from "@/components/bienestar/Esqueletos";
 import ResumenDelMes from "@/components/bienestar/ResumenDelMes";
@@ -105,8 +104,6 @@ export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bi
         <Kpi {...explica("Costo por asistente")} label="Costo por asistente" valor={kpis.costoPorAsistente ? <AnimatedNumber value={kpis.costoPorAsistente} format={fmtCOP} /> : "—"} sub="Compras asociadas ÷ asistentes de esas actividades" fuente="cruce" />
       </div>
 
-      <ComprasSinActividad datos={resumen.comprasSinActividad} anio={anio} mes={vista === "mensual" ? mes : null} linea={linea} periodo={periodo} puedeEditar={puedeEditar} onCambio={() => setRecarga((n) => n + 1)} />
-
       <AnalisisNova linea={linea} anio={anio} mes={vista === "mensual" ? mes : 0} puedeEditar={puedeEditar} respaldo={lectura} />
 
       <div className="resumen-fila">
@@ -137,7 +134,7 @@ export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bi
           <p className="card-sub">Compras asociadas a cada actividad; al pasar el cursor, su presupuesto.</p>
           {presupuestoVsGasto.length ? (
             <HBarChartSvg
-              data={presupuestoVsGasto.slice(0, 8).map((a) => ({ key: String(a.id), id: a.id, label: a.nombre, value: a.gastado, detalle: a.presupuesto ? `Presupuesto ${fmtCOP(a.presupuesto)} · ${pct(a.gastado / a.presupuesto)} usado` : "Sin presupuesto asignado" }))}
+              data={presupuestoVsGasto.slice(0, 8).map((a) => ({ key: String(a.id), id: a.id, label: a.nombre, value: a.gastado, detalle: a.presupuestoConfigurado ? `Presupuesto ${fmtCOP(a.presupuesto)} · ${pct(a.gastado / a.presupuesto)} usado` : "Presupuesto sin configurar (= compras)" }))}
               color="var(--secondary)"
               onSelect={(d) => onAbrirActividad(d.id)}
             />
@@ -210,7 +207,7 @@ export default function ResumenBienestar({ anio, anios = [], onAnio, linea = "Bi
                       <td className="mono">{a.fecha}</td>
                       <td><span className="desc-tooltip-wrap"><span className="desc-text">{a.nombre}</span><span className="desc-tooltip-bubble">{a.nombre}</span></span></td>
                       <td><span className={`pill ${estadoActividad(a.estado).pill}`}>{estadoActividad(a.estado).label}</span></td>
-                      <td className="num">{a.presupuesto != null ? fmtCOP(a.presupuesto) : <span className="muted">Sin asignar</span>}</td>
+                      <td className="num">{fmtCOP(a.presupuesto || 0)}{!a.presupuestoConfigurado && <span className="pres-sin-config" title="El presupuesto no está configurado: se toma lo acumulado en compras asociadas">sin configurar</span>}</td>
                       <td className="num"><button type="button" className="btn small resumen-asignar" onClick={() => onAbrirActividad(a.id)}>Ver ficha</button></td>
                     </tr>
                   ))}

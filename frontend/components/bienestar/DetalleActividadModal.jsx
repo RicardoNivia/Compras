@@ -110,7 +110,8 @@ export default function DetalleActividadModal({ actividad: resumen, fichaHref, e
               </section>
               <div className="detalle-kpis">
                 <Tarjeta titulo="Presupuesto y gasto">
-                  <ComparaPresupuesto presupuesto={act.presupuesto || 0} gastado={act.gastado || 0} />
+                  <ComparaPresupuesto presupuesto={act.presupuestoConfigurado ? act.presupuesto : 0} gastado={act.gastado || 0} />
+                  {act.presupuestoConfigurado === false && <span className="count-note">Presupuesto sin configurar: se toma lo acumulado en compras.</span>}
                   <span className="count-note">{entero(act.compras)} compra(s) asociada(s)</span>
                 </Tarjeta>
                 {act.aplicaParticipantes ? (

@@ -67,6 +67,8 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
     if (!actividad) return { ...vacio, linea: lineaPorDefecto, fecha: fechaInicial || "", estado: fechaInicial ? "programada" : "creada" };
     const out = { ...vacio };
     for (const k of Object.keys(vacio)) out[k] = actividad[k] ?? vacio[k];
+    // Se edita lo que se digitó, no el presupuesto efectivo (que sin configurar es lo acumulado en compras).
+    if ("presupuestoAsignado" in actividad) out.presupuesto = actividad.presupuestoAsignado ?? "";
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -134,6 +136,8 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
   const enTramite = total - ejecutado;
   const presupuestoNum = form.presupuesto === "" || form.presupuesto === null ? null : Number(form.presupuesto);
   const pct = presupuestoNum ? total / presupuestoNum : null;
+  // Sin configurar (vacío o 0) el presupuesto es lo acumulado en compras: no hay disponible ni sobregiro.
+  const configurado = presupuestoNum > 0;
   const inscritos = form.inscritos === "" || form.inscritos === null ? null : Number(form.inscritos);
   const asistentes = form.asistentes === "" || form.asistentes === null ? null : Number(form.asistentes);
   const pctAsistencia = inscritos && asistentes != null ? asistentes / inscritos : null;
@@ -356,10 +360,16 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
                 <label htmlFor="act-presupuesto">¿Cuánto se le asigna?</label>
                 <MoneyInput id="act-presupuesto" value={form.presupuesto ?? ""} onChange={(v) => update("presupuesto", v)} disabled={ro} placeholder="Sin asignar" />
               </div>
+              {!configurado && (
+                <div className="pres-aviso" role="note">
+                  <strong>El presupuesto no está configurado.</strong>
+                  <span>Mientras esté vacío o en 0, se toma como presupuesto lo acumulado en las compras asociadas: {fmtCOP(total)}.{ro ? "" : " Digita cuánto se le asigna para controlar el disponible."}</span>
+                </div>
+              )}
               <div className="af-tiles">
                 <div><span>Ejecutado</span><strong>{fmtCOP(ejecutado)}</strong><small>Compras legalizadas</small></div>
                 <div><span>En trámite</span><strong>{fmtCOP(enTramite)}</strong><small>Asociadas sin legalizar</small></div>
-                <div className={presupuestoNum != null && presupuestoNum - total < 0 ? "negativo" : ""}><span>Disponible</span><strong>{presupuestoNum != null ? fmtCOP(presupuestoNum - total) : "—"}</strong><small>Presupuesto − compras</small></div>
+                <div className={configurado && presupuestoNum - total < 0 ? "negativo" : ""}><span>Disponible</span><strong>{configurado ? fmtCOP(presupuestoNum - total) : fmtCOP(0)}</strong><small>{configurado ? "Presupuesto − compras" : "Sin configurar: presupuesto = compras"}</small></div>
               </div>
               {pct != null && (
                 <div>
@@ -489,7 +499,7 @@ export default function ActividadFormulario({ actividad, lineaPorDefecto = "Bien
                 <div><dt>Cuándo</dt><dd>{rangoHumano(vistaPrevia)}{vistaPrevia.fechaFin && vistaPrevia.fecha ? ` · ${diasDeActividad(vistaPrevia)} días` : ""}</dd></div>
                 <div><dt>Línea</dt><dd>{form.linea}</dd></div>
                 <div><dt>Responsable</dt><dd>{opcionesResponsable.find((r) => r.userId === form.responsableUserId)?.nombre || "Sin asignar"}</dd></div>
-                <div><dt>Presupuesto</dt><dd>{presupuestoNum != null ? fmtCOP(presupuestoNum) : "Sin asignar"}</dd></div>
+                <div><dt>Presupuesto</dt><dd>{configurado ? fmtCOP(presupuestoNum) : `${fmtCOP(total)} (sin configurar)`}</dd></div>
                 <div><dt>Compras</dt><dd>{lista.length ? `${lista.length} · ${fmtCOP(total)}` : "Ninguna"}</dd></div>
                 {form.aplicaParticipantes !== false && (inscritos != null || asistentes != null) && <div><dt>Personas</dt><dd>{asistentes ?? "—"} de {inscritos ?? "—"}</dd></div>}
               </dl>

@@ -55,7 +55,7 @@ export default function AsociarComprasPanel({ act, onClose, onAsociadas }) {
   const alternar = (c) => setElegidas((m) => { const n = new Map(m); if (n.has(c.id)) n.delete(c.id); else n.set(c.id, c); return n; });
   const sumaElegidas = [...elegidas.values()].reduce((s, c) => s + (c.valorConIva || 0), 0);
   const totalNuevo = act.gastado + sumaElegidas;
-  const presupuesto = act.presupuesto;
+  const presupuesto = act.presupuestoConfigurado === false ? null : act.presupuesto; // sin configurar no hay tope
   const queda = presupuesto != null ? presupuesto - totalNuevo : null;
   const pctAntes = presupuesto ? Math.min(100, (act.gastado / presupuesto) * 100) : 0;
   const pctNuevo = presupuesto ? Math.min(100 - pctAntes, (sumaElegidas / presupuesto) * 100) : 0;
