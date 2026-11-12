@@ -6193,3 +6193,8 @@ tr.tes-ex-no td{ opacity:.45; text-decoration:line-through; }
 .pres-sin-config{ display:inline-block; margin-left:6px; padding:1px 6px; border-radius:999px; font-size:10.5px; font-weight:600; color:var(--warning); background:color-mix(in srgb, var(--warning) 12%, var(--surface)); vertical-align:1px; white-space:nowrap; }
 .pres-aviso{ display:flex; flex-direction:column; gap:2px; margin:8px 0 12px; padding:10px 14px; border-radius:10px; background:color-mix(in srgb, var(--warning) 12%, var(--surface)); border:1px solid color-mix(in srgb, var(--warning) 40%, var(--border)); font-size:12.5px; color:var(--ink-2); }
 .pres-aviso strong{ color:var(--ink); font-size:13px; }
+
+/* Importar con Nova: qué hacer con quienes quedan sin asistencia registrada. */
+.importar-sindato{ margin:10px 0; padding:10px 14px; border:1px solid color-mix(in srgb, var(--warning) 40%, var(--border)); border-radius:10px; background:color-mix(in srgb, var(--warning) 8%, var(--surface)); display:flex; flex-direction:column; gap:6px; }
+.importar-sindato legend{ padding:0 4px; font-size:13px; font-weight:600; color:var(--ink); }
+.importar-sindato label{ display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }

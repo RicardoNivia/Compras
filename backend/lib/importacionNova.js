@@ -272,7 +272,7 @@ function leerFilas(wb, m, tipo) {
 }
 
 // Sin mapeo: Nova lo arma. Sin confirmar: vista previa, no escribe nada.
-export async function importarConNova(actividadId, buffer, { tipo, mapeo, confirmar = false, noMarcadosNoAsistieron = false }, actor) {
+export async function importarConNova(actividadId, buffer, { tipo, mapeo, confirmar = false, noMarcadosNoAsistieron = false, sinDatoComo = "si" }, actor) {
   const def = TIPOS_IMPORTACION[tipo];
   if (!def) throw badRequest("Tipo de importación inválido.");
   const actividad = await prisma.actividadBienestar.findUnique({ where: { id: Number(actividadId) } });
@@ -293,13 +293,16 @@ export async function importarConNova(actividadId, buffer, { tipo, mapeo, confir
     const falta = tipo === "calificaciones" ? "personas con calificación" : tipo === "asistentes" ? "personas con su asistencia" : "personas";
     throw badRequest(`No encontré ${falta} en la hoja "${m.hoja}".${crudo.explicacion ? ` Nova leyó: ${crudo.explicacion}` : ""}`);
   }
-  const resultado = await aplicarParticipantes(actividad, participantes, { modo, noMarcadosNoAsistieron: modo === "asistentes" && noMarcadosNoAsistieron, actor, origen: "importacion", simular: !confirmar });
+  // Antes de la actividad, no tener asistencia es lo normal (aún no se hace): la pregunta solo aplica si ya pasó.
+  const yaPaso = !actividad.fecha || actividad.fecha <= new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
+  const resultado = await aplicarParticipantes(actividad, participantes, { modo, noMarcadosNoAsistieron: modo === "asistentes" && noMarcadosNoAsistieron, sinDatoComoAsistio: yaPaso && sinDatoComo !== "sin_asignar", actor, origen: "importacion", simular: !confirmar });
   if (confirmar) {
-    logParticipantes(actor, actividad, "importar", `Importó ${def.etiqueta} con Nova (hoja "${m.hoja}"): ${resultado.creados} nuevos, ${resultado.actualizados} actualizados${resultado.marcadosNo ? `, ${resultado.marcadosNo} marcados como no asistieron` : ""}`).catch(() => {});
+    logParticipantes(actor, actividad, "importar", `Importó ${def.etiqueta} con Nova (hoja "${m.hoja}"): ${resultado.creados} nuevos, ${resultado.actualizados} actualizados${resultado.marcadosNo ? `, ${resultado.marcadosNo} marcados como no asistieron` : ""}${resultado.marcadosSi ? `, ${resultado.marcadosSi} sin asistencia registrada marcados como asistieron` : ""}`).catch(() => {});
   }
   return {
     tipo,
     hoja: m.hoja,
+    preguntarSinDato: yaPaso,
     mapeo: { ...m, explicacion: String(crudo.explicacion || "").slice(0, 600), advertencias: (Array.isArray(crudo.advertencias) ? crudo.advertencias : []).map((a) => String(a).slice(0, 300)).slice(0, 6) },
     columnas: CAMPOS.filter((c) => m.columnas[c] >= 0).map((campo) => ({ campo, encabezado: encabezados[m.columnas[campo]] || `Columna ${m.columnas[campo] + 1}` })),
     modo,

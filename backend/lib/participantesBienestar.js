@@ -277,13 +277,15 @@ export async function importarParticipantes(actividadId, buffer, { modo = "inscr
 // "calificaciones" (pone la calificación y el comentario de cada persona; quien calificó sin estar se agrega como
 // asistente). simular: no escribe nada, solo cuenta qué haría (la vista previa de la importación con Nova).
 const MODOS_QUE_CREAN = ["inscripcion", "asistentes", "calificaciones"];
-export async function aplicarParticipantes(actividad, lista, { modo = "inscripcion", noMarcadosNoAsistieron = false, actor = null, origen = "importacion", creadoPorNombre, simular = false } = {}) {
+// sinDatoComoAsistio: regla de Bienestar «no debe quedar gente sin registrar»: al terminar, quien siga sin asistencia
+// registrada (null) en la actividad queda como asistió. Quien importa lo decide en la vista previa (por defecto sí).
+export async function aplicarParticipantes(actividad, lista, { modo = "inscripcion", noMarcadosNoAsistieron = false, sinDatoComoAsistio = false, actor = null, origen = "importacion", creadoPorNombre, simular = false } = {}) {
   const existentes = await prisma.participanteActividad.findMany({ where: { actividadId: actividad.id } });
   const cat = await resolvedoresImportacion({ crear: !simular, actor });
   const porDoc = new Map(existentes.filter((p) => p.documento).map((p) => [p.documento, p]));
   const porNombre = new Map(existentes.map((p) => [sinTildes(p.nombre), p]));
   const vistos = new Set();
-  let creados = 0, actualizados = 0, sinCoincidencia = 0;
+  let creados = 0, actualizados = 0, sinCoincidencia = 0, vistosSinDato = 0, nuevosSinDato = 0;
   const nuevos = [];
   const sinCoincidir = [];
   for (const p of lista) {
@@ -300,6 +302,7 @@ export async function aplicarParticipantes(actividad, lista, { modo = "inscripci
       if (p.datos && Object.keys(p.datos).length) data.datos = JSON.stringify({ ...parse(actual.datos, {}), ...p.datos });
       if ("motivoInasistencia" in data) Object.assign(data, cat.motivo(data.motivoInasistencia));
       if ("area" in data) Object.assign(data, await cat.area(data.area));
+      if (("asistio" in data ? data.asistio : actual.asistio) == null) vistosSinDato++;
       if (Object.keys(data).length) {
         if (!simular) await prisma.participanteActividad.update({ where: { id: actual.id }, data });
         actualizados++;
@@ -314,6 +317,7 @@ export async function aplicarParticipantes(actividad, lista, { modo = "inscripci
           origen, creadoPorUserId: actor?.id || null, creadoPorNombre: creadoPorNombre || actor?.nombre || "Importación Excel",
       };
       Object.assign(datosNuevo, await cat.area(p.area), cat.motivo(datosNuevo.motivoInasistencia));
+      if (asistio == null) nuevosSinDato++;
       const row = simular ? { ...datosNuevo, id: `sim-${creados}` } : await prisma.participanteActividad.create({ data: datosNuevo });
       if (nuevos.length < 50) nuevos.push(row.nombre);
       vistos.add(row.id);
@@ -330,11 +334,20 @@ export async function aplicarParticipantes(actividad, lista, { modo = "inscripci
     const where = { actividadId: actividad.id, inscrito: true, asistio: null, id: { notIn: [...vistos].filter((id) => typeof id === "number") } };
     marcadosNo = simular ? await prisma.participanteActividad.count({ where }) : (await prisma.participanteActividad.updateMany({ where, data: { asistio: false } })).count;
   }
+  // Cuántos quedarían sin asistencia registrada después de importar (los del archivo y los que ya estaban).
+  const vistosNum = [...vistos].filter((id) => typeof id === "number");
+  const noMarcadosAplica = (modo === "asistencia" || modo === "asistentes") && noMarcadosNoAsistieron;
+  const otrosSinDato = await prisma.participanteActividad.count({ where: { actividadId: actividad.id, asistio: null, id: { notIn: vistosNum }, ...(noMarcadosAplica ? { inscrito: false } : {}) } });
+  const sinDato = simular ? otrosSinDato + vistosSinDato + nuevosSinDato : await prisma.participanteActividad.count({ where: { actividadId: actividad.id, asistio: null } });
+  let marcadosSi = 0;
+  if (sinDatoComoAsistio && sinDato) {
+    marcadosSi = simular ? sinDato : (await prisma.participanteActividad.updateMany({ where: { actividadId: actividad.id, asistio: null }, data: { asistio: true, motivoInasistencia: null, motivoInasistenciaId: null } })).count;
+  }
   if (!simular) {
     await sincronizarConteos(actividad.id);
     clasificarEnSegundoPlano(actividad.id);
   }
-  return { leidos: lista.length, creados, actualizados, sinCoincidencia, marcadosNo, nuevos, sinCoincidir };
+  return { leidos: lista.length, creados, actualizados, sinCoincidencia, marcadosNo, sinDato, marcadosSi, nuevos, sinCoincidir };
 }
 
 // ---------- Formulario público ----------

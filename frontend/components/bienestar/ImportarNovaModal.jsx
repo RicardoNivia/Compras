@@ -25,6 +25,7 @@ const siNo = (v) => (v === true ? "Sí" : v === false ? "No" : "—");
 export default function ImportarNovaModal({ actividadId, tipo, archivo, onClose, onListo }) {
   const [previa, setPrevia] = useState(null);
   const [noMarcados, setNoMarcados] = useState(false);
+  const [sinDatoComo, setSinDatoComo] = useState("si"); // quienes queden sin asistencia registrada: asistieron (por defecto) o sin asignar
   const [trabajando, setTrabajando] = useState(true);
   const [error, setError] = useState("");
 
@@ -55,7 +56,7 @@ export default function ImportarNovaModal({ actividadId, tipo, archivo, onClose,
     setTrabajando(true);
     setError("");
     try {
-      const r = await importarConNovaApi(actividadId, archivo, { tipo, mapeo: previa.mapeo, noMarcadosNoAsistieron: noMarcados, confirmar: true });
+      const r = await importarConNovaApi(actividadId, archivo, { tipo, mapeo: previa.mapeo, noMarcadosNoAsistieron: noMarcados, sinDatoComo, confirmar: true });
       const x = r.resultado;
       const l = r.lectura;
       onListo(`${TITULOS[tipo].replace("Importar ", "")[0].toUpperCase()}${TITULOS[tipo].replace("Importar ", "").slice(1)}: ${tipo === "lista" && l ? `${l.asistieron} asistieron, ${l.noAsistieron} no asistieron${l.sinDato ? `, ${l.sinDato} sin dato de asistencia` : ""} · ` : ""}${x.creados} nuevos, ${x.actualizados} actualizados${x.sinCoincidencia ? `, ${x.sinCoincidencia} sin coincidencia` : ""}${x.marcadosNo ? `, ${x.marcadosNo} marcados como no asistieron` : ""}.`);
@@ -124,6 +125,14 @@ export default function ImportarNovaModal({ actividadId, tipo, archivo, onClose,
                   <span>Los programados que no aparezcan en el archivo, no asistieron</span>
                   <input id="importar-nomarcados" type="checkbox" checked={noMarcados} disabled={trabajando} onChange={(e) => cambiarNoMarcados(e.target.checked)} />
                 </label>
+              )}
+
+              {previa.preguntarSinDato && previa.resultado?.sinDato > 0 && (
+                <fieldset className="importar-sindato">
+                  <legend>{previa.resultado.sinDato} persona(s) quedarían sin asistencia registrada. ¿Qué hago con ellas?</legend>
+                  <label><input type="radio" name="importar-sindato" checked={sinDatoComo === "si"} disabled={trabajando} onChange={() => setSinDatoComo("si")} /> Marcarlas como <strong>asistieron</strong> (recomendado)</label>
+                  <label><input type="radio" name="importar-sindato" checked={sinDatoComo === "sin_asignar"} disabled={trabajando} onChange={() => setSinDatoComo("sin_asignar")} /> Dejarlas <strong>sin asignar</strong></label>
+                </fieldset>
               )}
 
               <div className="table-scroll">

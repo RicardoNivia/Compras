@@ -625,11 +625,12 @@ export function importarParticipantesApi(actividadId, archivo, { modo = "inscrip
   fd.append("archivo", archivo);
   fd.append("modo", modo);
   if (noMarcadosNoAsistieron) fd.append("noMarcadosNoAsistieron", "1");
+  fd.append("sinDatoComo", sinDatoComo);
   return fetch(`/api/actividades/${actividadId}/participantes/importar`, { method: "POST", body: fd }).then(handle);
 }
 
 // Excel con Nova: sin confirmar devuelve la vista previa (no escribe nada); al confirmar se reenvía con su mapeo.
-export function importarConNovaApi(actividadId, archivo, { tipo, mapeo, noMarcadosNoAsistieron = false, confirmar = false }) {
+export function importarConNovaApi(actividadId, archivo, { tipo, mapeo, noMarcadosNoAsistieron = false, sinDatoComo = "si", confirmar = false }) {
   const fd = new FormData();
   fd.append("archivo", archivo);
   fd.append("tipo", tipo);

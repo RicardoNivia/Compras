@@ -34,6 +34,7 @@ export async function POST(request, { params }) {
       mapeo,
       confirmar: form.get("confirmar") === "1",
       noMarcadosNoAsistieron: form.get("noMarcadosNoAsistieron") === "1",
+      sinDatoComo: form.get("sinDatoComo") === "sin_asignar" ? "sin_asignar" : "si",
     }, user));
   } catch (err) {
     return apiError(err);
