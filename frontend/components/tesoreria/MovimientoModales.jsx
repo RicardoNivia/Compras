@@ -8,7 +8,8 @@ import {
 import { fmtMoneda } from "@/lib/moneda";
 import { IconSpark, IconTrash, IconSearch } from "@/components/icons";
 import MoneyInput from "@/components/MoneyInput";
-import { Modal, MESES, hoyCO, fechaCorta, fechaSinAnio, EstadoPago, TipoPago } from "@/components/tesoreria/comun";
+import { Modal, MESES, hoyCO, fechaCorta, fechaSinAnio, EstadoPago, TipoPago, useCatalogos } from "@/components/tesoreria/comun";
+import { PagoFormModal } from "@/components/tesoreria/PagoModales";
 import { ConciliacionContable, PistasDiferencia } from "@/components/tesoreria/ConciliacionContable";
 
 const num = (v) => Number(String(v ?? "").replace(",", ".")) || 0;
@@ -19,6 +20,8 @@ const VACIO = { bancoId: "", tipo: "debito", fecha: "", valor: "", descripcion: 
 // esperan movimiento, ordenados por lo parecido del valor; también se puede buscar por texto.
 export function AsociadorPagos({ movimiento, lista, onCambio }) {
   const [q, setQ] = useState("");
+  const [creando, setCreando] = useState(false);
+  const { cat } = useCatalogos();
   const [cands, setCands] = useState([]);
   const [cargando, setCargando] = useState(false);
   const valorMov = num(movimiento.valor);
@@ -86,6 +89,10 @@ export function AsociadorPagos({ movimiento, lista, onCambio }) {
       <div className="tes-lista-cands">
         {cargando && !cands.length && <span className="muted">Buscando…</span>}
         {!cargando && !cands.length && <div className="empty compacta">No hay pagos que esperen movimiento con este criterio.</div>}
+        <div className="tes-cand">
+          <div><strong>¿El pago no está en la lista?</strong><small>Créalo aquí con los datos de este movimiento y queda agregado a la asociación.</small></div>
+          <button type="button" className="btn small" onClick={() => setCreando(true)} disabled={!cat}>+ Crear un pago nuevo</button>
+        </div>
         {cands.map((p) => {
           const igual = Math.abs(Math.abs(p.valor) - valorMov) < 0.5;
           return (
@@ -99,6 +106,18 @@ export function AsociadorPagos({ movimiento, lista, onCambio }) {
           );
         })}
       </div>
+      {creando && cat && (
+        <PagoFormModal
+          cat={cat}
+          paraAsociar
+          inicial={{
+            tipo: movimiento.tipo === "credito" ? "I" : "E", sentido: movimiento.tipo === "credito" ? "entra" : "sale", fecha: fecha,
+            valor: String(resto > 0.5 ? Math.round(resto * 100) / 100 : valorMov || ""), observacion: [movimiento.descripcion, movimiento.tercero].filter(Boolean).join(" · ").slice(0, 300),
+          }}
+          onClose={() => setCreando(false)}
+          onSaved={(p) => { setCreando(false); if (p) agregar(p); }}
+        />
+      )}
     </div>
   );
 }
@@ -106,10 +125,12 @@ export function AsociadorPagos({ movimiento, lista, onCambio }) {
 // ---------- Registrar / editar ----------
 // conSoporte: «Registrar con soporte» — empieza pidiendo el comprobante; Nova lo lee, llena el formulario y, si ese pago ya
 // está registrado (por ejemplo vino en el extracto), ofrece adjuntar el soporte a ese movimiento en vez de crear otro.
-export function FormMovimientoModal({ cat, movimiento, conSoporte = false, onClose, onSaved }) {
+// inicial: valores con que arranca un movimiento nuevo. pagoInicial: { pagoId, valor, pago } — se abre desde un pago que no
+// encontró su movimiento; el movimiento nuevo queda asociado a ese pago al guardarlo.
+export function FormMovimientoModal({ cat, movimiento, conSoporte = false, inicial = null, pagoInicial = null, onClose, onSaved }) {
   const editando = !!movimiento?.id;
-  const [v, set] = useState(() => (movimiento ? { ...VACIO, ...Object.fromEntries(Object.entries(movimiento).map(([k, x]) => [k, x ?? ""])), valor: String(movimiento.valor ?? "") } : { ...VACIO, fecha: hoyCO(), bancoId: cat.bancos.filter((b) => b.activo)[0]?.id || "" }));
-  const [asoc, setAsoc] = useState(() => (movimiento?.listaPagos || []).map((a) => ({ pagoId: a.pagoId, valor: String(a.valor), pago: { concepto: a.concepto, item: a.item, mes: a.mes, anio: a.anio, valor: a.valorPago } })));
+  const [v, set] = useState(() => (movimiento ? { ...VACIO, ...Object.fromEntries(Object.entries(movimiento).map(([k, x]) => [k, x ?? ""])), valor: String(movimiento.valor ?? "") } : { ...VACIO, fecha: hoyCO(), bancoId: cat.bancos.filter((b) => b.activo)[0]?.id || "", ...(inicial || {}) }));
+  const [asoc, setAsoc] = useState(() => (pagoInicial ? [pagoInicial] : (movimiento?.listaPagos || []).map((a) => ({ pagoId: a.pagoId, valor: String(a.valor), pago: { concepto: a.concepto, item: a.item, mes: a.mes, anio: a.anio, valor: a.valorPago } }))));
   const [archivo, setArchivo] = useState(null);
   const [leyendo, setLeyendo] = useState(false);
   const [coincidencias, setCoincidencias] = useState([]);

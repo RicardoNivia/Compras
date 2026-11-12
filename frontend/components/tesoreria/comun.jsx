@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { tesMaestros, tesAnios } from "@/lib/tesoreriaApi";
 import { Portal } from "@/components/notificaciones/ui";
 
@@ -62,14 +62,16 @@ export function Aviso({ texto, onCerrar }) {
 
 // Modal con el diseño de la app. ancho en px; pie = botones.
 export function Modal({ titulo, sub, onClose, ancho = 720, children, pie }) {
+  const overlay = useRef(null);
   useEffect(() => {
-    const k = (e) => { if (e.key === "Escape") onClose(); };
+    // Con un modal abierto encima de otro (p. ej. crear un pago desde el de un movimiento), Escape cierra solo el de arriba.
+    const k = (e) => { if (e.key !== "Escape") return; const todos = document.querySelectorAll(".modal-overlay"); if (overlay.current && todos[todos.length - 1] !== overlay.current) return; onClose(); };
     document.addEventListener("keydown", k);
     return () => document.removeEventListener("keydown", k);
   }, [onClose]);
   return (
     <Portal>
-      <div className="modal-overlay tes-tema" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div ref={overlay} className="modal-overlay tes-tema" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         <div className="modal" role="dialog" aria-modal="true" aria-label={titulo} style={{ maxWidth: ancho, width: "100%" }}>
           <div className="modal-head">
             <div style={{ minWidth: 0 }}>

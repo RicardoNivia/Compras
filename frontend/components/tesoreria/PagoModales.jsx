@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { tesCrearPeriodico, tesPago, tesCrearPago, tesEditarPago, tesBorrarPago, tesAsociarPago, tesMovimientos, tesProponerPagos, tesAplicarPropuestos } from "@/lib/tesoreriaApi";
+import { tesCrearPeriodico, tesPago, tesCrearPago, tesEditarPago, tesBorrarPago, tesAsociarPago, tesMovimientos, tesMovimiento, tesProponerPagos, tesAplicarPropuestos } from "@/lib/tesoreriaApi";
+import { FormMovimientoModal } from "@/components/tesoreria/MovimientoModales";
 import { fmtMoneda } from "@/lib/moneda";
 import { crossfade } from "@/lib/crossfade";
 import { IconSpark, IconTrash, IconSearch } from "@/components/icons";
@@ -127,8 +128,10 @@ function fechasPeriodicas(fecha, periodicidad, fechaFin) {
   return out;
 }
 
-export function PagoFormModal({ cat, onClose, onSaved }) {
-  const [v, set] = useState({ tipo: "E", sentido: "sale", conceptoId: "", itemId: "", valor: "", fecha: hoyCO(), medioPagoId: "", pagadorId: "", observacion: "" });
+// inicial: valores con que arranca el formulario. paraAsociar: se abre desde el asociador de un movimiento; crea un solo
+// pago (sin «¿Se repite?») y onSaved lo recibe para dejarlo asociado.
+export function PagoFormModal({ cat, inicial = null, paraAsociar = false, onClose, onSaved }) {
+  const [v, set] = useState({ tipo: "E", sentido: "sale", conceptoId: "", itemId: "", valor: "", fecha: hoyCO(), medioPagoId: "", pagadorId: "", observacion: "", ...(inicial || {}) });
   const [repite, setRepite] = useState(false);
   const [periodicidad, setPeriodicidad] = useState("mensual");
   const [fechaFin, setFechaFin] = useState("");
@@ -153,10 +156,10 @@ export function PagoFormModal({ cat, onClose, onSaved }) {
     } catch (e) { setError(e.message); } finally { setGuardando(false); }
   }
   return (
-    <Modal titulo={repite ? "Nuevo pago que se repite" : "Nuevo pago extraordinario"} sub={repite ? "Se crea como gasto periódico: sus pagos quedan pendientes (P) desde esta fecha hasta diciembre." : "Un pago que no se repite: un arreglo, una compra, un impuesto puntual. Queda pendiente (P) hasta que lo pagues o le asocies el movimiento del banco."} onClose={onClose} ancho={820}
-      pie={<><button type="button" className="btn" onClick={onClose}>Cancelar</button><div className="spacer" /><button type="button" className="btn btn-primary" onClick={guardar} disabled={guardando || !v.conceptoId || !num(v.valor) || !v.fecha || (repite && !fechas.length)}>{guardando ? <span className="spinner" /> : null} {repite ? `Crear ${fechas.length} pago(s) periódicos` : "Crear pago pendiente"}</button></>}>
+    <Modal titulo={paraAsociar ? "Nuevo pago para este movimiento" : repite ? "Nuevo pago que se repite" : "Nuevo pago extraordinario"} sub={paraAsociar ? "El pago no estaba en la lista: créalo aquí y queda agregado a la asociación del movimiento. Se guarda como pagado (E) cuando guardes la asociación." : repite ? "Se crea como gasto periódico: sus pagos quedan pendientes (P) desde esta fecha hasta diciembre." : "Un pago que no se repite: un arreglo, una compra, un impuesto puntual. Queda pendiente (P) hasta que lo pagues o le asocies el movimiento del banco."} onClose={onClose} ancho={820}
+      pie={<><button type="button" className="btn" onClick={onClose}>Cancelar</button><div className="spacer" /><button type="button" className="btn btn-primary" onClick={guardar} disabled={guardando || !v.conceptoId || !num(v.valor) || !v.fecha || (repite && !fechas.length)}>{guardando ? <span className="spinner" /> : null} {paraAsociar ? "Crear y asociar" : repite ? `Crear ${fechas.length} pago(s) periódicos` : "Crear pago pendiente"}</button></>}>
       <CamposPago v={v} set={set} cat={cat} />
-      <section className={`pg-bloque pg-repite${repite ? " on" : ""}`}>
+      {!paraAsociar && <section className={`pg-bloque pg-repite${repite ? " on" : ""}`}>
         <label className="pg-repite-t">
           <span><span className="pg-bloque-num">5</span> ¿Se repite?<small>Márcalo si este pago vuelve cada cierto tiempo (arriendo, servicio, cuota…): se convierte en gasto periódico.</small></span>
           <input type="checkbox" role="switch" checked={repite} onChange={(e) => setRepite(e.target.checked)} aria-label="Se repite" />
@@ -177,15 +180,18 @@ export function PagoFormModal({ cat, onClose, onSaved }) {
             </div>
           </>
         )}
-      </section>
+      </section>}
       {error && <p className="modal-error">{error}</p>}
     </Modal>
   );
 }
 
-// Movimientos que pagan este pago (asociar desde el pago): busca movimientos con valor sin asignar.
-function AsociadorMovimientos({ pago, lista, onCambio }) {
+// Movimientos que pagan este pago (asociar desde el pago): busca movimientos con valor sin asignar. Si el movimiento no
+// está, «Registrarlo con soporte» lo crea (Nova lee el comprobante) ya asociado a este pago y lo agrega a la lista.
+function AsociadorMovimientos({ pago, cat, lista, onCambio }) {
   const [q, setQ] = useState("");
+  const [registrando, setRegistrando] = useState(false);
+  const [aviso, setAviso] = useState("");
   const [cands, setCands] = useState([]);
   const prog = Math.abs(pago.valor);
   useEffect(() => {
@@ -222,6 +228,12 @@ function AsociadorMovimientos({ pago, lista, onCambio }) {
       </div>
       <div className="tes-lista-cands">
         {!cands.length && <div className="empty compacta">No hay movimientos con valor sin asignar con este criterio.</div>}
+        {cat && (
+          <div className="tes-cand">
+            <div><strong>¿No encuentras el movimiento?</strong><small>Regístralo con el soporte (foto o PDF del comprobante): Nova lo lee, llena el formulario y el movimiento queda asociado a este pago.</small></div>
+            <button type="button" className="btn small" onClick={() => { setAviso(""); setRegistrando(true); }}>+ Registrarlo con soporte</button>
+          </div>
+        )}
         {cands.map((m) => (
           <div key={m.id} className="tes-cand">
             <div><strong>{m.descripcion}</strong><small>{[m.banco, fechaCorta(m.fecha), m.concepto && `«${m.concepto}»`, m.tercero].filter(Boolean).join(" · ")}</small></div>
@@ -232,6 +244,27 @@ function AsociadorMovimientos({ pago, lista, onCambio }) {
           </div>
         ))}
       </div>
+      {aviso && <div className="tes-ayuda"><div>{aviso}</div></div>}
+      {registrando && cat && (
+        <FormMovimientoModal
+          cat={cat}
+          conSoporte
+          inicial={{ tipo: pago.valor < 0 ? "debito" : "credito", fecha: pago.fecha, valor: String(Math.max(0, Math.round((prog - total) * 100) / 100) || prog), concepto: pago.concepto || "" }}
+          pagoInicial={{ pagoId: pago.id, valor: String(Math.max(0, Math.round((prog - total) * 100) / 100) || prog), pago: { concepto: pago.concepto, item: pago.item, mes: pago.mes, anio: pago.anio, valor: pago.valor } }}
+          onClose={() => setRegistrando(false)}
+          onSaved={async (m, msg) => {
+            setRegistrando(false);
+            if (msg) setAviso(msg);
+            try {
+              const full = await tesMovimiento(m.id);
+              if (lista.some((a) => a.movimientoId === full.id)) return;
+              const deEste = (full.listaPagos || []).find((a) => a.pagoId === pago.id);
+              const valor = deEste ? deEste.valor : Math.min(full.sinAsignar ?? full.valor, Math.max(0, prog - total) || full.valor);
+              onCambio([...lista, { movimientoId: full.id, valor: String(valor), mov: { descripcion: full.descripcion, banco: full.banco, fecha: full.fecha, concepto: full.concepto, valorTexto: full.valorTexto } }]);
+            } catch { /* el movimiento ya quedó guardado; si no se puede leer, se ve al recargar */ }
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -287,7 +320,7 @@ export function DetallePagoModal({ id, cat, puedeRegistrar, onClose, onCambio })
         </div>
       )}
       {modo === "editar" && v && <CamposPago v={v} set={set} cat={cat} />}
-      {modo === "asociar" && <AsociadorMovimientos pago={p} lista={asoc} onCambio={setAsoc} />}
+      {modo === "asociar" && <AsociadorMovimientos pago={p} cat={cat} lista={asoc} onCambio={setAsoc} />}
       {modo === "ver" && (
         <>
           <h4 className="tes-sub">Movimientos que lo pagan</h4>
