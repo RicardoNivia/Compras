@@ -103,7 +103,7 @@ export default function SolicitudProveedorCorreo({ id, onCambio }) {
           {s.resumen && <p className="sc-resumen">{s.resumen}</p>}
           <small className="muted">De {s.remitente || "—"} · {fecha(s.recibidoAt)}{s.asunto ? <> · «{s.asunto}»</> : null}</small>
         </div>
-        {s.webLink && <a className="btn small btn-ghost" href={s.webLink} target="_blank" rel="noopener noreferrer">Abrir en Outlook</a>}
+        {s.webLink && <a className="btn small btn-ghost" href={s.webLink} target="_blank" rel="noopener noreferrer">{s.webLink.startsWith("https://mail.google.com/") ? "Abrir en Gmail" : "Abrir en Outlook"}</a>}
       </div>
 
       <div className="sc-datos">

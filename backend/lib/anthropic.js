@@ -3,7 +3,7 @@
 // corregir ahí — se acepta también ese nombre para no depender de que se
 // arregle en Azure. ANTHROPIC_API_KEY (el nombre correcto) sigue teniendo
 // prioridad si ambas estuvieran definidas.
-function getAnthropicApiKey() {
+export function getAnthropicApiKey() {
   return process.env.ANTHROPIC_API_KEY || process.env.ANTROPIC_API_KEY;
 }
 
@@ -338,6 +338,13 @@ export async function generateAnthropicJson({ model, systemInstruction, prompt, 
   try {
     return JSON.parse(stripCodeFence(text));
   } catch {
-    throw new Error("Anthropic no devolvió un JSON válido.");
+    // Algunos modelos (Sonnet al leer recibos de Consumo) escriben una frase antes o después del JSON: se toma el
+    // objeto que va de la primera «{» a la última «}».
+    const ini = text.indexOf("{");
+    const fin = text.lastIndexOf("}");
+    if (ini >= 0 && fin > ini) {
+      try { return JSON.parse(text.slice(ini, fin + 1)); } catch { /* sigue al error de abajo */ }
+    }
+    console.error("Anthropic no devolvió un JSON válido. Inicio de la respuesta:", text.slice(0, 300));    throw new Error("Anthropic no devolvió un JSON válido.");
   }
 }

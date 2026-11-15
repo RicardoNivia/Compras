@@ -253,6 +253,16 @@ export function IconBox(props) {
   );
 }
 
+export function IconGauge(props) {
+  return (
+    <Svg {...props}>
+      <path d="M2.3 12.2a6.2 6.2 0 1 1 12.4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M8.5 12.2l3-4.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M2.3 14.6h12.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function IconBuilding(props) {
   return (
     <Svg {...props}>

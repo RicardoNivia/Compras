@@ -2,9 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { createProveedor } from "@/lib/proveedores";
 import { calcularFaltantes } from "@/lib/agenteCorreoProveedores";
 import { logSolicitudProveedorCorreo } from "@/lib/audit";
+import { isRoleAllowed } from "@/lib/permissions";
+import { USUARIO_COMPARTIDO } from "@/lib/correoCuentas";
 
 // Solicitudes de creación de proveedor que el agente de correo encontró (ver lib/agenteCorreoProveedores.js).
-// Cada una es de la persona dueña del buzón (un admin también puede verlas). Aprobar crea el proveedor con
+// Cada una es de la persona dueña del buzón (un admin también puede verlas); las del buzón compartido (Gmail de
+// solicitudes, userId = "compartido") las ve y aprueba cualquiera que pueda editar proveedores. Aprobar crea el proveedor con
 // lib/proveedores.js#createProveedor (mismas validaciones, auditoría y ciclo que el formulario); si falta algo,
 // el cliente abre el formulario con lo que falta y lo vuelve a enviar aquí.
 
@@ -41,12 +44,18 @@ export function toClientSolicitud(s, faltantes) {
 
 async function cargar(user, id) {
   const s = await prisma.solicitudProveedorCorreo.findUnique({ where: { id: Number(id) || 0 } });
-  if (!s || (s.userId !== user.id && user.role !== "admin")) throw err("No se encontró la solicitud.", 404);
+  const compartidaVisible = s?.userId === USUARIO_COMPARTIDO && (await isRoleAllowed(user.role, "editProveedores"));
+  if (!s || (s.userId !== user.id && user.role !== "admin" && !compartidaVisible)) throw err("No se encontró la solicitud.", 404);
   return s;
 }
 
+// Las propias y, si la persona puede editar proveedores, también las del buzón compartido.
+export async function duenosVisibles(user) {
+  return (await isRoleAllowed(user.role, "editProveedores")) ? [user.id, USUARIO_COMPARTIDO] : [user.id];
+}
+
 export async function listSolicitudes(user, { estado, page = 1, size = 10 } = {}) {
-  const where = { userId: user.id, ...(estado ? { estado } : {}) };
+  const where = { userId: { in: await duenosVisibles(user) }, ...(estado ? { estado } : {}) };
   const total = await prisma.solicitudProveedorCorreo.count({ where });
   const paginas = Math.max(1, Math.ceil(total / size));
   const p = Math.min(Math.max(1, Number(page) || 1), paginas);

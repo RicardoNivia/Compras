@@ -50,7 +50,7 @@ export default function UsuariosView({ initialUsers, initialPermissionsMatrix, i
   const [roleFilter, setRoleFilter] = useState("");
   const [moduloFilter, setModuloFilter] = useState("");
   // Módulos de un rol según la Matriz: los que tienen al menos una funcionalidad permitida.
-  const modulosDeRol = (rol) => ["Compras", "Bienestar", "Tesorería"].filter((mod) => matrix.some((r) => r.modulo === mod && r.roles?.[rol]));
+  const modulosDeRol = (rol) => ["Compras", "Bienestar", "Tesorería", "Consumo"].filter((mod) => matrix.some((r) => r.modulo === mod && r.roles?.[rol]));
   const cumpleModulo = (u) => !moduloFilter || modulosDeRol(u.role).includes(moduloFilter);
   const [modalUser, setModalUser] = useState(undefined); // undefined = closed, null = new
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -142,6 +142,7 @@ export default function UsuariosView({ initialUsers, initialPermissionsMatrix, i
             <option value="Compras">Compras</option>
             <option value="Bienestar">Bienestar y Fundación</option>
             <option value="Tesorería">Tesorería</option>
+            <option value="Consumo">Consumo</option>
           </select>
         </div>
         <div className="spacer" />

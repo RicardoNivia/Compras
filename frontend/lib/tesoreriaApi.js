@@ -98,3 +98,17 @@ export const tesPorResolver = () => get("/api/tesoreria/por-resolver");
 export const tesVencidosHeredados = (hasta) => get(`/api/tesoreria/pagos/vencidos-heredados?${qs({ hasta })}`);
 export const tesMarcarPagadosLote = (ids, motivo) => fetch("/api/tesoreria/pagos/vencidos-heredados", json("POST", { ids, motivo })).then(handle);
 export const tesProyeccion = (periodo) => get(`/api/tesoreria/proyeccion?${qs({ periodo })}`);
+
+// Soportes que llegaron al correo de soportes (Gmail compartido) y que Nova ya leyó (backend/lib/tesoreria/soportesCorreo.js).
+export const tesSoportesCorreo = (filtros) => get(`/api/tesoreria/soportes-correo?${qs(filtros)}`);
+export const tesSoporteCorreo = (id) => get(`/api/tesoreria/soportes-correo/${id}`);
+export const urlSoporteCorreo = (id) => `/api/tesoreria/soportes-correo/${id}/archivo`;
+// El comprobante como File, para adjuntarlo al movimiento desde el formulario.
+export async function tesArchivoSoporteCorreo(id, nombre, tipo) {
+  const res = await fetch(urlSoporteCorreo(id), { cache: "no-store" });
+  if (!res.ok) await handle(res);
+  const blob = await res.blob();
+  return new File([blob], nombre || "soporte", { type: tipo || blob.type });
+}
+export const tesRegistrarSoporteCorreo = (id, movimientoId) => fetch(`/api/tesoreria/soportes-correo/${id}/registrar`, json("POST", { movimientoId })).then(handle);
+export const tesDescartarSoporteCorreo = (id, motivo) => fetch(`/api/tesoreria/soportes-correo/${id}/descartar`, json("POST", { motivo })).then(handle);

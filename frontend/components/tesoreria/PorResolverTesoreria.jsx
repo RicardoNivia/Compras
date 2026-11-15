@@ -7,6 +7,7 @@ import { tesPorResolver, tesResolverPendiente, tesVencidosHeredados, tesMarcarPa
 import { IconCheck, IconAlert, IconSpark } from "@/components/icons";
 import { Aviso, Modal, useCatalogos, fechaCorta, fechaSinAnio, MESES } from "@/components/tesoreria/comun";
 import { ExtractoModal, SoportesLoteModal } from "@/components/tesoreria/MovimientoModales";
+import SoportesCorreo from "@/components/tesoreria/SoportesCorreo";
 
 const PAGE = 10;
 
@@ -43,11 +44,14 @@ export default function PorResolverTesoreria({ acceso }) {
           </a>
         ))}
       </section>
-      {totalPendiente === 0 && <div className="card"><EstadoVacio titulo="Todo al día">No hay extractos, asociaciones, diferencias ni soportes pendientes.</EstadoVacio></div>}
+      {totalPendiente === 0 && <div className="card"><EstadoVacio titulo="Todo al día">No hay soportes del correo, extractos, asociaciones, diferencias ni soportes pendientes.</EstadoVacio></div>}
 
-      {/* 1. Extractos */}
+      {/* 1. Soportes que llegaron al correo de soportes */}
+      <SoportesCorreo cat={cat} puede={puede} onCambio={cargar} />
+
+      {/* 2. Extractos */}
       <section id="pr-extractos" className="card pr-sec">
-        <div className="card-head"><div><h3>1 · Extractos</h3><span className="card-sub">Sin el extracto de un mes ya cerrado, el saldo de esa cuenta no es real.</span></div>
+        <div className="card-head"><div><h3>2 · Extractos</h3><span className="card-sub">Sin el extracto de un mes ya cerrado, el saldo de esa cuenta no es real.</span></div>
           {puede && cat && <button type="button" className="btn btn-primary" onClick={() => setModal({ tipo: "extracto" })}>Subir extracto</button>}</div>
         {d.mesesSinExtracto.length ? d.mesesSinExtracto.map((b) => (
           <div key={b.bancoId} className="tes-tarea">
@@ -73,9 +77,9 @@ export default function PorResolverTesoreria({ acceso }) {
         )}
       </section>
 
-      {/* 2. Asociar */}
+      {/* 3. Asociar */}
       <section id="pr-asociar" className="card pr-sec">
-        <div className="card-head"><div><h3>2 · Asociar movimientos y pagos</h3><span className="card-sub">{d.movimientosSinPago.total.toLocaleString("es-CO")} movimiento(s) del año sin su pago · {d.propuestas.movimientos + d.propuestas.pagos} propuesta(s) de los agentes por revisar ({d.propuestas.alta} de confianza alta).</span></div>
+        <div className="card-head"><div><h3>3 · Asociar movimientos y pagos</h3><span className="card-sub">{d.movimientosSinPago.total.toLocaleString("es-CO")} movimiento(s) del año sin su pago · {d.propuestas.movimientos + d.propuestas.pagos} propuesta(s) de los agentes por revisar ({d.propuestas.alta} de confianza alta).</span></div>
           <Link className="btn btn-primary" href="/tesoreria/agentes"><IconSpark size={13} /> Ir a los agentes</Link></div>
         {d.movimientosSinPago.recientes.length ? d.movimientosSinPago.recientes.map((m) => (
           <div key={m.id} className="tes-cand">
@@ -87,9 +91,9 @@ export default function PorResolverTesoreria({ acceso }) {
         {d.movimientosSinPago.total > d.movimientosSinPago.recientes.length && <span className="card-sub" style={{ margin: 0 }}>Los {d.movimientosSinPago.recientes.length} más recientes. Todos en Movimientos › «Sin asociar».</span>}
       </section>
 
-      {/* 3. Diferencias */}
+      {/* 4. Diferencias */}
       <section id="pr-conciliar" className="card pr-sec">
-        <div className="card-head"><div><h3>3 · Pagos con diferencia</h3><span className="card-sub">Lo que se pagó no da lo que estaba programado: corrige el valor del pago o revisa el movimiento.</span></div></div>
+        <div className="card-head"><div><h3>4 · Pagos con diferencia</h3><span className="card-sub">Lo que se pagó no da lo que estaba programado: corrige el valor del pago o revisa el movimiento.</span></div></div>
         {d.pagosConDiferencia.length ? d.pagosConDiferencia.slice(0, 15).map((p) => (
           <div key={p.id} className="tes-cand">
             <div><strong>{p.concepto}</strong><small>{[fechaCorta(p.fecha), p.item].filter(Boolean).join(" · ")} · programado {p.programado} · asociado {p.asociado}</small></div>
@@ -99,9 +103,9 @@ export default function PorResolverTesoreria({ acceso }) {
         )) : <div className="empty compacta">Ningún pago tiene diferencia.</div>}
       </section>
 
-      {/* 4. Soportes */}
+      {/* 5. Soportes */}
       <section id="pr-soportes" className="card pr-sec">
-        <div className="card-head"><div><h3>4 · Soportes que faltan</h3><span className="card-sub">Pagos de este mes y el anterior pagados con movimiento del banco pero sin comprobante.</span></div>
+        <div className="card-head"><div><h3>5 · Soportes que faltan</h3><span className="card-sub">Pagos de este mes y el anterior pagados con movimiento del banco pero sin comprobante.</span></div>
           {puede && <button type="button" className="btn btn-primary" onClick={() => setModal({ tipo: "lote" })}>Subir varios soportes</button>}</div>
         {d.sinSoporte.length ? d.sinSoporte.slice(0, 15).map((p) => (
           <div key={p.id} className="tes-cand"><div><strong>{p.concepto}</strong><small>{[fechaCorta(p.fecha), p.item].filter(Boolean).join(" · ")}</small></div><span className="tes-num">{p.valorTexto}</span><Link className="btn small" href={`/tesoreria/pagos?id=${p.id}`}>Ver</Link></div>

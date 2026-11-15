@@ -27,10 +27,15 @@
   "prisma": {
     "seed": "node prisma/seed.mjs"
   },
+  "engines": {
+    "node": ">=22.13"
+  },
   "dependencies": {
     "@prisma/client": "^5.20.0",
     "bcryptjs": "^2.4.3",
     "iconv-lite": "^0.6.3",
+    "imapflow": "^2.11.0",
+    "mailparser": "^3.14.3",
     "next": "^14.2.15",
     "nodemailer": "^6.10.1",
     "pdfjs-dist": "^6.3.289",

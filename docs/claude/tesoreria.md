@@ -88,3 +88,30 @@ Conciliación starts each month from `saldoInicialPrevio`, so it also follows th
 **Crear un pago al asociar (`AsociadorPagos` en `MovimientoModales.jsx`).** Si el pago no aparece entre los sugeridos ni en la búsqueda, «+ Crear un pago nuevo» abre `PagoFormModal` con `paraAsociar` (sin «¿Se repite?») e `inicial` tomado del movimiento: tipo E (débito) o I (crédito), su fecha, el valor sin asignar y la descripción/tercero como observación. El pago se crea en P (`POST /api/tesoreria/pagos`, auditado) y queda agregado a la lista; pasa a E al guardar la asociación. Si se cancela el movimiento, el pago queda como extraordinario en P. `Modal` (comun.jsx): con modales anidados, Escape cierra solo el de arriba.
 
 **Registrar el movimiento desde el pago (`AsociadorMovimientos` en `PagoModales.jsx`).** Si al asociar desde un pago el movimiento no aparece, «+ Registrarlo con soporte» abre `FormMovimientoModal conSoporte` con `inicial` (débito/crédito según el signo del pago, su fecha, lo que falta por asociar y su concepto) y `pagoInicial` (ese pago ya elegido en la asociación). Nova lee el comprobante; al guardar, el movimiento queda asociado y el pago en E; si Nova detecta que el movimiento ya existía, «Adjuntar el soporte y asociar el pago» lo usa en vez de duplicarlo. El movimiento se agrega a la lista del asociador para que «Guardar asociaciones» lo conserve. `PagoModales.jsx` y `MovimientoModales.jsx` se importan mutuamente (solo componentes usados al renderizar).
+
+**Soportes que llegan al correo y sugerencia de Nova (`lib/buzonCompartido.js`, `lib/tesoreria/soportesCorreo.js`, `components/tesoreria/SoportesCorreo.jsx`, migrations `correo_compartido_gmail_soportes` + `soporte_correo_sugerencia`).**
+- **Origen:** el correo de soportes, un Gmail compartido (solo soportes de pago) que configura un administrador en Mi correo. Ver `docs/correo-agente-proveedores.md`.
+- **Lectura:** cada comprobante adjunto (o el texto del correo del banco) lo lee `soportes.js#leerComprobante`. Queda en `SoporteCorreoTesoreria` en estado pendiente, con el archivo, lo leído (`leido`) y la `sugerencia`.
+- **Sugerencia de Nova** (`soportes.js#sugerirConNova`): escoge entre los candidatos del código.
+  - Movimientos: valor a ≤2 % y fecha a ±7 días.
+  - Pagos: `pagosPosibles`, top 8.
+  - Dice cuál movimiento ya es este comprobante y a qué pago o gasto corresponde, con un motivo.
+  - Ids fuera de las listas se descartan. La confianza nunca supera la del código: movimiento alta solo con valor exacto y ≤3 días; pago, la de `pagosPosibles`.
+- **También en «Registrar con soporte»:** `leerSoporte` usa `analizarLeido(leido, { conNova: true })`.
+  - El movimiento sugerido aparece primero en «Este pago ya parece registrado», con la etiqueta «Nova sugiere».
+  - El pago sugerido con confianza alta o media queda marcado en la asociación; la persona lo quita o lo confirma al guardar.
+- **Dónde se revisan:** en Mi correo › pestaña «Pagos», en Tesorería › Movimientos › pestaña «Llegó al correo» (con contador de pendientes; `?vista=correo` la abre directo) y en Tesorería › Por resolver › paso 1. Las dos usan el mismo componente: tarjetas paginadas con lo leído, la sugerencia de Nova y los botones.
+  - «Revisar y registrar» abre `FormMovimientoModal` con `archivoInicial` y `lecturaInicial`, sin volver a pagar la lectura.
+  - Si no se guardó sugerencia al llegar, se pide al abrir y se guarda.
+  - Al guardar, o al adjuntar el soporte a un movimiento existente, se llama a `POST /api/tesoreria/soportes-correo/{id}/registrar`.
+  - «Descartar» pide confirmación.
+  - Rutas: `GET /api/tesoreria/soportes-correo`, `/{id}`, `/{id}/archivo`, `POST /{id}/registrar`, `POST /{id}/descartar`, todas a nivel registro.
+
+**Menú (nov. 2026):** «Por resolver» ya no está en el menú de Tesorería; la página `/tesoreria/por-resolver` sigue y se llega por enlaces (por ejemplo «Ir a Por resolver» al aprobar un extracto).
+
+**Modales de movimiento, rediseño (nov. 2026; `MovimientoModales.jsx`, clases `mv-*` al final de `globals.css`).** Mismas reglas, otra presentación:
+- **Piezas comunes:** `HeroMovimiento` (sale en rojo / entra en verde, valor grande, descripción, banco · fecha y etiquetas de soporte y pago) y `BarraCuadre` (cuánto del movimiento está asignado a pagos).
+- **`FormMovimientoModal`:** tres pasos con pestañas grandes — 1 Datos del banco (tarjetas «Salió plata / Entró plata», banco, fecha, valor, descripción; concepto y tercero opcionales; el resto bajo «Agregar más detalles») · 2 Soporte (zona para subir, «Leer con Nova» y el aviso «Este pago ya parece registrado») · 3 Pago que corresponde. Se guarda desde cualquier paso; el pie dice qué falta. Con `conSoporte` empieza en Soporte y los otros pasos se habilitan al leer el comprobante; si hay un movimiento que ya parece ser ese, hay que decidirlo antes de seguir.
+- **`AsociadorPagos`:** barra de cuadre, «Pagos elegidos» con su valor, buscador con el botón **«Crear un pago nuevo» siempre visible** a su lado (y en el estado vacío) y candidatos paginados de 5 en 5.
+- **`DetalleMovimientoModal`:** el mismo encabezado y pestañas Pagos / Soportes / Datos. Quitar un soporte y eliminar el movimiento piden confirmación con `useConfirmar` (antes era una confirmación en línea).
+- **Pagos programados con el mismo formato (`PagoModales.jsx`):** `HeroPago` (el resumen en vivo, sobre `HeroMovimiento`) y `PasosPago`. `PagoFormModal`: pasos «Qué pago es» (tipo, concepto, ítem) · «Cuánto y cuándo» (valor, vence, medio, quién paga, observación) · «¿Se repite?» (no con `paraAsociar`). `DetallePagoModal`: encabezado, fila «¿Ya se pagó?» (P / E), pestañas Movimientos / Datos; **editar usa los mismos dos pasos de crear**; `AsociadorMovimientos` con el botón «Registrarlo con soporte» siempre visible junto al buscador y candidatos de 5 en 5. Eliminar pide confirmación con `useConfirmar`.

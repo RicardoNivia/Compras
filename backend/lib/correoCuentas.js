@@ -10,6 +10,10 @@ import { logCuentaCorreo } from "@/lib/audit";
 
 const badRequest = (m) => Object.assign(new Error(m), { status: 400 });
 export const COOKIE_ESTADO = "correo_oauth";
+// userId del buzón compartido (Gmail de solicitudes, ver lib/buzonCompartido.js): no pertenece a ninguna persona.
+export const USUARIO_COMPARTIDO = "compartido";
+// Cuenta personal de una persona (cada una tiene a lo sumo una).
+const personal = (userId) => ({ userId_tipo: { userId, tipo: "personal" } });
 const VIGENCIA_ESTADO_MS = 10 * 60 * 1000;
 
 const paraAuditoria = (c) => ({ email: c.email, estado: c.estado, agenteActivo: c.agenteActivo });
@@ -31,13 +35,19 @@ export function toClientCuenta(c) {
 }
 
 export async function estadoCorreo(user) {
-  const cuenta = await prisma.cuentaCorreo.findUnique({ where: { userId: user.id } });
+  const cuenta = await prisma.cuentaCorreo.findUnique({ where: personal(user.id) });
   const pendientes = await prisma.solicitudProveedorCorreo.count({ where: { userId: user.id, estado: "pendiente" } });
   return { modo: modoCorreo(), cuenta: toClientCuenta(cuenta), pendientes, emailUsuario: user.email };
 }
 
 // Paso 1: arma la URL de Microsoft. state = token firmado (persona + nonce, 10 min) y el nonce va también en una cookie.
+// Un solo correo en toda la aplicación: el de solicitudes (Gmail compartido, lib/buzonCompartido.js). Los correos
+// personales ya no se vinculan; CORREO_PERSONAL=1 lo vuelve a permitir.
+const personalPermitido = () => process.env.CORREO_PERSONAL === "1";
+const SOLO_UN_CORREO = "La aplicación lee un solo correo: el correo de soportes (Gmail), que configura un administrador en Mi correo.";
+
 export async function iniciarVinculacion(user) {
+  if (!personalPermitido()) throw badRequest(SOLO_UN_CORREO);
   const modo = modoCorreo();
   if (modo === "desactivado") throw badRequest("La conexión con el correo de Microsoft aún no está habilitada en el servidor.");
   const nonce = randomBytes(16).toString("base64url");
@@ -48,6 +58,7 @@ export async function iniciarVinculacion(user) {
 
 // Modo simulado: vincula sin Microsoft (para probar el agente pegando correos).
 export async function vincularSimulado(user) {
+  if (!personalPermitido()) throw badRequest(SOLO_UN_CORREO);
   if (modoCorreo() !== "simulado") throw badRequest("El modo simulado no está activo en el servidor.");
   return guardarCuenta(user, { email: String(user.email).toLowerCase(), proveedor: "simulado", tokens: null });
 }
@@ -70,7 +81,7 @@ export async function completarVinculacion(user, { code, state, nonceCookie }) {
 }
 
 async function guardarCuenta(user, { email, proveedor, tokens }) {
-  const antes = await prisma.cuentaCorreo.findUnique({ where: { userId: user.id } });
+  const antes = await prisma.cuentaCorreo.findUnique({ where: personal(user.id) });
   const data = {
     email, proveedor, userNombre: user.nombre || "",
     accessToken: tokens ? cifrar(tokens.accessToken) : null,
@@ -79,7 +90,7 @@ async function guardarCuenta(user, { email, proveedor, tokens }) {
     estado: "activa", ultimoError: null,
   };
   const cuenta = antes
-    ? await prisma.cuentaCorreo.update({ where: { userId: user.id }, data })
+    ? await prisma.cuentaCorreo.update({ where: personal(user.id), data })
     // Al vincular por primera vez se leen los correos de los últimos 7 días.
     : await prisma.cuentaCorreo.create({ data: { ...data, userId: user.id, agenteActivo: true, revisadoHasta: new Date(Date.now() - 7 * 86400000), creadoPorUserId: user.id, creadoPorNombre: user.nombre || null } });
   logCuentaCorreo(user, "vincular", cuenta, antes ? paraAuditoria(antes) : null, paraAuditoria(cuenta)).catch(() => {});
@@ -87,7 +98,7 @@ async function guardarCuenta(user, { email, proveedor, tokens }) {
 }
 
 export async function desvincular(user) {
-  const cuenta = await prisma.cuentaCorreo.findUnique({ where: { userId: user.id } });
+  const cuenta = await prisma.cuentaCorreo.findUnique({ where: personal(user.id) });
   if (!cuenta) throw badRequest("No tienes un correo vinculado.");
   await prisma.cuentaCorreo.delete({ where: { id: cuenta.id } });
   await prisma.correoRevisado.deleteMany({ where: { cuentaId: cuenta.id } });
@@ -96,7 +107,7 @@ export async function desvincular(user) {
 }
 
 export async function cambiarAgente(user, activo) {
-  const cuenta = await prisma.cuentaCorreo.findUnique({ where: { userId: user.id } });
+  const cuenta = await prisma.cuentaCorreo.findUnique({ where: personal(user.id) });
   if (!cuenta) throw badRequest("Primero vincula tu correo.");
   const nueva = await prisma.cuentaCorreo.update({ where: { id: cuenta.id }, data: { agenteActivo: !!activo } });
   logCuentaCorreo(user, "editar", nueva, paraAuditoria(cuenta), paraAuditoria(nueva)).catch(() => {});

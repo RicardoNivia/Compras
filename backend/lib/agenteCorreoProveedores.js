@@ -5,7 +5,7 @@ import { generateStructuredJson } from "@/lib/aiStructured";
 import { prepararArchivo } from "@/lib/agenteCotizador";
 import { normalizeNit, nitValido } from "@/lib/proveedores";
 import { modoCorreo, mensajesDesde, adjuntosDe, contenidoAdjunto } from "@/lib/correoGraph";
-import { tokenVigente } from "@/lib/correoCuentas";
+import { tokenVigente, USUARIO_COMPARTIDO } from "@/lib/correoCuentas";
 import { logSolicitudProveedorCorreo } from "@/lib/audit";
 
 // Agente de correo: lee la Bandeja de entrada de quien vinculó su correo y, cuando llega una solicitud de creación de
@@ -146,30 +146,41 @@ export async function calcularFaltantes(datos) {
 
 const ETIQUETA = { nit: "NIT", nombre: "Razón social", descripcion: "Descripción" };
 
+// Destinatarios del aviso: la dueña del buzón o, si llegó al buzón compartido, cada persona activa que puede
+// registrar proveedores.
+async function destinatarios(s) {
+  if (s.userId !== USUARIO_COMPARTIDO) return [{ id: s.userId, nombre: s.userNombre }];
+  const activos = await prisma.user.findMany({ where: { activo: true }, select: { id: true, nombre: true, role: true } });
+  const out = [];
+  for (const u of activos) if (await isRoleAllowed(u.role, "editProveedores")) out.push({ id: u.id, nombre: u.nombre || "" });
+  return out;
+}
+
 async function avisarEnBandeja(s, faltantes) {
   const nombre = JSON.parse(s.datos).nombre || "proveedor sin nombre";
   const yaExiste = faltantes.some((f) => f.existe);
+  const donde = s.userId === USUARIO_COMPARTIDO ? "al correo de solicitudes" : "a tu correo";
   const texto = yaExiste
     ? `${s.remitente || "Alguien"} pidió registrarlo, pero ${faltantes.find((f) => f.existe).motivo.toLowerCase()}`
     : faltantes.length
-      ? `Llegó a tu correo de ${s.remitente || "un remitente"}. Nova la leyó; falta: ${faltantes.map((f) => ETIQUETA[f.campo]).join(", ")}. Ábrela para completarla y registrarlo.`
-      : `Llegó a tu correo de ${s.remitente || "un remitente"}. Nova la leyó y está completa: revísala y agrega el proveedor.`;
-  await prisma.notificacionEntrega.create({
-    data: {
-      userId: s.userId, userNombre: s.userNombre, canal: "app", estado: "enviada", enviadaAt: new Date(),
-      creadoPorNombre: "Agente de correo",
-      contenido: JSON.stringify({
-        sistema: true, fuente: "correo", clave: `correo|${s.id}`, solicitudCorreoId: s.id,
-        notificacionNombre: "Agente de correo",
-        titulo: limpiar(`Solicitud de proveedor: ${nombre}`, 200),
-        texto: limpiar(texto, 500),
-      }),
-    },
+      ? `Llegó ${donde} de ${s.remitente || "un remitente"}. Nova la leyó; falta: ${faltantes.map((f) => ETIQUETA[f.campo]).join(", ")}. Ábrela para completarla y registrarlo.`
+      : `Llegó ${donde} de ${s.remitente || "un remitente"}. Nova la leyó y está completa: revísala y agrega el proveedor.`;
+  const contenido = JSON.stringify({
+    sistema: true, fuente: "correo", clave: `correo|${s.id}`, solicitudCorreoId: s.id,
+    notificacionNombre: "Agente de correo",
+    titulo: limpiar(`Solicitud de proveedor: ${nombre}`, 200),
+    texto: limpiar(texto, 500),
   });
+  for (const d of await destinatarios(s)) {
+    await prisma.notificacionEntrega.create({
+      data: { userId: d.id, userNombre: d.nombre, canal: "app", estado: "enviada", enviadaAt: new Date(), creadoPorNombre: "Agente de correo", contenido },
+    });
+  }
 }
 
 // Analiza un correo y, si es una solicitud de proveedor, la guarda y avisa. Devuelve la solicitud o null.
-async function analizarYGuardar(cuenta, msg, adjunto, nombresAdjuntos, notasPrevias = []) {
+// También lo usa el buzón compartido (lib/buzonCompartido.js), con cuenta.userId = "compartido".
+export async function analizarYGuardar(cuenta, msg, adjunto, nombresAdjuntos, notasPrevias = []) {
   const cat = await catalogos();
   const r = await leerConNova({ asunto: msg.asunto, remitente: msg.remitente, cuerpo: msg.cuerpo, adjunto }, cat);
   if (!r?.esSolicitudProveedor) return null;
@@ -214,7 +225,7 @@ function elegirAdjunto(adjuntos) {
   return leibles.find((a) => /rut/i.test(a.name)) || leibles[0] || null;
 }
 
-function prepararSeguro(buffer, nombre, notas) {
+export function prepararSeguro(buffer, nombre, notas) {
   try {
     const p = prepararArchivo(buffer, nombre);
     return p.tipo === "hoja" ? null : { nombre, documento: p.documento, image: p.image };
@@ -301,7 +312,7 @@ export async function revisarCuenta(cuentaId) {
 
 // "Revisar ahora" de Mi correo.
 export async function revisarMiCorreo(user) {
-  const cuenta = await prisma.cuentaCorreo.findUnique({ where: { userId: user.id } });
+  const cuenta = await prisma.cuentaCorreo.findUnique({ where: { userId_tipo: { userId: user.id, tipo: "personal" } } });
   if (!cuenta) throw Object.assign(new Error("Primero vincula tu correo."), { status: 400 });
   if (cuenta.proveedor === "simulado") throw Object.assign(new Error("En modo simulado no hay buzón que revisar: usa «Probar con un correo»."), { status: 400 });
   return revisarCuenta(cuenta.id);
@@ -310,7 +321,7 @@ export async function revisarMiCorreo(user) {
 // Modo simulado: procesa un correo pegado (y un adjunto opcional) igual que si hubiera llegado al buzón.
 export async function simularCorreo(user, { asunto, remitente, cuerpo, adjunto }) {
   if (modoCorreo() !== "simulado") throw Object.assign(new Error("El modo simulado no está activo en el servidor."), { status: 400 });
-  const cuenta = await prisma.cuentaCorreo.findUnique({ where: { userId: user.id } });
+  const cuenta = await prisma.cuentaCorreo.findUnique({ where: { userId_tipo: { userId: user.id, tipo: "personal" } } });
   if (!cuenta) throw Object.assign(new Error("Primero vincula tu correo."), { status: 400 });
   const sinPermiso = await puedeUsarAgente(user.id);
   if (sinPermiso) throw Object.assign(new Error(sinPermiso), { status: 403 });
@@ -337,7 +348,13 @@ export async function revisarTodas() {
 export function startAgenteCorreo() {
   if (globalThis.__agenteCorreo || process.env.CORREO_AGENTE_AUTO === "0") return;
   globalThis.__agenteCorreo = true;
-  const correr = () => revisarTodas().catch((e) => console.error("[agente correo]", e.message));
+  const correr = async () => {
+    await revisarTodas().catch((e) => console.error("[agente correo]", e.message));
+    // El correo de soportes (Gmail compartido) no depende de CORREO_MODO: solo de que esté configurado y encendido.
+    await import("@/lib/buzonCompartido")
+      .then((m) => m.revisarBuzonCompartido())
+      .catch((e) => console.error("[correo de soportes]", e.message));
+  };
   setTimeout(correr, 60 * 1000);
   setInterval(correr, CADA_MS);
 }

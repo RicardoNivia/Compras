@@ -1,6 +1,8 @@
 # Imagen de producción del backend de Panel de Compras y Bienestar (Next.js API-only + Prisma/PostgreSQL).
 # Build context: backend/ (docker build -f backend/Dockerfile backend)
-FROM node:20-alpine AS base
+# Node 22: pdfjs-dist 6 (lectura de extractos en PDF, lib/tesoreria/extractoPdf.js) exige Node >= 22.13; con Node 20
+# el texto del PDF no se podía leer en producción.
+FROM node:22-alpine AS base
 # Prisma necesita OpenSSL en Alpine para elegir el query engine correcto.
 RUN apk add --no-cache openssl libc6-compat
 
@@ -32,4 +34,6 @@ EXPOSE 3001
 
 # Aplica migraciones pendientes contra PostgreSQL (servicio "db" del stack)
 # antes de arrancar — mismo patrón que el "prisma db push" del API de bienestar.
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+# Tras las migraciones corre la carga inicial de Consumo (prisma/consumo-inicial/cargar.mjs): solo actúa la primera vez
+# por versión de datos y, si falla, no impide que la app arranque.
+CMD ["sh", "-c", "npx prisma migrate deploy && (node prisma/consumo-inicial/cargar.mjs || echo 'La carga inicial de Consumo fallo: la app arranca igual.') && npm start"]

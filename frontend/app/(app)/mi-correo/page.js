@@ -1,30 +1,23 @@
 import { redirect } from "next/navigation";
-import { backendFetch } from "@/lib/backendFetch";
 import { getSessionUser } from "@/lib/auth";
-import { canVincularCorreo, canEditProveedores } from "@/lib/roles";
+import { canVincularCorreo } from "@/lib/roles";
 import AppShell from "@/components/AppShell";
 import MiCorreoView from "@/components/correo/MiCorreoView";
 
 export const dynamic = "force-dynamic";
 
-// Mi correo: vincular el correo de Microsoft 365 y el agente que deja en la Bandeja las solicitudes de proveedor
-// (ver backend/lib/agenteCorreoProveedores.js). ?vinculado=1 / ?error=… llegan de la vuelta de Microsoft.
-export default async function MiCorreoPage({ searchParams }) {
+// Mi correo: la única página del correo de la aplicación (Gmail de solicitudes, ver backend/lib/buzonCompartido.js).
+// Solo soportes de pago: Pagos (registro en Tesorería) y Conexión (solo admin).
+export default async function MiCorreoPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (!(user.permissions?.vincularCorreo ?? canVincularCorreo(user.role))) redirect("/");
 
-  const res = await backendFetch("/api/correo");
-  const inicial = res.ok ? await res.json() : { modo: "desactivado", cuenta: null, pendientes: 0, emailUsuario: user.email };
-  const error = typeof searchParams?.error === "string" ? searchParams.error.slice(0, 400) : "";
-
   return (
-    <AppShell user={user} title="Mi correo" subtitle="El agente lee las solicitudes de proveedor que te llegan y te las deja en la Bandeja">
+    <AppShell user={user} title="Mi correo" subtitle="Los soportes de pago que llegan al correo y que Nova lee">
       <MiCorreoView
-        inicial={inicial}
-        vinculado={searchParams?.vinculado === "1"}
-        errorVinculo={error}
-        puedeRegistrar={user.permissions?.editProveedores ?? canEditProveedores(user.role)}
+        esAdmin={user.role === "admin"}
+        puedePagos={!!user.tesoreria?.puedeRegistrar}
       />
     </AppShell>
   );

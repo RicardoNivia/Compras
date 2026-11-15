@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, canViewNotificaciones, canViewBienestar, canEditBienestar, canViewAgentesCompras, ROLE_LABELS } from "@/lib/roles";
+import { canViewDashboard, canViewUsuarios, canViewAgenteIA, canViewAuditoria, canViewMaestros, canViewProveedores, canViewPresupuesto, canViewReportes, canViewAlertas, canViewRegistros, canViewNotificaciones, canViewBienestar, canEditBienestar, canViewAgentesCompras, canVincularCorreo, ROLE_LABELS } from "@/lib/roles";
 import { EVENTO_NO_LEIDAS, EVENTO_SOLICITUDES } from "@/lib/notificacionesApi";
 import { MODULOS } from "@/lib/modulos";
 import { useModulo } from "@/components/ModuloShell";
 import {
   IconDashboard, IconTable, IconSpark, IconUsers, IconHistory, IconLayers, IconLogout, IconKey, IconMoney, IconMail,
-  IconBell, IconBuilding, IconEye, IconCalendar, IconBag, IconHeart, IconList, IconCheck, IconClock, IconSearch, IconPanel, IconSun, IconMoon, IconBox, IconInbox } from "@/components/icons";
+  IconBell, IconBuilding, IconEye, IconCalendar, IconBag, IconHeart, IconList, IconCheck, IconClock, IconSearch, IconPanel, IconSun, IconMoon, IconBox, IconGauge, IconAlert } from "@/components/icons";
 import { fetchCompartidosApi } from "@/lib/api";
 import { crossfade } from "@/lib/crossfade";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
@@ -71,7 +71,7 @@ const GRUPOS = {
       titulo: "Día a día",
       items: [
         { key: "tesoreria", href: "/tesoreria", label: "Dashboard", buscar: "Dashboard · Resumen · Tesorería", Icon: IconDashboard, permite: (u) => !!u.tesoreria },
-        { key: "tesoreria-por-resolver", href: "/tesoreria/por-resolver", label: "Por resolver", buscar: "Por resolver · extractos, asociar, diferencias, soportes · Tesorería", Icon: IconInbox, permite: (u) => !!u.tesoreria },
+        // «Por resolver» salió del menú (noviembre 2026): la página /tesoreria/por-resolver sigue y se llega por enlaces (Mi día, avisos).
         { key: "tesoreria-movimientos", href: "/tesoreria/movimientos", label: "Movimientos", buscar: "Movimientos del banco · Tesorería", Icon: IconTable, permite: (u) => !!u.tesoreria },
         { key: "tesoreria-pagos", href: "/tesoreria/pagos", label: "Pagos programados", buscar: "Pagos programados · Tesorería", Icon: IconCalendar, permite: (u) => !!u.tesoreria },
         { key: "tesoreria-periodicos", href: "/tesoreria/periodicos", label: "Gastos periódicos", buscar: "Gastos periódicos · Tesorería", Icon: IconHistory, permite: (u) => !!u.tesoreria },
@@ -99,12 +99,38 @@ const GRUPOS = {
       ],
     },
   ],
+  // Consumo (servicios públicos por sede): el acceso viene de la Matriz (user.consumo, de /api/auth/me:
+  // verConsumo / registrarConsumo / administrarConsumo). Las páginas se van sumando por fases.
+  consumo: [
+    {
+      titulo: "Operación",
+      items: [
+        { key: "consumo", href: "/consumo", label: "Dashboard", buscar: "Dashboard · Consumo", Icon: IconDashboard, permite: (u) => !!u.consumo },
+        { key: "consumo-subir", href: "/consumo/subir", label: "Subir recibos", buscar: "Subir recibos con Nova · Consumo", Icon: IconSpark, permite: (u) => !!u.consumo?.puedeRegistrar },
+        { key: "consumo-recibos", href: "/consumo/recibos", label: "Recibos", buscar: "Recibos de servicios públicos · Consumo", Icon: IconTable, permite: (u) => !!u.consumo },
+        { key: "consumo-sedes", href: "/consumo/sedes", label: "Sedes y cuentas", buscar: "Sedes y cuentas de servicio · Consumo", Icon: IconBuilding, permite: (u) => !!u.consumo },
+      ],
+    },
+    {
+      titulo: "Análisis",
+      items: [
+        { key: "consumo-auditoria", href: "/consumo/auditoria", label: "Auditoría y hallazgos", buscar: "Auditoría y hallazgos · Consumo", Icon: IconAlert, permite: (u) => !!u.consumo },
+      ],
+    },
+    {
+      titulo: "Configuración",
+      items: [
+        { key: "consumo-maestros", href: "/consumo/maestros", label: "Maestros", buscar: "Maestros de Consumo · Empresas de servicio", Icon: IconLayers, permite: (u) => !!u.consumo },
+      ],
+    },
+  ],
 };
 
 const GENERALES = [
   { key: "alertas", href: "/alertas", label: "Alertas y notificaciones", corto: "Alertas", Icon: IconBell, feature: "viewAlertas", show: canViewAlertas, alt: { feature: "viewNotificaciones", show: canViewNotificaciones } },
   { key: "agente-ia", href: "/agente-ia", label: "Nova", Icon: IconSpark, feature: "viewAgenteIA", show: canViewAgenteIA },
-  // "Mi correo" está oculto del menú y del buscador (noviembre 2026); la página /mi-correo y el agente siguen existiendo.
+  // Mi correo: el correo de soportes de pago (Gmail compartido, lo conecta un administrador).
+  { key: "mi-correo", href: "/mi-correo", label: "Mi correo", corto: "Correo", Icon: IconMail, feature: "vincularCorreo", show: canVincularCorreo },
   { key: "usuarios", href: "/usuarios", label: "Usuarios y roles", corto: "Usuarios", Icon: IconUsers, feature: "viewUsuarios", show: canViewUsuarios },
   { key: "auditoria", href: "/auditoria", label: "Auditoría", Icon: IconHistory, feature: "viewAuditoria", show: canViewAuditoria },
   // Solo para administradores (no es un permiso de la Matriz: se valida el rol).
@@ -129,7 +155,7 @@ export function modulosDelUsuario(user) {
   return out;
 }
 
-export const ICONOS_MODULO = { compras: IconBag, bienestar: IconHeart, tesoreria: IconMoney };
+export const ICONOS_MODULO = { compras: IconBag, bienestar: IconHeart, tesoreria: IconMoney, consumo: IconGauge };
 
 function initials(name) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);

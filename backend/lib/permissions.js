@@ -16,7 +16,7 @@ function badRequest(message) {
 // Si agregas una funcionalidad nueva aquí, también debes leerla desde el
 // punto del código donde hoy se decide ese permiso (ver lib/roles.js y los
 // route handlers que la usan) para que la matriz tenga efecto real.
-// modulo: "Compras", "Bienestar" o "General" (lo de todos, sin importar el módulo). La Matriz y Roles se agrupan por él.
+// modulo: "Compras", "Bienestar", "Tesorería", "Consumo" o "General" (lo de todos, sin importar el módulo). La Matriz y Roles se agrupan por él.
 export const FEATURES = [
   { key: "viewDashboard", label: "Ver Dashboard de Compras", modulo: "Compras", section: "Dashboard", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR] },
   { key: "viewRegistros", label: "Ver Registros de compra", modulo: "Compras", section: "Registros", defaultRoles: ROLES_COMPRAS },
@@ -47,6 +47,10 @@ export const FEATURES = [
   { key: "verTesoreria", label: "Ver Tesorería (resumen, movimientos, pagos programados, gastos periódicos, saldos, alertas y reportes)", modulo: "Tesorería", section: "Tesorería", defaultRoles: [ROLES.ADMIN] },
   { key: "registrarTesoreria", label: "Registrar en Tesorería (movimientos, soportes, extractos, pagos, gastos periódicos, asociaciones, agente e importar la plantilla)", modulo: "Tesorería", section: "Tesorería", defaultRoles: [ROLES.ADMIN] },
   { key: "firmarTesoreria", label: "Administrar los maestros de Tesorería (bancos, medios de pago, ítems, conceptos y Paga)", modulo: "Tesorería", section: "Tesorería", defaultRoles: [ROLES.ADMIN] },
+  // Consumo (servicios públicos por sede): módulo independiente, por defecto solo admin.
+  { key: "verConsumo", label: "Ver Consumo (dashboard, recibos, sedes, análisis y reportes)", modulo: "Consumo", section: "Consumo", defaultRoles: [ROLES.ADMIN] },
+  { key: "registrarConsumo", label: "Registrar en Consumo (subir y crear recibos, editarlos, confirmar la sede y marcar pagos)", modulo: "Consumo", section: "Consumo", defaultRoles: [ROLES.ADMIN] },
+  { key: "administrarConsumo", label: "Administrar Consumo (sedes, cuentas, medidores, empresas y eliminar recibos)", modulo: "Consumo", section: "Consumo", defaultRoles: [ROLES.ADMIN] },
   { key: "viewAlertas", label: "Ver Mi día y alertas", modulo: "General", section: "Alertas y notificaciones", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR, ROLES.PROVEEDORES] },
   { key: "viewNotificaciones", label: "Configurar mis notificaciones (app y Teams)", modulo: "General", section: "Alertas y notificaciones", defaultRoles: [ROLES.ADMIN, ROLES.REGISTRO, ROLES.LEGALIZAR, ROLES.RADICAR, ROLES.PROVEEDORES] },
   { key: "vincularCorreo", label: "Vincular mi correo (el agente lee las solicitudes de proveedor y las deja en la Bandeja)", modulo: "General", section: "Mi correo", defaultRoles: [ROLES.ADMIN, ROLES.PROVEEDORES] },

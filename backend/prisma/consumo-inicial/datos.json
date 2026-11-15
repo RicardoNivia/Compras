@@ -1,0 +1,1992 @@
+{
+ "exportado": "2026-11-15T18:48:13.491Z",
+ "sedes": [
+  {
+   "nombre": "CL 81 # 11-08 · OF 1001",
+   "edificio": "CL 81 # 11-08",
+   "direccion": "CL 81 # 11-08 OF 1001",
+   "ciudad": "Bogotá, D.C.",
+   "activo": true
+  },
+  {
+   "nombre": "CL 81 # 11-08 · OF 1002",
+   "edificio": "CL 81 # 11-08",
+   "direccion": "CL 81 # 11-08 OF 1002",
+   "ciudad": "Bogotá, D.C.",
+   "activo": true
+  },
+  {
+   "nombre": "CL 81 # 11-08 · OF 1003",
+   "edificio": "CL 81 # 11-08",
+   "direccion": "CL 81 # 11-08 OF 1003",
+   "ciudad": "Bogotá, D.C.",
+   "activo": true
+  },
+  {
+   "nombre": "CL 81 # 11-08 · OF 1004",
+   "edificio": "CL 81 # 11-08",
+   "direccion": "CL 81 # 11-08 OF 1004",
+   "ciudad": "Bogotá, D.C.",
+   "activo": true
+  },
+  {
+   "nombre": "KR 12A # 79-08 · OF 203",
+   "edificio": "KR 12A # 79-08",
+   "direccion": "KR 12A # 79-08 OF 203",
+   "ciudad": "Bogotá, D.C.",
+   "activo": true
+  },
+  {
+   "nombre": "KR 12A # 79-08 · OF 204",
+   "edificio": "KR 12A # 79-08",
+   "direccion": "KR 12A # 79-08 OF 204",
+   "ciudad": "Bogotá, D.C.",
+   "activo": true
+  },
+  {
+   "nombre": "KR 12A # 79-08 · OF 402",
+   "edificio": "KR 12A # 79-08",
+   "direccion": "KR 12A # 79-08 OF 402",
+   "ciudad": "Bogotá, D.C.",
+   "activo": true
+  },
+  {
+   "nombre": "KR 12 # 79-50 · OF 501",
+   "edificio": "KR 12 # 79-50",
+   "direccion": "KR 12 # 79-50 OF 501",
+   "ciudad": "Bogotá, D.C.",
+   "activo": true
+  },
+  {
+   "nombre": "KR 12 # 79-50 · OF 502",
+   "edificio": "KR 12 # 79-50",
+   "direccion": "KR 12 # 79-50 OF 502",
+   "ciudad": "Bogotá, D.C.",
+   "activo": true
+  },
+  {
+   "nombre": "Mesa de Yeguas",
+   "edificio": "Anapoima",
+   "direccion": "Club Mesa de Yeguas LT Z 30",
+   "ciudad": "Anapoima",
+   "activo": true
+  }
+ ],
+ "empresas": [
+  {
+   "nombre": "Enel Colombia",
+   "nit": "860.063.875-8",
+   "servicios": "energia",
+   "activo": true
+  },
+  {
+   "nombre": "Acueducto de Bogotá (EAAB)",
+   "nit": "899.999.094-1",
+   "servicios": "acueducto",
+   "activo": true
+  },
+  {
+   "nombre": "Vanti",
+   "nit": null,
+   "servicios": "gas",
+   "activo": true
+  },
+  {
+   "nombre": "Promoambiental Distrito",
+   "nit": "901.145.808-5",
+   "servicios": "aseo",
+   "activo": true
+  }
+ ],
+ "cuentas": [
+  {
+   "sede": "Mesa de Yeguas",
+   "servicio": "energia",
+   "empresa": "Enel Colombia",
+   "numeroCuenta": "7849564-9",
+   "titular": "SINCOSOFT SAS",
+   "claseUso": "Comercial",
+   "estrato": "0",
+   "periodicidad": "mensual",
+   "direccionRecibo": null,
+   "noAplica": false,
+   "activo": true,
+   "creadoPorNombre": "Ricardo Nivia",
+   "medidores": [
+    {
+     "numero": "22527127",
+     "factor": 1,
+     "desde": null,
+     "hasta": null
+    }
+   ],
+   "recibos": [
+    {
+     "medidor": "22527127",
+     "numeroFactura": "857835473-2",
+     "periodoDesde": "2025-12-23",
+     "periodoHasta": "2026-01-22",
+     "dias": 31,
+     "anio": 2026,
+     "mes": 1,
+     "tipoLectura": "real",
+     "lecturaAnterior": 14221,
+     "lecturaActual": 14881,
+     "factor": 1,
+     "consumo": 660,
+     "unidad": "kWh",
+     "vigenciaTarifa": "DIC/2025",
+     "valorUnitario": 785.0883,
+     "totalCargos": 641790,
+     "saldoAnterior": 0,
+     "totalPagar": 641790,
+     "moneda": "COP",
+     "fechaExpedicion": null,
+     "fechaPagoOportuno": null,
+     "fechaSuspension": null,
+     "estadoPago": "pagado",
+     "valorPagado": 1283580,
+     "fechaPago": null,
+     "origen": "manual",
+     "extras": null,
+     "nota": null,
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Consumo de energía",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 518158,
+       "orden": 0
+      },
+      {
+       "grupo": "energia",
+       "concepto": "Contribución (20 %)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 103632,
+       "orden": 1
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Alumbrado público",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 20000,
+       "orden": 2
+      }
+     ],
+     "historial": [],
+     "soportes": []
+    },
+    {
+     "medidor": "22527127",
+     "numeroFactura": "858366519-7",
+     "periodoDesde": "2026-01-23",
+     "periodoHasta": "2026-02-21",
+     "dias": 30,
+     "anio": 2026,
+     "mes": 2,
+     "tipoLectura": "real",
+     "lecturaAnterior": 14881,
+     "lecturaActual": 15238,
+     "factor": 1,
+     "consumo": 357,
+     "unidad": "kWh",
+     "vigenciaTarifa": "ENE/2026",
+     "valorUnitario": 740.2485,
+     "totalCargos": 317120,
+     "saldoAnterior": -641790,
+     "totalPagar": -324670,
+     "moneda": "COP",
+     "fechaExpedicion": null,
+     "fechaPagoOportuno": null,
+     "fechaSuspension": null,
+     "estadoPago": "saldo_favor",
+     "valorPagado": null,
+     "fechaPago": null,
+     "origen": "manual",
+     "extras": null,
+     "nota": null,
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Consumo de energía",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 264269,
+       "orden": 0
+      },
+      {
+       "grupo": "energia",
+       "concepto": "Contribución (20 %)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 52854,
+       "orden": 1
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Ajuste a la decena",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": -3,
+       "orden": 2
+      }
+     ],
+     "historial": [],
+     "soportes": []
+    },
+    {
+     "medidor": "22527127",
+     "numeroFactura": "858909570-9",
+     "periodoDesde": "2026-02-22",
+     "periodoHasta": "2026-03-24",
+     "dias": 31,
+     "anio": 2026,
+     "mes": 3,
+     "tipoLectura": "real",
+     "lecturaAnterior": 15238,
+     "lecturaActual": 15965,
+     "factor": 1,
+     "consumo": 727,
+     "unidad": "kWh",
+     "vigenciaTarifa": "FEB/2026",
+     "valorUnitario": 834.1177,
+     "totalCargos": 727690,
+     "saldoAnterior": -324670,
+     "totalPagar": 403020,
+     "moneda": "COP",
+     "fechaExpedicion": null,
+     "fechaPagoOportuno": null,
+     "fechaSuspension": null,
+     "estadoPago": "pagado",
+     "valorPagado": 403020,
+     "fechaPago": null,
+     "origen": "manual",
+     "extras": null,
+     "nota": null,
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Consumo de energía",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 606404,
+       "orden": 0
+      },
+      {
+       "grupo": "energia",
+       "concepto": "Contribución (20 %)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 121281,
+       "orden": 1
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Ajuste a la decena",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 5,
+       "orden": 2
+      }
+     ],
+     "historial": [],
+     "soportes": []
+    },
+    {
+     "medidor": "22527127",
+     "numeroFactura": "859439389-0",
+     "periodoDesde": "2026-03-25",
+     "periodoHasta": "2026-04-23",
+     "dias": 30,
+     "anio": 2026,
+     "mes": 4,
+     "tipoLectura": "real",
+     "lecturaAnterior": 15965,
+     "lecturaActual": 16540,
+     "factor": 1,
+     "consumo": 575,
+     "unidad": "kWh",
+     "vigenciaTarifa": "MAR/2026",
+     "valorUnitario": 824.5854,
+     "totalCargos": 588960,
+     "saldoAnterior": 0,
+     "totalPagar": 588960,
+     "moneda": "COP",
+     "fechaExpedicion": null,
+     "fechaPagoOportuno": null,
+     "fechaSuspension": null,
+     "estadoPago": "pagado",
+     "valorPagado": 588960,
+     "fechaPago": null,
+     "origen": "manual",
+     "extras": null,
+     "nota": null,
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Consumo de energía",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 474137,
+       "orden": 0
+      },
+      {
+       "grupo": "energia",
+       "concepto": "Contribución (20 %)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 94827,
+       "orden": 1
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Alumbrado público",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 20000,
+       "orden": 2
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Ajuste a la decena",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": -4,
+       "orden": 3
+      }
+     ],
+     "historial": [],
+     "soportes": []
+    },
+    {
+     "medidor": "22527127",
+     "numeroFactura": "859984923-0",
+     "periodoDesde": "2026-04-24",
+     "periodoHasta": "2026-05-23",
+     "dias": 30,
+     "anio": 2026,
+     "mes": 5,
+     "tipoLectura": "promediada",
+     "lecturaAnterior": 16540,
+     "lecturaActual": 16540,
+     "factor": 1,
+     "consumo": 553,
+     "unidad": "kWh",
+     "vigenciaTarifa": "ABR/2026",
+     "valorUnitario": 819.6601,
+     "totalCargos": 543930,
+     "saldoAnterior": 0,
+     "totalPagar": 543930,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-05-26",
+     "fechaPagoOportuno": null,
+     "fechaSuspension": null,
+     "estadoPago": "pagado",
+     "valorPagado": 543930,
+     "fechaPago": null,
+     "origen": "manual",
+     "extras": null,
+     "nota": null,
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Consumo de energía",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 453272,
+       "orden": 0
+      },
+      {
+       "grupo": "energia",
+       "concepto": "Contribución (20 %)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 90654,
+       "orden": 1
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Ajuste a la decena",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 4,
+       "orden": 2
+      }
+     ],
+     "historial": [],
+     "soportes": []
+    },
+    {
+     "medidor": "22527127",
+     "numeroFactura": "860522953-7",
+     "periodoDesde": "2026-05-24",
+     "periodoHasta": "2026-06-22",
+     "dias": 30,
+     "anio": 2026,
+     "mes": 6,
+     "tipoLectura": "promediada",
+     "lecturaAnterior": 16540,
+     "lecturaActual": 16540,
+     "factor": 1,
+     "consumo": 553,
+     "unidad": "kWh",
+     "vigenciaTarifa": "MAY/2026",
+     "valorUnitario": 839.6742,
+     "totalCargos": 577210,
+     "saldoAnterior": 0,
+     "totalPagar": 577210,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-06-24",
+     "fechaPagoOportuno": null,
+     "fechaSuspension": null,
+     "estadoPago": "pagado",
+     "valorPagado": 577210,
+     "fechaPago": null,
+     "origen": "manual",
+     "extras": null,
+     "nota": null,
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Consumo de energía",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 464340,
+       "orden": 0
+      },
+      {
+       "grupo": "energia",
+       "concepto": "Contribución (20 %)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 92868,
+       "orden": 1
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Alumbrado público",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 20000,
+       "orden": 2
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Ajuste a la decena",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 2,
+       "orden": 3
+      }
+     ],
+     "historial": [],
+     "soportes": []
+    }
+   ]
+  },
+  {
+   "sede": "Mesa de Yeguas",
+   "servicio": "energia",
+   "empresa": "Enel Colombia",
+   "numeroCuenta": "8175752-3",
+   "titular": "JUAN ARANGO",
+   "claseUso": "Residencial",
+   "estrato": "6",
+   "periodicidad": "bimestral",
+   "direccionRecibo": null,
+   "noAplica": false,
+   "activo": true,
+   "creadoPorNombre": "Ricardo Nivia",
+   "medidores": [
+    {
+     "numero": "27568",
+     "factor": 1,
+     "desde": null,
+     "hasta": null
+    }
+   ],
+   "recibos": [
+    {
+     "medidor": "27568",
+     "numeroFactura": "862198184-9",
+     "periodoDesde": "2026-05-26",
+     "periodoHasta": "2026-09-25",
+     "dias": 123,
+     "anio": 2026,
+     "mes": 9,
+     "tipoLectura": "real",
+     "lecturaAnterior": 0,
+     "lecturaActual": 2152,
+     "factor": 1,
+     "consumo": 2152,
+     "unidad": "kWh",
+     "vigenciaTarifa": null,
+     "valorUnitario": null,
+     "totalCargos": 2601710,
+     "saldoAnterior": 0,
+     "totalPagar": 2601710,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-09-25",
+     "fechaPagoOportuno": "2026-10-02",
+     "fechaSuspension": null,
+     "estadoPago": "pagado",
+     "valorPagado": 2601710,
+     "fechaPago": null,
+     "origen": "manual",
+     "extras": null,
+     "nota": "Pago global sin factura detallada (tomado del Excel del contador). El portal de Enel lo asocia a la factura 862198184-9 (expedida 25/09/2026). Cubre las lecturas 0 → 2.152 del medidor 27568 (180 + 942 + 1.030 kWh). Inicio del período aproximado: el medidor nuevo se instaló antes del 26/05/2026. Falta descargar la factura del portal.",
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [],
+     "historial": [
+      {
+       "anio": 2026,
+       "mes": 5,
+       "etiqueta": "May-26 (parcial)",
+       "consumo": 180
+      },
+      {
+       "anio": 2026,
+       "mes": 7,
+       "etiqueta": "Jul-26",
+       "consumo": 942
+      },
+      {
+       "anio": 2026,
+       "mes": 9,
+       "etiqueta": "Sep-26",
+       "consumo": 1030
+      }
+     ],
+     "soportes": []
+    },
+    {
+     "medidor": "27568",
+     "numeroFactura": "862800246-3",
+     "periodoDesde": "2026-09-26",
+     "periodoHasta": "2026-11-03",
+     "dias": 39,
+     "anio": 2026,
+     "mes": 11,
+     "tipoLectura": "real",
+     "lecturaAnterior": 2152,
+     "lecturaActual": 2851,
+     "factor": 1,
+     "consumo": 699,
+     "unidad": "kWh",
+     "vigenciaTarifa": "SEP/2026",
+     "valorUnitario": 875.0465,
+     "totalCargos": 850240,
+     "saldoAnterior": 0,
+     "totalPagar": 850240,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-11-05",
+     "fechaPagoOportuno": "2026-11-10",
+     "fechaSuspension": "2026-11-12",
+     "estadoPago": "pendiente",
+     "valorPagado": null,
+     "fechaPago": null,
+     "origen": "manual",
+     "extras": null,
+     "nota": null,
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Consumo de energía",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 611658,
+       "orden": 0
+      },
+      {
+       "grupo": "energia",
+       "concepto": "Contribución (20 %)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 122332,
+       "orden": 1
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Alumbrado público",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 130935,
+       "orden": 2
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Ajuste a la decena",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": -4,
+       "orden": 3
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Compensación CREG 015/18",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": -25673,
+       "orden": 4
+      },
+      {
+       "grupo": "financiado",
+       "concepto": "Cuota capital crédito de conexión",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 5584,
+       "orden": 5
+      },
+      {
+       "grupo": "financiado",
+       "concepto": "Interés crédito de conexión",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 5401,
+       "orden": 6
+      },
+      {
+       "grupo": "otros",
+       "concepto": "IM residencial",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 7,
+       "orden": 7
+      }
+     ],
+     "historial": [],
+     "soportes": [
+      {
+       "nombre": "noviembre nuevo medidor.pdf",
+       "tipoMime": "application/pdf",
+       "tamano": 84923,
+       "sha1": "3691a277e983eef34d2cc159a3cdee67a0a1d429",
+       "archivo": "3691a277e983eef34d2cc159a3cdee67a0a1d429.pdf",
+       "creadoPorNombre": "Ricardo Nivia"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sede": "CL 81 # 11-08 · OF 1001",
+   "servicio": "energia",
+   "empresa": "Enel Colombia",
+   "numeroCuenta": "7174172-4",
+   "titular": "M001 SAS",
+   "claseUso": "No Residencial",
+   "estrato": null,
+   "periodicidad": "mensual",
+   "direccionRecibo": "CL 81 NO 11 08 OF 1001",
+   "noAplica": false,
+   "activo": true,
+   "creadoPorNombre": "Ricardo Nivia",
+   "medidores": [
+    {
+     "numero": "120025",
+     "factor": 1,
+     "desde": null,
+     "hasta": null
+    }
+   ],
+   "recibos": [
+    {
+     "medidor": "120025",
+     "numeroFactura": "413400254-8",
+     "periodoDesde": "2026-09-17",
+     "periodoHasta": "2026-10-16",
+     "dias": 30,
+     "anio": 2026,
+     "mes": 10,
+     "tipoLectura": "real",
+     "lecturaAnterior": 119487,
+     "lecturaActual": 120025,
+     "factor": 1,
+     "consumo": 822,
+     "unidad": "kWh",
+     "vigenciaTarifa": "SEP2026",
+     "valorUnitario": 825.97,
+     "totalCargos": 964780,
+     "saldoAnterior": 0,
+     "totalPagar": 964780,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-10-18",
+     "fechaPagoOportuno": "2026-11-03",
+     "fechaSuspension": "2026-11-05",
+     "estadoPago": "pendiente",
+     "valorPagado": null,
+     "fechaPago": null,
+     "origen": "nova",
+     "extras": "{\"Número de cliente\":\"18111296\",\"Documento equivalente electrónico No.\":\"413400254-8\",\"CUDE\":\"d87767998a017e5a9d454fcb7b16110d1faa9d4e4c4072c6e86e0ee535e82b48/71f4093779562760274937b17bef\",\"Subclase\":\"Básico\",\"Tipo de Lectura Real\":\"Real\",\"Cargo kW\":\"9.00\",\"Operador de aseo\":\"Promoambiental Distrito SAS ESP\",\"TV 4 No. 51A-25 Línea 110\":\"Dirección operador aseo\",\"Consumo promedio últimos 6 meses\":\"777 kWh\",\"Consumo mes actual\":\"822 kWh\",\"Diferencia de lecturas\":\"822\",\"Consumo promedio\":\"777 kWh\",\"Valor kWh aplicado\":\"825.97\",\"Consumo diario\":\"27.40 kWh\",\"Valor diario\":\"27158\",\"Energía facturada kWh\":\"822\",\"Factor\":\"1\",\"Generación\":\"9.65\",\"Transmisión\":\"0\",\"Distribución + Costo Fijo\":\"0\",\"Costo Variable\":\"80.41\",\"Pérdidas\":\"72.01\",\"Restricciones\":\"0\",\"Vigencia tarifa\":\"SEP2026\",\"Cobro adicional por superar meta de consumo\":\"$64.091\",\"Meta de consumo\":\"646.5 kWh\",\"Consumo adicional (exceso sobre meta)\":\"110.85 kWh\",\"Valor de costo adicional\":\"$64.091\",\"Ahorro reconocido\":\"0 kWh\",\"Período evaluado incentivo\":\"17 SEP/2026 - 16 OCT/2026\",\"Meta lograda\":\"646.5 kWh (100%)\",\"Medidor - Medelín\":\"21.55 kWh\",\"Cuenta contrato aseo\":\"70174702\",\"Período facturación aseo\":\"19.09.2026 a 18.10.2026\",\"Días liquidación aseo\":\"30\",\"Estrato aseo\":\"0\",\"% Participación\":\"0\",\"Tipo producto aseo\":\"No Residenciales\",\"Volumen aseo\":\"0.20\",\"FREC. Recolección\":\"5\",\"FREC. Barrido\":\"3\",\"Pago / Prof. Comercial\":\"0\",\"Descuentos aseo\":\"0\",\"Calidad del Servicio - FIUs\":\"13.00\",\"Calidad del Servicio - DT\":\"203.79\",\"Calidad del Servicio - DMG\":\"11.57\",\"Calidad del Servicio - Grupo\":\"11\",\"Calidad del Servicio - SAIDI\":\"0.00\",\"Calidad del Servicio - SAIFI\":\"0.00\",\"Calidad del Servicio - FIUc\":\"0.00\",\"Calidad del Servicio - MF\":\"1.00\",\"Calidad del Servicio - MC\":\"1.00\",\"Calidad del Servicio - CEC\":\"0.00\",\"CD\":\"58427781\",\"PERÍODO\":\"2026095\",\"Ruta Reparto\":\"3 4 15 403 9666\",\"Clase de servicio\":\"Comercial\",\"ENERGÍA ACTIVA FP\":\"822\",\"Energía reactiva\":\"213\",\"Contribución reactiva\":\"0\",\"Archivo leído\":\"CL 81 NO 11 08 OF 1001.pdf\",\"Modelo que leyó\":\"claude-sonnet-4-6\"}",
+     "nota": "Revisar (carga inicial con Nova): Las lecturas dan 538, pero el recibo factura 822. · Los valores individuales de los cargos de aseo (servicio no residencial, recolección, aprovechamiento, etc.) no se leen con claridad suficiente para desglosarlos con certeza. · La lectura anterior del medidor (119487 aprox.) y la actual (120025 aprox.) son difíciles de confirmar con exactitud por la resolución del escaneo. · Los componentes tarifarios (G, T, D, CV, PR) no se leen todos con claridad; algunos valores pueden estar incompletos. · El desglose exacto del subtotal de energía ($891,650) entre consumo base y cobro adicional ($64,091) no está completamente claro en la tabla; los cargos individuales de energía podrían no sumar exacta",
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Consumo excedente kWh (energía facturada 822 kWh)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 819818,
+       "orden": 0
+      },
+      {
+       "grupo": "energia",
+       "concepto": "Contribución excedente",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 71832,
+       "orden": 1
+      },
+      {
+       "grupo": "aseo",
+       "concepto": "Total aseo (Promoambiental Distrito SAS ESP)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 73130,
+       "orden": 2
+      }
+     ],
+     "historial": [
+      {
+       "anio": 2026,
+       "mes": 4,
+       "etiqueta": "Abr",
+       "consumo": 748
+      },
+      {
+       "anio": 2026,
+       "mes": 5,
+       "etiqueta": "May",
+       "consumo": 744
+      },
+      {
+       "anio": 2026,
+       "mes": 6,
+       "etiqueta": "Jun",
+       "consumo": 723
+      },
+      {
+       "anio": 2026,
+       "mes": 7,
+       "etiqueta": "Jul",
+       "consumo": 761
+      },
+      {
+       "anio": 2026,
+       "mes": 8,
+       "etiqueta": "Ago",
+       "consumo": 771
+      },
+      {
+       "anio": 2026,
+       "mes": 9,
+       "etiqueta": "Sep",
+       "consumo": 795
+      }
+     ],
+     "soportes": [
+      {
+       "nombre": "CL 81 NO 11 08 OF 1001.pdf",
+       "tipoMime": "application/pdf",
+       "tamano": 2567907,
+       "sha1": "adae819c509f7e620e20084dc4eca31ae756a4d9",
+       "archivo": "adae819c509f7e620e20084dc4eca31ae756a4d9.pdf",
+       "creadoPorNombre": "Ricardo Nivia"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sede": "CL 81 # 11-08 · OF 1002",
+   "servicio": "energia",
+   "empresa": "Enel Colombia",
+   "numeroCuenta": "7174173-6",
+   "titular": "M001 SAS",
+   "claseUso": "Comercial",
+   "estrato": null,
+   "periodicidad": "mensual",
+   "direccionRecibo": "CL 81 NO 11 08 OF 1002 OFICINA 1002",
+   "noAplica": false,
+   "activo": true,
+   "creadoPorNombre": "Ricardo Nivia",
+   "medidores": [
+    {
+     "numero": "18111297",
+     "factor": 1,
+     "desde": null,
+     "hasta": null
+    }
+   ],
+   "recibos": [
+    {
+     "medidor": "18111297",
+     "numeroFactura": "4134000255-5",
+     "periodoDesde": "2026-09-17",
+     "periodoHasta": "2026-10-16",
+     "dias": 30,
+     "anio": 2026,
+     "mes": 10,
+     "tipoLectura": "real",
+     "lecturaAnterior": 14299,
+     "lecturaActual": 14487,
+     "factor": 1,
+     "consumo": 188,
+     "unidad": "kWh",
+     "vigenciaTarifa": "SEP2026",
+     "valorUnitario": 825.97,
+     "totalCargos": 259470,
+     "saldoAnterior": 0,
+     "totalPagar": 259470,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-10-18",
+     "fechaPagoOportuno": "2026-11-03",
+     "fechaSuspension": "2026-11-05",
+     "estadoPago": "pendiente",
+     "valorPagado": null,
+     "fechaPago": null,
+     "origen": "nova",
+     "extras": "{\"Documento equivalente electrónico No.\":\"4134000255-5\",\"Número de cliente\":\"18111297\",\"Cuenta contrato\":\"70174703\",\"Ruta Reparto\":\"3 4 15 403 9967\",\"Subclase\":\"Básico\",\"Cargo kW\":\"9.00\",\"Generación\":\"Costo Variable\",\"Transmisión\":\"$9.65\",\"Distribución\":\"Costo Fijo $0.00\",\"Pérdidas\":\"$72.01\",\"Valor kWh aplicado\":\"825.97\",\"Valor kWh Mes anterior\":\"825.97\",\"Energía facturada kWh\":\"188\",\"Consumo promedio últimos 6 meses\":\"201 kWh\",\"Próxima lectura\":\"17 NOV/2026\",\"Operador de aseo\":\"PROMOAMBIENTAL DISTRITO SAS ESP\",\"Dirección aseo\":\"TV 4 No. 51A-25\",\"Línea aseo\":\"110\",\"Período facturación aseo\":\"19.09.2026 a 18.10.2026\",\"Días aseo\":\"30\",\"Liquidación aseo\":\"Permanentemente generado\",\"Estrato aseo\":\"0\",\"Tipo producto aseo\":\"No Residencial\",\"Volumen aseo\":\"0.0000\",\"% Participación aseo\":\"0.20\",\"Aporte no residencial aseo\":\"0%\",\"Descuentos aseo\":\"0\",\"FREC. Recolección aseo\":\"5\",\"FREC. Barrido aseo\":\"3\",\"Toneladas por suscriptor aseo\":\"7\",\"Energía activa FP\":\"188 kWh\",\"Energía reactiva\":\"Contribución\",\"Ahorro del 30% del valor facturado\":\"$825.97\",\"Meta asignada\":\"213 kWh\",\"Consumo del mes\":\"188 kWh\",\"Consumo ahorro reconocido del mes\":\"3.7 kWh\",\"Consumo acumulado ahorro reconocido\":\"234.3 kWh\",\"Período medición ahorro reconocido\":\"17 SEP/2023 - 16 OCT/2026\",\"Meta acumulada ahorro reconocido\":\"213 kWh\",\"Anomalías consumo\":\"Consumiste 188 kWh de 213 kWh. Ahorraste 25.0 kWh frente a la meta.\",\"Resoluciones tarifa\":\"101 120/126 de 2026\",\"Calidad del servicio - DIU\":\"13.57\",\"Calidad del servicio - FIU\":\"11\",\"Calidad del servicio - Grupo\":\"11\",\"FHUG\":\"13.00\",\"GT\":\"203.79\",\"DHUG\":\"0.00\",\"DT\":\"0.00030\",\"FMIG\":\"0.00\",\"MC\":\"0.00\",\"TMC\":\"1.00\",\"PERIODO\":\"202509\",\"CEC\":\"0.00\",\"CUDE\":\"4d5a8e6a619e888d9b1978c0ca8a110889b7a706b5a76eb5a2191c22a99d77cca9a44b046a72846627394407c9f603da80\",\"NIT Promoambiental\":\"901145808-5\",\"Puntuación relativa\":\"10.19%\",\"Medidor (Meta)\":\"7.1 kWh\",\"Archivo leído\":\"CL 81 NO 11 08 OF 1002.pdf\",\"Modelo que leyó\":\"claude-sonnet-4-6\"}",
+     "nota": "Revisar (carga inicial con Nova): Los cargos suman 259.470 y el total del período dice 186.340: revisa si falta o sobra un cargo. · Total del período 186.340 + saldo anterior 0 no da el total a pagar 259.470. · El desglose exacto de los componentes de tarifa (G, T, D, CV, PR, R) no es completamente legible en la imagen. · El valor de la contribución ($30.957) se deduce por diferencia entre total energía ($186.340 - $73.130 aseo = $113.210 energía; $155.383 consumo + $30.957 contribución ≈ $186.340 - $73.130); confirmar · Algunos valores de la tabla de aseo (limpieza urbana, barrido, etc.) no son completamente legibles.",
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Energía consumida kWh",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 155383,
+       "orden": 0
+      },
+      {
+       "grupo": "energia",
+       "concepto": "Contribución",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 30957,
+       "orden": 1
+      },
+      {
+       "grupo": "aseo",
+       "concepto": "Aseo - Servicio no residencial (PROMOAMBIENTAL DISTRITO SAS ESP)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 73130,
+       "orden": 2
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Ajuste de cobro (décimas)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 0,
+       "orden": 3
+      }
+     ],
+     "historial": [
+      {
+       "anio": 2025,
+       "mes": 11,
+       "etiqueta": "Nov",
+       "consumo": 232
+      },
+      {
+       "anio": 2025,
+       "mes": 12,
+       "etiqueta": "Dic",
+       "consumo": 187
+      },
+      {
+       "anio": 2026,
+       "mes": 1,
+       "etiqueta": "Ene",
+       "consumo": 174
+      },
+      {
+       "anio": 2026,
+       "mes": 2,
+       "etiqueta": "Feb",
+       "consumo": 116
+      },
+      {
+       "anio": 2026,
+       "mes": 3,
+       "etiqueta": "Mar",
+       "consumo": 58
+      },
+      {
+       "anio": 2026,
+       "mes": 4,
+       "etiqueta": "Abr",
+       "consumo": 224
+      },
+      {
+       "anio": 2026,
+       "mes": 5,
+       "etiqueta": "May",
+       "consumo": 208
+      },
+      {
+       "anio": 2026,
+       "mes": 6,
+       "etiqueta": "Jun",
+       "consumo": 197
+      },
+      {
+       "anio": 2026,
+       "mes": 7,
+       "etiqueta": "Jul",
+       "consumo": 201
+      },
+      {
+       "anio": 2026,
+       "mes": 8,
+       "etiqueta": "Ago",
+       "consumo": 194
+      },
+      {
+       "anio": 2026,
+       "mes": 9,
+       "etiqueta": "Sep",
+       "consumo": 197
+      }
+     ],
+     "soportes": [
+      {
+       "nombre": "CL 81 NO 11 08 OF 1002.pdf",
+       "tipoMime": "application/pdf",
+       "tamano": 2528295,
+       "sha1": "2adc2f1bc06e811face4f4bee46558636e11e620",
+       "archivo": "2adc2f1bc06e811face4f4bee46558636e11e620.pdf",
+       "creadoPorNombre": "Ricardo Nivia"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sede": "CL 81 # 11-08 · OF 1003",
+   "servicio": "energia",
+   "empresa": "Enel Colombia",
+   "numeroCuenta": "7174174-8",
+   "titular": "M001 SAS",
+   "claseUso": "No Residencial",
+   "estrato": null,
+   "periodicidad": "mensual",
+   "direccionRecibo": "CL 81 NO 11 08 OF 1003",
+   "noAplica": false,
+   "activo": true,
+   "creadoPorNombre": "Ricardo Nivia",
+   "medidores": [
+    {
+     "numero": "18111298",
+     "factor": 1,
+     "desde": null,
+     "hasta": null
+    }
+   ],
+   "recibos": [
+    {
+     "medidor": "18111298",
+     "numeroFactura": "413407475-6",
+     "periodoDesde": "2026-09-17",
+     "periodoHasta": "2026-10-16",
+     "dias": 30,
+     "anio": 2026,
+     "mes": 10,
+     "tipoLectura": "real",
+     "lecturaAnterior": 203565,
+     "lecturaActual": 208069,
+     "factor": 1,
+     "consumo": 4504,
+     "unidad": "kWh",
+     "vigenciaTarifa": "SEP2026",
+     "valorUnitario": 825.97,
+     "totalCargos": 4629740,
+     "saldoAnterior": 0,
+     "totalPagar": 4629740,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-10-18",
+     "fechaPagoOportuno": "2026-11-03",
+     "fechaSuspension": "2026-11-05",
+     "estadoPago": "pendiente",
+     "valorPagado": null,
+     "fechaPago": null,
+     "origen": "nova",
+     "extras": "{\"Subtotal energía\":\"4556610\",\"Total otros cobros\":\"15398\",\"Consumo promedio últimos 6 meses\":\"3973.5 kWh\",\"Meta de consumo\":\"3973.5 kWh\",\"Consumo actual\":\"4504 kWh\",\"Exceso sobre meta\":\"133.15 kWh\",\"Ahorro reconocido\":\"0 kWh\",\"Valor kWh aplicado\":\"825.97\",\"Costo Variable (CV)\":\"80.41\",\"Distribución + Costo Fijo\":\"9.65\",\"Transmisión + Generación\":\"no legible\",\"Pérdidas\":\"72.01\",\"Vigencia tarifa\":\"SEP2026\",\"Energía facturada kWh\":\"4504\",\"Energía consumida kWh\":\"4558\",\"Diferencia de lecturas\":\"4504\",\"Valor diario\":\"148808\",\"Energía Activa FP\":\"mencionada\",\"Energía Reactiva\":\"mencionada\",\"Contribución\":\"mencionada\",\"Operador de aseo\":\"PROMOAMBIENTAL DISTRITO SAS ESP\",\"Línea aseo\":\"110\",\"TV aseo\":\"TV 4 No. 51A-25\",\"Cuenta contrato aseo\":\"70174704\",\"Periodo facturación aseo\":\"19.09.2026 a 18.10.2026\",\"Estrato aseo\":\"0\",\"Días aseo\":\"30\",\"FREC. Recolección\":\"5\",\"FREC. Barrido\":\"3\",\"Tipo productor aseo\":\"Paq. / Comercial\",\"Aporte no residencial aseo\":\"0\",\"Subsidio aseo\":\"0\",\"Descuento aseo\":\"0\",\"Calidad del Servicio - FIUg\":\"13.00\",\"Calidad del Servicio - GT\":\"203.79\",\"Calidad del Servicio - FIUd\":\"13.00\",\"Calidad del Servicio - FM\":\"0.00\",\"Calidad del Servicio - TNE\":\"1.00\",\"Calidad del Servicio - CEC\":\"0.00\",\"Calidad del Servicio - Grupo\":\"11\",\"Resolución tarifa\":\"Resoluciones 101 1120/126 de 2025\",\"CUDE\":\"74290d6deec63dc19b944a61a59ee46b1a9653be83fe1a9fe6d848c7090c7096/94374340b5050040016ce853807\",\"Número de cliente\":\"18111298\",\"Subclase: Básico\":\"Carga kW: 9.00\",\"Tipo de Lectura\":\"Real\",\"Clase de servicio\":\"Comercial\",\"Próxima lectura\":\"17 NOV/2026\",\"Acorde al 100% del valor facturado\":\"825.97\",\"Deuda total ASFC\":\"73130\",\"Archivo leído\":\"CL 81 NO 11 08 OF 1003.pdf\",\"Modelo que leyó\":\"claude-sonnet-4-6\"}",
+     "nota": "Revisar (carga inicial con Nova): Los componentes individuales de la tarifa (Generación, Transmisión, Distribución) no se leen con total claridad en la imagen. · El desglose exacto de los cargos de aseo por concepto (limpieza urbana, recolección, barrido, etc.) no es completamente legible. · El valor exacto del cargo 'Otros cobros EXCEDENTE' ($15.398 aprox.) podría no cuadrar perfectamente con el subtotal visible; se tomó de la tabla de cobros adicionales. · La suma de cargos detallados (3720189 + 744038 + 76985 + 15398 + 73130 = 4629740) cuadra con el total a pagar.",
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Energía facturada kWh",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 3720189,
+       "orden": 0
+      },
+      {
+       "grupo": "energia",
+       "concepto": "Contribución energía",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 744038,
+       "orden": 1
+      },
+      {
+       "grupo": "energia",
+       "concepto": "Cobro adicional (consumo superó rango esperado)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 76985,
+       "orden": 2
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Otros cobros EXCEDENTE / CONSUMO EXCEDENTE",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 15398,
+       "orden": 3
+      },
+      {
+       "grupo": "aseo",
+       "concepto": "Total Aseo PROMOAMBIENTAL DISTRITO SAS ESP",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 73130,
+       "orden": 4
+      }
+     ],
+     "historial": [
+      {
+       "anio": 2026,
+       "mes": 4,
+       "etiqueta": "Abr",
+       "consumo": 3227
+      },
+      {
+       "anio": 2026,
+       "mes": 5,
+       "etiqueta": "May",
+       "consumo": 4059
+      },
+      {
+       "anio": 2026,
+       "mes": 6,
+       "etiqueta": "Jun",
+       "consumo": 5070
+      },
+      {
+       "anio": 2026,
+       "mes": 7,
+       "etiqueta": "Jul",
+       "consumo": 3810
+      },
+      {
+       "anio": 2026,
+       "mes": 8,
+       "etiqueta": "Ago",
+       "consumo": 2540
+      },
+      {
+       "anio": 2026,
+       "mes": 9,
+       "etiqueta": "Sep",
+       "consumo": 1270
+      }
+     ],
+     "soportes": [
+      {
+       "nombre": "CL 81 NO 11 08 OF 1003.pdf",
+       "tipoMime": "application/pdf",
+       "tamano": 2581173,
+       "sha1": "a9182731097bbc8c2aba37c09001cdae1dd8bb99",
+       "archivo": "a9182731097bbc8c2aba37c09001cdae1dd8bb99.pdf",
+       "creadoPorNombre": "Ricardo Nivia"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sede": "KR 12A # 79-08 · OF 402",
+   "servicio": "energia",
+   "empresa": "Enel Colombia",
+   "numeroCuenta": "6102070-4",
+   "titular": "ACCION SOCIEDAD FIDUCIARIA",
+   "claseUso": "Comercial",
+   "estrato": null,
+   "periodicidad": "mensual",
+   "direccionRecibo": "KR 12 A NO 79 08 OF 402",
+   "noAplica": false,
+   "activo": true,
+   "creadoPorNombre": "Ricardo Nivia",
+   "medidores": [
+    {
+     "numero": "46673",
+     "factor": 1,
+     "desde": null,
+     "hasta": null
+    }
+   ],
+   "recibos": [
+    {
+     "medidor": "46673",
+     "numeroFactura": "413171458-0",
+     "periodoDesde": "2026-09-16",
+     "periodoHasta": "2026-10-15",
+     "dias": 30,
+     "anio": 2026,
+     "mes": 10,
+     "tipoLectura": "real",
+     "lecturaAnterior": 24834,
+     "lecturaActual": 21764,
+     "factor": 1,
+     "consumo": 2870,
+     "unidad": "kWh",
+     "vigenciaTarifa": "SEP/2026",
+     "valorUnitario": 825.97,
+     "totalCargos": 3151377,
+     "saldoAnterior": 0,
+     "totalPagar": 3045680,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-10-15",
+     "fechaPagoOportuno": "2026-10-30",
+     "fechaSuspension": "2026-11-04",
+     "estadoPago": "pendiente",
+     "valorPagado": null,
+     "fechaPago": null,
+     "origen": "nova",
+     "extras": "{\"Documento equivalente electrónico No.\":\"413171458-0\",\"Número de cliente\":\"46673\",\"Cuenta contrato\":\"122751182\",\"Subtotal energía\":\"2971490\",\"Energía facturada kWh\":\"2870\",\"Valor unitario kWh aplicado\":\"825.97\",\"Consumo promedio últimos 6 meses\":\"3082 kWh\",\"Meta de consumo\":\"2442.9 kWh\",\"Consumo actual\":\"2870 kWh\",\"Exceso sobre meta\":\"427.1 kWh\",\"Cobro adicional por exceder meta\":\"105697\",\"Ahorro reconocido\":\"0 kWh\",\"Generación\":\"499.06\",\"Transmisión\":\"9.65\",\"Distribución + Costo Fijo\":\"80.41\",\"Pérdidas\":\"72.01\",\"Costo Variable (CV) Mes\":\"825.97\",\"Vigencia tarifa\":\"SEP/2026\",\"Energía reactiva\":\"0\",\"ENERGIA ACTIVA FP\":\"2870\",\"Contribución\":\"0\",\"Valor diario\":\"94822\",\"Diferencia de lecturas\":\"2870\",\"Lectura anterior\":\"24834\",\"Lectura actual\":\"21764\",\"Próxima lectura\":\"13 NOV/2026\",\"Ruta Reparto\":\"3 14 404 8358\",\"Subclase: Básico\":\"Básico\",\"Cargo kW\":\"0.00\",\"Operador de aseo\":\"PROAMBIENTAL DISTRITO SAS ESP\",\"Dirección operador aseo\":\"TV 4 NO. 51A-25\",\"Línea aseo\":\"110\",\"Período facturación aseo\":\"01.09.2026 a 30.09.2026\",\"Días liquidación aseo\":\"30\",\"Frecuencia recolección aseo\":\"5\",\"Frecuencia barrido aseo\":\"3\",\"Tipo productor aseo\":\"No Residencial\",\"Volumen aseo\":\"0.0000\",\"Densidad aseo\":\"0.20\",\"% Participación aseo\":\"0%\",\"Toneladas por suscriptor aseo\":\"0.0000179\",\"Total ASFC aseo\":\"74190\",\"Calidad del Servicio - FMG\":\"3.00\",\"Calidad del Servicio - DT\":\"203.79\",\"Calidad del Servicio - Grupo\":\"11\",\"Calidad del Servicio - RIC\":\"0.00\",\"Calidad del Servicio - FMI\":\"13.00\",\"Calidad del Servicio - FAI\":\"1.00\",\"Calidad del Servicio - TMC\":\"1.00\",\"CUDE\":\"8e50b0e7c4a52216873562216fabb0d64c4a82617403e9423dca0ca22611a107a457760f2682f4e876898e0b51e4fb46\",\"Resolución cobro adicional\":\"101 1207/126 de 2026\",\"Consumo meta programa\":\"2442.9 kWh\",\"Consumo período anterior en meta\":\"182.81 kWh\",\"Valor de costo adicional\":\"105697\",\"Ahorro reconocido período\":\"0 kWh\",\"Período evaluado cobro adicional\":\"16 SEP/2026 - 15 OCT/2026\",\"Archivo leído\":\"KR 12 A NO 79 08 OF 402.pdf\",\"Modelo que leyó\":\"claude-sonnet-4-6\"}",
+     "nota": "Revisar (carga inicial con Nova): Las lecturas dan -3.070, pero el recibo factura 2.870. · Los cargos suman 3.151.377 y el total del período dice 3.045.680: revisa si falta o sobra un cargo. · El historial de consumo de los meses Abr a Oct muestra valores que podrían estar parcialmente cortados o solapados en la gráfica; los valores extraídos son aproximados. · La lectura actual (21764) es menor que la anterior (24834), lo que podría indicar un cambio de medidor o un factor de transformación no explícito; el factor aparece como 1. · Los valores individuales de los cargos de aseo (limpieza vial, recolección, etc.) no se pudieron leer con precisión; se reporta el total de aseo.",
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Total Energía",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 2971490,
+       "orden": 0
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Otros cobros EXCEDENTE (Resolución 101 1207/126 de 2026 - Cobro adicional)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 105697,
+       "orden": 1
+      },
+      {
+       "grupo": "aseo",
+       "concepto": "Total Aseo PROAMBIENTAL DISTRITO SAS ESP",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 74190,
+       "orden": 2
+      }
+     ],
+     "historial": [
+      {
+       "anio": 2026,
+       "mes": 4,
+       "etiqueta": "Abr",
+       "consumo": 3252
+      },
+      {
+       "anio": 2026,
+       "mes": 5,
+       "etiqueta": "May",
+       "consumo": 3058
+      },
+      {
+       "anio": 2026,
+       "mes": 6,
+       "etiqueta": "Jun",
+       "consumo": 3151
+      },
+      {
+       "anio": 2026,
+       "mes": 7,
+       "etiqueta": "Jul",
+       "consumo": 3222
+      },
+      {
+       "anio": 2026,
+       "mes": 8,
+       "etiqueta": "Ago",
+       "consumo": 2439
+      },
+      {
+       "anio": 2026,
+       "mes": 9,
+       "etiqueta": "Sep",
+       "consumo": 1626
+      },
+      {
+       "anio": 2026,
+       "mes": 10,
+       "etiqueta": "Oct (Restima)",
+       "consumo": 813
+      }
+     ],
+     "soportes": [
+      {
+       "nombre": "KR 12 A NO 79 08 OF 402.pdf",
+       "tipoMime": "application/pdf",
+       "tamano": 2590614,
+       "sha1": "9cc0d862d9a45e60494f13337f3e4343326b6c96",
+       "archivo": "9cc0d862d9a45e60494f13337f3e4343326b6c96.pdf",
+       "creadoPorNombre": "Ricardo Nivia"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sede": "KR 12 # 79-50 · OF 501",
+   "servicio": "energia",
+   "empresa": "Enel Colombia",
+   "numeroCuenta": "1509547-4",
+   "titular": "YENIFER MANCERA",
+   "claseUso": "Residencial",
+   "estrato": "2",
+   "periodicidad": "mensual",
+   "direccionRecibo": "KR 12 NO 79 50 AP 501",
+   "noAplica": false,
+   "activo": true,
+   "creadoPorNombre": "Ricardo Nivia",
+   "medidores": [
+    {
+     "numero": "6083669",
+     "factor": 1,
+     "desde": null,
+     "hasta": null
+    }
+   ],
+   "recibos": [
+    {
+     "medidor": "6083669",
+     "numeroFactura": "413149785-9",
+     "periodoDesde": "2026-09-16",
+     "periodoHasta": "2026-10-15",
+     "dias": 30,
+     "anio": 2026,
+     "mes": 10,
+     "tipoLectura": "real",
+     "lecturaAnterior": 37897,
+     "lecturaActual": 38076,
+     "factor": 1,
+     "consumo": 179,
+     "unidad": "kWh",
+     "vigenciaTarifa": "SEP2026",
+     "valorUnitario": 875.05,
+     "totalCargos": 262150,
+     "saldoAnterior": 0,
+     "totalPagar": 262150,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-10-15",
+     "fechaPagoOportuno": "2026-10-30",
+     "fechaSuspension": "2026-11-04",
+     "estadoPago": "pendiente",
+     "valorPagado": null,
+     "fechaPago": null,
+     "origen": "nova",
+     "extras": "{\"Consumo promedio últimos 6 meses\":\"192 kWh\",\"Meta asignada (meta a 30 días)\":\"188.4 kWh\",\"Consumo del mes\":\"179 kWh\",\"Cobro adicional (superó rango definido por programa)\":\"No (consumo dentro del rango habitual)\",\"Color de consumo\":\"CONSUMO HABITUAL\",\"Ahorro reconocido\":\"3.80% y 4.90%\",\"Período evaluado incentivo\":\"16 SEP/2026 - 15 OCT/2026\",\"Consumo acumulado al periodo\":\"188.4 kWh (100%)\",\"Generación\":\"$9.65\",\"Transmisión\":\"incluido en tarifa\",\"Distribución + Costo Fijo\":\"$0.00\",\"Costo Variable + Pérdidas\":\"$72.01\",\"Valor unitario kWh aplicado\":\"$875.05\",\"Valor facturado energía\":\"$187.960\",\"Cargo kW\":\"6.35\",\"Subclase\":\"Básico\",\"Energía reactiva\":\"0 kVArh (ENERGÍA ACTIVA FP / Contribución reactiva)\",\"Ahorro del 30% del valor facturado\":\"$875.05\",\"Operador de aseo\":\"PROAMBIENTAL DISTRITO SAS ESP\",\"Dirección operador aseo\":\"TV 4 No. 51A-25\",\"Línea aseo\":\"110\",\"NIT operador aseo\":\"901145808-5\",\"Cuenta contrato aseo\":\"11017462\",\"Periodo facturación aseo\":\"01.09.2026 a 30.09.2026\",\"Días liquidación aseo\":\"30\",\"Estrato aseo\":\"2\",\"Frecuencia recolección\":\"3\",\"Frecuencia barrido\":\"7\",\"Tipo producto aseo\":\"Prod. Comercial / Residenciales\",\"Deuda total aseo\":\"$74.190\",\"Próxima lectura\":\"13 NOV/2026\",\"Documento equivalente electrónico No.\":\"413149785-9\",\"CUDE\":\"0ffe8d0be05fe05fe5d6d6393a6c08a9c57994b6b0a716b993ace123592db0be2663f5c36af558bdc1481f8aa91623725\",\"DMG\":\"11.57\",\"GT\":\"283.27\",\"FMG\":\"13.00\",\"DT\":\"600030\",\"MF\":\"1.00\",\"VC\":\"0.00\",\"Grupo\":\"11\",\"DIU\":\"13.00\",\"FIU\":\"0.00\",\"TMC\":\"1.00\",\"CEC\":\"0.00\",\"CD\":\"22807781\",\"Resoluciones tarifa\":\"101 120 / 125 de 2026\",\"Archivo leído\":\"KR 12 NO 79 50 AP 501.pdf\",\"Modelo que leyó\":\"claude-sonnet-4-6\"}",
+     "nota": "Revisar (carga inicial con Nova): Los valores individuales de los cargos de aseo (limpieza urbana, barrido, recolección, etc.) no se leen con claridad suficiente para desglosarlos; se reporta el total aseo de $74.190. · Los componentes exactos G, T, D de la tarifa no se leen con total claridad en la imagen.",
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Energía facturada kWh",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 187960,
+       "orden": 0
+      },
+      {
+       "grupo": "aseo",
+       "concepto": "ASEO - PROAMBIENTAL DISTRITO SAS ESP (total aseo)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 74190,
+       "orden": 1
+      }
+     ],
+     "historial": [
+      {
+       "anio": 2026,
+       "mes": 4,
+       "etiqueta": "Abr",
+       "consumo": 54
+      },
+      {
+       "anio": 2026,
+       "mes": 5,
+       "etiqueta": "May",
+       "consumo": 108
+      },
+      {
+       "anio": 2026,
+       "mes": 6,
+       "etiqueta": "Jun",
+       "consumo": 162
+      },
+      {
+       "anio": 2026,
+       "mes": 7,
+       "etiqueta": "Jul",
+       "consumo": 206
+      },
+      {
+       "anio": 2026,
+       "mes": 8,
+       "etiqueta": "Ago",
+       "consumo": 196
+      },
+      {
+       "anio": 2026,
+       "mes": 9,
+       "etiqueta": "Sep",
+       "consumo": 193
+      }
+     ],
+     "soportes": [
+      {
+       "nombre": "KR 12 NO 79 50 AP 501.pdf",
+       "tipoMime": "application/pdf",
+       "tamano": 2515755,
+       "sha1": "a420503013ea4f3744f3fddfc881809bd6ac69c0",
+       "archivo": "a420503013ea4f3744f3fddfc881809bd6ac69c0.pdf",
+       "creadoPorNombre": "Ricardo Nivia"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sede": "KR 12 # 79-50 · OF 501",
+   "servicio": "acueducto",
+   "empresa": "Acueducto de Bogotá (EAAB)",
+   "numeroCuenta": "11017462",
+   "titular": "OFICINAS CALLE 79 SA",
+   "claseUso": "Comercial",
+   "estrato": "5",
+   "periodicidad": "bimestral",
+   "direccionRecibo": "KR 12 79 50 OF 501",
+   "noAplica": false,
+   "activo": true,
+   "creadoPorNombre": "Ricardo Nivia",
+   "medidores": [
+    {
+     "numero": "9614131",
+     "factor": 1,
+     "desde": null,
+     "hasta": null
+    }
+   ],
+   "recibos": [
+    {
+     "medidor": "9614131",
+     "numeroFactura": "16620218913",
+     "periodoDesde": "2026-07-01",
+     "periodoHasta": "2026-08-28",
+     "dias": 59,
+     "anio": 2026,
+     "mes": 8,
+     "tipoLectura": "real",
+     "lecturaAnterior": 2945,
+     "lecturaActual": 2946,
+     "factor": 1,
+     "consumo": 1,
+     "unidad": "m3",
+     "vigenciaTarifa": null,
+     "valorUnitario": null,
+     "totalCargos": 60590.35,
+     "saldoAnterior": 0,
+     "totalPagar": 60590,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-09-17",
+     "fechaPagoOportuno": "2026-10-05",
+     "fechaSuspension": "2026-10-08",
+     "estadoPago": "pendiente",
+     "valorPagado": null,
+     "fechaPago": null,
+     "origen": "nova",
+     "extras": "{\"Zona\":\"2\",\"Ciclo\":\"K2\",\"Ruta\":\"K22424\",\"Marca medidor\":\"KENT\",\"Tipo medidor\":\"VOLU015B\",\"Diámetro medidor (pulgadas)\":\"½\",\"Facturado con\":\"Consumo Normal\",\"Base promedio\":\"0\",\"Descargue fuente alterna\":\"0\",\"Consumo totalizadora\":\"0\",\"Promedio consumo 3 períodos anteriores (m³)\":\"1\",\"Consumo en botellas de 1 litro - este período\":\"1.000\",\"Consumo en botellas de 1 litro - promedio al día\":\"17\",\"Subtotal Acueducto\":\"32254.91\",\"Subtotal Alcantarillado\":\"28331.44\",\"CMA Acueducto ($/unidad)\":\"9135.88\",\"CMA Alcantarillado ($/unidad)\":\"6908.09\",\"CMO Acueducto ($/unidad)\":\"1609.34\",\"CMO Alcantarillado ($/unidad)\":\"1205.70\",\"CMO-COIR Acueducto ($/unidad)\":\"0.00\",\"CMO-COIR Alcantarillado ($/unidad)\":\"0.00\",\"CMI Acueducto ($/unidad)\":\"1438.33\",\"CMI Alcantarillado ($/unidad)\":\"3612.81\",\"CMI-CI Acueducto ($/unidad)\":\"0.00\",\"CMI-CI Alcantarillado ($/unidad)\":\"0.00\",\"CMITC Acueducto ($/unidad)\":\"183.48\",\"CMITC Alcantarillado ($/unidad)\":\"252.75\",\"Tasa Uso - Tarifa consumo básico ($/m³)\":\"275.22\",\"Tasa Retributiva - Tarifa consumo básico ($/m³)\":\"379.13\",\"Tasa Uso - Tarifa consumo superior a básico ($/m³)\":\"0.00\",\"Tasa Retributiva - Tarifa consumo superior a básico ($/m³)\":\"0.00\",\"Tasa Uso - Total por consumo facturado\":\"275\",\"Tasa Retributiva - Total por consumo facturado\":\"379\",\"Aporte acueducto cargo fijo no residencial (%)\":\"50\",\"Aporte acueducto consumo no residencial (%)\":\"50\",\"Aporte alcantarillado cargo fijo no residencial (%)\":\"50\",\"Aporte alcantarillado consumo no residencial (%)\":\"50\",\"Valor unitario acueducto cargo fijo no residencial (mes)\":\"9135.88\",\"Valor unitario acueducto consumo no residencial (m³)\":\"3231.15\",\"Valor unitario alcantarillado cargo fijo no residencial (mes)\":\"6908.09\",\"Valor unitario alcantarillado consumo no residencial (m³)\":\"5071.26\",\"Tarifa acueducto cargo fijo no residencial\":\"13703.82\",\"Tarifa acueducto consumo no residencial\":\"4846.73\",\"Tarifa alcantarillado cargo fijo no residencial\":\"10362.14\",\"Tarifa alcantarillado consumo no residencial\":\"7606.89\",\"Cantidad meses acueducto cargo fijo no residencial\":\"2\",\"Cantidad meses alcantarillado cargo fijo no residencial\":\"2\",\"Cantidad m³ acueducto consumo no residencial\":\"1\",\"Cantidad m³ alcantarillado consumo no residencial\":\"1\",\"Fecha esperada próxima factura\":\"2026-11-25\",\"Unidades Habitacionales\":\"0\",\"Unidades No Habitacionales\":\"1\",\"CUDE\":\"dc5b713ce124baeea0c2667d3dfaba29f8df217e67e72e1817690354ef2177285e06784660f001d2df8cb37d41453ceb\",\"Resolución tarifaria\":\"CRA 1032 de 2026\",\"Barrio\":\"ESPARTILLAL\",\"Localidad\":\"CHAPINERO\",\"Archivo leído\":\"KR 12 79 50 OF 501.pdf\",\"Modelo que leyó\":\"claude-sonnet-4-6\"}",
+     "nota": "Revisar (carga inicial con Nova): Los valores de los cargos de acueducto y alcantarillado corresponden a cargo fijo no residencial (2 meses) y consumo no residencial (1 m³); no se observan cargos residenciales en la tabla, lo que es c · El historial muestra etiquetas ENE-MAR, MAR-ABR y MAY-JUN con consumos 1, 2 y 1 m³ respectivamente; los meses exactos de inicio de cada período bimestral se dedujeron aproximadamente.",
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "acueducto",
+       "concepto": "Cargo fijo no residencial (mes)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 27407.76,
+       "orden": 0
+      },
+      {
+       "grupo": "acueducto",
+       "concepto": "Consumo no residencial (m³)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 4847.15,
+       "orden": 1
+      },
+      {
+       "grupo": "alcantarillado",
+       "concepto": "Cargo fijo no residencial (mes)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 20724.18,
+       "orden": 2
+      },
+      {
+       "grupo": "alcantarillado",
+       "concepto": "Consumo no residencial (m³)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 7607.26,
+       "orden": 3
+      },
+      {
+       "grupo": "otros",
+       "concepto": "I-ajuste a la decena",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 4,
+       "orden": 4
+      }
+     ],
+     "historial": [
+      {
+       "anio": 2026,
+       "mes": 3,
+       "etiqueta": "ENE-MAR",
+       "consumo": 1
+      },
+      {
+       "anio": 2026,
+       "mes": 4,
+       "etiqueta": "MAR-ABR",
+       "consumo": 2
+      },
+      {
+       "anio": 2026,
+       "mes": 6,
+       "etiqueta": "MAY-JUN",
+       "consumo": 1
+      }
+     ],
+     "soportes": [
+      {
+       "nombre": "KR 12 79 50 OF 501.pdf",
+       "tipoMime": "application/pdf",
+       "tamano": 602175,
+       "sha1": "4b2a5460caba51fbdf49536294ac6b455cf4de2f",
+       "archivo": "4b2a5460caba51fbdf49536294ac6b455cf4de2f.pdf",
+       "creadoPorNombre": "Ricardo Nivia"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sede": "KR 12 # 79-50 · OF 502",
+   "servicio": "acueducto",
+   "empresa": "Acueducto de Bogotá (EAAB)",
+   "numeroCuenta": "11017472",
+   "titular": "OFICINAS CALLE 79 SA",
+   "claseUso": "Comercial",
+   "estrato": "5",
+   "periodicidad": "bimestral",
+   "direccionRecibo": "KR 12 79 50 OF 502",
+   "noAplica": false,
+   "activo": true,
+   "creadoPorNombre": "Ricardo Nivia",
+   "medidores": [
+    {
+     "numero": "A14S517909",
+     "factor": 1,
+     "desde": null,
+     "hasta": null
+    }
+   ],
+   "recibos": [
+    {
+     "medidor": "A14S517909",
+     "numeroFactura": "16620219010",
+     "periodoDesde": "2026-07-01",
+     "periodoHasta": "2026-08-28",
+     "dias": 59,
+     "anio": 2026,
+     "mes": 8,
+     "tipoLectura": "promediada",
+     "lecturaAnterior": 216,
+     "lecturaActual": 217,
+     "factor": 1,
+     "consumo": 1,
+     "unidad": "m3",
+     "vigenciaTarifa": null,
+     "valorUnitario": 3231.15,
+     "totalCargos": 60590.35,
+     "saldoAnterior": 0,
+     "totalPagar": 60590,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-09-17",
+     "fechaPagoOportuno": "2026-10-05",
+     "fechaSuspension": "2026-10-08",
+     "estadoPago": "pendiente",
+     "valorPagado": null,
+     "fechaPago": null,
+     "origen": "nova",
+     "extras": "{\"Número para pagos\":\"16620219010\",\"Zona\":\"2\",\"Ciclo\":\"K2\",\"Ruta\":\"K22424\",\"Barrio\":\"ESPARTILLAL\",\"Localidad\":\"CHAPINERO\",\"Unidades Habitacionales\":\"0\",\"Unidades No Habitacionales\":\"1\",\"Marca medidor\":\"FLODYS CYBLE\",\"Tipo medidor\":\"VELO015R160\",\"Diámetro pulgadas\":\"½\",\"Facturado con\":\"Base promedio\",\"Descarga fuente alterna\":\"0\",\"Consumo totalizadora\":\"0\",\"Promedio consumo 3 períodos anteriores\":\"1 m³\",\"Consumo en botellas de 1 litro - este período\":\"1.000\",\"Consumo en botellas de 1 litro - promedio al día\":\"17\",\"Fecha esperada próxima factura\":\"2026-11-25\",\"Fecha y hora de generación factura\":\"2026-09-17 08:51:12\",\"CMA Acueducto ($/mes)\":\"9135,88\",\"CMO Acueducto ($/mes)\":\"1609,34\",\"CMO-COIR Acueducto ($/mes)\":\"0,00\",\"CMI Acueducto ($/mes)\":\"1438,33\",\"CMI-CI Acueducto ($/mes)\":\"0,00\",\"CMITC Acueducto ($/mes)\":\"183,48\",\"CMA Alcantarillado ($/mes)\":\"6908,09\",\"CMO Alcantarillado ($/mes)\":\"1205,70\",\"CMO-COIR Alcantarillado ($/mes)\":\"0,00\",\"CMI Alcantarillado ($/mes)\":\"3612,81\",\"CMI-CI Alcantarillado ($/mes)\":\"0,00\",\"CMITC Alcantarillado ($/mes)\":\"252,75\",\"Tasa Uso Acueducto - Tarifa consumo básico ($/m³)\":\"275,22\",\"Tasa Uso Acueducto - Tarifa consumo superior a básico ($/m³)\":\"0,00\",\"Tasa Uso Acueducto - Total por consumo facturado\":\"275\",\"Tasa Retributiva Alcantarillado - Tarifa consumo básico ($/m³)\":\"379,13\",\"Tasa Retributiva Alcantarillado - Tarifa consumo superior a básico ($/m³)\":\"0,00\",\"Tasa Retributiva Alcantarillado - Total por consumo facturado\":\"379\",\"Subtotal Acueducto\":\"32254,91\",\"Subtotal Alcantarillado\":\"28331,44\",\"Aporte acueducto cargo fijo no residencial (%)\":\"50\",\"Aporte acueducto consumo no residencial (%)\":\"50\",\"Aporte alcantarillado cargo fijo no residencial (%)\":\"50\",\"Aporte alcantarillado consumo no residencial (%)\":\"50\",\"Resolución tarifaria\":\"CRA 1032 de 2026\",\"CUDE\":\"19b41856d46894d58b0bf6372d70fc62c455164cf5822453c730d66366fb75b804c5c82d4e074be5137b7496419aab2c\",\"NIT emisor (EAAB-ESP)\":\"899.999.094-1\",\"NIT impresor (Cadena)\":\"890.930.534-0\",\"Archivo leído\":\"KR 12 79 50 OF 502.pdf\",\"Modelo que leyó\":\"claude-sonnet-4-6\"}",
+     "nota": "Revisar (carga inicial con Nova): El valor exacto del cargo 'Consumo no residencial acueducto' en la columna Total (Tarifa x Cant.) aparece como $4.847,15 pero el subtotal cuadra con ese valor; se confirma $4847.15. · Los consumos históricos del historial muestran valor '1' para los tres períodos anteriores pero las etiquetas de los ejes de la gráfica muestran montos en pesos ($54.681, $55.603, $44.799) que podrían · La cantidad de meses facturados para el cargo fijo (2,00) corresponde al período bimestral jul-ago 2026; se confirma lectura.",
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "acueducto",
+       "concepto": "Cargo fijo no residencial (mes)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 27407.76,
+       "orden": 0
+      },
+      {
+       "grupo": "acueducto",
+       "concepto": "Consumo no residencial (m³)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 4847.15,
+       "orden": 1
+      },
+      {
+       "grupo": "alcantarillado",
+       "concepto": "Cargo fijo no residencial (mes)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 20724.18,
+       "orden": 2
+      },
+      {
+       "grupo": "alcantarillado",
+       "concepto": "Consumo no residencial (m³)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 7607.26,
+       "orden": 3
+      },
+      {
+       "grupo": "otros",
+       "concepto": "I-ajuste a la decena",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 4,
+       "orden": 4
+      }
+     ],
+     "historial": [
+      {
+       "anio": 2026,
+       "mes": 3,
+       "etiqueta": "ENE-MAR",
+       "consumo": 1
+      },
+      {
+       "anio": 2026,
+       "mes": 4,
+       "etiqueta": "MAR-ABR",
+       "consumo": 1
+      },
+      {
+       "anio": 2026,
+       "mes": 6,
+       "etiqueta": "MAY-JUN",
+       "consumo": 1
+      }
+     ],
+     "soportes": [
+      {
+       "nombre": "KR 12 79 50 OF 502.pdf",
+       "tipoMime": "application/pdf",
+       "tamano": 601998,
+       "sha1": "721ae48e07a08ffe6f335bda69192f2fe21d5aa9",
+       "archivo": "721ae48e07a08ffe6f335bda69192f2fe21d5aa9.pdf",
+       "creadoPorNombre": "Ricardo Nivia"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sede": "KR 12A # 79-08 · OF 203",
+   "servicio": "acueducto",
+   "empresa": "Acueducto de Bogotá (EAAB)",
+   "numeroCuenta": "12275176",
+   "titular": "EDIFICIO ARTTICK 79 BUSSINES C",
+   "claseUso": "Comercial",
+   "estrato": "5",
+   "periodicidad": "bimestral",
+   "direccionRecibo": "KR 12A 79 08 AP 203",
+   "noAplica": false,
+   "activo": true,
+   "creadoPorNombre": "Ricardo Nivia",
+   "medidores": [
+    {
+     "numero": "15-3671421",
+     "factor": 1,
+     "desde": null,
+     "hasta": null
+    }
+   ],
+   "recibos": [
+    {
+     "medidor": "15-3671421",
+     "numeroFactura": "11203874919",
+     "periodoDesde": "2026-07-01",
+     "periodoHasta": "2026-08-28",
+     "dias": 59,
+     "anio": 2026,
+     "mes": 8,
+     "tipoLectura": "sin_consumo",
+     "lecturaAnterior": 253,
+     "lecturaActual": 253,
+     "factor": 1,
+     "consumo": 0,
+     "unidad": "m3",
+     "vigenciaTarifa": null,
+     "valorUnitario": null,
+     "totalCargos": 48159.94,
+     "saldoAnterior": 0,
+     "totalPagar": 48160,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-09-17",
+     "fechaPagoOportuno": "2026-10-05",
+     "fechaSuspension": "2026-10-08",
+     "estadoPago": "pendiente",
+     "valorPagado": null,
+     "fechaPago": null,
+     "origen": "nova",
+     "extras": "{\"Facturado con\":\"Base promedio\",\"Descargue fuente alterna\":\"0\",\"Consumo totalizadora\":\"0\",\"Promedio consumo 3 períodos anteriores\":\"0 m3\",\"Marca medidor\":\"WATERTECH ITALIA\",\"Tipo medidor\":\"VELO015R160\",\"Diámetro pulgadas\":\"½\",\"Zona\":\"2\",\"Ciclo\":\"K2\",\"Ruta\":\"K22424\",\"Unidades Habitacionales\":\"0\",\"Unidades No Habitacionales\":\"1\",\"Fecha esperada próxima factura\":\"2026-11-25\",\"Fecha y hora de generación factura\":\"2026-09-17 08:51:43\",\"CMA Acueducto ($/mes)\":\"9135.88\",\"CMO Acueducto ($/mes)\":\"1609.34\",\"CMO-COIR Acueducto ($/mes)\":\"0.00\",\"CMI Acueducto ($/mes)\":\"1438.33\",\"CMI-CI Acueducto ($/mes)\":\"0.00\",\"CMITC Acueducto ($/mes)\":\"183.48\",\"CMA Alcantarillado ($/mes)\":\"6908.09\",\"CMO Alcantarillado ($/mes)\":\"1205.70\",\"CMO-COIR Alcantarillado ($/mes)\":\"0.00\",\"CMI Alcantarillado ($/mes)\":\"3612.81\",\"CMI-CI Alcantarillado ($/mes)\":\"0.00\",\"CMITC Alcantarillado ($/mes)\":\"252.75\",\"Tasa Uso Acueducto - Tarifa consumo básico ($/m3)\":\"275.22\",\"Tasa Retributiva Alcantarillado - Tarifa consumo básico ($/m3)\":\"379.13\",\"Tasa Uso Acueducto - Tarifa consumo superior a básico ($/m3)\":\"0.00\",\"Tasa Retributiva Alcantarillado - Tarifa consumo superior a básico ($/m3)\":\"0.00\",\"Aporte acueducto cargo fijo no residencial (%)\":\"50\",\"Aporte alcantarillado cargo fijo no residencial (%)\":\"50\",\"Tarifa acueducto cargo fijo no residencial ($/mes)\":\"13703.82\",\"Tarifa alcantarillado cargo fijo no residencial ($/mes)\":\"10362.14\",\"CUDE\":\"cc1bd26a969e7f7ca7979ea4978b6aa62dc68209566440b41a13847301fce61b865a935d67be32ff069b5bce185b0008\",\"Barrio\":\"ESPARTILLAL\",\"Localidad\":\"CHAPINERO\",\"Resolución tarifaria\":\"CRA 1032 de 2026\",\"Archivo leído\":\"KR 12A 79 08 AP 203.pdf\",\"Modelo que leyó\":\"claude-sonnet-4-6\"}",
+     "nota": "Revisar (carga inicial con Nova): Los valores del historial (ENE-MAR $43.355, MAR-ABR $55.603, MAY-JUN $44.799) parecen ser valores en pesos, no consumos en m3; el consumo mostrado en la gráfica para los tres períodos anteriores apare · El ajuste a la decena aparece como '$2-' lo que se interpreta como -2 (descuento de $2); se confirma que el subtotal de Otros conceptos es $28 = -2 + 30.",
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "acueducto",
+       "concepto": "Cargo fijo no residencial (mes)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 27407.76,
+       "orden": 0
+      },
+      {
+       "grupo": "alcantarillado",
+       "concepto": "Cargo fijo no residencial (mes)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 20724.18,
+       "orden": 1
+      },
+      {
+       "grupo": "otros",
+       "concepto": "I-ajuste a la decena",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": -2,
+       "orden": 2
+      },
+      {
+       "grupo": "otros",
+       "concepto": "I-intereses de mora",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 30,
+       "orden": 3
+      }
+     ],
+     "historial": [
+      {
+       "anio": 2026,
+       "mes": 3,
+       "etiqueta": "ENE-MAR",
+       "consumo": 1
+      },
+      {
+       "anio": 2026,
+       "mes": 4,
+       "etiqueta": "MAR-ABR",
+       "consumo": 1
+      },
+      {
+       "anio": 2026,
+       "mes": 6,
+       "etiqueta": "MAY-JUN",
+       "consumo": 1
+      }
+     ],
+     "soportes": [
+      {
+       "nombre": "KR 12A 79 08 AP 203.pdf",
+       "tipoMime": "application/pdf",
+       "tamano": 601962,
+       "sha1": "ccdc288ecade995fcc480bb4c88598c38de90d9b",
+       "archivo": "ccdc288ecade995fcc480bb4c88598c38de90d9b.pdf",
+       "creadoPorNombre": "Ricardo Nivia"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sede": "KR 12A # 79-08 · OF 204",
+   "servicio": "acueducto",
+   "empresa": "Acueducto de Bogotá (EAAB)",
+   "numeroCuenta": "12275177",
+   "titular": "EDIFICIO ARTTICK 79 BUSSINES C",
+   "claseUso": "Residencial",
+   "estrato": "5",
+   "periodicidad": "bimestral",
+   "direccionRecibo": "KR 12A 79 08 AP 204",
+   "noAplica": false,
+   "activo": true,
+   "creadoPorNombre": "Ricardo Nivia",
+   "medidores": [
+    {
+     "numero": "15-3671412",
+     "factor": 1,
+     "desde": null,
+     "hasta": null
+    }
+   ],
+   "recibos": [
+    {
+     "medidor": "15-3671412",
+     "numeroFactura": "11203875015",
+     "periodoDesde": "2026-07-01",
+     "periodoHasta": "2026-08-28",
+     "dias": 59,
+     "anio": 2026,
+     "mes": 8,
+     "tipoLectura": "sin_consumo",
+     "lecturaAnterior": 205,
+     "lecturaActual": 205,
+     "factor": 1,
+     "consumo": 0,
+     "unidad": "m3",
+     "vigenciaTarifa": null,
+     "valorUnitario": null,
+     "totalCargos": 75349.94,
+     "saldoAnterior": 0,
+     "totalPagar": 75350,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-09-17",
+     "fechaPagoOportuno": "2026-10-05",
+     "fechaSuspension": "2026-10-08",
+     "estadoPago": "pendiente",
+     "valorPagado": null,
+     "fechaPago": null,
+     "origen": "nova",
+     "extras": "{\"Número para pagos\":\"11203875015\",\"Zona\":\"2\",\"Ciclo\":\"K2\",\"Ruta\":\"K22424\",\"Barrio\":\"ESPARTILAL\",\"Localidad\":\"CHAPINERO\",\"Unidades Habitacionales\":\"1\",\"Unidades No Habitacionales\":\"0\",\"Marca medidor\":\"WATERTECH ITALIA\",\"Tipo medidor\":\"VELO015R160\",\"Diámetro medidor\":\"Pulgadas ½\",\"Facturado con\":\"Base promedio\",\"Descargue fuente alterna\":\"0\",\"Consumo totalizadora\":\"0\",\"Promedio consumo 3 períodos anteriores\":\"0 m3\",\"CMA Acueducto\":\"8135.88\",\"CMA Alcantarillado\":\"6800.09\",\"CMIO Acueducto\":\"1609.34\",\"CMIO Alcantarillado\":\"1205.70\",\"CVI-CI Acueducto\":\"1438.33\",\"CVI-CI Alcantarillado\":\"3612.81\",\"CMITC Acueducto\":\"183.48\",\"CMITC Alcantarillado\":\"252.75\",\"Tarifa consumo básico Acueducto ($/m3)\":\"284.39\",\"Tarifa consumo básico Alcantarillado ($/m3)\":\"381.65\",\"Tarifa consumo superior a básico Acueducto ($/m3)\":\"0.00\",\"Tarifa consumo superior a básico Alcantarillado ($/m3)\":\"0.00\",\"Aporte/Subsidio Acueducto %\":\"124\",\"Valor unitario Acueducto (cargo fijo mes)\":\"9135.88\",\"Cant. meses Acueducto\":\"2.00\",\"Subtotal tarifa Acueducto\":\"22857\",\"Valor unitario Alcantarillado (cargo fijo mes)\":\"6908.09\",\"Cant. meses Alcantarillado\":\"2.00\",\"Aporte/Subsidio Alcantarillado %\":\"149\",\"Subtotal tarifa Alcantarillado\":\"20586\",\"Fecha próxima factura esperada\":\"2026-11-25\",\"Fecha y hora generación factura\":\"2026-09-17 08:51:43\",\"CUDE\":\"bf6979563427dd3203a8c29084cad75882c27a550430e25ba85112b3ba811da779f6c6674ffa8129490c2d6203b30d1\",\"Representante Legal\":\"Natasha Avendaño García\",\"Archivo leído\":\"KR 12A 79 08 AP 204.pdf\",\"Modelo que leyó\":\"claude-sonnet-4-6\"}",
+     "nota": "Revisar (carga inicial con Nova): El valor exacto del último dígito del total de Alcantarillado ($34,402.1_) no se lee con total claridad; se interpreta como $34,402.18. · Los valores del historial (ENE-MAR $67.071, MAR-ABR $68.207, MAY-JUN $81.230) aparecen con punto como separador de miles en el recibo; se interpretan como 67.071, 68.207 y 81.230 m3 respectivamente, a · El barrio aparece como 'ESPARTILAL' o 'ESPARTILLAL'; no se lee con total claridad.",
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "acueducto",
+       "concepto": "Cargo fijo residencial (mes) + Consumo acueducto - Total período",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 40928.76,
+       "orden": 0
+      },
+      {
+       "grupo": "alcantarillado",
+       "concepto": "Cargo fijo + Consumo alcantarillado - Total período",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 34402.18,
+       "orden": 1
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Ajuste a la decena",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": -1,
+       "orden": 2
+      },
+      {
+       "grupo": "otros",
+       "concepto": "Intereses de mora",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 20,
+       "orden": 3
+      }
+     ],
+     "historial": [
+      {
+       "anio": 2026,
+       "mes": 3,
+       "etiqueta": "ENE-MAR",
+       "consumo": 67.071
+      },
+      {
+       "anio": 2026,
+       "mes": 5,
+       "etiqueta": "MAR-ABR",
+       "consumo": 68.207
+      },
+      {
+       "anio": 2026,
+       "mes": 6,
+       "etiqueta": "MAY-JUN",
+       "consumo": 81.23
+      }
+     ],
+     "soportes": [
+      {
+       "nombre": "KR 12A 79 08 AP 204.pdf",
+       "tipoMime": "application/pdf",
+       "tamano": 1437046,
+       "sha1": "1b38b63e7e69fa644c15dd0aaa1113d0af06f193",
+       "archivo": "1b38b63e7e69fa644c15dd0aaa1113d0af06f193.pdf",
+       "creadoPorNombre": "Ricardo Nivia"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sede": "CL 81 # 11-08 · OF 1004",
+   "servicio": "energia",
+   "empresa": "Enel Colombia",
+   "numeroCuenta": "71174175-0",
+   "titular": "M001 SAS",
+   "claseUso": "Comercial",
+   "estrato": null,
+   "periodicidad": "mensual",
+   "direccionRecibo": "CL 81 NO 11 08 OF 1004",
+   "noAplica": false,
+   "activo": true,
+   "creadoPorNombre": "Ricardo Nivia",
+   "medidores": [
+    {
+     "numero": "15.403.6589",
+     "factor": 1,
+     "desde": null,
+     "hasta": null
+    }
+   ],
+   "recibos": [
+    {
+     "medidor": "15.403.6589",
+     "numeroFactura": "41340025B-2",
+     "periodoDesde": "2026-09-17",
+     "periodoHasta": "2026-10-16",
+     "dias": 30,
+     "anio": 2026,
+     "mes": 10,
+     "tipoLectura": "real",
+     "lecturaAnterior": 73000,
+     "lecturaActual": 73984,
+     "factor": 1,
+     "consumo": 984,
+     "unidad": "kWh",
+     "vigenciaTarifa": "SEP/2026",
+     "valorUnitario": 825.97,
+     "totalCargos": 1048440,
+     "saldoAnterior": 0,
+     "totalPagar": 1048440,
+     "moneda": "COP",
+     "fechaExpedicion": "2026-10-21",
+     "fechaPagoOportuno": "2026-11-03",
+     "fechaSuspension": "2026-11-05",
+     "estadoPago": "pendiente",
+     "valorPagado": null,
+     "fechaPago": null,
+     "origen": "nova",
+     "extras": "{\"Número de cliente\":\"18111272\",\"Carga MW\":\"3.00\",\"Subsidio / Contribución\":\"Básica\",\"Consumo promedio (mes anterior)\":\"1215 kWh\",\"Valor kWh aplicado\":\"825.97\",\"Vigencia tarifa\":\"SEP/2026\",\"Componente Generación\":\"383.83\",\"Componente Distribución\":\"384.41\",\"Componente Transmisión\":\"9.65\",\"Componente Pérdidas + CV\":\"72.01\",\"Cargo Fijo\":\"43.83\",\"Diferencia de lecturas\":\"984\",\"Valor diario\":\"32510\",\"Energía facturada kWh\":\"984\",\"Ajuste a la decena\":\"El efecto unitario es de $825.97\",\"Programa ahorro reconocido\":\"68.19 kWh\",\"Consumo acumulado ahorro\":\"1169.1 kWh\",\"Período evaluado programa\":\"17 SEP/2026 - 16 OCT/2026\",\"Meta asignada\":\"1169.1 kWh\",\"Posición relativa\":\"68.03%\",\"Resoluciones tarifa\":\"101 120/126 de 2026\",\"Operador de aseo\":\"PROMOAMBIENTAL DISTRITO SAS ESP\",\"Cuenta contrato aseo\":\"70174705\",\"Documento equivalente aseo\":\"41340025B-2\",\"Período facturación aseo\":\"18.05.2026 a 18.10.2026\",\"Estrato aseo\":\"50%\",\"Aporte residencial aseo\":\"0%\",\"% Participación aseo\":\"0%\",\"Tipo productor aseo\":\"Pequ. Prod. Comercial\",\"Densidad aseo\":\"0.0000\",\"Volumen aseo\":\"5\",\"Días liquidados aseo\":\"30\",\"FREC. Recolección aseo\":\"3\",\"FREC. Barrido aseo\":\"7\",\"Ocupaciones aseo\":\"0\",\"DIU\":\"11.57\",\"FIU\":\"0.00\",\"Grupos: 11\":\"DT: 503.79\",\"HC: 3.00\":\"MC: 0.00\",\"CUDE\":\"619733196c763c30d9bc184eb6885b04877791201f16C16555dC673c44260b170c50c139b4b9f89b24044\",\"Energía reactiva\":\"284 kVArh\",\"Ruta Reparto\":\"3 & 15.403.6589\",\"Fecha generación\":\"2026-10-21\",\"Archivo leído\":\"CL 81 NO 11 08 OF 1004.pdf\",\"Modelo que leyó\":\"claude-sonnet-4-6\"}",
+     "nota": "Revisar (carga inicial con Nova): Los valores exactos de los cargos individuales de energía (cargo fijo, generación, transmisión, distribución, pérdidas) no se leen con total claridad en la tabla de la página 2; se reportan como compo · La lectura anterior exacta no se lee con certeza; se deduce como 73000 por diferencia con consumo 984 y lectura actual aproximada. · El historial de consumos de la gráfica de barras tiene valores que podrían corresponder a dos filas (Activa y Reactiva); se reportan los de la fila Activa. · El valor del cargo fijo de energía ($43.83) parece ser el componente unitario por kWh, no un cargo fijo separado; la tabla no discrimina claramente los cargos individuales.",
+     "creadoPorNombre": "Ricardo Nivia",
+     "cargos": [
+      {
+       "grupo": "energia",
+       "concepto": "Energía activa (consumo 984 kWh)",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 975310,
+       "orden": 0
+      },
+      {
+       "grupo": "aseo",
+       "concepto": "Total aseo PROMOAMBIENTAL DISTRITO SAS ESP",
+       "cantidad": null,
+       "valorUnitario": null,
+       "valor": 73130,
+       "orden": 1
+      }
+     ],
+     "historial": [
+      {
+       "anio": 2026,
+       "mes": 4,
+       "etiqueta": "Abr",
+       "consumo": 1324
+      },
+      {
+       "anio": 2026,
+       "mes": 5,
+       "etiqueta": "May",
+       "consumo": 1191
+      },
+      {
+       "anio": 2026,
+       "mes": 6,
+       "etiqueta": "Jun",
+       "consumo": 1194
+      },
+      {
+       "anio": 2026,
+       "mes": 7,
+       "etiqueta": "Jul",
+       "consumo": 1141
+      },
+      {
+       "anio": 2026,
+       "mes": 8,
+       "etiqueta": "Ago",
+       "consumo": 999
+      },
+      {
+       "anio": 2026,
+       "mes": 9,
+       "etiqueta": "Sep",
+       "consumo": 662
+      }
+     ],
+     "soportes": [
+      {
+       "nombre": "CL 81 NO 11 08 OF 1004.pdf",
+       "tipoMime": "application/pdf",
+       "tamano": 1725681,
+       "sha1": "38f572ebc2a7231ea3ce502df0ed36733d95a344",
+       "archivo": "38f572ebc2a7231ea3ce502df0ed36733d95a344.pdf",
+       "creadoPorNombre": "Ricardo Nivia"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

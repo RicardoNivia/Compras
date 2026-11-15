@@ -363,6 +363,22 @@ export const SOPORTE_TESORERIA_FIELD_LABELS = {
   movimiento: "Movimiento",
 };
 
+// Soportes de pago que llegan al correo de soportes (Gmail compartido) y que Nova lee.
+Object.assign(ENTITY_LABELS, { soporteCorreoTesoreria: "Soporte recibido por correo" });
+export const SOPORTE_CORREO_TESORERIA_FIELD_LABELS = {
+  estado: "Estado",
+  remitente: "Remitente",
+  asunto: "Asunto",
+  archivo: "Archivo",
+  valor: "Valor leído",
+  fecha: "Fecha leída",
+  tercero: "Tercero",
+  sugerenciaMovimiento: "Movimiento que sugiere Nova",
+  sugerenciaPago: "Pago que sugiere Nova",
+  movimiento: "Movimiento registrado",
+  motivoDescarte: "Motivo del descarte",
+};
+
 // Pagos recurrentes de Tesorería.
 Object.assign(ACTION_LABELS, { generar: "Generó" });
 Object.assign(ENTITY_LABELS, { recurrenciaTesoreria: "Pago recurrente de tesorería" });
@@ -463,3 +479,74 @@ Object.assign(EXTRACTO_TESORERIA_FIELD_LABELS, { banco: "Banco", aMano: "Ya regi
 // Conciliación de Tesorería por banco y mes.
 Object.assign(ACTION_LABELS, { verificar: "Verificó", desverificar: "Quitó la verificación" });
 Object.assign(CONCILIACION_TESORERIA_FIELD_LABELS, { verificado: "Confirmado por el banco" });
+
+// Consumo (servicios públicos por sede; ver backend/lib/consumo/*).
+Object.assign(ENTITY_LABELS, {
+  sedeConsumo: "Sede de consumo",
+  empresaConsumo: "Empresa de servicio",
+  cuentaConsumo: "Cuenta de servicio",
+});
+export const SEDE_CONSUMO_FIELD_LABELS = {
+  nombre: "Nombre",
+  edificio: "Edificio",
+  direccion: "Dirección",
+  ciudad: "Ciudad",
+  activo: "Activa",
+};
+export const EMPRESA_CONSUMO_FIELD_LABELS = {
+  nombre: "Nombre",
+  nit: "NIT",
+  servicios: "Servicios que factura",
+  activo: "Activa",
+};
+export const CUENTA_CONSUMO_FIELD_LABELS = {
+  sede: "Sede",
+  servicio: "Servicio",
+  empresa: "Empresa",
+  numeroCuenta: "Número de cuenta",
+  titular: "Titular",
+  claseUso: "Clase de uso",
+  estrato: "Estrato",
+  periodicidad: "Periodicidad",
+  direccionRecibo: "Dirección en el recibo",
+  noAplica: "La sede no tiene este servicio",
+  activo: "Activa",
+  medidores: "Medidores",
+};
+
+Object.assign(ENTITY_LABELS, { reciboConsumo: "Recibo de consumo", soporteReciboConsumo: "Soporte de recibo de consumo" });
+export const RECIBO_CONSUMO_FIELD_LABELS = {
+  sede: "Sede",
+  servicio: "Servicio",
+  cuenta: "Número de cuenta",
+  medidor: "Medidor",
+  numeroFactura: "Número de factura",
+  periodo: "Período facturado",
+  dias: "Días facturados",
+  mesReporte: "Mes de reporte",
+  tipoLectura: "Tipo de lectura",
+  lecturaAnterior: "Lectura anterior",
+  lecturaActual: "Lectura actual",
+  factor: "Factor del medidor",
+  consumo: "Consumo",
+  vigenciaTarifa: "Vigencia de la tarifa",
+  valorUnitario: "Valor unitario",
+  totalCargos: "Total cargos del período",
+  saldoAnterior: "Saldo anterior",
+  totalPagar: "Total a pagar",
+  fechaExpedicion: "Fecha de expedición",
+  fechaPagoOportuno: "Pago oportuno",
+  fechaSuspension: "Fecha de suspensión",
+  estadoPago: "Estado del pago",
+  valorPagado: "Valor pagado",
+  fechaPago: "Fecha de pago",
+  origen: "Origen",
+  nota: "Nota",
+  cargos: "Cargos",
+  soportes: "Soportes",
+};
+export const SOPORTE_RECIBO_CONSUMO_FIELD_LABELS = {
+  archivo: "Archivo",
+  recibo: "Recibo",
+};
+Object.assign(ENTITY_LABELS, { cargaInicialConsumo: "Carga inicial de Consumo" });

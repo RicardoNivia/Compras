@@ -3,7 +3,8 @@
 import EstadoVacio from "@/components/EstadoVacio";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { tesMovimientos } from "@/lib/tesoreriaApi";
+import { tesMovimientos, tesSoportesCorreo } from "@/lib/tesoreriaApi";
+import SoportesCorreo from "@/components/tesoreria/SoportesCorreo";
 import { fmtMoneda } from "@/lib/moneda";
 import { crossfade } from "@/lib/crossfade";
 import { Paginacion } from "@/components/notificaciones/ui";
@@ -38,6 +39,13 @@ export default function MovimientosTesoreria({ acceso }) {
   const [modal, setModal] = useState(params.get("id") ? { tipo: "detalle", id: Number(params.get("id")) } : params.get("nuevo") ? { tipo: "form", conSoporte: params.get("nuevo") === "soporte" } : null);
   const [aviso, setAviso] = useState("");
   const puedeRegistrar = !!acceso?.puedeRegistrar;
+  // Pestaña «Llegó al correo»: soportes de pago que llegaron al correo de soportes y Nova leyó (sin registrar aún).
+  const [correo, setCorreo] = useState(params.get("vista") === "correo");
+  const [pendCorreo, setPendCorreo] = useState(0);
+  const contarCorreo = useCallback(() => {
+    if (puedeRegistrar) tesSoportesCorreo({ estado: "pendiente", size: 1 }).then((r) => setPendCorreo(r.total)).catch(() => {});
+  }, [puedeRegistrar]);
+  useEffect(() => { contarCorreo(); }, [contarCorreo]);
 
   useEffect(() => { const t = setTimeout(() => setF((x) => (x.q === q ? x : { ...x, q, ids: "" })), 350); return () => clearTimeout(t); }, [q]);
   useEffect(() => { setPage(1); }, [f, size]);
@@ -92,16 +100,25 @@ export default function MovimientosTesoreria({ acceso }) {
 
       <div className="tes-cabecera">
         <div className="dash-tabs" role="tablist" aria-label="Asociación">
-          {TABS.map(([k, t]) => <button key={k || "todos"} type="button" role="tab" className="dash-tab" aria-selected={f.asociacion === k} onClick={() => crossfade(() => setF((x) => ({ ...x, asociacion: k, ids: "" })))}>{t}</button>)}
+          {TABS.map(([k, t]) => <button key={k || "todos"} type="button" role="tab" className="dash-tab" aria-selected={!correo && f.asociacion === k} onClick={() => crossfade(() => { setCorreo(false); setF((x) => ({ ...x, asociacion: k, ids: "" })); })}>{t}</button>)}
+          {puedeRegistrar && (
+            <button type="button" role="tab" className="dash-tab" aria-selected={correo} onClick={() => crossfade(() => setCorreo(true))} title="Soportes de pago que llegaron al correo y que Nova leyó">
+              Llegó al correo{pendCorreo > 0 && <span className="tab-badge">{pendCorreo}</span>}
+            </button>
+          )}
         </div>
         <div className="spacer" />
+        {!correo && <>
         <span className="tes-totales">Con este filtro: entra <strong className="tes-num tes-pos">{fmtMoneda(data.totales.creditos, "COP")}</strong> · sale <strong className="tes-num tes-neg">{fmtMoneda(data.totales.debitos, "COP")}</strong> · {data.totales.sinAsociar} sin asociar</span>
         <BotonExcel nombre="tesoreria-movimientos" hoja="Movimientos" columnas={COLS_EXCEL} obtener={() => todasLasPaginas(tesMovimientos, f)} deshabilitado={!data.total} />
+        </>}
       </div>
       {f.ids && <div className="tes-ayuda"><div>Mostrando solo el movimiento #{f.ids}.</div><button type="button" className="btn small" onClick={() => setF((x) => ({ ...x, ids: "", anio: anioActual(), mes: "" }))}>Ver todos</button></div>}
 
       {(error || errorCat) && <p className="modal-error">{error || errorCat}</p>}
 
+      {correo && <SoportesCorreo cat={cat} puede={puedeRegistrar} onCambio={() => { contarCorreo(); cargar(); }} id="mov-correo" titulo="Movimientos que llegaron al correo" />}
+      {!correo && <>
       <div className={`table-card${cargando && data.items.length ? " tes-recargando" : ""}`}>
         <div className="table-scroll">
           <table className="records tes-tabla">
@@ -132,6 +149,7 @@ export default function MovimientosTesoreria({ acceso }) {
         <Paginacion id="tes-mov-pagesize" page={page} size={size} total={data.total} sizes={PAGE_SIZES} onPage={setPage} onSize={setSize} etiqueta="movimiento(s)" />
       </div>
       <p className="muted" style={{ fontSize: 12, margin: 0 }}>* Fecha aproximada: en el Excel la fecha estaba dañada y se tomó el mes. Corrígela editando el movimiento.</p>
+      </>}
 
       {modal?.tipo === "form" && cat && <FormMovimientoModal cat={cat} movimiento={modal.mov} conSoporte={!!modal.conSoporte} onClose={() => setModal(null)} onSaved={(_m, msg, seguir) => { if (seguir) cargar(); else { setModal(null); cambio(msg); } }} />}
       {modal?.tipo === "detalle" && cat && <DetalleMovimientoModal id={modal.id} cat={cat} puedeRegistrar={puedeRegistrar} onClose={() => setModal(null)} onCambio={cambio} onEditar={(mov) => setModal({ tipo: "form", mov })} />}

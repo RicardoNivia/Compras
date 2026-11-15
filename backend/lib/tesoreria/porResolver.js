@@ -67,7 +67,11 @@ export async function porResolver() {
   const corte = desdeSoportes; // primer día del mes pasado
   const viejos = await prisma.pagoProgramado.findMany({ where: { estado: "P", fecha: { lt: corte }, NOT: { valor: 0 }, tipo: { in: ["I", "E", "J", "T"] } }, select: { valor: true, fecha: true } });
 
+  // 0. Soportes que llegaron al correo de soportes y que Nova ya leyó (ver lib/buzonCompartido.js).
+  const soportesCorreo = await prisma.soporteCorreoTesoreria.count({ where: { estado: "pendiente" } });
+
   const pasos = [
+    { k: "correo", titulo: "Soportes del correo", pendiente: soportesCorreo },
     { k: "extractos", titulo: "Subir extractos", pendiente: mesesSinExtracto.reduce((s, b) => s + b.meses.length, 0) + lineas.length },
     { k: "asociar", titulo: "Asociar movimientos y pagos", pendiente: sinPago.length },
     { k: "conciliar", titulo: "Resolver diferencias", pendiente: conDiferencia.length + mesesSinExtracto.reduce((s, b) => s + b.noCuadran.length, 0) },

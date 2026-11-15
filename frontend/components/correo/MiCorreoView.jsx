@@ -1,252 +1,122 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
-import {
-  estadoCorreoApi, cambiarAgenteCorreoApi, desvincularCorreoApi, revisarCorreoApi, simularCorreoApi, listarSolicitudesCorreoApi,
-} from "@/lib/correoApi";
-import SolicitudProveedorCorreo from "@/components/correo/SolicitudProveedorCorreo";
-import ConfirmarModal from "@/components/notificaciones/ConfirmarModal";
-import { Paginacion } from "@/components/notificaciones/ui";
-import { IconMail, IconSearch, IconSpark, IconChevronDown } from "@/components/icons";
+import { useCallback, useEffect, useState } from "react";
+import { estadoBuzonApi, revisarBuzonApi } from "@/lib/correoApi";
+import { crossfade } from "@/lib/crossfade";
+import BuzonCompartido from "@/components/correo/BuzonCompartido";
+import SoportesCorreo from "@/components/tesoreria/SoportesCorreo";
+import { useCatalogos } from "@/components/tesoreria/comun";
+import { IconMail, IconSearch, IconSpark, IconCheck, IconMoney, IconSend } from "@/components/icons";
 
-const PAGE_SIZES = [10, 25, 50, 100];
-const FILTROS = [["pendiente", "Pendientes"], ["aprobada", "Agregadas"], ["descartada", "Descartadas"], ["", "Todas"]];
-const ESTADO_PILL = { pendiente: ["warning", "Pendiente"], aprobada: ["good", "Agregada"], descartada: ["muted", "Descartada"] };
-const fecha = (iso) => (iso ? new Date(iso).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—");
-
-function Celda({ v }) {
-  if (!v) return <span className="muted">—</span>;
-  return <span className="desc-tooltip-wrap"><span className="desc-text">{v}</span><span className="desc-tooltip-bubble">{v}</span></span>;
+function hace(iso) {
+  if (!iso) return "todavía no";
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return "hace un momento";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  return new Date(iso).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-// Mi correo: vincular el correo de Microsoft 365, encender el agente de correo y ver las solicitudes de proveedor que
-// encontró. Con CORREO_MODO=simulado (local) se prueba pegando un correo.
-export default function MiCorreoView({ inicial, vinculado, errorVinculo, puedeRegistrar }) {
-  const [estado, setEstado] = useState(inicial);
-  const [aviso, setAviso] = useState(vinculado ? "Tu correo quedó vinculado. El agente revisará tu bandeja de entrada cada 10 minutos." : "");
-  const [error, setError] = useState(errorVinculo || "");
-  const [ocupado, setOcupado] = useState("");
-  const [confirmar, setConfirmar] = useState(null);
+// Mi correo: la única página del correo de la aplicación (un Gmail compartido al que se reenvían los soportes de pago).
+// Arriba, en una frase, si está conectado; luego cómo funciona y dos pestañas: Pagos (soportes que leyó Nova, para
+// Tesorería) y Conexión (solo un admin conecta el Gmail).
+export default function MiCorreoView({ esAdmin = false, puedePagos = false }) {
+  const [estado, setEstado] = useState(null);
+  const [tab, setTab] = useState(null);
+  const [aviso, setAviso] = useState("");
+  const [error, setError] = useState("");
+  const [revisando, setRevisando] = useState(false);
+  const [version, setVersion] = useState(0); // fuerza recargar las listas después de «Revisar ahora»
 
-  // Prueba (modo simulado)
-  const [prueba, setPrueba] = useState({ remitente: "", asunto: "", cuerpo: "", adjunto: null });
-  const [resultadoPrueba, setResultadoPrueba] = useState(null);
-
-  // Tabla de solicitudes
-  const [filtro, setFiltro] = useState("pendiente");
-  const [page, setPage] = useState(1);
-  const [size, setSize] = useState(PAGE_SIZES[0]);
-  const [lista, setLista] = useState({ items: [], total: 0 });
-  const [abierta, setAbierta] = useState(null);
-
-  const modo = estado?.modo;
-  const cuenta = estado?.cuenta;
-
-  const recargarEstado = useCallback(() => estadoCorreoApi().then(setEstado).catch((e) => setError(e.message)), []);
-  const recargarLista = useCallback(async () => {
-    try {
-      const r = await listarSolicitudesCorreoApi({ estado: filtro, page, size });
-      setLista(r);
-      if (r.page !== page) setPage(r.page);
-    } catch (e) {
-      setError(e.message);
-    }
-  }, [filtro, page, size]);
-
-  useEffect(() => { recargarLista(); }, [recargarLista]);
-  useEffect(() => { setPage(1); setAbierta(null); }, [filtro, size]);
+  const cargar = useCallback(() => estadoBuzonApi().then((e) => { setEstado(e); return e; }).catch((e) => setError(e.message)), []);
   useEffect(() => {
-    if (vinculado || errorVinculo) window.history.replaceState(null, "", "/mi-correo");
-  }, [vinculado, errorVinculo]);
+    cargar().then((e) => {
+      if (!e) return;
+      // Pestaña inicial: conectar si falta (admin); si no, los pagos.
+      setTab(esAdmin && !e.cuenta ? "conexion" : puedePagos ? "pagos" : "conexion");
+    });
+  }, [cargar, esAdmin, puedePagos]);
+  useEffect(() => { if (!aviso) return undefined; const t = setTimeout(() => setAviso(""), 6000); return () => clearTimeout(t); }, [aviso]);
 
-  useEffect(() => { if (!aviso) return undefined; const t = setTimeout(() => setAviso(""), 4500); return () => clearTimeout(t); }, [aviso]);
-
-  const cambio = () => { recargarEstado(); recargarLista(); };
-
-  async function accion(clave, fn, ok) {
-    setOcupado(clave);
-    setError("");
+  async function revisar() {
+    setRevisando(true); setError("");
     try {
-      const r = await fn();
-      if (ok) setAviso(typeof ok === "function" ? ok(r) : ok);
-      cambio();
-      return r;
-    } catch (e) {
-      setError(e.message);
-      return null;
-    } finally {
-      setOcupado("");
-    }
+      const r = await revisarBuzonApi();
+      setAviso(r.enCurso ? "Nova ya está revisando el correo; en un momento verás el resultado."
+        : r.revisados === 0 ? "No hay correos nuevos."
+          : `Nova revisó ${r.revisados} correo(s) nuevo(s): ${r.soportes} soporte(s) de pago.${r.omitidos ? ` ${r.omitidos} no traían un comprobante.` : ""}${r.error ? ` Se detuvo: ${r.error}` : ""}`);
+      await cargar();
+      setVersion((v) => v + 1);
+    } catch (e) { setError(e.message); } finally { setRevisando(false); }
   }
 
-  const revisar = () => accion("revisar", revisarCorreoApi, (r) => (r.enCurso
-    ? "El agente ya está revisando tu correo; en un momento verás el resultado."
-    : `Listo: ${r.revisados} correo(s) nuevo(s), ${r.analizados} leído(s) por Nova, ${r.solicitudes} solicitud(es) de proveedor.`));
+  if (!estado) return <div className="mc-vista"><div className="card"><span className="spinner" /></div></div>;
+  const c = estado.cuenta;
+  const conectado = c && c.estado === "activa";
+  const pend = estado.pendientes;
 
-  const desvincular = () => setConfirmar({
-    titulo: "Desvincular mi correo",
-    mensaje: "¿Desvincular tu correo?",
-    detalle: "El agente dejará de leer tu bandeja de entrada y se borra la autorización guardada. Las solicitudes que ya encontró se conservan.",
-    boton: "Desvincular",
-    onOk: () => accion("desvincular", desvincularCorreoApi, "Tu correo quedó desvinculado."),
-  });
-
-  async function probar(e) {
-    e.preventDefault();
-    setResultadoPrueba(null);
-    const r = await accion("probar", () => simularCorreoApi(prueba));
-    if (r) setResultadoPrueba(r);
-  }
+  const TABS = [
+    puedePagos && { k: "pagos", color: "morado", icono: <IconMoney size={22} />, titulo: "Pagos", nota: "Soportes de pago que leyó Nova, con el movimiento y el pago a los que cree que corresponden.", n: pend.soportes },
+    { k: "conexion", color: "azul", icono: <IconMail size={22} />, titulo: "Conexión", nota: esAdmin ? "Conecta el Gmail, enciende o apaga a Nova y cambia el código." : "Qué correo lee la aplicación.", n: null, estadoTxt: conectado ? "Conectado" : c ? "Revisar" : "Sin conectar" },
+  ].filter(Boolean);
 
   return (
-    <div className="mc-vista">
+    <div className="mc-vista agentes">
       {aviso && <div className="toast toast-good" role="status">{aviso}</div>}
-      {error && <p className="modal-error">{error}</p>}
 
-      <section className="mc-tarjeta">
-        <div className="mc-fila">
-          <IconMail size={20} />
-          <h3>{cuenta ? `Correo vinculado: ${cuenta.email}` : "Vincula tu correo"}</h3>
-          {modo === "simulado" && <span className="pill warning">Modo de prueba</span>}
-          {cuenta && <span className={`pill ${cuenta.estado === "activa" ? "good" : "critical"}`}>{cuenta.estado === "activa" ? "Conectado" : "Hay que volver a vincular"}</span>}
+      {/* En una frase: ¿está conectado? */}
+      <section className="ag-hero mc-hero">
+        <div className="ag-hero-txt">
+          <span className="ag-hero-chip"><IconMail size={13} /> Correo de soportes de pago</span>
+          <h1>{conectado ? "Nova está leyendo el correo" : c ? "El correo necesita atención" : "Aún no hay un correo conectado"}</h1>
+          <p>
+            {conectado
+              ? <>Revisa <b>{c.email}</b> cada 10 minutos · última revisión {hace(c.ultimaRevision)}{c.agenteActivo ? "" : " · ahora está apagado"}.</>
+              : c ? <>No se pudo leer <b>{c.email}</b>. {esAdmin ? "Ve a Conexión para volver a conectarlo." : "Avísale a un administrador."}</>
+                : esAdmin ? <>Conéctalo en la pestaña <b>Conexión</b>: toma 3 pasos.</> : <>Un administrador debe conectarlo.</>}
+          </p>
         </div>
-
-        {modo === "desactivado" && (
-          <p className="prov-note">La conexión con el correo de Microsoft aún no está habilitada en el servidor. TI debe registrar la aplicación en Microsoft Entra ID (ver docs/correo-agente-proveedores.md); cuando esté lista, aquí aparecerá el botón para vincular.</p>
-        )}
-
-        {modo !== "desactivado" && !cuenta && (
-          <>
-            <p style={{ margin: 0 }}>Cuando te llegue al correo una solicitud para registrar un proveedor nuevo, el agente la lee (también el RUT adjunto), saca los datos y te la deja en la <strong>Bandeja</strong> para que la apruebes. Nunca registra un proveedor sin que tú lo confirmes.</p>
-            <ol className="mc-pasos">
-              <li>Inicias sesión con tu cuenta de Microsoft de Sinco ({estado.emailUsuario}).</li>
-              <li>Autorizas solo la <strong>lectura</strong> de tu correo: el panel no puede enviar, borrar ni mover correos.</li>
-              <li>Cada 10 minutos el agente revisa tu bandeja de entrada. Solo los correos que hablan de registrar un proveedor pasan a Nova.</li>
-            </ol>
-            <div className="mc-fila">
-              <a className="btn btn-primary" href="/api/correo/vincular"><IconMail size={14} /> {modo === "simulado" ? "Vincular (modo de prueba)" : "Vincular mi correo de Microsoft"}</a>
-            </div>
-          </>
-        )}
-
-        {cuenta && (
-          <>
-            {cuenta.estado !== "activa" && cuenta.ultimoError && <p className="modal-error" style={{ margin: 0 }}>{cuenta.ultimoError}</p>}
-            {cuenta.estado === "activa" && cuenta.ultimoError && <p className="prov-note" style={{ margin: 0 }}>Última revisión: {cuenta.ultimoError}</p>}
-            <p className="prov-note" style={{ margin: 0 }}>
-              Vinculado el {fecha(cuenta.createdAt)}
-              {cuenta.proveedor === "microsoft" && <> · última revisión: {cuenta.ultimaRevision ? fecha(cuenta.ultimaRevision) : "todavía no"}</>}
-              {estado.pendientes > 0 && <> · <strong>{estado.pendientes}</strong> solicitud(es) pendiente(s)</>}
-            </p>
-            {!puedeRegistrar && <p className="prov-note" style={{ margin: 0 }}>Tu rol no puede registrar proveedores, así que el agente no revisará tu correo. Pide el permiso «Editar proveedores».</p>}
-            <div className="mc-fila">
-              <label className={`ag-switch ${cuenta.agenteActivo ? "on" : ""}`}>
-                <span className="ag-switch-txt">
-                  <strong>Agente de correo</strong>
-                  <small>{cuenta.agenteActivo ? "Encendido · revisa cada 10 minutos" : "Apagado · no lee tu correo"}</small>
-                </span>
-                <span className="toggle-switch">
-                  <input type="checkbox" role="switch" checked={cuenta.agenteActivo} disabled={!!ocupado}
-                    onChange={(e) => accion("agente", () => cambiarAgenteCorreoApi(e.target.checked), e.target.checked ? "Agente encendido." : "Agente apagado: no leerá tu correo.")} />
-                  <span className="toggle-track"><span className="toggle-thumb" /></span>
-                </span>
-              </label>
-              <div className="spacer" />
-              {cuenta.proveedor === "microsoft" && (
-                <button type="button" className="btn" onClick={revisar} disabled={!!ocupado || !cuenta.agenteActivo || cuenta.estado !== "activa"}>
-                  {ocupado === "revisar" ? <span className="spinner" /> : <IconSearch size={13} />} Revisar ahora
-                </button>
-              )}
-              {cuenta.estado !== "activa" && <a className="btn btn-primary" href="/api/correo/vincular">Volver a vincular</a>}
-              <button type="button" className="btn btn-ghost btn-danger-text" onClick={desvincular} disabled={!!ocupado}>Desvincular</button>
-            </div>
-          </>
+        {esAdmin && c && (
+          <button type="button" className="btn mc-hero-btn" onClick={revisar} disabled={revisando || !conectado}>
+            {revisando ? <><span className="spinner" /> Revisando…</> : <><IconSearch size={14} /> Revisar ahora</>}
+          </button>
         )}
       </section>
 
-      {modo === "simulado" && cuenta && (
-        <section className="mc-tarjeta">
-          <h3><IconSpark size={14} /> Probar con un correo</h3>
-          <p className="prov-note" style={{ margin: 0 }}>Modo de prueba: pega un correo como el que te llega (y adjunta el RUT si quieres). El agente lo procesa igual que si hubiera llegado a tu bandeja y, si es una solicitud, te deja el aviso en la Bandeja.</p>
-          <form onSubmit={probar} className="prov-form" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div className="prov-form-grid">
-              <div className="field">
-                <label htmlFor="mc-remitente">De</label>
-                <input id="mc-remitente" value={prueba.remitente} onChange={(e) => setPrueba({ ...prueba, remitente: e.target.value })} placeholder="Andrea Pérez <andrea.perez@sinco.com.co>" />
-              </div>
-              <div className="field">
-                <label htmlFor="mc-asunto">Asunto</label>
-                <input id="mc-asunto" value={prueba.asunto} onChange={(e) => setPrueba({ ...prueba, asunto: e.target.value })} placeholder="Registro de proveedor en SRM" />
-              </div>
-            </div>
-            <div className="field">
-              <label htmlFor="mc-cuerpo">Texto del correo</label>
-              <textarea id="mc-cuerpo" rows={8} value={prueba.cuerpo} onChange={(e) => setPrueba({ ...prueba, cuerpo: e.target.value })} placeholder="Hola Lau, por favor tu ayuda para el registro de este proveedor en SRM…" />
-            </div>
-            <div className="field">
-              <label htmlFor="mc-adjunto">Adjunto (RUT en PDF o foto, opcional)</label>
-              <input id="mc-adjunto" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={(e) => setPrueba({ ...prueba, adjunto: e.target.files?.[0] || null })} />
-            </div>
-            <div className="mc-fila">
-              <button type="submit" className="btn btn-primary" disabled={!!ocupado || !prueba.cuerpo.trim()}>
-                {ocupado === "probar" ? <><span className="spinner" /> Nova está leyendo…</> : <><IconSpark size={13} /> Procesar como si llegara</>}
-              </button>
-            </div>
-          </form>
-          {resultadoPrueba && !resultadoPrueba.solicitud && <p className="prov-note">{resultadoPrueba.motivo}</p>}
-          {resultadoPrueba?.solicitud && (
-            <>
-              <p className="sc-hecho">Es una solicitud de proveedor: quedó en tu Bandeja. Así se ve:</p>
-              <SolicitudProveedorCorreo id={resultadoPrueba.solicitud.id} onCambio={cambio} />
-            </>
-          )}
-        </section>
-      )}
+      {/* Cómo funciona, en tres pasos */}
+      <ol className="mc-como" aria-label="Cómo funciona">
+        <li><span className="mc-como-i"><IconSend size={16} /></span><div><strong>1. Reenvías</strong><span>Los soportes de pago llegan al Gmail (con reglas de reenvío): PDF, foto o el aviso del banco.</span></div></li>
+        <li><span className="mc-como-i"><IconSpark size={16} /></span><div><strong>2. Nova lee</strong><span>Saca los datos y sugiere si el pago ya está registrado y a qué gasto corresponde.</span></div></li>
+        <li><span className="mc-como-i"><IconCheck size={16} /></span><div><strong>3. Tú confirmas</strong><span>Nada se registra sin que lo revises aquí. Puedes corregir o descartar.</span></div></li>
+      </ol>
 
-      <section className="table-card">
-        <div className="mc-fila" style={{ padding: "12px 14px 0" }}>
-          <h3 style={{ margin: 0, fontSize: 16 }}>Solicitudes de proveedor encontradas</h3>
-          <div className="spacer" />
-          <div className="nx-segmento" role="tablist" aria-label="Estado">
-            {FILTROS.map(([v, t]) => <button key={v || "todas"} type="button" role="tab" aria-selected={filtro === v} onClick={() => setFiltro(v)}>{t}</button>)}
-          </div>
-        </div>
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr><th>Recibido</th><th>De</th><th>Proveedor</th><th>NIT</th><th>Falta</th><th>Estado</th><th aria-label="Abrir" /></tr>
-            </thead>
-            <tbody>
-              {lista.items.length === 0 && (
-                <tr><td colSpan={7} className="empty">No hay solicitudes {filtro ? FILTROS.find((f) => f[0] === filtro)[1].toLowerCase() : ""}.</td></tr>
-              )}
-              {lista.items.map((s) => {
-                const [cls, txt] = ESTADO_PILL[s.estado] || ["muted", s.estado];
-                const abiertaEsta = abierta === s.id;
-                return (
-                  <Fragment key={s.id}>
-                    <tr className="clickable" onClick={() => setAbierta(abiertaEsta ? null : s.id)} aria-expanded={abiertaEsta}>
-                      <td>{fecha(s.recibidoAt || s.createdAt)}</td>
-                      <td><Celda v={s.remitente} /></td>
-                      <td><Celda v={s.datos?.nombre} /></td>
-                      <td className="mono">{s.datos?.nit || <span className="muted">—</span>}</td>
-                      <td>{s.estado === "pendiente" && s.faltantes?.length ? <Celda v={s.faltantes.map((f) => ({ nit: "NIT", nombre: "Razón social", descripcion: "Descripción" }[f.campo])).join(", ")} /> : <span className="muted">—</span>}</td>
-                      <td><span className={`pill ${cls}`}>{txt}</span></td>
-                      <td><IconChevronDown size={14} style={{ transform: abiertaEsta ? "rotate(180deg)" : undefined }} /></td>
-                    </tr>
-                    {abiertaEsta && (
-                      <tr className="mc-detalle"><td colSpan={7}><SolicitudProveedorCorreo id={s.id} onCambio={cambio} /></td></tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        <Paginacion id="mc-pagesize" page={page} size={size} total={lista.total} sizes={PAGE_SIZES} onPage={setPage} onSize={setSize} etiqueta="solicitud(es)" />
-      </section>
+      {error && <p className="modal-error" style={{ margin: 0 }}>{error}</p>}
 
-      {confirmar && <ConfirmarModal pedido={confirmar} onClose={() => setConfirmar(null)} />}
+      <div className="ag-selector mc-tabs" role="tablist" aria-label="Secciones del correo">
+        {TABS.map((t) => (
+          <button key={t.k} type="button" role="tab" aria-selected={tab === t.k} className={`ag-opcion ag-${t.color}`} onClick={() => crossfade(() => setTab(t.k))}>
+            <span className="ag-icono" aria-hidden="true">{t.icono}</span>
+            <span className="ag-opcion-txt">
+              <strong>{t.titulo}</strong>
+              <span>{t.nota}</span>
+              <em>{t.n != null ? (t.n ? `${t.n} por revisar` : "Nada por revisar") : t.estadoTxt}</em>
+            </span>
+            {t.n ? <span className="mc-badge">{t.n}</span> : <span className="ag-opcion-check" aria-hidden="true"><IconCheck size={13} /></span>}
+          </button>
+        ))}
+      </div>
+
+      <div data-crossfade>
+        {tab === "conexion" && <BuzonCompartido estado={estado} esAdmin={esAdmin} onCambio={cargar} onAviso={setAviso} />}
+        {tab === "pagos" && <TabPagos key={`g${version}`} onCambio={cargar} />}
+      </div>
     </div>
   );
+}
+
+// ---------- Pagos: soportes que leyó Nova (los mismos de Tesorería › Por resolver) ----------
+function TabPagos({ onCambio }) {
+  const { cat } = useCatalogos();
+  return <SoportesCorreo cat={cat} puede onCambio={onCambio} id="mc-pagos" titulo="Soportes de pago" />;
 }

@@ -43,3 +43,10 @@ export async function catalogosProveedorCliente() {
   }));
   return Object.fromEntries(pares);
 }
+
+// Correo de soportes (Gmail compartido, sin dueño; solo administradores) — ver backend/lib/buzonCompartido.js.
+export const estadoBuzonApi = () => fetch("/api/correo/compartido", { cache: "no-store" }).then(handle);
+export const guardarBuzonApi = (email, clave) => fetch("/api/correo/compartido", json("PUT", { email, clave })).then(handle);
+export const agenteBuzonApi = (agenteActivo) => fetch("/api/correo/compartido", json("PATCH", { agenteActivo })).then(handle);
+export const quitarBuzonApi = () => fetch("/api/correo/compartido", { method: "DELETE" }).then(handle);
+export const revisarBuzonApi = () => fetch("/api/correo/compartido/revisar", { method: "POST" }).then(handle);

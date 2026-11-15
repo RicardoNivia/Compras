@@ -21,12 +21,13 @@ export function MarcaAnimada({ tamano = 42 }) {
 }
 
 // Fondo vivo: formas pequeñas que caen despacio en diagonal, girando (la misma idea de las hojas que caen en Selvana,
-// con formas propias de cada módulo: cajitas en Compras, corazones en Bienestar, monedas en Tesorería). Posiciones y
+// con formas propias de cada módulo: cajitas en Compras, corazones en Bienestar, monedas en Tesorería, gotas en Consumo). Posiciones y
 // ritmos fijos (sin azar) para que el servidor y el navegador pinten lo mismo. Solo decoración.
 const FORMAS = {
   compras: <rect x="4" y="4" width="16" height="16" rx="4.5" />,
   bienestar: <path d="M12 20.5s-7.5-4.6-7.5-10A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.5 2.9c0 5.4-7.5 10-7.5 10z" />,
   tesoreria: <><circle cx="12" cy="12" r="8.5" /><circle className="hueco" cx="12" cy="12" r="4" /></>,
+  consumo: <path d="M12 3.2c3.4 4.2 6 7.300 6 10.600a6 6 0 0 1-12 0c0-3.300 2.600-6.400 6-10.600z" />,
 };
 const ORDEN = ["compras", "bienestar", "tesoreria"];
 // [posición horizontal %, tamaño px, duración s, retraso s, giro grados]

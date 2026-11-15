@@ -52,3 +52,27 @@ Con `CORREO_MODO=simulado` en `backend/.env`, en Mi correo:
 
 1. "Vincular (modo de prueba)" vincula sin Microsoft.
 2. "Probar con un correo" procesa un correo pegado, con un RUT adjunto opcional, igual que si hubiera llegado. El aviso queda en la Bandeja.
+
+## Correo de soportes (Gmail compartido)
+
+**Desde noviembre de 2026 la aplicación lee un solo correo: este, y SOLO para soportes de pago.** Las solicitudes de proveedor por correo se quitaron, y Mi correo ya no ofrece vincular el correo personal de Outlook (el servidor lo rechaza salvo con `CORREO_PERSONAL=1`). El código del agente de proveedores sigue, sin usarse.
+
+Es un Gmail compartido, sin dueño, al que los demás correos reenvían (con reglas) los soportes de pago. No depende de `CORREO_MODO` ni de Microsoft.
+
+**Configurarlo (un administrador, en el menú › «Mi correo» › pestaña «Conexión»):** es un asistente de 3 pasos con enlaces directos a Google.
+
+1. Crear el Gmail y activar la **verificación en dos pasos**.
+2. Cuenta de Google › **Contraseñas de aplicación**: crear una y copiar el código de 16 letras.
+3. Pegarlo en el panel › **Probar y conectar**. El panel prueba la conexión IMAP antes de guardar y guarda el código cifrado (`CuentaCorreo.claveCifrada`, AES-256-GCM). Si alguien escribe la contraseña normal, el panel lo detecta y explica cómo sacar el código.
+
+**Qué hace el agente (`lib/buzonCompartido.js`, cada 10 minutos con el agente encendido, o «Revisar ahora»):**
+
+- Lee la Bandeja de entrada por IMAP en solo lectura (`lib/correoGmail.js`, `imapflow` + `mailparser`): no marca como leído, no mueve ni borra. La primera vez lee los últimos 7 días; después sigue por UID.
+- Omite Promociones (`X-GM-RAW -category:promotions`), los anuncios masivos (`List-Unsubscribe`/`Precedence: bulk` sin adjunto que leer) y los correos sin un comprobante.
+- **Filtro en código (sin IA):** pasa a Nova un correo con un PDF o una foto adjunta, o con texto de banco (transferencia, PSE, comprobante, CUS…).
+- **Lectura con Nova:** lee cada comprobante (hasta 3 por correo) o, si no hay adjunto, el texto del correo. También sugiere si el movimiento ya existe y a qué pago o gasto corresponde, escogiendo solo entre candidatos del código.
+- **Dónde queda:** pendiente (`SoporteCorreoTesoreria`) en **Mi correo › Pagos** y en **Tesorería › Movimientos › «Llegó al correo»**.
+- **Nunca crea movimientos ni asocia pagos.** La persona confirma con «Revisar y registrar».
+- **Una sola lectura por correo** (`CorreoRevisado`), con un máximo de 20 lecturas de Nova por revisión. Un archivo repetido (mismo sha1) no se vuelve a leer.
+
+**Auditoría:** `cuentaCorreo` (conectar, cambiar, encender o apagar, quitar) y `soporteCorreoTesoreria` (detectar, descargar, aprobar = registrado, descartar).

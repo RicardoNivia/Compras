@@ -1,6 +1,7 @@
 import { generateStructuredJson } from "@/lib/aiStructured";
 import { prepararArchivo } from "@/lib/agenteCotizador";
 import { badRequest } from "@/lib/tesoreria/comun";
+import { getAnthropicApiKey } from "@/lib/anthropic";
 
 // Extracto bancario en PDF (Conciliación de Tesorería).
 // 1) El PDF se revisa por su CONTENIDO: que sea PDF de verdad, sin JavaScript, acciones que abran programas, archivos
@@ -173,12 +174,15 @@ export async function leerExtractoPdf(buffer, nombre, cuenta) {
   let leido = null;
   try {
     leido = leerTexto(await textoPorRenglones(buffer));
-  } catch {
-    leido = null; // texto ilegible: se intenta con Nova
+  } catch (e) {
+    // Texto ilegible (o pdfjs no pudo correr en este servidor): se intenta con Nova. Se deja rastro en el log.
+    console.error("[extracto pdf] no se pudo leer el texto:", e?.message || e);
+    leido = null;
   }
   let leidoPor = "texto";
   if (!leido?.lineas?.length) {
-    if (!process.env.ANTHROPIC_API_KEY) throw badRequest("El PDF no trae texto legible (parece escaneado) y Nova no está disponible en este servidor para leerlo. Descarga el extracto en PDF o Excel desde el portal del banco.");
+    // Mismo criterio que el resto de la app: en producción la variable se llama ANTROPIC_API_KEY (ver lib/anthropic.js).
+    if (!getAnthropicApiKey()) throw badRequest("El PDF no trae texto legible (parece escaneado) y Nova no está disponible en este servidor para leerlo. Descarga el extracto en PDF o Excel desde el portal del banco.");
     leido = await leerConNova(archivo.documento, nombre, cuenta);
     leidoPor = "nova";
   }

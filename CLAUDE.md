@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-"Panel de Compras y Bienestar" (Sinco) — a purchasing and employee-wellbeing app with two modules, Compras and Bienestar (Bienestar and Fundación activities). Internal ids such as the `panel-compras` MCP server name keep the old name on purpose: changing them would break existing connections. Migrated from a single-file HTML app (vendored jsPDF/jspdf-autotable/html2canvas, inline JSON data) into **Next.js (App Router, JavaScript, not TypeScript)** + **React** + **Prisma ORM on PostgreSQL**. The original's "regenerate and republish the whole HTML file" persistence model was replaced with a real REST API + database.
+"Panel de Compras y Bienestar" (Sinco) — a purchasing and employee-wellbeing app with two modules, Compras and Bienestar (Bienestar and Fundación activities). Later modules: Tesorería and Consumo (utility bills per site), each independent, with its own docs file (see the table below). Internal ids such as the `panel-compras` MCP server name keep the old name on purpose: changing them would break existing connections. Migrated from a single-file HTML app (vendored jsPDF/jspdf-autotable/html2canvas, inline JSON data) into **Next.js (App Router, JavaScript, not TypeScript)** + **React** + **Prisma ORM on PostgreSQL**. The original's "regenerate and republish the whole HTML file" persistence model was replaced with a real REST API + database.
 
 The repo is split into two independent Next.js apps, sibling folders at the repo root:
 
@@ -85,6 +85,7 @@ There is no test suite in this repo currently.
 | Maestros, Proveedores, Valoración IA, Presupuesto, Solicitudes de compra, Agentes de Compras, Mi correo, Salario mínimo, Nova filters | `docs/claude/compras.md` |
 | Bienestar and Fundación (activities, participants, inventory, survey, agents, historias, Nova in Bienestar) | `docs/claude/bienestar.md` |
 | Tesorería | `docs/claude/tesoreria.md` |
+| Consumo (servicios públicos por sede: sedes, cuentas, recibos) | `docs/claude/consumo.md` |
 | Mi día, alertas, configurable notifications | `docs/claude/alertas-notificaciones.md` |
 | Estudio de informes, Claude MCP, deploy agent | `docs/claude/informes-mcp-despliegue.md` |
 | Frontend (routing, modules and design line 2026, views, charts, formatting, export, `globals.css`) | `docs/claude/frontend.md` |

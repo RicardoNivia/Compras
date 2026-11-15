@@ -985,13 +985,17 @@ model ConfigAgente {
 // Los tokens se guardan cifrados (AES-256-GCM, lib/cifradoTokens.js) y nunca salen al cliente ni a la auditoría.
 model CuentaCorreo {
   id              Int       @id @default(autoincrement())
-  userId          String    @unique // una cuenta por persona (sin FK, como el resto de referencias a User)
+  userId          String // personal: dueño del buzón (sin FK) · compartido: "compartido" (no pertenece a nadie)
   userNombre      String
-  email           String // buzón vinculado (debe ser el mismo correo del usuario del panel)
-  proveedor       String    @default("microsoft") // "microsoft" | "simulado"
+  tipo            String    @default("personal") // "personal" (uno por persona) | "compartido" (el Gmail de solicitudes, uno solo)
+  email           String // personal: el mismo correo del usuario del panel · compartido: el Gmail de soportes
+  proveedor       String    @default("microsoft") // "microsoft" | "simulado" | "gmail"
   accessToken     String? // cifrado
   refreshToken    String? // cifrado
   expiraAt        DateTime?
+  claveCifrada    String? // gmail: contraseña de aplicación (IMAP), cifrada; nunca sale al cliente ni a la auditoría
+  imapUidValidity String? // gmail: si cambia, los UID ya no sirven y se vuelve a leer por fecha
+  imapUltimoUid   Int? // gmail: último UID leído de la Bandeja de entrada
   agenteActivo    Boolean   @default(true) // el agente lee el correo solo con esto encendido
   estado          String    @default("activa") // "activa" | "error" (hay que volver a vincular)
   ultimoError     String?
@@ -1002,6 +1006,7 @@ model CuentaCorreo {
   creadoPorNombre String?
   updatedAt       DateTime  @updatedAt
 
+  @@unique([userId, tipo])
   @@map("cuentas_correo")
 }
 
@@ -1224,6 +1229,40 @@ model SoporteMovimiento {
   @@map("tesoreria_soportes")
 }
 
+// Comprobante de pago que llegó al buzón compartido (Gmail) y que Nova leyó. Queda pendiente hasta que una persona lo
+// registre como movimiento (o lo adjunte a uno que ya existía, con su pago) o lo descarte: el agente nunca crea nada.
+model SoporteCorreoTesoreria {
+  id                Int       @id @default(autoincrement())
+  cuentaId          Int // CuentaCorreo (compartido) de donde vino; sin FK, el soporte se conserva si se desvincula
+  mensajeId         String
+  indice            Int       @default(0) // n-ésimo comprobante del mismo correo
+  remitente         String?
+  asunto            String?
+  recibidoAt        DateTime?
+  webLink           String?
+  archivoNombre     String? // null = el comprobante estaba en el texto del correo, sin adjunto
+  tipoMime          String?
+  tamano            Int?
+  sha1              String?
+  contenido         Bytes?
+  leido             String // JSON: tipo, fecha, valor, banco, tercero, referencia, descripcion
+  sugerencia        String? // JSON: lo que Nova sugiere (movimiento que ya existe y pago al que corresponde), entre candidatos del código
+  estado            String    @default("pendiente") // "pendiente" | "registrado" | "descartado"
+  movimientoId      Int?
+  motivoDescarte    String?
+  resueltoAt        DateTime?
+  resueltoPorUserId String?
+  resueltoPorNombre String?
+  createdAt         DateTime  @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+
+  @@unique([cuentaId, mensajeId, indice])
+  @@index([estado])
+  @@index([sha1])
+  @@map("tesoreria_soportes_correo")
+}
+
 // Gasto (o ingreso) que se repite: genera sus pagos programados en P desde el mes en curso hasta su fecha fin o hasta
 // diciembre del año actual («Replicar pagos» llena el año siguiente). Desactivado deja de generar.
 model GastoPeriodico {
@@ -1441,4 +1480,217 @@ model MovimientoInventario {
   @@index([recordId])
   @@index([actividadId])
   @@map("inventario_movimientos")
+}
+
+// ===================== Consumo (servicios públicos por sede: energía, acueducto, gas y aseo) =====================
+// Módulo independiente de Compras, Bienestar y Tesorería (lib/consumo/*, docs/claude/consumo.md). Una sede tiene cuentas
+// de servicio (una por empresa y número de cuenta); cada recibo pertenece a una cuenta. La cuenta y el medidor son lo
+// que le dice a Nova de qué sede es un recibo: la persona siempre confirma la sede antes de guardar.
+
+model SedeConsumo {
+  id              Int      @id @default(autoincrement())
+  nombre          String   @unique
+  edificio        String? // agrupa las sedes del mismo edificio (p. ej. «CL 81 # 11-08»)
+  direccion       String?
+  ciudad          String?
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  cuentas   CuentaConsumo[]
+  hallazgos HallazgoConsumo[]
+
+  @@map("consumo_sedes")
+}
+
+model EmpresaConsumo {
+  id              Int      @id @default(autoincrement())
+  nombre          String   @unique
+  nit             String?
+  servicios       String   @default("") // lista separada por comas: energia, acueducto, gas, aseo
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime @updatedAt
+
+  cuentas CuentaConsumo[]
+
+  @@map("consumo_empresas")
+}
+
+model CuentaConsumo {
+  id              Int             @id @default(autoincrement())
+  sedeId          Int
+  sede            SedeConsumo     @relation(fields: [sedeId], references: [id], onDelete: Restrict)
+  servicio        String // "energia" | "acueducto" | "gas" | "aseo"
+  empresaId       Int?
+  empresa         EmpresaConsumo? @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  numeroCuenta    String? // número de cuenta o cuenta contrato; null cuando noAplica
+  titular         String?
+  claseUso        String? // Comercial, Residencial…
+  estrato         String?
+  periodicidad    String          @default("mensual") // "mensual" | "bimestral"
+  direccionRecibo String? // la dirección tal como la escribe la empresa en el recibo
+  noAplica        Boolean         @default(false) // la sede no tiene ese servicio: no se reporta como recibo faltante
+  activo          Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+  updatedAt       DateTime        @updatedAt
+
+  medidores MedidorConsumo[]
+  recibos   ReciboConsumo[]
+
+  @@index([sedeId])
+  @@index([servicio, numeroCuenta])
+  @@map("consumo_cuentas")
+}
+
+model MedidorConsumo {
+  id              Int           @id @default(autoincrement())
+  cuentaId        Int
+  cuenta          CuentaConsumo @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  numero          String
+  factor          Decimal       @default(1) @db.Decimal(12, 4)
+  desde           String? // AAAA-MM-DD (cambio de medidor)
+  hasta           String?
+  createdAt       DateTime      @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  recibos ReciboConsumo[]
+
+  @@index([cuentaId])
+  @@index([numero])
+  @@map("consumo_medidores")
+}
+
+model ReciboConsumo {
+  id                Int             @id @default(autoincrement())
+  cuentaId          Int
+  cuenta            CuentaConsumo   @relation(fields: [cuentaId], references: [id], onDelete: Restrict)
+  medidorId         Int?
+  medidor           MedidorConsumo? @relation(fields: [medidorId], references: [id], onDelete: SetNull)
+  numeroFactura     String?
+  periodoDesde      String // AAAA-MM-DD
+  periodoHasta      String
+  dias              Int?
+  anio              Int // mes de reporte (el del fin del período, salvo que la persona lo cambie)
+  mes               Int
+  tipoLectura       String          @default("real") // "real" | "promediada" | "estimada" | "sin_consumo"
+  lecturaAnterior   Decimal?        @db.Decimal(18, 4)
+  lecturaActual     Decimal?        @db.Decimal(18, 4)
+  factor            Decimal         @default(1) @db.Decimal(12, 4)
+  consumo           Decimal?        @db.Decimal(18, 4)
+  unidad            String          @default("kWh") // kWh | m3
+  vigenciaTarifa    String?
+  valorUnitario     Decimal?        @db.Decimal(18, 4)
+  totalCargos       Decimal         @db.Decimal(18, 2)
+  saldoAnterior     Decimal         @default(0) @db.Decimal(18, 2)
+  totalPagar        Decimal         @db.Decimal(18, 2)
+  moneda            String          @default("COP") // ISO 4217
+  fechaExpedicion   String?
+  fechaPagoOportuno String?
+  fechaSuspension   String?
+  estadoPago        String          @default("pendiente") // "pendiente" | "pagado" | "saldo_favor"
+  valorPagado       Decimal?        @db.Decimal(18, 2)
+  fechaPago         String?
+  origen            String          @default("manual") // "manual" | "nova"
+  extras            String? // JSON: lo que trae el recibo y el informe no usa (componentes de tarifa, calidad, reactiva, meta, CUDE…)
+  nota              String?
+  createdAt         DateTime        @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+  updatedAt         DateTime        @updatedAt
+
+  cargos    CargoReciboConsumo[]
+  historial HistorialReciboConsumo[]
+  soportes  SoporteReciboConsumo[]
+  hallazgos HallazgoConsumo[]
+
+  @@index([cuentaId, anio, mes])
+  @@index([estadoPago])
+  @@map("consumo_recibos")
+}
+
+model CargoReciboConsumo {
+  id              Int           @id @default(autoincrement())
+  reciboId        Int
+  recibo          ReciboConsumo @relation(fields: [reciboId], references: [id], onDelete: Cascade)
+  grupo           String // "energia" | "acueducto" | "alcantarillado" | "gas" | "aseo" | "otros" | "financiado"
+  concepto        String
+  cantidad        Decimal?      @db.Decimal(18, 4)
+  valorUnitario   Decimal?      @db.Decimal(18, 4)
+  valor           Decimal       @db.Decimal(18, 2)
+  orden           Int           @default(0)
+  createdAt       DateTime      @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@index([reciboId])
+  @@map("consumo_recibo_cargos")
+}
+
+// Consumo de meses anteriores que trae la gráfica del recibo: sirve para tener el dato aunque falte ese recibo.
+model HistorialReciboConsumo {
+  id              Int           @id @default(autoincrement())
+  reciboId        Int
+  recibo          ReciboConsumo @relation(fields: [reciboId], references: [id], onDelete: Cascade)
+  cuentaId        Int
+  anio            Int
+  mes             Int
+  etiqueta        String? // como lo escribe el recibo («MAY-JUN», «Sep»)
+  consumo         Decimal       @db.Decimal(18, 4)
+  createdAt       DateTime      @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@index([cuentaId, anio, mes])
+  @@index([reciboId])
+  @@map("consumo_recibo_historial")
+}
+
+model SoporteReciboConsumo {
+  id              Int           @id @default(autoincrement())
+  reciboId        Int
+  recibo          ReciboConsumo @relation(fields: [reciboId], references: [id], onDelete: Cascade)
+  nombre          String
+  tipoMime        String
+  tamano          Int
+  sha1            String
+  contenido       Bytes
+  createdAt       DateTime      @default(now())
+  creadoPorUserId String?
+  creadoPorNombre String?
+
+  @@index([sha1])
+  @@index([reciboId])
+  @@map("consumo_soportes")
+}
+
+model HallazgoConsumo {
+  id                Int            @id @default(autoincrement())
+  tipo              String // "vencido" | "lectura_promediada" | "titular" | "exceso_meta" | "doble_cobro" | "variacion" | …
+  nivel             String         @default("media") // "alta" | "media"
+  sedeId            Int
+  sede              SedeConsumo    @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  reciboId          Int?
+  recibo            ReciboConsumo? @relation(fields: [reciboId], references: [id], onDelete: Cascade)
+  titulo            String
+  detalle           String?
+  valor             Decimal?       @db.Decimal(18, 2)
+  moneda            String         @default("COP")
+  estado            String         @default("abierto") // "abierto" | "resuelto" | "descartado"
+  resueltoAt        DateTime?
+  resueltoPorUserId String?
+  resueltoPorNombre String?
+  createdAt         DateTime       @default(now())
+  creadoPorUserId   String?
+  creadoPorNombre   String?
+
+  @@index([sedeId, estado])
+  @@map("consumo_hallazgos")
 }

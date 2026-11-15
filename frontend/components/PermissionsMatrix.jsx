@@ -25,7 +25,7 @@ function Cell({ row, role, label, allowed, onRequestChange }) {
 }
 
 // roles: [{ clave, nombre }] — los del sistema y los personalizados (Usuarios › Roles), en ese orden.
-const MODULOS_MATRIZ = [["Compras", "Compras"], ["Bienestar", "Bienestar y Fundación"], ["Tesorería", "Tesorería"], ["General", "Generales"], ["", "Todos"]];
+const MODULOS_MATRIZ = [["Compras", "Compras"], ["Bienestar", "Bienestar y Fundación"], ["Tesorería", "Tesorería"], ["Consumo", "Consumo"], ["General", "Generales"], ["", "Todos"]];
 
 export default function PermissionsMatrix({ initialMatrix, roles = [], onChanged }) {
   const [matrix, setMatrix] = useState(initialMatrix || []);
