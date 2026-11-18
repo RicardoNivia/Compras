@@ -30,14 +30,18 @@ export function Celda({ v, ancha = false }) {
 }
 
 // Estado de un pago programado: P pendiente (rojo si ya venció) / E pagado.
-export function EstadoPago({ estado, vencido = false }) {
-  if (estado === "E") return <span className="pill good">E · Pagado</span>;
-  return <span className={`pill ${vencido ? "critical" : "warning"}`}>{vencido ? "P · Vencido" : "P · Pendiente"}</span>;
+// corto: sin la letra (para tablas angostas); el texto completo queda en el title.
+export function EstadoPago({ estado, vencido = false, corto = false }) {
+  if (estado === "E") return <span className="pill good" title="E · Pagado">{corto ? "Pagado" : "E · Pagado"}</span>;
+  const t = vencido ? "P · Vencido" : "P · Pendiente";
+  return <span className={`pill ${vencido ? "critical" : "warning"}`} title={t}>{corto ? t.slice(4) : t}</span>;
 }
 
-export function TipoPago({ tipo }) {
+// corto: solo la letra (I, E, J, S, T) con el nombre en el title.
+export function TipoPago({ tipo, corto = false }) {
   const cls = tipo === "I" ? "good" : tipo === "E" ? "critical" : "muted";
-  return <span className={`pill ${cls}`}>{tipo} · {TIPOS_PAGO[tipo] || tipo}</span>;
+  const t = `${tipo} · ${TIPOS_PAGO[tipo] || tipo}`;
+  return <span className={`pill ${cls}`} title={t}>{corto ? tipo : t}</span>;
 }
 
 // Valor de dinero con su signo y color (egresos/débitos en rojo, ingresos/créditos en verde).

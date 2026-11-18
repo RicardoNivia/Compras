@@ -80,6 +80,7 @@ function SeccionTabla({ items, dominio, onEnviarInforme }) {
   const esPresupuesto = dominio === "presupuesto";
   const esInformes = dominio === "informes";
   const esTesoreria = dominio === "tesoreria";
+  const esConsumo = dominio === "consumo";
 
   // Si el filtro reduce la lista, la página actual no puede quedar fuera de rango.
   useEffect(() => { setPage(1); }, [items.length, pageSize]);
@@ -90,10 +91,10 @@ function SeccionTabla({ items, dominio, onEnviarInforme }) {
         <table className="audit-log mi-dia-tabla">
           <thead>
             <tr>
-              <th>{esProv ? "NIT" : esPresupuesto ? "" : esInformes ? "Período" : esBienestar ? "Línea" : esTesoreria ? "Tipo" : "#"}</th>
-              <th>{esProv ? "Proveedor" : esPresupuesto ? "Área" : esInformes ? "Informe" : esBienestar ? "Actividad" : esTesoreria ? "Qué pasa" : "Descripción"}</th>
-              <th>{esPresupuesto ? "Período" : esProv ? "Área · tipo" : esInformes ? "Para" : esBienestar ? "Línea · fecha" : esTesoreria ? "Contexto" : "Proveedor · área"}</th>
-              <th>{esPresupuesto ? "% consumido" : esProv || esInformes || esBienestar || esTesoreria ? "Días" : "Días háb."}</th>
+              <th>{esProv ? "NIT" : esPresupuesto ? "" : esInformes ? "Período" : esBienestar ? "Línea" : esTesoreria ? "Tipo" : esConsumo ? "Qué" : "#"}</th>
+              <th>{esProv ? "Proveedor" : esPresupuesto ? "Área" : esInformes ? "Informe" : esBienestar ? "Actividad" : esTesoreria || esConsumo ? "Qué pasa" : "Descripción"}</th>
+              <th>{esPresupuesto ? "Período" : esProv ? "Área · tipo" : esInformes ? "Para" : esBienestar ? "Línea · fecha" : esTesoreria ? "Contexto" : esConsumo ? "Sede · cuenta" : "Proveedor · área"}</th>
+              <th>{esPresupuesto ? "% consumido" : esProv || esInformes || esBienestar || esTesoreria || esConsumo ? "Días" : "Días háb."}</th>
               <th>Detalle</th>
               <th></th>
             </tr>

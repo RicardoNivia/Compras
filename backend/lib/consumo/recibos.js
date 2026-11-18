@@ -120,6 +120,12 @@ export async function obtenerRecibo(id) {
 
 // ---------- Escritura ----------
 
+// El agente de hallazgos vuelve a revisar la sede y el servicio del recibo (en segundo plano; import dinámico porque
+// agentes.js importa este archivo). Nunca hace fallar la escritura.
+function revisarDespues(actor, r) {
+  import("@/lib/consumo/agentes").then((m) => m.revisarTrasCambio(actor, r.sedeId, r.servicio)).catch(() => {});
+}
+
 const opc = (v, campo) => (v === undefined || v === null || v === "" ? null : numero(v, campo));
 const fechaOpc = (v, campo) => (v ? fechaValida(v, campo) : null);
 
@@ -253,6 +259,7 @@ export async function crearRecibo(actor, body) {
   if (historial.length) await prisma.historialReciboConsumo.createMany({ data: historial.map((h) => ({ reciboId: creado.id, cuentaId: cuenta.id, anio: Math.round(h.anio), mes: Math.round(h.mes), etiqueta: limpiar(h.etiqueta, 30), consumo: Number(h.consumo), ...quien(actor) })) });
   const r = await obtenerRecibo(creado.id);
   logConsumo(actor, { action: "crear", entityType: "reciboConsumo", recordId: r.id, recordInfo: info(r), after: paraAuditoria(r) }).catch(() => {});
+  revisarDespues(actor, r);
   return r;
 }
 
@@ -272,6 +279,7 @@ export async function editarRecibo(actor, id, body) {
   });
   const r = await obtenerRecibo(actual.id);
   logConsumo(actor, { action: "editar", entityType: "reciboConsumo", recordId: r.id, recordInfo: info(r), before: paraAuditoria(antes), after: paraAuditoria(r) }).catch(() => {});
+  revisarDespues(actor, r);
   return r;
 }
 
@@ -280,6 +288,7 @@ export async function marcarPago(actor, id, body) {
   await prisma.reciboConsumo.update({ where: { id: antes.id }, data: datosPago(body || {}, antes.totalPagar) });
   const r = await obtenerRecibo(antes.id);
   logConsumo(actor, { action: "editar", entityType: "reciboConsumo", recordId: r.id, recordInfo: info(r), before: paraAuditoria(antes), after: paraAuditoria(r) }).catch(() => {});
+  revisarDespues(actor, r);
   return r;
 }
 
@@ -287,6 +296,7 @@ export async function borrarRecibo(actor, id) {
   const antes = await obtenerRecibo(id);
   await prisma.reciboConsumo.delete({ where: { id: antes.id } });
   logConsumo(actor, { action: "eliminar", entityType: "reciboConsumo", recordId: antes.id, recordInfo: info(antes), before: { ...paraAuditoria(antes), soportes: antes.soportes.map((s) => s.nombre).join(" · ") || null } }).catch(() => {});
+  revisarDespues(actor, antes);
   return { ok: true };
 }
 

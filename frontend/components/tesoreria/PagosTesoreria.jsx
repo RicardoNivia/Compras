@@ -158,25 +158,32 @@ export default function PagosTesoreria({ acceso }) {
 
           <div className={`table-card${cargando && data.items.length ? " tes-recargando" : ""}`}>
             <div className="table-scroll">
-              <table className="records tes-tabla">
-                <thead><tr><th>Estado</th><th>Vence</th><th>Ítem</th><th>Concepto</th><th>Tipo</th><th>Medio de pago</th><th>Paga</th><th style={{ textAlign: "right" }}>Programado</th><th>Movimientos</th><th style={{ textAlign: "right" }}>Diferencia</th></tr></thead>
+              {/* Compacta: cabe sin scroll horizontal; el valor va justo después del concepto. Los textos largos se
+                  recortan con el globo al pasar el mouse; estado y tipo van cortos (el detalle está en su title). */}
+              <table className="records tes-tabla tes-tabla-compacta">
+                <colgroup>
+                  <col style={{ width: 78 }} /><col /><col style={{ width: 150 }} /><col style={{ width: "13%" }} />
+                  <col style={{ width: 92 }} /><col style={{ width: 54 }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} />
+                  <col style={{ width: 56 }} /><col style={{ width: 140 }} />
+                </colgroup>
+                <thead><tr><th>Vence</th><th>Concepto</th><th className="num">Valor</th><th>Ítem</th><th>Estado</th><th>Tipo</th><th>Medio de pago</th><th>Paga</th><th className="num">Mov.</th><th className="num">Diferencia</th></tr></thead>
                 <tbody>
-                  {cargando && !data.items.length && Array.from({ length: 8 }).map((_, i) => <tr key={`e${i}`} aria-hidden="true">{Array.from({ length: 10 }).map((__, j) => <td key={j}><div className="skeleton-bar" style={{ height: 12, borderRadius: 6, width: j === 3 ? 170 : 70 }} /></td>)}</tr>)}
+                  {cargando && !data.items.length && Array.from({ length: 8 }).map((_, i) => <tr key={`e${i}`} aria-hidden="true">{Array.from({ length: 10 }).map((__, j) => <td key={j}><div className="skeleton-bar" style={{ height: 12, borderRadius: 6, width: j === 1 ? "80%" : "70%" }} /></td>)}</tr>)}
                   {!cargando && !data.items.length && <tr><td colSpan={10}><EstadoVacio titulo={`No hay pagos en ${nombreMes}`}>Con otro filtro o mes puede que aparezcan. Para llenarlo usa «Proponer pagos con IA», «Replicar» o crea un pago extraordinario.</EstadoVacio></td></tr>}
                   {data.items.map((p) => {
                     const vencido = p.estado === "P" && p.fecha < hoy;
                     return (
                       <tr key={p.id} className="clickable" onClick={() => setModal({ tipo: "detalle", id: p.id })}>
-                        <td><EstadoPago estado={p.estado} vencido={vencido} /></td>
                         <td title={p.fechaAproximada ? "Del Excel: solo se sabe el mes" : undefined}>{p.fechaAproximada ? MESES_CORTOS[p.mes - 1] : fechaSinAnio(p.fecha)}{!mes ? ` ${p.anio}` : ""}</td>
+                        <td><Celda v={p.concepto} /></td>
+                        <td className="num">{p.valor === 0 ? <span className="pill warning" title="Vino en 0 del Excel: pon el valor real">COP 0</span> : <Dinero valor={p.valor} texto={p.valorTexto} fuerte />}</td>
                         <td><Celda v={p.item} /></td>
-                        <td><Celda v={p.concepto} ancha /></td>
-                        <td><TipoPago tipo={p.tipo} /></td>
-                        <td>{p.medioPago || <span className="muted">—</span>}</td>
-                        <td>{p.pagador || <span className="muted">—</span>}</td>
-                        <td style={{ textAlign: "right" }}>{p.valor === 0 ? <span className="pill warning" title="Vino en 0 del Excel: pon el valor real">COP 0</span> : <Dinero valor={p.valor} texto={p.valorTexto} fuerte />}</td>
-                        <td>{p.movimientos ? `${p.movimientos} mov.` : <span className="muted">—</span>}</td>
-                        <td style={{ textAlign: "right" }}>{p.diferencia == null ? <span className="muted">—</span> : Math.abs(p.diferencia) < 0.5 ? <span className="pill good">Cuadra</span> : <span className="pill warning">{p.diferencia > 0 ? "Faltan " : "Sobran "}{fmtMoneda(Math.abs(p.diferencia), "COP")}</span>}</td>
+                        <td><EstadoPago estado={p.estado} vencido={vencido} corto /></td>
+                        <td><TipoPago tipo={p.tipo} corto /></td>
+                        <td><Celda v={p.medioPago} /></td>
+                        <td><Celda v={p.pagador} /></td>
+                        <td className="num">{p.movimientos || <span className="muted">—</span>}</td>
+                        <td className="num">{p.diferencia == null ? <span className="muted">—</span> : Math.abs(p.diferencia) < 0.5 ? <span className="pill good">Cuadra</span> : <span className="pill warning" title={`${p.diferencia > 0 ? "Faltan" : "Sobran"} ${fmtMoneda(Math.abs(p.diferencia), "COP")}`}>{p.diferencia > 0 ? "−" : "+"}{fmtMoneda(Math.abs(p.diferencia), "COP")}</span>}</td>
                       </tr>
                     );
                   })}

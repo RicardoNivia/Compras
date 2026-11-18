@@ -550,3 +550,28 @@ export const SOPORTE_RECIBO_CONSUMO_FIELD_LABELS = {
   recibo: "Recibo",
 };
 Object.assign(ENTITY_LABELS, { cargaInicialConsumo: "Carga inicial de Consumo" });
+
+// Agentes de Consumo (lib/consumo/agentes.js y reclamaciones.js).
+Object.assign(ACTION_LABELS, { revisar: "Revisó" });
+Object.assign(ENTITY_LABELS, {
+  hallazgoConsumo: "Hallazgo de consumo",
+  agenteHallazgosConsumo: "Agente de hallazgos de Consumo",
+  reclamacionConsumo: "Reclamación de consumo",
+});
+export const HALLAZGO_CONSUMO_FIELD_LABELS = {
+  estado: "Estado",
+  nota: "Nota",
+  titulo: "Hallazgo",
+};
+export const AGENTE_HALLAZGOS_CONSUMO_FIELD_LABELS = {
+  alcance: "Alcance",
+  revisadas: "Sedes y servicios revisados",
+  nuevos: "Hallazgos nuevos",
+  reabiertos: "Reabiertos",
+  cerrados: "Cerrados (ya no aplican)",
+};
+export const RECLAMACION_CONSUMO_FIELD_LABELS = {
+  reclamacionEstado: "Estado de la reclamación",
+  asunto: "Asunto",
+  radicadoNumero: "Número de radicado",
+};

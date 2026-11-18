@@ -15,10 +15,10 @@ import { FormReciboModal, DetalleReciboModal } from "@/components/consumo/Recibo
 const PAGE_SIZES = [25, 50, 100];
 const Texto = ({ v }) => (v ? <span className="desc-tooltip-wrap"><span className="desc-text">{v}</span><span className="desc-tooltip-bubble">{v}</span></span> : <span className="muted">—</span>);
 
-export default function RecibosConsumo({ acceso }) {
+export default function RecibosConsumo({ acceso, qInicial = "" }) {
   const { cat, recargar: recargarCat } = useCatalogosConsumo();
-  const [f, setF] = useState({ q: "", sedeId: "", servicio: "", anio: "", pago: "", lectura: "" });
-  const [q, setQ] = useState("");
+  const [f, setF] = useState({ q: qInicial, sedeId: "", servicio: "", anio: "", pago: "", lectura: "" });
+  const [q, setQ] = useState(qInicial);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(PAGE_SIZES[0]);
   const [datos, setDatos] = useState(null);

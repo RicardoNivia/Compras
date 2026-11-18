@@ -1674,7 +1674,7 @@ model SoporteReciboConsumo {
 model HallazgoConsumo {
   id                Int            @id @default(autoincrement())
   tipo              String // "vencido" | "lectura_promediada" | "titular" | "exceso_meta" | "doble_cobro" | "variacion" | …
-  nivel             String         @default("media") // "alta" | "media"
+  nivel             String         @default("media") // prioridad: "urgente" | "alta" | "media" | "baja"
   sedeId            Int
   sede              SedeConsumo    @relation(fields: [sedeId], references: [id], onDelete: Cascade)
   reciboId          Int?
@@ -1691,6 +1691,23 @@ model HallazgoConsumo {
   creadoPorUserId   String?
   creadoPorNombre   String?
 
+  // Agente de hallazgos (lib/consumo/agentes.js): lo que encuentra se guarda una sola vez por `clave` y se actualiza en
+  // cada revisión; si deja de cumplirse se cierra solo (resueltoPorNombre «Nova: ya no aplica»).
+  clave              String?   @unique // tipo|sede|servicio|recibo… (huella del hallazgo)
+  servicio           String? // energia | acueducto | gas | aseo
+  accion             String? // qué hacer, con la cifra
+  confianza          String    @default("media") // "alta" | "media" | "baja": qué tan seguro está el código del hallazgo
+  nota               String? // lo que escribió la persona al resolverlo o descartarlo
+  actualizadoAt      DateTime? // última vez que la revisión lo volvió a encontrar
+  // Agente de reclamaciones (lib/consumo/reclamaciones.js): borrador que redacta Nova y la persona revisa.
+  reclamacion        String? // JSON { asunto, destinatario, cuerpo, anexos[], datosFaltantes[] }
+  reclamacionEstado  String? // "borrador" | "radicada"
+  reclamacionAt      DateTime?
+  reclamacionPorNombre String?
+  radicadaAt         DateTime?
+  radicadoNumero     String? // número de radicado que da la empresa
+
   @@index([sedeId, estado])
+  @@index([estado, nivel])
   @@map("consumo_hallazgos")
 }

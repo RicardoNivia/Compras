@@ -6621,3 +6621,23 @@ table.records.con-tabla thead th.num{ text-align:right; }
 .con-hallazgo.p-urgente, .con-hallazgo.p-alta{ border-color:color-mix(in srgb, var(--critical) 40%, var(--border)); background:color-mix(in srgb, var(--critical) 6%, var(--surface)); }
 .con-hallazgo.p-media{ border-color:color-mix(in srgb, var(--warning) 40%, var(--border)); background:color-mix(in srgb, var(--warning) 6%, var(--surface)); }
 @media (max-width: 640px){ .con-hallazgo{ grid-template-columns:1fr; } }
+
+/* Tesorería › Pagos programados y Movimientos: tablas compactas sin scroll horizontal, con el valor cerca del concepto. */
+table.records.tes-tabla-compacta{ min-width:0; width:100%; table-layout:fixed; }
+.tes-tabla-compacta thead th{ padding:9px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tes-tabla-compacta thead th.num{ text-align:right; }
+table.records.tes-tabla-compacta tbody td{ padding:8px 8px; vertical-align:middle; overflow:hidden; text-overflow:ellipsis; }
+.tes-tabla-compacta .desc-text{ max-width:100%; }
+.tes-tabla-compacta .pill{ padding:2px 8px; font-size:11px; }
+.tes-tabla-compacta td.num .tes-num{ font-variant-numeric:tabular-nums; }
+
+/* Consumo › Agentes: modal del hallazgo con su carta de reclamación (AgentesConsumo.jsx). */
+.con-recl{ display:flex; flex-direction:column; gap:12px; }
+.con-recl .con-recl-hallazgo{ grid-template-columns:1fr; }
+.con-recl-estado{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.con-recl-cuerpo{ font-family:inherit; font-size:13px; line-height:1.55; min-height:280px; resize:vertical; }
+.con-recl-acciones{ display:flex; flex-wrap:wrap; gap:8px; }
+.con-recl-radicar{ padding:14px 16px; gap:8px; }
+.con-recl-radicar-campos{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; }
+.con-recl-radicar-campos .field{ margin:0; min-width:180px; }
+@media (max-width: 640px){ .con-recl-radicar-campos .field{ min-width:0; flex:1 1 100%; } }

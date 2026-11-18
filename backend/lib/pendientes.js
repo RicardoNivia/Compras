@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { itemsAlertasImportacion, itemsPagosVencidos } from "@/lib/tesoreria/alertas";
+import { itemsRecibosFaltantes, itemsHallazgosAltos } from "@/lib/consumo/agentes";
 import { solicitudesPendientes } from "@/lib/solicitudesCompra";
 import { listRecords } from "@/lib/records";
 import { getSolicitudesPendientes, getRiesgoPresupuesto, getRiesgoTiempos } from "@/lib/alerts";
@@ -298,6 +299,9 @@ const SECCIONES = [
   // Tesorería ("*" + permiso: también roles creados que tengan verTesoreria)
   { clave: "tesVencidos", titulo: "Pagos de Tesorería vencidos", descripcion: "Su fecha de vencimiento ya pasó y siguen en P: asóciales el movimiento del banco o márcalos pagados.", roles: ["*"], fuente: "tesoreria", permiso: "verTesoreria" },
   { clave: "tesAlertas", titulo: "Tesorería: lo que no cuadró al importar", descripcion: "Pagos que vinieron en 0, fechas dañadas, saldos del Excel por registrar y filas sin datos. Corrígelos con «Ir» y márcalos como revisados aquí mismo.", roles: ["*"], fuente: "tesoreria", permiso: "verTesoreria" },
+  // Consumo ("*" + permiso: también roles creados que tengan verConsumo)
+  { clave: "conFaltantes", titulo: "Consumo: recibos que no han llegado", descripcion: "Ya cerró el período y el recibo no se ha cargado (o quedó un hueco entre dos recibos): búscalo en el correo o en el portal de la empresa antes de que se venza.", roles: ["*"], fuente: "consumo", permiso: "verConsumo" },
+  { clave: "conHallazgos", titulo: "Consumo: hallazgos urgentes y altos", descripcion: "Recibos vencidos, doble facturación, consumos o costos fuera de lo normal y titulares distintos que encontró el agente. Resuélvelos o pide a Nova la reclamación en Consumo › Agentes.", roles: ["*"], fuente: "consumo", permiso: "verConsumo" },
   // Compras
   { clave: "atrasadas", titulo: "Solicitudes atrasadas", descripcion: "Compras sin fecha de entrega. Pasados 8 días hábiles incumplen el plazo; desde 5 ya conviene moverlas.", roles: ["admin", "registro"], fuente: "records" },
   { clave: "porLegalizar", titulo: "Compras por legalizar", descripcion: "Ya fueron entregadas o ejecutadas pero su legalización no se ha hecho. Los días cuentan desde la entrega.", roles: ["admin", "legalizar"], fuente: "records" },
@@ -345,6 +349,8 @@ async function prepararConstructores(user, usa) {
     bienSinCerrar: () => actividadesSinCerrar(user),
     tesVencidos: () => itemsPagosVencidos(),
     tesAlertas: () => itemsAlertasImportacion(user),
+    conFaltantes: () => itemsRecibosFaltantes(),
+    conHallazgos: () => itemsHallazgosAltos(),
   };
   return { constructores, ctxProv };
 }
@@ -382,7 +388,7 @@ export async function getPendientes(user) {
       clave: s.clave,
       titulo: s.titulo,
       descripcion: s.descripcion,
-      dominio: s.fuente === "proveedores" ? "proveedores" : s.fuente === "presupuesto" ? "presupuesto" : s.fuente === "informes" ? "informes" : s.fuente === "bienestar" ? "bienestar" : s.fuente === "tesoreria" ? "tesoreria" : "compras",
+      dominio: s.fuente === "proveedores" ? "proveedores" : s.fuente === "presupuesto" ? "presupuesto" : s.fuente === "informes" ? "informes" : s.fuente === "bienestar" ? "bienestar" : s.fuente === "tesoreria" ? "tesoreria" : s.fuente === "consumo" ? "consumo" : "compras",
       total: items.length,
       criticos: items.filter((i) => i.nivel === "critico").length,
       nivel: items.length ? peorNivel(items) : "ok",

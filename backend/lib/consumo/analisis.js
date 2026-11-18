@@ -22,8 +22,8 @@ const esReal = (r) => r.tipoLectura === "real";
 const etiqueta = (r) => `${MESES[r.mes - 1]} ${String(r.anio).slice(2)}${r.tipoLectura === "promediada" || r.tipoLectura === "estimada" ? " (est.)" : ""}`;
 
 // Recibos del filtro, del más viejo al más nuevo. servicio por defecto: energía (como el Excel).
-async function recibosDe({ sedeId, servicio = "energia", anio }) {
-  const todos = await todosLosRecibos();
+async function recibosDe({ sedeId, servicio = "energia", anio }, precargados = null) {
+  const todos = precargados || await todosLosRecibos();
   const lista = todos.filter((r) => r.servicio === servicio && (!sedeId || r.sedeId === Number(sedeId)) && (!anio || r.anio === Number(anio)));
   return lista.sort((a, b) => a.periodoHasta.localeCompare(b.periodoHasta) || a.id - b.id);
 }
@@ -173,19 +173,22 @@ const extrasDe = (txt) => { try { return txt ? JSON.parse(txt) : {}; } catch { r
 const buscarExtra = (ex, re) => { const k = Object.keys(ex).find((x) => re.test(x)); return k ? ex[k] : null; };
 const aNum = (s) => { if (s == null) return null; const m = String(s).replace(/\./g, "").replace(",", ".").match(/-?\d+(\.\d+)?/); return m ? Number(m[0]) : null; };
 
-export async function auditoria(filtro = {}) {
+// `precargados` (opcional): la lista de todosLosRecibos() ya leída, para que el agente de hallazgos revise todas las
+// sedes sin volver a leer la base en cada una.
+export async function auditoria(filtro = {}, precargados = null) {
   const servicio = SERVICIOS[filtro.servicio] ? filtro.servicio : "energia";
+  const todosL = precargados || await todosLosRecibos();
   const sedes = await prisma.sedeConsumo.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } });
   // La auditoría es de UNA sede: sin sede elegida se toma la que tenga más recibos del servicio.
   let sedeId = Number(filtro.sedeId) || null;
   if (!sedeId) {
     const cuenta = new Map();
-    for (const r of (await todosLosRecibos()).filter((x) => x.servicio === servicio)) cuenta.set(r.sedeId, (cuenta.get(r.sedeId) || 0) + 1);
+    for (const r of todosL.filter((x) => x.servicio === servicio)) cuenta.set(r.sedeId, (cuenta.get(r.sedeId) || 0) + 1);
     sedeId = [...cuenta.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
   }
-  const l = sedeId ? await recibosDe({ sedeId, servicio, anio: filtro.anio }) : [];
+  const l = sedeId ? await recibosDe({ sedeId, servicio, anio: filtro.anio }, todosL) : [];
   const unidad = SERVICIOS[servicio].unidad === "m3" ? "m³" : SERVICIOS[servicio].unidad;
-  const anios = [...new Set((await todosLosRecibos()).filter((r) => r.servicio === servicio && r.sedeId === sedeId).map((r) => r.anio))].sort((a, b) => b - a);
+  const anios = [...new Set(todosL.filter((r) => r.servicio === servicio && r.sedeId === sedeId).map((r) => r.anio))].sort((a, b) => b - a);
   const base = { servicio, unidad, sedes, anios, sedeId, filtro: { anio: filtro.anio ? Number(filtro.anio) : null } };
   if (!l.length) return { ...base, vacio: true };
   const extras = Object.fromEntries((await prisma.reciboConsumo.findMany({ where: { id: { in: l.map((r) => r.id) } }, select: { id: true, extras: true } })).map((x) => [x.id, extrasDe(x.extras)]));
@@ -263,23 +266,24 @@ export async function auditoria(filtro = {}) {
     credito = { mes: etiqueta(conCredito), capital, interes, saldo, tasaPeriodo: tasa, tasaAnual: tasa != null && conCredito.dias ? (1 + tasa) ** (365 / conCredito.dias) - 1 : null, cuotas: saldo && capital ? Math.ceil(saldo / capital) : null };
   }
 
-  // G. Hallazgos y acciones recomendadas (con prioridad), todos con su cifra.
+  // G. Hallazgos y acciones recomendadas (con prioridad), todos con su cifra. `tipo`, `id` (lo que lo identifica dentro de
+  // la sede y el servicio), `valor` (la plata en juego) y `confianza` los usa el agente de hallazgos (agentes.js).
   const hallazgos = [];
-  for (const r of l.filter((x) => x.vencido)) hallazgos.push({ prioridad: "URGENTE", titulo: `Recibo de ${etiqueta(r)} (${fmtMoneda(r.totalPagar)}) vencido${r.fechaSuspension ? `; suspensión prevista el ${r.fechaSuspension}` : ""}.`, accion: "Pagarlo cuanto antes para evitar la suspensión y los costos de reconexión.", reciboId: r.id });
-  for (const c of doble.casos) hallazgos.push({ prioridad: "ALTA", titulo: `Doble facturación probable en ${c.mes}: la cuenta ${c.cuenta} cobró ${fmtN(c.consumo, 0)} ${unidad} con lectura estimada mientras se registraba consumo real en ${c.cruzaCon.join("; ")}.`, accion: `Radicar reclamación ante la empresa${c.plazoReclamo ? ` antes del ${c.plazoReclamo}${c.diasParaReclamar != null ? ` (${c.diasParaReclamar} días)` : ""}` : ""} pidiendo reliquidar ese período. Exposición: ${fmtMoneda(c.central)} (máximo ${fmtMoneda(c.maximo)}).`, reciboId: c.reciboId });
+  for (const r of l.filter((x) => x.vencido)) hallazgos.push({ tipo: "vencido", id: `r${r.id}`, confianza: "alta", valor: r.totalPagar, prioridad: "URGENTE", titulo: `Recibo de ${etiqueta(r)} (${fmtMoneda(r.totalPagar)}) vencido${r.fechaSuspension ? `; suspensión prevista el ${r.fechaSuspension}` : ""}.`, accion: "Pagarlo cuanto antes para evitar la suspensión y los costos de reconexión.", reciboId: r.id });
+  for (const c of doble.casos) hallazgos.push({ tipo: "doble_cobro", id: `r${c.reciboId}`, confianza: "media", valor: c.central, prioridad: "ALTA", titulo: `Doble facturación probable en ${c.mes}: la cuenta ${c.cuenta} cobró ${fmtN(c.consumo, 0)} ${unidad} con lectura estimada mientras se registraba consumo real en ${c.cruzaCon.join("; ")}.`, accion: `Radicar reclamación ante la empresa${c.plazoReclamo ? ` antes del ${c.plazoReclamo}${c.diasParaReclamar != null ? ` (${c.diasParaReclamar} días)` : ""}` : ""} pidiendo reliquidar ese período. Exposición: ${fmtMoneda(c.central)} (máximo ${fmtMoneda(c.maximo)}).`, reciboId: c.reciboId, plazoReclamo: c.plazoReclamo });
   const tit = comparativo.filas.find((f) => f.titulo.startsWith("Titular") && f.cambia);
-  if (tit) hallazgos.push({ prioridad: "ALTA", titulo: `Las cuentas de la sede tienen titulares distintos (${tit.valores.join(" / ")}).`, accion: "Confirmar que la cuenta vigente esté a nombre de la empresa (NIT); si no, solicitar el cambio de titular y revisar la clase de servicio." });
+  if (tit) hallazgos.push({ tipo: "titular", id: "sede", confianza: "alta", valor: null, prioridad: "ALTA", titulo: `Las cuentas de la sede tienen titulares distintos (${tit.valores.join(" / ")}).`, accion: "Confirmar que la cuenta vigente esté a nombre de la empresa (NIT); si no, solicitar el cambio de titular y revisar la clase de servicio." });
   const alumbrado = l.map((r) => ({ r, v: suma(r.cargos.filter((c) => /alumbrado/i.test(c.concepto)), (c) => c.valor) })).filter((x) => x.v > 0);
   if (alumbrado.length >= 2) {
     const min = Math.min(...alumbrado.map((x) => x.v)); const ult = alumbrado[alumbrado.length - 1];
-    if (ult.v > min * 1.5) hallazgos.push({ prioridad: "MEDIA", titulo: `El alumbrado público pasó de ${fmtMoneda(min)} a ${fmtMoneda(ult.v)} por período (${etiqueta(ult.r)}).`, accion: "Revisar con la secretaría de hacienda del municipio la tarifa que corresponde a la clase de servicio real." });
+    if (ult.v > min * 1.5) hallazgos.push({ tipo: "alumbrado", id: `r${ult.r.id}`, confianza: "media", valor: r2(ult.v - min), prioridad: "MEDIA", titulo: `El alumbrado público pasó de ${fmtMoneda(min)} a ${fmtMoneda(ult.v)} por período (${etiqueta(ult.r)}).`, accion: "Revisar con la secretaría de hacienda del municipio la tarifa que corresponde a la clase de servicio real.", reciboId: ult.r.id });
   }
-  for (const s of sinFactura) hallazgos.push({ prioridad: "MEDIA", titulo: `Recibo de ${s.mes} (${fmtMoneda(s.total)}) sin factura detallada.`, accion: `Conseguir la factura${s.factura ? ` ${s.factura}` : ""} para soporte contable y adjuntarla.${s.diferencia != null ? ` Su costo implícito (${fmtMoneda(s.implicito)} por ${unidad}) está ${fmtP(s.diferencia)} frente a los recibos con detalle.` : ""}`, reciboId: s.id });
-  if (credito) hallazgos.push({ prioridad: "MEDIA", titulo: `Crédito de conexión cobrado en el recibo: cuota ${fmtMoneda(credito.capital)} e interés ${fmtMoneda(credito.interes)}${credito.saldo ? ` (saldo ${fmtMoneda(credito.saldo)})` : ""}.`, accion: credito.tasaAnual != null ? `Tasa efectiva anual aproximada ${fmtN(credito.tasaAnual * 100, 1)} %: evaluar el prepago total.` : "Pedir a la empresa el saldo y la tasa del crédito para evaluar el prepago." });
+  for (const s of sinFactura) hallazgos.push({ tipo: "sin_factura", id: `r${s.id}`, confianza: "alta", valor: s.total, prioridad: "MEDIA", titulo: `Recibo de ${s.mes} (${fmtMoneda(s.total)}) sin factura detallada.`, accion: `Conseguir la factura${s.factura ? ` ${s.factura}` : ""} para soporte contable y adjuntarla.${s.diferencia != null ? ` Su costo implícito (${fmtMoneda(s.implicito)} por ${unidad}) está ${fmtP(s.diferencia)} frente a los recibos con detalle.` : ""}`, reciboId: s.id });
+  if (credito) hallazgos.push({ tipo: "credito", id: `r${conCredito.id}`, confianza: "media", valor: credito.saldo, prioridad: "MEDIA", titulo: `Crédito de conexión cobrado en el recibo: cuota ${fmtMoneda(credito.capital)} e interés ${fmtMoneda(credito.interes)}${credito.saldo ? ` (saldo ${fmtMoneda(credito.saldo)})` : ""}.`, accion: credito.tasaAnual != null ? `Tasa efectiva anual aproximada ${fmtN(credito.tasaAnual * 100, 1)} %: evaluar el prepago total.` : "Pedir a la empresa el saldo y la tasa del crédito para evaluar el prepago.", reciboId: conCredito.id });
   const promediadas = l.filter((r) => (r.tipoLectura === "promediada" || r.tipoLectura === "estimada") && !doble.casos.some((c) => c.reciboId === r.id));
-  if (promediadas.length) hallazgos.push({ prioridad: "MEDIA", titulo: `${promediadas.length} recibo(s) con lectura promediada o estimada (${promediadas.map(etiqueta).join(", ")}).`, accion: "Pedir la lectura real del medidor y la reliquidación si el consumo estimado fue mayor al real." });
-  for (const r of l.filter((x) => x.valorPagado != null && x.totalPagar > 0 && x.valorPagado > x.totalPagar * 1.5)) hallazgos.push({ prioridad: "BAJA", titulo: `Pago de más en ${etiqueta(r)}: se pagaron ${fmtMoneda(r.valorPagado)} por un recibo de ${fmtMoneda(r.totalPagar)}.`, accion: "Confirmar que el saldo a favor se compensó en los recibos siguientes y reforzar el control de pagos.", reciboId: r.id });
-  if (reactiva.length && !reactiva.some((x) => x.cobro)) hallazgos.push({ prioridad: "INFORMATIVO", titulo: `Energía reactiva por debajo del 50 % de la activa en ${reactiva.length} período(s): sin cobro.`, accion: `Factor de potencia mínimo ${fmtN(Math.min(...reactiva.map((x) => x.fp)), 3)}: monitorearlo.` });
+  if (promediadas.length) hallazgos.push({ tipo: "lectura_estimada", id: "grupo", confianza: "alta", valor: null, prioridad: "MEDIA", titulo: `${promediadas.length} recibo(s) con lectura promediada o estimada (${promediadas.map(etiqueta).join(", ")}).`, accion: "Pedir la lectura real del medidor y la reliquidación si el consumo estimado fue mayor al real.", porRecibo: promediadas.map((r) => ({ reciboId: r.id, mes: etiqueta(r), tipoLectura: r.tipoLectura, consumo: r.consumo, unidad, total: r.costoServicio, fechaExpedicion: r.fechaExpedicion, cuenta: r.numeroCuenta })) });
+  for (const r of l.filter((x) => x.valorPagado != null && x.totalPagar > 0 && x.valorPagado > x.totalPagar * 1.5)) hallazgos.push({ tipo: "pago_de_mas", id: `r${r.id}`, confianza: "alta", valor: r2(r.valorPagado - r.totalPagar), prioridad: "BAJA", titulo: `Pago de más en ${etiqueta(r)}: se pagaron ${fmtMoneda(r.valorPagado)} por un recibo de ${fmtMoneda(r.totalPagar)}.`, accion: "Confirmar que el saldo a favor se compensó en los recibos siguientes y reforzar el control de pagos.", reciboId: r.id });
+  if (reactiva.length && !reactiva.some((x) => x.cobro)) hallazgos.push({ tipo: "reactiva", id: "sede", confianza: "alta", valor: null, prioridad: "INFORMATIVO", titulo: `Energía reactiva por debajo del 50 % de la activa en ${reactiva.length} período(s): sin cobro.`, accion: `Factor de potencia mínimo ${fmtN(Math.min(...reactiva.map((x) => x.fp)), 3)}: monitorearlo.` });
   const orden = { URGENTE: 0, ALTA: 1, MEDIA: 2, BAJA: 3, INFORMATIVO: 4 };
   hallazgos.sort((a, b) => orden[a.prioridad] - orden[b.prioridad]);
 

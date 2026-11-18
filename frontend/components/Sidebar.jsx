@@ -115,6 +115,7 @@ const GRUPOS = {
       titulo: "Análisis",
       items: [
         { key: "consumo-auditoria", href: "/consumo/auditoria", label: "Auditoría y hallazgos", buscar: "Auditoría y hallazgos · Consumo", Icon: IconAlert, permite: (u) => !!u.consumo },
+        { key: "consumo-agentes", href: "/consumo/agentes", label: "Agentes", buscar: "Agentes de Nova · Recibos faltantes · Hallazgos · Reclamaciones · Consumo", Icon: IconSpark, permite: (u) => !!u.consumo },
       ],
     },
     {

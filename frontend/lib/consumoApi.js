@@ -43,3 +43,11 @@ export const urlSoporteConsumo = (id) => `/api/consumo/soportes/${id}`;
 // Análisis (filtros: sedeId, servicio, anio): Resumen ejecutivo y Auditoría y hallazgos del Excel del contador.
 export const conAnalisis = (filtros) => get(`/api/consumo/analisis?${qs(filtros)}`);
 export const conAuditoria = (filtros) => get(`/api/consumo/analisis/auditoria?${qs(filtros)}`);
+
+// Agentes (backend/lib/consumo/agentes.js y reclamaciones.js).
+export const conFaltantes = (filtros) => get(`/api/consumo/agentes/faltantes?${qs(filtros)}`);
+export const conHallazgos = (filtros) => get(`/api/consumo/agentes/hallazgos?${qs(filtros)}`);
+export const conRevisarHallazgos = (datos) => fetch("/api/consumo/agentes/hallazgos", json("POST", datos)).then(handle);
+export const conResolverHallazgo = (id, accion, nota) => fetch(`/api/consumo/agentes/hallazgos/${id}`, json("POST", { accion, nota })).then(handle);
+export const conGenerarReclamacion = (id) => fetch(`/api/consumo/agentes/hallazgos/${id}/reclamacion`, json("POST")).then(handle);
+export const conActualizarReclamacion = (id, datos) => fetch(`/api/consumo/agentes/hallazgos/${id}/reclamacion`, json("PATCH", datos)).then(handle);

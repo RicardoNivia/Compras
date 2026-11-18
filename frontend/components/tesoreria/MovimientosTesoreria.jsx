@@ -121,26 +121,32 @@ export default function MovimientosTesoreria({ acceso }) {
       {!correo && <>
       <div className={`table-card${cargando && data.items.length ? " tes-recargando" : ""}`}>
         <div className="table-scroll">
-          <table className="records tes-tabla">
+          {/* Compacta como Pagos programados: cabe sin scroll horizontal y el valor va justo después de la descripción.
+              Los textos largos se recortan con el globo al pasar el mouse; el tipo va corto (Sale / Entra). */}
+          <table className="records tes-tabla tes-tabla-compacta">
+            <colgroup>
+              <col style={{ width: 92 }} /><col /><col style={{ width: 150 }} /><col style={{ width: "13%" }} /><col style={{ width: "12%" }} />
+              <col style={{ width: "11%" }} /><col style={{ width: 70 }} /><col style={{ width: 104 }} /><col style={{ width: 64 }} />
+            </colgroup>
             <thead>
-              <tr><th>Fecha</th><th>Banco</th><th>Tipo</th><th>Descripción del banco</th><th>Concepto</th><th>Tercero</th><th style={{ textAlign: "right" }}>Valor</th><th>Pagos</th><th>Soporte</th></tr>
+              <tr><th>Fecha</th><th>Descripción del banco</th><th className="num">Valor</th><th>Concepto</th><th>Tercero</th><th>Banco</th><th>Tipo</th><th>Pagos</th><th className="num">Soporte</th></tr>
             </thead>
             <tbody>
               {cargando && !data.items.length && Array.from({ length: 8 }).map((_, i) => (
-                <tr key={`esq-${i}`} aria-hidden="true">{Array.from({ length: 9 }).map((__, j) => <td key={j}><div className="skeleton-bar" style={{ height: 12, borderRadius: 6, width: j === 3 ? 180 : 70 }} /></td>)}</tr>
+                <tr key={`esq-${i}`} aria-hidden="true">{Array.from({ length: 9 }).map((__, j) => <td key={j}><div className="skeleton-bar" style={{ height: 12, borderRadius: 6, width: j === 1 ? "80%" : "70%" }} /></td>)}</tr>
               ))}
               {!cargando && !data.items.length && <tr><td colSpan={9}><EstadoVacio titulo="No hay movimientos aquí" accion={puedeRegistrar && cat?.bancos.length ? <button type="button" className="btn btn-primary" onClick={() => setModal({ tipo: "extracto" })}>Subir extracto o movimientos</button> : !cat?.bancos.length ? <a className="btn btn-primary" href="/tesoreria/importar">Importar la plantilla</a> : null}>Sube el extracto del banco, registra un movimiento o importa la plantilla de flujo de caja. Si filtraste, prueba con otro período.</EstadoVacio></td></tr>}
               {data.items.map((m) => (
                 <tr key={m.id} className="clickable" onClick={() => setModal({ tipo: "detalle", id: m.id })}>
                   <td title={m.fechaAproximada ? "La fecha del Excel estaba dañada: solo se sabe el mes" : undefined}>{fechaCorta(m.fecha)}{m.fechaAproximada ? " *" : ""}</td>
-                  <td>{m.banco}</td>
-                  <td><span className={`pill ${m.tipo === "debito" ? "critical" : "good"}`}>{m.tipoTexto}</span></td>
-                  <td><Celda v={m.descripcion} ancha /></td>
+                  <td><Celda v={m.descripcion} /></td>
+                  <td className="num"><span className={`tes-num ${m.tipo === "debito" ? "tes-neg" : "tes-pos"}`}><strong>{m.tipo === "debito" ? "−" : "+"}{m.valorTexto}</strong></span></td>
                   <td><Celda v={m.concepto} /></td>
                   <td><Celda v={m.tercero} /></td>
-                  <td style={{ textAlign: "right" }}><span className={`tes-num ${m.tipo === "debito" ? "tes-neg" : "tes-pos"}`}><strong>{m.tipo === "debito" ? "−" : "+"}{m.valorTexto}</strong></span></td>
-                  <td>{m.pagos === 0 ? <span className="pill warning">Sin asociar</span> : Math.abs(m.sinAsignar) > 0.5 ? <span className="pill secondary" title={`Faltan ${m.sinAsignarTexto} por asignar`}>{m.pagos} · parcial</span> : <span className="pill good">{m.pagos} pago(s)</span>}</td>
-                  <td>{m.soportes ? `${m.soportes} archivo(s)` : <span className="muted">—</span>}</td>
+                  <td><Celda v={m.banco} /></td>
+                  <td><span className={`pill ${m.tipo === "debito" ? "critical" : "good"}`} title={m.tipoTexto}>{m.tipo === "debito" ? "Sale" : "Entra"}</span></td>
+                  <td>{m.pagos === 0 ? <span className="pill warning">Sin asociar</span> : Math.abs(m.sinAsignar) > 0.5 ? <span className="pill secondary" title={`Faltan ${m.sinAsignarTexto} por asignar`}>{m.pagos} · parcial</span> : <span className="pill good" title={`${m.pagos} pago(s) asociado(s)`}>{m.pagos} pago{m.pagos === 1 ? "" : "s"}</span>}</td>
+                  <td className="num" title={m.soportes ? `${m.soportes} archivo(s) de soporte` : "Sin soporte"}>{m.soportes || <span className="muted">—</span>}</td>
                 </tr>
               ))}
             </tbody>

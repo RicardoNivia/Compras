@@ -1,4 +1,5 @@
 import { accesoDe } from "@/lib/tesoreria/comun";
+import { accesoConsumo } from "@/lib/consumo/comun";
 import { getSessionUser } from "@/lib/auth-server";
 import { isRoleAllowed } from "@/lib/permissions";
 import { logAgentViolation } from "@/lib/audit";
@@ -27,9 +28,9 @@ const MAX_CHARS_MENSAJE_VIEJO = 1500;
 // miles de tokens que se repetiría en cada mensaje de cada conversación —
 // cachearlo (idéntico entre usuarios con el mismo combo de permisos) evita
 // pagar ese costo de nuevo en cada llamada.
-const NUMEROS_TEXTO = ["", "UNA", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO"];
+const NUMEROS_TEXTO = ["", "UNA", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
 
-function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar, canSeeTesoreria = false) {
+function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar, canSeeTesoreria = false, canSeeConsumo = false) {
   const sourceList = [
     "Los datos transaccionales de compras (registros de solicitudes) — se consultan con las herramientas \"resumen_compras\" (cifras exactas/agregadas) y \"buscar_registros\" (registros puntuales). Lo que le toca hacer HOY a quien te escribe (pendientes según su rol: compras por legalizar o radicar, solicitudes atrasadas, proveedores por actualizar, etc.) se consulta con \"mis_pendientes\" — úsala ante \"¿qué me toca hoy?\" o \"¿por dónde empiezo?\" y prioriza primero lo urgente. Las valoraciones de Nova de las compras radicadas (puntaje de la compra y del proveedor, y por qué se calificó así) se consultan con \"consultar_valoraciones\"; los PARÁMETROS con los que se califican compras y proveedores están en la guía (C), sección 9 — explícalos con esa sección, y para el porqué de un puntaje concreto cita la valoración guardada.",
     `El texto de referencia de "${PROCUREMENT_POLICY_TITLE}" — el procedimiento oficial de compras de la compañía (roles y responsabilidades, plazos, umbrales de cuadro comparativo, debida diligencia, aprobaciones por monto, flujo de actividades, etc.). Se consulta por secciones con la herramienta "consultar_referencia" (documento "procedimiento"); su índice está más abajo.`,
@@ -51,14 +52,18 @@ function buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSee
     sourceList.push(`El módulo de Tesorería (las finanzas que antes se llevaban en el Excel «Flujo de Caja»): movimientos reales de cada banco (débitos = sale, créditos = entra), pagos programados (estado P pendiente / E pagado, con ítem/propiedad, concepto, medio de pago y quién paga; tipos I ingreso, E egreso, J jornal (suma según su signo), S saldo y T traslado; I, E y J suman en ingresos y egresos, S y T no), gastos periódicos, la asociación movimiento ↔ pago y el saldo de cada banco anclado a sus extractos. Quien te pregunta es como el gerente que administra estas finanzas: respóndele directo y concreto. Qué herramienta usar: «¿qué tengo que pagar hoy / esta semana / la próxima / este mes?», «¿qué pagos tengo pendientes?», «¿qué se pagó la semana pasada?» → agenda_pagos_tesoreria con el periodo (las fechas las calcula el servidor, NUNCA las calcules tú; para «¿qué tengo pendiente?» sin período usa periodo pendientes_al_fin_de_mes con estado pendientes y separa lo VENCIDO de lo que está POR VENCER (no sumes dos consultas que se cruzan); «¿qué se pagó…?» va con estado pagados (por el día en que se pagó)). «¿Ya se pagó el gas de Bahía?», «¿cuándo se pagó X?» → estado_pago_tesoreria (di si está pagado, cuándo y con qué movimiento del banco; si está pendiente o vencido, dilo con la fecha). «¿Cuánto ha salido de AV Villas hasta hoy?», «dame el detalle/reporte de la cuenta X» → reporte_banco_tesoreria (por defecto del 1 de enero a hoy). «¿Cuánta plata tengo?», «saldo de X» → saldos_hoy_tesoreria. «Dame el soporte del pago X» → soporte_pago_tesoreria y entrega cada soporte como enlace Markdown [nombre](enlace) tal cual. Cifras del mes, vencidos y próximos → resumen_tesoreria; listas con filtros → buscar_pagos_tesoreria y buscar_movimientos_tesoreria; saldo mes a mes → saldos_bancos_tesoreria. SALDOS: un saldo solo es real si está confirmado con el extracto del banco. Si al banco le falta el extracto de un mes ya cerrado, di claramente que NO es posible conocer el saldo real de ese banco (ni el total) hasta subir el extracto, y da la estimación como estimación: el último saldo confirmado (o el saldo inicial) más y menos los movimientos registrados después, diciendo desde qué fecha. Si el saldo está confirmado por un extracto que llega a una fecha anterior a hoy, dilo así: «confirmado al <fecha del extracto>» y que de ahí a hoy es estimado; nunca pongas solo «✓ confirmado» junto a la palabra estimación. Di siempre el período exacto que consultaste (las herramientas lo devuelven). Es información confidencial: úsala solo para responder a quien pregunta. El dinero va SIEMPRE con su código de moneda ISO 4217 (p. ej. «COP 1.234.567»), tal como lo devuelven las herramientas. Tú no registras ni cambias nada: para registrar un movimiento, asociar o crear pagos, indica Tesorería › Movimientos, Pagos programados o Agentes; para recibir avisos (cuando se pague algo, cada lunes a las 8…) indica Alertas y notificaciones › Mis notificaciones, donde se configuran escribiéndolos.`);
 
   }
+  if (canSeeConsumo) {
+    sourceList.push(`El módulo de Consumo (servicios públicos por sede: energía, acueducto y alcantarillado, gas y aseo): cada sede tiene cuentas de servicio con su empresa (Enel, Acueducto de Bogotá, Vanti…) y recibos por período con consumo, cargos, total a pagar, pago oportuno y estado de pago (por pagar, pagado, saldo a favor; «vencido» = por pagar con el pago oportuno ya pasado). El mes de un recibo es el de reporte (el del fin del período). El aseo llega dentro del recibo de energía y no suma al costo de la energía. Qué herramienta usar: gasto, consumo, comparaciones entre sedes, servicios o meses → resumen_consumo; recibos puntuales, por pagar, vencidos, con lectura estimada, «¿ya llegó el recibo de X?» → buscar_recibos_consumo; «¿qué recibos faltan?» → recibos_faltantes_consumo; problemas, cobros raros, qué reclamar → hallazgos_consumo (trae prioridad, confianza, plata en juego, qué hacer y si ya hay reclamación). Si no encuentras una sede, la herramienta devuelve las sedes disponibles: pregunta cuál. El dinero va SIEMPRE con su código ISO 4217 (p. ej. «COP 1.234.567»), tal como lo devuelven las herramientas. Tú no registras ni cambias nada: para subir recibos indica Consumo › Subir recibos; para resolver hallazgos o pedir a Nova el borrador de una reclamación, Consumo › Agentes.`);
+  }
   const restricciones = [];
+  if (!canSeeConsumo) restricciones.push("Consumo (servicios públicos por sede: recibos, consumos y hallazgos)");
   if (!canSeeProveedoresGestion) restricciones.push("gestión de proveedores");
   if (!canSeePresupuesto) restricciones.push("presupuesto");
   if (!canSeeAuditoria) restricciones.push("auditoría");
   if (!canSeeBienestar) restricciones.push("Bienestar y Fundación");
   if (!canSeeTesoreria) restricciones.push("Tesorería (bancos, cuentas, saldos, pagos programados, movimientos y soportes)");
 
-  const letras = "ABCDEFGH";
+  const letras = "ABCDEFGHI";
   const fuentesTexto = sourceList.map((s, i) => `${letras[i]}) ${s}`).join("\n");
   const fuentes = `Tienes acceso a ${NUMEROS_TEXTO[sourceList.length] || sourceList.length} fuentes de información:
 ${fuentesTexto}${restricciones.length ? `\nEl tema de ${restricciones.join(", de ")} es exclusivo de quien tenga ese permiso: si te preguntan por eso, aclara que esa información no está disponible para su rol (y no verás esas herramientas en tu lista).` : ""}`;
@@ -200,6 +205,8 @@ export async function POST(request) {
   const canSeeBienestar = (await Promise.all(["viewBienestar", "viewFundacion", "viewDashboardBienestar", "viewDashboardFundacion"].map((f) => isRoleAllowed(user.role, f)))).some(Boolean);
   // Tesorería: acceso nominal (no por rol). Sus herramientas nunca van al servidor MCP.
   const canSeeTesoreria = !!(await accesoDe(user));
+  // Consumo: por rol en la Matriz (verConsumo…). Sus herramientas tampoco van al servidor MCP.
+  const canSeeConsumo = !!(await accesoConsumo(user));
 
   const body = await request.json().catch(() => ({}));
   const message = (body.message || "").toString().trim();
@@ -250,10 +257,10 @@ export async function POST(request) {
   const jobId = createJob(async () => {
     let fullText = "";
     try {
-      const tools = buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar, canSeeTesoreria });
+      const tools = buildToolDefs({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar, canSeeTesoreria, canSeeConsumo });
       const executeTool = buildToolExecutor({ canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, user });
       for await (const chunk of streamChatCascade({
-        staticPrefix: buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar, canSeeTesoreria),
+        staticPrefix: buildStaticInstructionPrefix(canSeePresupuesto, canSeeAuditoria, canSeeProveedoresGestion, canSeeBienestar, canSeeTesoreria, canSeeConsumo),
         systemInstruction: buildDynamicInstructionSuffix(user, section, contexto),
         contents,
         tools,

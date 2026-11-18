@@ -2,7 +2,7 @@
 
 Servicios públicos por sede (energía, acueducto y alcantarillado, gas y aseo). Módulo **independiente** de Compras, Bienestar y Tesorería: tablas, permisos, maestros y menú propios; no cruza pagos con Tesorería (decisión del usuario, noviembre de 2026: «por ahora debe quedar aparte de todo»). Las convenciones generales siguen en `CLAUDE.md`.
 
-Se construye por fases. **Hechas: fase 1 (base), fase 2 (recibos a mano) y fase 3 (subir con Nova).** Pendientes: · 4 dashboard y ficha de sede · 5 análisis y reportes · 6 herramientas de Nova. El mockup aprobado (6 pantallas) está en el artifact «Módulo Consumo · mockup».
+Se construye por fases. **Hechas: fase 1 (base), fase 2 (recibos a mano), fase 3 (subir con Nova), dashboard y auditoría del contador, y agentes + herramientas de Nova (ver «Agentes»).** Pendiente: ficha de sede y reportes. El mockup aprobado (6 pantallas) está en el artifact «Módulo Consumo · mockup».
 
 ## Acceso
 
@@ -39,6 +39,17 @@ Se construye por fases. **Hechas: fase 1 (base), fase 2 (recibos a mano) y fase 
 - La pantalla lee los archivos de a uno; **«Guardar recibo» está deshabilitado hasta que la persona confirma la sede** («Sí, asociar a esta sede» o elegir otra). Al guardar llama a `POST /recibos` con `origen: "nova"`, `historial` y `extras`, y adjunta el archivo como soporte. Una cuenta nueva queda creada en la sede elegida con la dirección del recibo.
 - **Modelo propio para leer recibos: `CONSUMO_MODELO_RECIBOS`, por defecto `claude-sonnet-4-6`** (`lectura.js#leerConModelo`). Probado en noviembre de 2026: Claude Haiku 4.5 (el modelo de la app) **inventa** cuenta, consumo y total en los escaneados girados de Enel, con cifras que cuadran entre sí y pasan las comprobaciones; Sonnet 4.6 los lee bien. Si la clave no permite ese modelo (401/403/404) o no responde, cae al de la app y agrega una duda «compara las cifras con el archivo». **Antes de desplegar, confirmar que la clave de producción permite `claude-sonnet-4-6`** (el intento del 2026-11-05 con Opus/Sonnet en producción dio 401). Costo aproximado: USD 0,05–0,08 por recibo.
 - `anthropic.js#generateAnthropicJson` acepta una frase antes o después del JSON (Sonnet a veces la escribe).
+
+## Agentes (`lib/consumo/agentes.js`, `reclamaciones.js`, `novaConsumo.js`, página `/consumo/agentes`, `AgentesConsumo.jsx`)
+
+Mismo diseño que los agentes de Compras, Bienestar y Tesorería (ag-hero, ag-selector, CabezaAgente, tarjetas `ag-propuesta conf-*`). Migración `consumo_agentes` (columnas nuevas en `consumo_hallazgos`).
+
+- **Recibos faltantes** (`recibosFaltantes`, `GET /api/consumo/agentes/faltantes`, sin IA, no se guarda): por cuenta activa (no «no aplica», sede activa) el largo del período es la mediana de los días de sus recibos (sin datos, la periodicidad). Tipos: `atrasado` (cerró al menos un período y pasaron `GRACIA_DIAS` = 20 días), `hueco` (entre dos recibos quedó medio período o más), `sin_recibos`, `reemplazada` (otra cuenta del mismo servicio en la sede siguió recibiendo recibos: cambio de cuenta o medidor, como Mesa de Yeguas; solo sugiere desactivarla, no es un faltante).
+- **Hallazgos** (`revisarHallazgos`, `GET/POST /api/consumo/agentes/hallazgos`, `POST /hallazgos/{id}` resolver | descartar (nota obligatoria) | reabrir): corre `analisis.js#auditoria(filtro, precargados)` en cada sede y servicio (sin aseo; lo INFORMATIVO se queda en la auditoría), separa la lectura estimada por recibo y suma anomalías del último año frente a los (hasta 6) recibos anteriores: `consumo_alto` (consumo/día ≥ +30 % y > 2 desviaciones) y `costo_unidad` (≥ +20 %). Cada hallazgo se guarda una vez por `clave` (`tipo|s{sede}|{servicio}|{id}`) con `nivel` (urgente/alta/media/baja), `confianza` y `valor` en juego; si deja de cumplirse se cierra solo (`resueltoPorNombre` «Nova · agente de hallazgos: ya no aplica») y se reabre si vuelve; lo que cerró una persona no se reabre. Corre al pedirlo, 2,5 s después de crear/editar/pagar/borrar un recibo (solo esa sede y servicio, `recibos.js#revisarDespues`) y, si la última revisión completa fue hace más de 6 h, al listar.
+- **Reclamaciones** (`POST/PATCH /api/consumo/agentes/hallazgos/{id}/reclamacion`): para los tipos de `RECLAMABLES` (todos menos `vencido`) Nova (`generateStructuredJson`, sin caché) redacta la carta solo con los datos de la base y cita solo los artículos de la Ley 142 de 1994 de `NORMAS`; lo que no sabe va entre corchetes y en `datosFaltantes`. Se edita, se copia o descarga (.txt) y se marca radicada con número y fecha. Nada se envía desde la app.
+- **Mi día**: secciones `conFaltantes` (atrasados y huecos recientes) y `conHallazgos` (abiertos urgentes y altos), `roles: ["*"]` + `verConsumo`, dominio `consumo`.
+- **Nova** (`novaConsumo.js`): `resumen_consumo`, `buscar_recibos_consumo`, `recibos_faltantes_consumo`, `hallazgos_consumo`; solo con `accesoConsumo`, re-chequeado en cada llamada, nunca en el MCP. El moderador reconoce Consumo como tema.
+- Permisos: consultar = consulta; revisar, resolver y reclamaciones = registro. Auditoría: `hallazgoConsumo`, `agenteHallazgosConsumo` (cada revisión que crea, cierra o reabre algo, y toda revisión a pedido) y `reclamacionConsumo`.
 
 ## Carga inicial en producción (`backend/prisma/consumo-inicial/`)
 
